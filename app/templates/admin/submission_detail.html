@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}{{ dept.dept_name }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">
+        <a href="{{ url_for('admin.submissions') }}">Submissions</a> <span>›</span>
+        {{ dept.campus }} <span>›</span> {{ dept.school }}
+      </div>
+      <h1>{{ dept.dept_name }}</h1>
+      <p>{{ dept.dept_code }} · HoD {{ dept.hod_name or '—' }} · {{ dept.hod_email or '' }}</p>
+    </div>
+    <div class="spacer" style="text-align:right">
+      <div class="flex" style="justify-content:flex-end">
+        <div class="bar" style="width:160px"><i style="width:{{ progress.percent }}%"></i></div>
+        <span class="bar-label">{{ progress.done }} / {{ progress.total }}</span>
+      </div>
+      <div class="flex mt-1" style="justify-content:flex-end">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Excel</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set ns = namespace(group=None) %}
+{% for s in board %}
+  {% if s.group != ns.group %}{% set ns.group = s.group %}<div class="group-label">{{ s.group }}</div>{% endif %}
+
+  <div class="card mb-1">
+    <div class="card-head">
+      <span class="stage-num">{{ loop.index }}</span>
+      <div>
+        <h3 style="margin:0;font-size:1rem">{{ s.title }}</h3>
+        <span class="small muted">{{ s.blurb }}</span>
+      </div>
+      <span class="spacer flex">
+        {% if s.errors %}<span class="pill pill-err">{{ s.errors }} errors</span>{% endif %}
+        {% if s.warnings %}<span class="pill pill-warn">{{ s.warnings }} warnings</span>{% endif %}
+        {% if s.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
+        {% elif s.status == 'returned' %}<span class="pill pill-err">Returned</span>
+        {% elif s.status == 'draft' %}<span class="pill pill-warn">In progress</span>
+        {% elif s.status == 'locked' %}<span class="pill pill-lock">Locked</span>
+        {% else %}<span class="pill pill-gold">Open</span>{% endif %}
+      </span>
+    </div>
+
+    {% set state = submission.stages.get(s.key, {}) %}
+    {% if state.data or s.status in ('submitted','returned','locked') %}
+    <div class="card-body tight">
+      <div class="flex flex-wrap small muted">
+        {% if s.submitted_at %}<span>Submitted {{ s.submitted_at.strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
+        {% if s.returned_note %}<span style="color:var(--err)">Returned: {{ s.returned_note }}</span>{% endif %}
+        <span class="spacer"></span>
+
+        {% if s.status == 'locked' %}
+        <form method="post" action="{{ url_for('admin.submission_unlock', dept_code=dept.dept_code, stage_key=s.key) }}">
+          <button class="btn btn-ghost btn-sm" type="submit">Open this stage anyway</button>
+        </form>
+        {% elif s.status == 'submitted' %}
+        <details>
+          <summary class="btn btn-ghost btn-sm" style="display:inline-flex">Send back</summary>
+          <form method="post" class="mt-1"
+                action="{{ url_for('admin.submission_return', dept_code=dept.dept_code, stage_key=s.key) }}">
+            <textarea name="note" rows="2" placeholder="What must the department correct?" required
+                      style="min-width:340px"></textarea>
+            <button class="btn btn-danger btn-sm mt-1" type="submit">Return for correction</button>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+
+      {% if state.data %}
+      <details class="mt-1">
+        <summary class="small" style="cursor:pointer;color:var(--navy-600)">View what was submitted</summary>
+        <div class="mt-1" style="max-height:420px;overflow:auto">
+          {% for section in STAGE_BY_KEY[s.key].sections %}
+            {% set payload = state.data.get(section.key) %}
+            {% if payload %}
+            <h4 class="small" style="margin:14px 0 6px">{{ section.title }}</h4>
+            {% if payload is mapping %}
+              <table class="data">
+                {% for k, v in payload.items() %}
+                <tr><td class="small" style="width:240px;color:var(--ink-soft)">{{ k }}</td>
+                    <td class="small">{{ v if v is not mapping else v.get('name', v) }}</td></tr>
+                {% endfor %}
+              </table>
+            {% elif payload is iterable %}
+              <div class="table-wrap">
+                <table class="data">
+                  <thead><tr>{% for c in section.columns %}<th>{{ c.label }}</th>{% endfor %}</tr></thead>
+                  <tbody>
+                    {% for row in payload %}
+                    <tr>{% for c in section.columns %}
+                      <td class="small">{{ row.get(c.name) if row.get(c.name) is not mapping else row.get(c.name).get('name','') }}</td>
+                    {% endfor %}</tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+            {% endif %}
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+
+      {% if state.issues %}
+      <details class="mt-1">
+        <summary class="small" style="cursor:pointer;color:var(--err)">
+          {{ state.issues|length }} validation note(s)
+        </summary>
+        <div class="issues mt-1">
+          {% for i in state.issues %}
+          <div class="issue {{ i.level }}">{{ i.message }}</div>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+{% endfor %}
+
+{% if submission.programmes %}
+<div class="group-label">Per-programme records</div>
+{% for code, stages in submission.programmes.items() %}
+<div class="card mb-1">
+  <div class="card-head"><h3 style="font-size:1rem">{{ code }}</h3>
+    <span class="spacer small muted">{{ stages|length }} stage record(s)</span></div>
+  <div class="card-body tight">
+    {% for skey, st in stages.items() %}
+    <div class="flex small" style="padding:6px 0;border-bottom:1px solid var(--line)">
+      <span>{{ STAGE_BY_KEY[skey].title if skey in STAGE_BY_KEY else skey }}</span>
+      <span class="spacer"></span>
+      {% if st.summary and st.summary.errors %}<span class="pill pill-err">{{ st.summary.errors }} errors</span>{% endif %}
+      <span class="pill {{ 'pill-ok' if st.status == 'submitted' else 'pill-warn' }}">{{ st.status }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

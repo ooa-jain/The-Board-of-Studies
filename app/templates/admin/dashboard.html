@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Admin dashboard{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">Office of Academics</div>
+      <h1>Board of Studies — {{ year }}</h1>
+      <p>Where every department stands, across Bengaluru and Kochi.</p>
+    </div>
+    <div class="spacer flex">
+      <a class="btn btn-ghost" href="{{ url_for('admin.export_institution') }}">Export institution Excel</a>
+      <a class="btn" href="{{ url_for('admin.import_departments') }}">Import departments</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-4 mb-2">
+  <div class="stat"><div class="n">{{ total }}</div><div class="l">Departments</div><div class="sub">active</div></div>
+  <div class="stat"><div class="n">{{ counts.complete }}</div><div class="l">Complete</div><div class="sub">all stages submitted</div></div>
+  <div class="stat"><div class="n">{{ counts.in_progress }}</div><div class="l">In progress</div><div class="sub">started, not finished</div></div>
+  <div class="stat"><div class="n">{{ counts.not_started }}</div><div class="l">Not started</div><div class="sub">no stage submitted</div></div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h3>By campus</h3></div>
+    <div class="card-body">
+      {% for campus, c in by_campus.items() %}
+      <div class="flex mb-1">
+        <strong style="width:110px">{{ campus }}</strong>
+        <div class="bar" style="flex:1"><i style="width:{{ (c.complete * 100 / c.total)|round if c.total else 0 }}%"></i></div>
+        <span class="bar-label nowrap">{{ c.complete }} / {{ c.total }}</span>
+      </div>
+      {% else %}
+      <p class="muted small">No departments registered yet. Import the contact directory to get started.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Stage completion</h3></div>
+    <div class="card-body" style="max-height:300px;overflow:auto">
+      {% for s in stage_counts %}
+      <div class="flex mb-1">
+        <span class="small" style="width:180px;color:var(--ink-soft)">{{ s.title }}</span>
+        <div class="bar" style="flex:1"><i style="width:{{ (s.done * 100 / s.total)|round if s.total else 0 }}%"></i></div>
+        <span class="bar-label nowrap">{{ s.done }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card mt-2">
+  <div class="card-head">
+    <h3>Departments</h3>
+    <span class="spacer"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.departments') }}">Manage</a></span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th>Department</th><th>School</th><th>Campus</th><th>HoD</th><th style="width:190px">Progress</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>
+              <strong>{{ r.dept.dept_name }}</strong>
+              <div class="small muted mono">{{ r.dept.dept_code }}</div>
+            </td>
+            <td class="small">{{ r.dept.school }}</td>
+            <td><span class="pill">{{ r.dept.campus }}</span></td>
+            <td class="small">{{ r.dept.hod_name or '—' }}</td>
+            <td>
+              <div class="flex">
+                <div class="bar" style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
+                <span class="bar-label nowrap">{{ r.progress.done }}/{{ r.progress.total }}</span>
+              </div>
+            </td>
+            <td class="right">
+              <a class="btn btn-ghost btn-sm"
+                 href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="empty">
+            <div class="big">◇</div>
+            No departments yet.
+            <div class="mt-1"><a class="btn btn-sm" href="{{ url_for('admin.import_departments') }}">Import the contact directory</a></div>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>Recent activity</h3>
+    <span class="spacer"><a class="small" href="{{ url_for('admin.audit_log') }}">Full log</a></span></div>
+  <div class="card-body" style="padding:0">
+    <table class="data">
+      <tbody>
+        {% for e in recent %}
+        <tr>
+          <td class="small mono" style="width:150px">{{ e.at.strftime('%d %b %H:%M') }}</td>
+          <td class="small">{{ e.actor }}</td>
+          <td class="small"><span class="pill">{{ e.action }}</span></td>
+          <td class="small muted">{{ e.target }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

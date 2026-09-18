@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ dept.dept_name }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">{{ dept.campus }} <span>›</span> {{ dept.school }}</div>
+      <h1>{{ dept.dept_name }}</h1>
+      <p>Board of Studies submission for {{ year }}. Stages open in order — finish one to unlock the next.</p>
+    </div>
+    <div class="spacer" style="text-align:right">
+      <div class="flex" style="justify-content:flex-end;gap:14px">
+        <div class="bar" style="width:170px"><i style="width:{{ progress.percent }}%"></i></div>
+        <span class="bar-label">{{ progress.done }} / {{ progress.total }} stages</span>
+      </div>
+      <div class="flex mt-1" style="justify-content:flex-end">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.change_password') }}">Password</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if submission.status == 'sealed' %}
+<div class="alert alert-success">
+  <div>
+    <strong>This submission is complete and sealed.</strong>
+    The Office of Academics has the full record for {{ year }}. Contact them if anything needs reopening.
+  </div>
+</div>
+{% endif %}
+
+{% set returned = board|selectattr('status','equalto','returned')|list %}
+{% if returned %}
+<div class="alert alert-warning">
+  <div>
+    <strong>{{ returned|length }} stage(s) sent back for correction.</strong>
+    {% for r in returned %}<div class="small mt-1">“{{ r.title }}” — {{ r.returned_note }}</div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="grid grid-4 mb-2">
+  <div class="stat">
+    <div class="n">{{ progress.done }}</div><div class="l">Stages submitted</div>
+    <div class="sub">of {{ progress.total }}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ board|selectattr('can_open')|list|length }}</div><div class="l">Open now</div>
+    <div class="sub">ready to fill</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ programmes|length }}</div><div class="l">Programmes</div>
+    <div class="sub">{{ 'entered' if programmes else 'not yet entered' }}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ board|sum(attribute='errors') }}</div><div class="l">Open errors</div>
+    <div class="sub">across all stages</div>
+  </div>
+</div>
+
+{% set ns = namespace(group=None) %}
+<div class="stage-list">
+  {% for s in board %}
+    {% if s.group != ns.group %}
+      {% set ns.group = s.group %}
+      <div class="group-label">{{ s.group }}</div>
+    {% endif %}
+    <div class="stage-row {{ s.status }}">
+      <span class="stage-num">{{ loop.index }}</span>
+      <div class="stage-info">
+        <strong>{{ s.title }}</strong>
+        <span>{{ s.blurb }}</span>
+        {% if s.source_templates %}
+        <span class="small" style="color:var(--gold-600);margin-top:3px">
+          Replaces {{ s.source_templates|length }} template{{ 's' if s.source_templates|length > 1 }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="stage-actions">
+        {% if s.errors %}<span class="pill pill-err">{{ s.errors }} to fix</span>{% endif %}
+        {% if s.warnings and not s.errors %}<span class="pill pill-warn">{{ s.warnings }} to check</span>{% endif %}
+
+        {% if s.status == 'submitted' %}
+          <span class="pill pill-ok">Submitted</span>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">View</a>
+        {% elif s.status == 'locked' %}
+          <span class="pill pill-lock">Locked</span>
+        {% elif s.status == 'returned' %}
+          <span class="pill pill-err">Returned</span>
+          <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Correct</a>
+        {% elif s.status == 'draft' %}
+          <span class="pill pill-warn">In progress</span>
+          <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Continue</a>
+        {% else %}
+          <a class="btn btn-gold btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Start</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

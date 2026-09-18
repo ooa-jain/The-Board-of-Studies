@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Departments{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Departments</div>
+      <h1>Department master</h1>
+      <p>Click a department to generate its login. The username is the department code; the password
+         is generated here and shown once until the department signs in.</p>
+    </div>
+    <div class="spacer flex flex-wrap">
+      <a class="btn btn-ghost" href="{{ url_for('admin.credential_sheet') }}">Credential sheet</a>
+      <form method="post" action="{{ url_for('admin.bulk_credentials') }}" style="display:inline">
+        <button class="btn btn-ghost" type="submit">Generate all missing logins</button>
+      </form>
+      <a class="btn btn-ghost" href="{{ url_for('admin.import_departments') }}">Import from Excel</a>
+      <a class="btn" href="{{ url_for('admin.department_form') }}">Add department</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-2">
+  <div class="card-body tight">
+    <form class="flex flex-wrap" method="get">
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="Search name, code or HoD" style="max-width:280px">
+      <select name="campus" style="max-width:170px">
+        <option value="">All campuses</option>
+        {% for c in campuses %}<option value="{{ c }}" {{ 'selected' if filters.campus == c }}>{{ c }}</option>{% endfor %}
+      </select>
+      <select name="school" style="max-width:260px">
+        <option value="">All schools</option>
+        {% for s in schools %}<option value="{{ s }}" {{ 'selected' if filters.school == s }}>{{ s }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Filter</button>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.departments') }}">Clear</a>
+      <span class="spacer small muted">{{ departments|length }} shown</span>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Department</th><th>School</th><th>Campus</th><th>HoD</th>
+            <th>Login</th><th>Password</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in departments %}
+          <tr {{ 'style=opacity:.5' if not d.active }}>
+            <td>
+              <strong>{{ d.dept_name }}</strong>
+              <div class="small muted mono">{{ d.dept_code }}</div>
+            </td>
+            <td class="small">{{ d.school }}</td>
+            <td><span class="pill">{{ d.campus }}</span></td>
+            <td class="small">
+              {{ d.hod_name or '—' }}
+              {% if d.hod_email %}<div class="small muted">{{ d.hod_email }}</div>{% endif %}
+            </td>
+            <td class="mono small">{{ d.username or '—' }}</td>
+            <td>
+              {% if d.initial_password %}
+                <span class="mono small" data-pw="{{ d.initial_password }}">{{ d.initial_password }}</span>
+                <button class="copy-btn" type="button"
+                        onclick="navigator.clipboard.writeText('{{ d.username }}\t{{ d.initial_password }}');this.textContent='Copied';this.classList.add('done')">Copy</button>
+              {% elif d.username %}
+                <span class="pill pill-ok">Signed in</span>
+              {% else %}
+                <span class="muted small">Not generated</span>
+              {% endif %}
+            </td>
+            <td class="right nowrap">
+              <form method="post" style="display:inline"
+                    action="{{ url_for('admin.generate_credentials', dept_code=d.dept_code) }}">
+                <button class="btn btn-ghost btn-sm" type="submit">
+                  {{ 'Reset' if d.username else 'Generate' }}
+                </button>
+              </form>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.department_form', dept_code=d.dept_code) }}">Edit</a>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=d.dept_code) }}">Record</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty">
+            <div class="big">◇</div>No departments match.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

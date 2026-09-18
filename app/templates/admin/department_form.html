@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if dept else 'Add' }} department{% endblock %}
+{% block content %}
+<div class="card" style="max-width:720px;margin:24px auto">
+  <div class="card-head"><h3>{{ 'Edit ' + dept.dept_name if dept else 'Add a department' }}</h3></div>
+  <div class="card-body">
+    <form method="post">
+      <div class="fields-grid">
+        <div class="field">
+          <label>Department name<span class="req">*</span></label>
+          <input type="text" name="dept_name" required value="{{ dept.dept_name if dept else '' }}">
+        </div>
+        <div class="field">
+          <label>Department code<span class="req">*</span></label>
+          <input type="text" name="dept_code" required value="{{ dept.dept_code if dept else '' }}"
+                 pattern="[A-Za-z0-9\-/]{2,20}" style="text-transform:uppercase">
+          <span class="help">Becomes the login username. Letters, numbers, hyphen or slash.</span>
+        </div>
+        <div class="field">
+          <label>School / Faculty<span class="req">*</span></label>
+          <input type="text" name="school" required value="{{ dept.school if dept else '' }}">
+        </div>
+        <div class="field">
+          <label>Campus<span class="req">*</span></label>
+          <select name="campus" required>
+            {% for c in campuses %}
+            <option value="{{ c }}" {{ 'selected' if dept and dept.campus == c }}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Head of the Department</label>
+          <input type="text" name="hod_name" value="{{ dept.hod_name if dept else '' }}">
+        </div>
+        <div class="field">
+          <label>Designation</label>
+          <input type="text" name="hod_designation"
+                 value="{{ dept.hod_designation if dept else 'Head of the Department' }}">
+        </div>
+        <div class="field">
+          <label>HoD email</label>
+          <input type="email" name="hod_email" value="{{ dept.hod_email if dept else '' }}">
+        </div>
+        <div class="field">
+          <label>HoD mobile</label>
+          <input type="tel" name="hod_phone" value="{{ dept.hod_phone if dept else '' }}">
+        </div>
+      </div>
+
+      <label class="check mb-2">
+        <input type="checkbox" name="active" {{ 'checked' if not dept or dept.active }}>
+        <span>Active — the department can sign in and submit</span>
+      </label>
+
+      <div class="flex">
+        <button class="btn" type="submit">{{ 'Save changes' if dept else 'Add department' }}</button>
+        <a class="btn btn-ghost" href="{{ url_for('admin.departments') }}">Cancel</a>
+        {% if dept %}
+        <span class="spacer"></span>
+        <form method="post" action="{{ url_for('admin.department_toggle', dept_code=dept.dept_code) }}">
+          <button class="btn btn-ghost btn-sm" type="submit">
+            {{ 'Disable' if dept.active else 'Re-enable' }} this department
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

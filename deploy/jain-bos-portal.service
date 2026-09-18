@@ -1,0 +1,27 @@
+[Unit]
+Description=JAIN OoA — BoS Data Repository Portal
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/jain-bos-portal
+Environment="PATH=/var/www/jain-bos-portal/venv/bin"
+EnvironmentFile=/var/www/jain-bos-portal/.env
+ExecStart=/var/www/jain-bos-portal/venv/bin/gunicorn \
+    --workers 3 \
+    --worker-class gevent \
+    --bind 127.0.0.1:8102 \
+    --timeout 120 \
+    --access-logfile /var/log/jain-bos-portal/access.log \
+    --error-logfile /var/log/jain-bos-portal/error.log \
+    wsgi:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

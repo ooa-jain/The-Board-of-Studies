@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ stage.title }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">
+        <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> {{ stage.group }}
+      </div>
+      <h1>{{ stage.title }}</h1>
+      <p>{{ stage.blurb }} This stage is filled once per programme.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+  {% for p in programmes %}
+  {% set st = (submission.programmes.get(p.programme_code, {}).get(stage.key, {})) %}
+  <div class="card">
+    <div class="card-head">
+      <h3>{{ p.programme_name }}</h3>
+      <span class="spacer">
+        {% if st.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
+        {% elif st.status == 'draft' %}<span class="pill pill-warn">In progress</span>
+        {% else %}<span class="pill">Not started</span>{% endif %}
+      </span>
+    </div>
+    <div class="card-body">
+      <p class="small muted mb-1">
+        <span class="mono">{{ p.programme_code }}</span> · {{ p.degree_level }}
+        {% if p.specialisation %} · {{ p.specialisation }}{% endif %}
+      </p>
+      <p class="small muted">{{ p.semesters }} semesters · batch {{ p.batch }} · intake {{ p.intake }}</p>
+      {% if st.summary and st.summary.errors %}
+        <div class="alert alert-error small mt-1" style="margin-bottom:0">
+          {{ st.summary.errors }} item(s) still to fix.
+        </div>
+      {% endif %}
+      <a class="btn btn-block mt-2"
+         href="{{ url_for('dept.stage', stage_key=stage.key, programme_code=p.programme_code) }}">
+        {{ 'Review' if st.status == 'submitted' else 'Open' }} {{ p.programme_code }}
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ stage.title }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">
+        <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a>
+        <span>›</span> {{ stage.group }}
+        {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
+      </div>
+      <h1>{{ stage.title }}</h1>
+      <p>{{ stage.blurb }}</p>
+      {% if stage.source_templates %}
+      <p class="small" style="color:var(--gold-600);margin-top:6px">
+        Replaces: {{ stage.source_templates|join(' · ') }}
+      </p>
+      {% endif %}
+    </div>
+    <div class="spacer" style="text-align:right">
+      {% if status == 'submitted' %}<span class="pill pill-ok">Submitted — read only</span>
+      {% elif status == 'returned' %}<span class="pill pill-err">Returned for correction</span>
+      {% elif status == 'draft' %}<span class="pill pill-warn">In progress</span>
+      {% else %}<span class="pill pill-gold">Open</span>{% endif %}
+      {% if programme %}
+      <div class="small muted mt-1">{{ programme.programme_name }}<br>{{ programme.degree_level }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if state.returned_note %}
+<div class="alert alert-warning">
+  <div><strong>Sent back by the Office of Academics:</strong> {{ state.returned_note }}</div>
+</div>
+{% endif %}
+
+<div class="stage-layout">
+  <div>
+    <form id="stage-form" autocomplete="off">
+      <div id="sections"></div>
+    </form>
+  </div>
+
+  <aside class="stage-side">
+    <div class="card">
+      <div class="card-head">
+        <h3 style="font-size:1rem">Checks</h3>
+        <span class="spacer" id="issue-counts"></span>
+      </div>
+      <div class="card-body tight">
+        <div id="issues" class="issues">
+          <p class="small muted" style="margin:0">Fill the form — problems appear here as you type.</p>
+        </div>
+      </div>
+    </div>
+
+    {% if credit_matrix and credit_matrix.track %}
+    <div class="card">
+      <div class="card-head"><h3 style="font-size:1rem">UGC Table 2</h3></div>
+      <div class="card-body tight">
+        <p class="small muted" style="margin:0 0 8px">
+          Applying the <strong>{{ credit_matrix.track_label }}</strong> column.
+          Total required: <strong>{{ credit_matrix.total }}</strong> credits.
+        </p>
+        <div id="credit-tally" class="small"></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-head"><h3 style="font-size:1rem">Stages</h3></div>
+      <div class="card-body tight" style="max-height:300px;overflow:auto">
+        {% for s in board %}
+        <div class="flex small" style="padding:5px 0;{{ 'opacity:.5' if s.status == 'locked' }}">
+          <span class="pill {{ 'pill-ok' if s.status=='submitted' else ('pill-lock' if s.status=='locked' else 'pill-warn') }}"
+                style="width:8px;height:8px;padding:0;border-radius:50%"></span>
+          <span style="{{ 'font-weight:600;color:var(--navy-800)' if s.key == stage.key }}">{{ s.title }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+</div>
+
+{% if not readonly %}
+<div class="savebar">
+  <div class="wrap">
+    <span class="save-note" id="save-note">Not saved yet</span>
+    <span class="spacer"></span>
+    <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back</a>
+    <button class="btn btn-ghost" type="button" id="btn-check">Check now</button>
+    <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage</button>
+  </div>
+</div>
+{% else %}
+<div class="savebar">
+  <div class="wrap">
+    <span class="save-note">Submitted on
+      {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
+    <span class="spacer"></span>
+    <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back to my submission</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script id="stage-def" type="application/json">{{ stage|tojson }}</script>
+<script id="stage-data" type="application/json">{{ data|tojson }}</script>
+<script id="credit-def" type="application/json">{{ (credit_matrix or {})|tojson }}</script>
+<script>
+  window.STAGE_CTX = {
+    key: {{ stage.key|tojson }},
+    programme: {{ (programme.programme_code if programme else None)|tojson }},
+    readonly: {{ readonly|tojson }},
+    urls: {
+      save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
+      validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},
+      submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
+      upload:   {{ url_for('dept.api_upload')|tojson }},
+      dashboard:{{ url_for('dept.dashboard')|tojson }}
+    }
+  };
+</script>
+<script src="{{ url_for('static', filename='js/stage.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="card" style="max-width:620px;margin:24px auto">
+  <div class="card-head"><h3>Portal settings</h3></div>
+  <div class="card-body">
+    <form method="post">
+      <div class="field">
+        <label>Active academic year</label>
+        <input type="text" name="academic_year" value="{{ settings.academic_year }}" required>
+        <span class="help">New submissions are filed against this year. Changing it starts a fresh
+          cycle — existing records stay under their own year.</span>
+      </div>
+      <div class="field">
+        <label>Banner message</label>
+        <textarea name="banner" rows="2"
+                  placeholder="Shown at the top of every page, e.g. a submission deadline">{{ settings.banner }}</textarea>
+      </div>
+      <label class="check mb-2">
+        <input type="checkbox" name="submissions_open" {{ 'checked' if settings.submissions_open }}>
+        <span>Submissions are open</span>
+      </label>
+      <button class="btn" type="submit">Save settings</button>
+      <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change my password</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

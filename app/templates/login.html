@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% set hide_chrome = true %}
+{% block title %}Sign in{% endblock %}
+
+{% block body %}
+<div class="login-page">
+  <aside class="login-aside">
+    <a class="brand" href="{{ url_for('public.landing') }}" style="margin-bottom:34px">
+      <span class="brand-mark">J</span>
+      <span class="brand-text">
+        <strong>BoS Data Repository</strong>
+        <span>JAIN · Office of Academics</span>
+      </span>
+    </a>
+    <h2>Board of Studies submissions, in one place.</h2>
+    <p>Use the department login issued to you by the Office of Academics. If you do not have one, or
+       the password no longer works, write to the Office and a new one will be generated.</p>
+    <ul>
+      <li>Your username is your department code</li>
+      <li>Stages unlock in order — Pre-BoS opens first</li>
+      <li>Work is saved as you type; nothing is lost if you close the tab</li>
+      <li>Credit totals are checked against UGC Table 2 before submission</li>
+    </ul>
+  </aside>
+
+  <div class="login-main">
+    <div class="login-box">
+      <h1 style="font-size:1.6rem">Sign in</h1>
+      <p class="muted small mb-2">Bengaluru and Kochi campuses.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'error' if category == 'error' else category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+      <form method="post" autocomplete="on">
+        <div class="field">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required autofocus
+                 autocapitalize="none" spellcheck="false" placeholder="e.g. com.bba">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required
+                 placeholder="As issued by the Office of Academics">
+        </div>
+        <button class="btn btn-block btn-lg" type="submit">Sign in</button>
+      </form>
+
+      <p class="small muted mt-2" style="text-align:center">
+        <a href="{{ url_for('public.landing') }}">Back to the portal home</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

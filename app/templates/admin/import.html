@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Import departments{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.departments') }}">Departments</a> <span>›</span> Import</div>
+      <h1>Import the department master</h1>
+      <p>Upload the Directors / Dy. Directors / Deans / HoDs contact workbook, or any sheet with a
+         department column. Column headings are matched by keyword — check the preview before
+         anything is written.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if not preview %}
+<div class="card" style="max-width:640px">
+  <div class="card-head"><h3>Upload a workbook</h3></div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data">
+      <div class="field">
+        <label>Excel workbook (.xlsx)<span class="req">*</span></label>
+        <input type="file" name="workbook" accept=".xlsx,.xlsm" required>
+        <span class="help">The importer looks for columns named like Department, School, Campus,
+          HoD, Email and Mobile. It does not matter which row the headings are on.</span>
+      </div>
+      <div class="field">
+        <label>Sheet name (optional)</label>
+        <input type="text" name="sheet" placeholder="Leave blank for the first sheet">
+      </div>
+      <div class="field">
+        <label>Campus to assume when the sheet does not say</label>
+        <select name="default_campus">
+          <option>Bengaluru</option><option>Kochi</option>
+        </select>
+      </div>
+      <button class="btn" type="submit">Read the workbook</button>
+    </form>
+  </div>
+</div>
+{% else %}
+
+<div class="alert alert-info">
+  <div>
+    Read <strong>{{ meta.count }}</strong> department(s) from sheet “{{ meta.sheet }}”, headings on
+    row {{ meta.header_row }}.
+    {% if meta.unmapped %}
+      <div class="small mt-1">No column matched: {{ meta.unmapped|join(', ') }} — those fields are blank
+        and can be filled in afterwards.</div>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('admin.import_commit') }}">
+  <div class="card mb-2">
+    <div class="card-body tight flex flex-wrap">
+      <label class="check"><input type="checkbox" name="overwrite"><span>Update departments that already exist</span></label>
+      <label class="check"><input type="checkbox" name="make_logins" checked><span>Generate a login for each new department</span></label>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" type="button" id="all">Select all</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="none">Select none</button>
+      <button class="btn" type="submit">Import selected</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap" style="max-height:640px">
+        <table class="data">
+          <thead>
+            <tr><th style="width:42px"></th><th>Department</th><th>School</th><th>Code</th>
+                <th>Campus</th><th>HoD</th><th>Email</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for r in preview %}
+            <tr>
+              <td><input type="checkbox" name="include" value="{{ r.dept_code }}" {{ '' if r.exists else 'checked' }}></td>
+              <td><strong>{{ r.dept_name }}</strong></td>
+              <td class="small">{{ r.school }}</td>
+              <td class="mono small">{{ r.dept_code }}</td>
+              <td class="small">{{ r.campus }}</td>
+              <td class="small">{{ r.hod_name or '—' }}</td>
+              <td class="small">{{ r.hod_email or '—' }}</td>
+              <td>{% if r.exists %}<span class="pill pill-warn">Exists</span>{% else %}<span class="pill pill-ok">New</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+  document.getElementById("all").onclick = () =>
+    document.querySelectorAll("input[name=include]").forEach(c => c.checked = true);
+  document.getElementById("none").onclick = () =>
+    document.querySelectorAll("input[name=include]").forEach(c => c.checked = false);
+</script>
+{% endif %}
+{% endblock %}

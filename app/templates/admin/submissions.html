@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Submissions{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Submissions</div>
+      <h1>Submission monitor — {{ year }}</h1>
+      <p>Every department against every stage. Green is submitted, amber is in progress, red came back
+         for correction, grey is still locked.</p>
+    </div>
+    <div class="spacer">
+      <a class="btn btn-ghost" href="{{ url_for('admin.export_institution') }}">Export Excel</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th style="position:sticky;left:0;background:var(--navy-050);z-index:3">Department</th>
+            <th>Progress</th>
+            {% for s in stages %}<th title="{{ s.title }}" style="writing-mode:vertical-rl;height:130px;padding:8px 4px">{{ s.title }}</th>{% endfor %}
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td style="position:sticky;left:0;background:#fff;z-index:2">
+              <strong>{{ r.dept.dept_name }}</strong>
+              <div class="small muted">{{ r.dept.campus }} · {{ r.dept.dept_code }}</div>
+            </td>
+            <td style="min-width:130px">
+              <div class="flex">
+                <div class="bar" style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
+                <span class="bar-label nowrap">{{ r.progress.done }}/{{ r.progress.total }}</span>
+              </div>
+            </td>
+            {% for b in r.board %}
+            <td style="text-align:center;padding:6px">
+              {% set colour = {'submitted':'var(--ok)','draft':'var(--warn)','returned':'var(--err)','open':'var(--gold-500)','locked':'var(--lock)'}[b.status] %}
+              <span title="{{ b.title }} — {{ b.status }}"
+                    style="display:inline-block;width:13px;height:13px;border-radius:4px;background:{{ colour }};opacity:{{ '.3' if b.status=='locked' else '1' }}"></span>
+            </td>
+            {% endfor %}
+            <td class="right">
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ stages|length + 3 }}" class="empty">No submissions started yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
