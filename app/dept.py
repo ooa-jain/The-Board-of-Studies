@@ -170,6 +170,14 @@ def api_submit(stage_key, programme_code=None):
         i = STAGE_KEYS.index(stage_key)
         if i + 1 < len(STAGE_KEYS):
             nxt_key = STAGE_KEYS[i + 1]
+        # Confirm on the page we send them to, rather than in a browser dialog.
+        stage_title = STAGE_BY_KEY[stage_key]["title"]
+        if nxt_key:
+            flash(f"“{stage_title}” is submitted. "
+                  f"“{STAGE_BY_KEY[nxt_key]['title']}” is now open.", "success")
+        else:
+            flash(f"“{stage_title}” is submitted. Your Board of Studies record is complete.",
+                  "success")
         return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
                         "next": {"key": nxt_key,
                                  "title": STAGE_BY_KEY[nxt_key]["title"]} if nxt_key else None,

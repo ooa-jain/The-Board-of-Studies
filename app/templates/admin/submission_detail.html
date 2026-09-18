@@ -14,7 +14,9 @@
     </div>
     <div class="spacer" style="text-align:right">
       <div class="flex" style="justify-content:flex-end">
-        <div class="bar" style="width:160px"><i style="width:{{ progress.percent }}%"></i></div>
+        <div class="bar" role="progressbar" aria-valuenow="{{ progress.done }}" aria-valuemin="0"
+             aria-valuemax="{{ progress.total }}" aria-label="Stages submitted"
+             style="width:160px"><i style="width:{{ progress.percent }}%"></i></div>
         <span class="bar-label">{{ progress.done }} / {{ progress.total }}</span>
       </div>
       <div class="flex mt-1" style="justify-content:flex-end">
@@ -92,7 +94,7 @@
             {% elif payload is iterable %}
               <div class="table-wrap">
                 <table class="data">
-                  <thead><tr>{% for c in section.columns %}<th>{{ c.label }}</th>{% endfor %}</tr></thead>
+                  <thead><tr>{% for c in section.columns %}<th scope="col">{{ c.label }}</th>{% endfor %}</tr></thead>
                   <tbody>
                     {% for row in payload %}
                     <tr>{% for c in section.columns %}

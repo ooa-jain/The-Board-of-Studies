@@ -71,8 +71,10 @@
       <div class="table-wrap" style="max-height:640px">
         <table class="data">
           <thead>
-            <tr><th style="width:42px"></th><th>Department</th><th>School</th><th>Code</th>
-                <th>Campus</th><th>HoD</th><th>Email</th><th></th></tr>
+            <tr><th scope="col" style="width:42px"><span class="sr-only">Include</span></th>
+                <th scope="col">Department</th><th scope="col">School</th><th scope="col">Code</th>
+                <th scope="col">Campus</th><th scope="col">HoD</th><th scope="col">Email</th>
+                <th scope="col"><span class="sr-only">Status</span></th></tr>
           </thead>
           <tbody>
             {% for r in preview %}

@@ -24,30 +24,36 @@
       <table class="data">
         <thead>
           <tr>
-            <th style="position:sticky;left:0;background:var(--navy-050);z-index:3">Department</th>
-            <th>Progress</th>
-            {% for s in stages %}<th title="{{ s.title }}" style="writing-mode:vertical-rl;height:130px;padding:8px 4px">{{ s.title }}</th>{% endfor %}
-            <th></th>
+            <th scope="col" class="col-frozen">Department</th>
+            <th scope="col">Progress</th>
+            {% for s in stages %}<th scope="col" class="col-vertical" title="{{ s.title }}">{{ s.title }}</th>{% endfor %}
+            <th scope="col"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
           {% for r in rows %}
           <tr>
-            <td style="position:sticky;left:0;background:#fff;z-index:2">
+            <td class="col-frozen">
               <strong>{{ r.dept.dept_name }}</strong>
               <div class="small muted">{{ r.dept.campus }} · {{ r.dept.dept_code }}</div>
             </td>
-            <td style="min-width:130px">
+            <td class="col-progress">
               <div class="flex">
-                <div class="bar" style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
+                <div class="bar" role="progressbar" aria-valuenow="{{ r.progress.done }}"
+                     aria-valuemin="0" aria-valuemax="{{ r.progress.total }}"
+                     aria-label="Stages submitted by {{ r.dept.dept_name }}"
+                     style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
                 <span class="bar-label nowrap">{{ r.progress.done }}/{{ r.progress.total }}</span>
               </div>
             </td>
             {% for b in r.board %}
-            <td style="text-align:center;padding:6px">
-              {% set colour = {'submitted':'var(--ok)','draft':'var(--warn)','returned':'var(--err)','open':'var(--gold-500)','locked':'var(--lock)'}[b.status] %}
-              <span title="{{ b.title }} — {{ b.status }}"
-                    style="display:inline-block;width:13px;height:13px;border-radius:4px;background:{{ colour }};opacity:{{ '.3' if b.status=='locked' else '1' }}"></span>
+            {# A glyph as well as a hue: the grid has to be readable without colour. #}
+            {% set glyph = {'submitted': '✓', 'draft': '·', 'returned': '!', 'open': '○', 'locked': '–'}[b.status] %}
+            <td class="mx-cell">
+              <span class="mx-dot mx-{{ b.status }}" title="{{ b.title }} — {{ b.status }}">
+                <span aria-hidden="true">{{ glyph }}</span>
+                <span class="sr-only">{{ b.title }}: {{ b.status }}</span>
+              </span>
             </td>
             {% endfor %}
             <td class="right">

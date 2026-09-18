@@ -48,8 +48,10 @@
       <table class="data">
         <thead>
           <tr>
-            <th>Department</th><th>School</th><th>Campus</th><th>HoD</th>
-            <th>Login</th><th>Password</th><th></th>
+            <th scope="col">Department</th><th scope="col">School</th>
+            <th scope="col">Campus</th><th scope="col">HoD</th>
+            <th scope="col">Login</th><th scope="col">Password</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -68,9 +70,11 @@
             <td class="mono small">{{ d.username or '—' }}</td>
             <td>
               {% if d.initial_password %}
-                <span class="mono small" data-pw="{{ d.initial_password }}">{{ d.initial_password }}</span>
+                <span class="mono small">{{ d.initial_password }}</span>
                 <button class="copy-btn" type="button"
-                        onclick="navigator.clipboard.writeText('{{ d.username }}\t{{ d.initial_password }}');this.textContent='Copied';this.classList.add('done')">Copy</button>
+                        data-copy="{{ d.username }}&#9;{{ d.initial_password }}"
+                        data-copy-label="Copied"
+                        aria-label="Copy the login for {{ d.dept_name }}">Copy</button>
               {% elif d.username %}
                 <span class="pill pill-ok">Signed in</span>
               {% else %}

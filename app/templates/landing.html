@@ -2,6 +2,7 @@
 {% block title %}Board of Studies Data Repository{% endblock %}
 
 {% block body %}
+<main id="main-content">
 <section class="hero">
   <div class="wrap">
     <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
@@ -219,7 +220,7 @@
         <div class="card-body" style="padding:0">
           <table class="credits">
             <thead>
-              <tr><th>Category</th><th class="num">3-year UG</th><th class="num">4-Year UG</th></tr>
+              <tr><th scope="col">Category</th><th scope="col" class="num">3-year UG</th><th scope="col" class="num">4-Year UG</th></tr>
             </thead>
             <tbody>
               <tr><td>Major (Core)</td><td class="num">60</td><td class="num">80</td></tr>
@@ -242,4 +243,5 @@
     </div>
   </div>
 </section>
+</main>
 {% endblock %}
