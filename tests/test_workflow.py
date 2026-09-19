@@ -30,12 +30,31 @@ def make_department(app, code="COM", name="Department of Commerce"):
 
 # --------------------------------------------------------------------------
 
-def test_landing_page_names_both_campuses(client):
+def test_landing_page_does_not_name_the_campuses(client):
+    """The home page speaks for the university, not for one campus or two."""
     r = client.get("/")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
-    assert "Bengaluru" in body and "Kochi" in body
+    assert "Kochi" not in body
+    assert "Bengaluru" not in body
+    assert "Bangalore" not in body
+    # but it still explains what the portal is for
     assert "UGC Table 2" in body
+    assert "Board of Studies" in body
+
+
+def test_seed_list_is_usable_as_a_department_master(app):
+    """Codes become usernames, so they have to be unique and so do the names."""
+    from seed import SEED_DEPARTMENTS
+    codes = [c for _, _, c in SEED_DEPARTMENTS]
+    names = [n for _, n, _ in SEED_DEPARTMENTS]
+    assert len(codes) == len(set(codes)), "duplicate department code"
+    assert len(names) == len(set(names)), "duplicate department name"
+
+    from app.db import slugify_username
+    usernames = [slugify_username(c, n) for _, n, c in SEED_DEPARTMENTS]
+    assert len(usernames) == len(set(usernames)), "two departments would share a login"
+    assert all(codes), "every department needs a code"
 
 
 def test_admin_can_sign_in_and_reach_the_dashboard(app, client):

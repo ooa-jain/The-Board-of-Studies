@@ -34,15 +34,9 @@ def landing():
     stats = {
         "departments": db.departments.count_documents({"active": True}),
         "schools": len(db.departments.distinct("school", {"active": True})),
-        "campuses": len(db.departments.distinct("campus", {"active": True})) or 2,
         "submitted": db.submissions.count_documents({"status": {"$in": ["submitted", "sealed"]}}),
     }
-    per_campus = {}
-    for c in CAMPUS_INFO:
-        per_campus[c["name"]] = db.departments.count_documents(
-            {"campus": c["name"], "active": True})
-    return render_template("landing.html", campuses=CAMPUS_INFO, stats=stats,
-                           per_campus=per_campus)
+    return render_template("landing.html", stats=stats)
 
 
 @bp.route("/about")
