@@ -238,6 +238,64 @@ def test_pre_bos_no_longer_collects_composition_tables(app, client):
                    for s in STAGE_BY_KEY["pre_bos"]["sections"])
 
 
+def test_submitting_a_stage_carries_you_into_the_next_one(app, client):
+    """The point of the automation: no going back to the list to find it."""
+    u, p = make_department(app)
+    login(client, u, p)
+    r = client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK).get_json()
+    assert r["ok"]
+    assert r["next"]["key"] == "pre_bos"
+    assert r["redirect"].endswith("/department/stage/pre_bos")
+
+    # and the next one carries on from there
+    r = client.post("/department/api/pre_bos/submit", json=PRE_BOS_FILES_OK).get_json()
+    assert r["ok"]
+    assert r["redirect"].endswith(f"/department/stage/{r['next']['key']}")
+
+
+def test_the_dashboard_names_the_next_step(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    body = client.get("/department/").get_data(as_text=True)
+    assert "Your next step" in body
+    assert "Department Information" in body
+
+    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    body = client.get("/department/").get_data(as_text=True)
+    assert "Pre-BoS" in body
+
+
+def test_next_action_prefers_a_returned_stage(app):
+    """A stage sent back for correction outranks anything merely open."""
+    from app.workflow import next_action, get_or_create_submission
+    from app.db import get_db
+    make_department(app)
+    with app.app_context():
+        sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
+        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
+            "stages.dept_info.status": "submitted",
+            "stages.pre_bos.status": "draft",
+            "stages.bos_committee.status": "returned",
+        }})
+        sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
+        nxt = next_action(sub)
+        assert nxt["key"] == "bos_committee"
+        assert nxt["status"] == "returned"
+
+
+def test_next_action_is_none_once_everything_is_submitted(app):
+    from app.workflow import next_action, get_or_create_submission
+    from app.db import get_db
+    from app.schema import STAGE_KEYS
+    make_department(app)
+    with app.app_context():
+        sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
+        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
+            f"stages.{k}.status": "submitted" for k in STAGE_KEYS}})
+        sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
+        assert next_action(sub) is None
+
+
 def test_autosave_keeps_a_draft(app, client):
     u, p = make_department(app)
     login(client, u, p)

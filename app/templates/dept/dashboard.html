@@ -46,6 +46,35 @@
 </div>
 {% endif %}
 
+{# The one thing to do next, worked out by the portal rather than left for
+   the department to find in a list of thirteen. #}
+{% if next_step %}
+<a class="next-step" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
+  <span class="next-step-label">
+    {% if next_step.status == 'returned' %}Sent back — needs your correction
+    {% elif next_step.status == 'draft' %}Pick up where you left off
+    {% else %}Your next step{% endif %}
+  </span>
+  <span class="next-step-title">{{ next_step.title }}</span>
+  <span class="next-step-blurb">{{ next_step.blurb }}</span>
+  <span class="next-step-go">
+    {% if next_step.status == 'draft' %}Continue{% else %}Start{% endif %}
+    <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+</a>
+{% else %}
+<div class="next-step is-done">
+  <span class="next-step-label">All stages submitted</span>
+  <span class="next-step-title">Your Board of Studies record is complete</span>
+  <span class="next-step-blurb">
+    The Office of Academics has everything for {{ year }}. Nothing further is needed.
+  </span>
+</div>
+{% endif %}
+
 <div class="grid grid-4 mb-2">
   <div class="stat">
     <div class="n">{{ progress.done }}</div><div class="l">Stages submitted</div>

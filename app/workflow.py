@@ -95,6 +95,22 @@ def stage_board(submission: dict):
     return board
 
 
+def next_action(submission: dict):
+    """The one stage a department should work on next, or None when done.
+
+    A thirteen-stage sequence is easy to lose your place in, so the portal
+    works this out rather than leaving it to the person. Order of urgency:
+    a stage sent back for correction, then one already in progress, then the
+    next one that has opened.
+    """
+    board = stage_board(submission)
+    for wanted in ("returned", "draft", "open"):
+        for s in board:
+            if s["status"] == wanted:
+                return s
+    return None
+
+
 def progress(submission: dict):
     done = sum(1 for s in STAGES if compute_status(submission, s["key"]) in DONE)
     return {"done": done, "total": len(STAGES),

@@ -33,7 +33,7 @@
   <div class="wrap">
     <a class="brand" href="{{ url_for('public.landing') }}">
       <img class="brand-logo" alt="JAIN (Deemed-to-be University)"
-           src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
+           src="{{ url_for('static', filename='img/jain-logo.png') }}"
            width="1103" height="319">
       <span class="brand-text">
         <strong>BoS Data Repository</strong>
@@ -60,7 +60,13 @@
         <a href="{{ url_for('dept.export_word') }}">Download report</a>
       {% else %}
         {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
-        {{ nav_link(url_for('auth.login'), 'Sign in', request.endpoint == 'auth.login') }}
+        <a class="nav-cta" href="{{ url_for('auth.login') }}">
+          Sign in
+          <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
+                  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
       {% endif %}
 
       {% if current_user %}

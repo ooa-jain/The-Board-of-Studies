@@ -14,7 +14,7 @@ from .auth import department_required
 from .db import audit, get_db, now, rules_doc, settings
 from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
-from .workflow import (OPENABLE, compute_status, get_or_create_submission,
+from .workflow import (OPENABLE, compute_status, get_or_create_submission, next_action,
                        prefill_for, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only)
@@ -48,7 +48,8 @@ def dashboard():
     sub = get_or_create_submission(dept["dept_code"], _year())
     return render_template("dept/dashboard.html", dept=dept, submission=sub,
                            board=stage_board(sub), progress=progress(sub),
-                           programmes=programmes_of(sub), year=_year())
+                           programmes=programmes_of(sub), year=_year(),
+                           next_step=next_action(sub))
 
 
 # ---------------------------------------------------------------------------
@@ -170,18 +171,21 @@ def api_submit(stage_key, programme_code=None):
         i = STAGE_KEYS.index(stage_key)
         if i + 1 < len(STAGE_KEYS):
             nxt_key = STAGE_KEYS[i + 1]
-        # Confirm on the page we send them to, rather than in a browser dialog.
+        # Confirm on the page we send them to, rather than in a browser dialog,
+        # and carry them straight into whatever is next instead of dropping
+        # them back on the dashboard to find it themselves.
         stage_title = STAGE_BY_KEY[stage_key]["title"]
-        if nxt_key:
-            flash(f"“{stage_title}” is submitted. "
-                  f"“{STAGE_BY_KEY[nxt_key]['title']}” is now open.", "success")
+        nxt = next_action(get_or_create_submission(dept["dept_code"], _year()))
+        if nxt:
+            flash(f"“{stage_title}” is submitted. Next: “{nxt['title']}”.", "success")
+            target = url_for("dept.stage", stage_key=nxt["key"])
         else:
             flash(f"“{stage_title}” is submitted. Your Board of Studies record is complete.",
                   "success")
+            target = url_for("dept.dashboard")
         return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
-                        "next": {"key": nxt_key,
-                                 "title": STAGE_BY_KEY[nxt_key]["title"]} if nxt_key else None,
-                        "redirect": url_for("dept.dashboard")})
+                        "next": {"key": nxt["key"], "title": nxt["title"]} if nxt else None,
+                        "redirect": target})
     return jsonify({"ok": False, "status": status, "issues": issues, "summary": summary})
 
 

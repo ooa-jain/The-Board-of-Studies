@@ -105,7 +105,6 @@ a:hover { text-decoration: underline; }
   outline-offset: 2px;
   border-radius: 3px;
 }
-.topbar :focus-visible,
 .login-aside :focus-visible,
 .hero :focus-visible,
 .btn:focus-visible,
@@ -178,55 +177,61 @@ h4 { font-size: 1rem; }
   background: transparent; color: #fff; box-shadow: none;
 }
 .topbar .wrap {
-  display: flex; align-items: center; gap: 22px; height: 62px;
-  max-width: 1200px; padding: 0 12px 0 18px;
-  background: var(--ink-800); border-radius: 999px;
-  box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; gap: 22px; height: 64px;
+  max-width: 1200px; padding: 0 12px 0 22px;
+  background: rgba(253, 251, 247, .88); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 999px;
+  box-shadow: var(--shadow);
 }
 @media (max-width: 900px) {
   .topbar { top: 10px; margin-top: 10px; }
   .topbar .wrap { border-radius: 26px; }
 }
-.brand { display: flex; align-items: center; gap: 12px; color: #fff; }
+.brand { display: flex; align-items: center; gap: 12px; color: var(--ink-800); }
 .brand:hover { text-decoration: none; }
 .brand-logo { height: 30px; width: auto; display: block; flex: none; }
 @media (max-width: 480px) { .brand-logo { height: 26px; } }
-.brand-text strong { display: block; font-size: .92rem; letter-spacing: -.01em; line-height: 1.15; }
-.brand-text span { display: block; font-size: .72rem; color: rgba(255,255,255,.78); letter-spacing: .06em; text-transform: uppercase; }
+.brand-text strong { display: block; font-size: .92rem; letter-spacing: -.01em; line-height: 1.15; color: var(--ink-800); }
+.brand-text span { display: block; font-size: .72rem; color: var(--ink-faint); letter-spacing: .06em; text-transform: uppercase; }
 
 .topnav { display: flex; gap: 4px; margin-left: auto; align-items: center; }
 .topnav a {
-  color: rgba(255,255,255,.82); padding: 8px 15px; border-radius: 999px;
-  font-size: .87rem; font-weight: 500;
+  color: var(--ink-soft); padding: 9px 16px; border-radius: 999px;
+  font-size: .87rem; font-weight: 600;
 }
-.topnav a:hover { background: rgba(255,255,255,.1); color: #fff; text-decoration: none; }
-.topnav a.active {
-  background: rgba(255,255,255,.16); color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(230,210,160,.5);
+.topnav a:hover { background: var(--ink-050); color: var(--ink-800); text-decoration: none; }
+.topnav a.active { background: var(--ink-100); color: var(--ink-800); }
+
+/* the primary action sits in the bar as a filled pill, as on the reference */
+.topnav a.nav-cta {
+  background: var(--ink-800); color: #fff; font-weight: 700;
+  padding: 10px 20px; display: inline-flex; align-items: center; gap: 8px;
 }
+.topnav a.nav-cta:hover { background: var(--ink-700); color: #fff; }
+.topnav a.nav-cta .arrow { width: 16px; height: 16px; transition: transform .22s ease; }
+.topnav a.nav-cta:hover .arrow { transform: translateX(3px); }
 
 .who {
   display: flex; align-items: center; gap: 10px; padding-left: 16px; margin-left: 6px;
-  border-left: 1px solid rgba(255,255,255,.16);
+  border-left: 1px solid var(--line);
 }
 .who-avatar {
   width: 32px; height: 32px; border-radius: 50%; flex: none;
-  background: rgba(255,255,255,.18); color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(230,210,160,.45);
-  display: grid; place-items: center; font-weight: 600; font-size: .8rem;
+  background: var(--ink-800); color: #fff;
+  display: grid; place-items: center; font-weight: 700; font-size: .8rem;
 }
 .who-text { font-size: .8rem; line-height: 1.25; }
-.who-text strong { display: block; color: #fff; font-weight: 600; }
-.who-text span { color: rgba(255,255,255,.78); font-size: .72rem; }
+.who-text strong { display: block; color: var(--ink-800); font-weight: 600; }
+.who-text span { color: var(--ink-faint); font-size: .72rem; }
 
 /* the menu button only exists below the breakpoint */
 .nav-toggle {
   display: none; margin-left: auto; align-items: center; gap: 8px;
-  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22);
-  color: #fff; border-radius: 999px; padding: 8px 16px;
+  background: var(--ink-800); border: 1px solid var(--ink-800);
+  color: #fff; border-radius: 999px; padding: 9px 17px;
   font: 600 .84rem var(--font); cursor: pointer;
 }
-.nav-toggle:hover { background: rgba(255,255,255,.18); }
+.nav-toggle:hover { background: var(--ink-700); }
 .nav-toggle .bars { display: grid; gap: 3px; }
 .nav-toggle .bars i { display: block; width: 15px; height: 2px; background: currentColor; border-radius: 2px; }
 
@@ -246,7 +251,7 @@ h4 { font-size: 1rem; }
     position: absolute; left: 0; right: 0; top: calc(100% + 8px);
     flex-direction: column; align-items: stretch; gap: 2px;
     margin: 0; padding: 12px;
-    background: var(--ink-800); border-radius: 24px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 24px;
     box-shadow: var(--shadow-lg);
     max-height: calc(100vh - 110px); overflow-y: auto;
   }
@@ -760,6 +765,76 @@ footer.site .wrap { align-items: center; }
   padding: 6px 10px; border-radius: 999px;
 }
 .pw-toggle:hover { background: var(--ink-050); }
+
+/* ---------- the next step ----------
+   The portal works out the single next action and puts it above everything
+   else, so a thirteen-stage sequence never leaves anyone hunting for their
+   place. The arrow slides on hover, as on the reference. */
+
+.next-step {
+  display: grid; gap: 4px;
+  position: relative; overflow: hidden;
+  padding: 26px 200px 26px 28px; margin-bottom: 22px;
+  background: var(--ink-800); color: #fff;
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  text-decoration: none; transition: .22s ease;
+}
+a.next-step:hover {
+  text-decoration: none; color: #fff;
+  transform: translateY(-2px); box-shadow: var(--shadow-lg);
+}
+.next-step::after {
+  /* a wash of the accent, so the card reads as the live one */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px 220px at 100% 0%, rgba(238,189,27,.20), transparent 62%);
+}
+.next-step > * { position: relative; z-index: 1; }
+
+.next-step-label {
+  font-family: var(--font-mono); font-size: .74rem; letter-spacing: .02em;
+  text-transform: uppercase; color: var(--gold-300);
+}
+.next-step-title {
+  font-family: var(--font-head); font-weight: 600; letter-spacing: -.028em;
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem); line-height: 1.12; color: #fff;
+}
+.next-step-blurb { font-size: .92rem; color: rgba(255,255,255,.82); max-width: 62ch; }
+
+.next-step-go {
+  position: absolute; right: 26px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 24px; border-radius: 999px;
+  background: var(--gold-400); color: var(--ink-900);
+  font-weight: 700; font-size: .92rem; white-space: nowrap;
+  transition: background .2s ease;
+}
+.next-step:hover .next-step-go { background: var(--gold-300); }
+.next-step-go .arrow { width: 20px; height: 20px; transition: transform .22s ease; }
+.next-step:hover .next-step-go .arrow { transform: translateX(4px); }
+
+.next-step.is-done { background: var(--ok); }
+.next-step.is-done::after { display: none; }
+.next-step.is-done .next-step-label { color: rgba(255,255,255,.82); }
+.next-step.is-done { padding-right: 28px; }
+
+@media (max-width: 760px) {
+  .next-step { padding: 22px; }
+  .next-step-go {
+    position: static; transform: none; margin-top: 16px;
+    width: fit-content; justify-content: center;
+  }
+  .next-step:hover { transform: none; }
+}
+
+/* ---------- arrow buttons ----------
+   The reference's signature: a pill whose arrow slides out on hover. */
+.btn .arrow, .btn-arrow .arrow {
+  width: 18px; height: 18px; flex: none; transition: transform .22s ease;
+}
+.btn:hover .arrow { transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover .arrow, .next-step:hover .next-step-go .arrow { transform: none; }
+}
 
 /* ---------- stage board ---------- */
 
