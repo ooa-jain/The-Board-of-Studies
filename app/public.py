@@ -35,21 +35,11 @@ def landing():
     nxt = request.args.get("next")
     if not (nxt or "").startswith("/"):
         nxt = None
-    schools = sorted(x for x in db.departments.distinct("school", {"active": True}) if x)
-    stats = {
-        "departments": db.departments.count_documents({"active": True}),
-        "schools": len(schools),
-        "submitted": db.submissions.count_documents({"status": {"$in": ["submitted", "sealed"]}}),
-    }
-    # departments per school, biggest first, so the chooser leads with the
-    # schools most people are looking for rather than with whatever sorts first
-    by_school = sorted(
-        ({"name": s,
-          "count": db.departments.count_documents({"school": s, "active": True})}
-         for s in schools),
-        key=lambda x: (-x["count"], x["name"]))
-    return render_template("landing.html", stats=stats, by_school=by_school,
-                           next_url=nxt)
+    # Only what the page actually prints. The per-school breakdown used to be
+    # listed here and cost one count query per school; it is gone, and so is
+    # the counting.
+    stats = {"departments": db.departments.count_documents({"active": True})}
+    return render_template("landing.html", stats=stats, next_url=nxt)
 
 
 # What a department actually hands over, and the stage it hands it over at.

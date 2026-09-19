@@ -922,7 +922,6 @@ input.is-bad, select.is-bad, textarea.is-bad {
 /* ---------- landing sections, after the reference ---------------------- */
 
 /* a section on a light tint, between two plain ones */
-.section-tint { background: var(--ink-050); border-block: 1px solid var(--line); }
 
 /* the emphasised half of a heading, as the reference sets it */
 .section-head h2 em, .cta-band h2 em { font-style: normal; color: var(--gold-600); }
@@ -960,25 +959,6 @@ input.is-bad, select.is-bad, textarea.is-bad {
 .story::before {
   content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
   background: var(--gold-400);
-}
-
-/* ---- the school chooser ---- */
-.school-grid {
-  display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-.school {
-  display: flex; align-items: center; gap: 14px;
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: 999px; padding: 13px 14px 13px 22px;
-}
-.school-name { font-weight: 600; font-size: .92rem; color: var(--ink-800); line-height: 1.25; }
-.school-count {
-  margin-left: auto; flex: none;
-  min-width: 34px; height: 34px; padding: 0 10px; border-radius: 999px;
-  background: var(--ink-800); color: #fff;
-  display: grid; place-items: center;
-  font-family: var(--font-mono); font-size: .82rem;
 }
 
 /* ---- the figure-led blocks ---- */

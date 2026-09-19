@@ -140,30 +140,6 @@
   </div>
 </section>
 
-{# ------------------------------------------------------------- chooser ----
-   The reference offers a way to find your own way in. Ours lists the schools,
-   so a department can find itself at a glance. #}
-{% if by_school %}
-<section class="section section-tint">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Who files here</span>
-      <h2>Every department, <em>one sequence</em></h2>
-      <p>{{ stats.departments }} departments · {{ stats.schools }} schools</p>
-    </div>
-
-    <div class="school-grid">
-      {% for s in by_school %}
-      <div class="school">
-        <span class="school-name">{{ s.name }}</span>
-        <span class="school-count">{{ s.count }}</span>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
-{% endif %}
-
 {# ----------------------------------------------------------------- how ---#}
 <section class="section section-dark" id="how">
   <div class="wrap">
@@ -176,7 +152,7 @@
     <div class="flow">
       <div>
         <h4>The Office of Academics issues a login</h4>
-        <p>One account per department, named after its code.</p>
+        <p>One account per department at each campus, issued in a batch.</p>
       </div>
       <div>
         <h4>Pre-BoS is filled first</h4>
