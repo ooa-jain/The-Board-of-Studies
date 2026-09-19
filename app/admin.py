@@ -85,9 +85,12 @@ def dashboard():
 def departments():
     db = get_db()
     q = {}
+    place = request.args.get("place")
     campus = request.args.get("campus")
     school = request.args.get("school")
     search = (request.args.get("q") or "").strip()
+    if place:
+        q["place"] = place
     if campus:
         q["campus"] = campus
     if school:
@@ -97,11 +100,21 @@ def departments():
                     {"dept_code": {"$regex": search, "$options": "i"}},
                     {"school": {"$regex": search, "$options": "i"}},
                     {"faculty": {"$regex": search, "$options": "i"}}]
-    depts = list(db.departments.find(q).sort([("campus", 1), ("school", 1), ("dept_name", 1)]))
+    depts = list(db.departments.find(q)
+                 .sort([("place", 1), ("campus", 1), ("school", 1), ("dept_name", 1)]))
+
+    # only the campuses in the city being looked at: offering Kochi Campus
+    # while Bangalore is selected would be a filter that can only return none
+    campuses = [c for c in current_app.config["CAMPUSES"]
+                if not place or db.departments.count_documents(
+                    {"place": place, "campus": c})]
     return render_template("admin/departments.html", departments=depts,
                            schools=sorted(x for x in db.departments.distinct("school") if x),
-                           campuses=current_app.config["CAMPUSES"],
-                           filters={"campus": campus, "school": school, "q": search})
+                           campuses=campuses,
+                           places=current_app.config["PLACES"],
+                           total=db.departments.count_documents({}),
+                           filters={"place": place, "campus": campus,
+                                    "school": school, "q": search})
 
 
 @bp.route("/departments/new", methods=["GET", "POST"])
@@ -206,6 +219,35 @@ def credential_slip(dept_code):
         return redirect(url_for("admin.departments"))
     return render_template("admin/credential_slip.html", dept=dept,
                            login_url=url_for("auth.login", _external=True), year=_year())
+
+
+@bp.route("/departments/clear", methods=["POST"])
+@admin_required
+def departments_clear():
+    """Remove every department in one go, with its login and its submissions.
+
+    This empties the master, so it asks for the word to be typed rather than
+    for a button to be clicked. It is not as final as it sounds: seed.py puts
+    the whole list back from the Office of Academics workbook.
+    """
+    db = get_db()
+    if (request.form.get("confirm") or "").strip().upper() != "REMOVE ALL":
+        flash("Nothing was removed — type REMOVE ALL to confirm.", "warning")
+        return redirect(url_for("admin.departments"))
+
+    counts = {
+        "departments": db.departments.count_documents({}),
+        "logins": db.users.count_documents({"role": "department"}),
+        "submissions": db.submissions.count_documents({}),
+    }
+    db.departments.delete_many({})
+    db.users.delete_many({"role": "department"})
+    db.submissions.delete_many({})
+    audit(_actor(), "departments.cleared", detail=counts)
+    flash(f"Removed {counts['departments']} department(s), "
+          f"{counts['logins']} login(s) and {counts['submissions']} submission(s). "
+          f"Run seed.py to put the master back from the workbook.", "success")
+    return redirect(url_for("admin.departments"))
 
 
 @bp.route("/credentials/bulk", methods=["POST"])

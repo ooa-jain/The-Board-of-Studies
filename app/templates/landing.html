@@ -104,6 +104,8 @@
         {% endwith %}
 
         <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on">
+          {# where to land afterwards, when something sent you here to sign in #}
+          {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
           <div class="field">
             <label for="username">Username</label>
             <input type="text" id="username" name="username" required

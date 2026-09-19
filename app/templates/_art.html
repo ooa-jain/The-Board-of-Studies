@@ -108,3 +108,25 @@
 </svg>
 {% endif %}
 {% endmacro %}
+
+{% macro missing() %}
+{# For the error pages: the sheet that is not there. A dashed outline where a
+   page should be, and the stack it went missing from. #}
+<svg class="art art-missing" viewBox="0 0 320 210" fill="none" aria-hidden="true" focusable="false">
+  <g stroke="currentColor" stroke-width="2" stroke-linejoin="round" opacity=".35">
+    <rect x="16" y="46" width="118" height="148" rx="6"/>
+    <rect x="32" y="34" width="118" height="148" rx="6" fill="var(--paper-art, #fff)"/>
+  </g>
+  <g stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".38">
+    <path d="M50 62h82M50 80h82M50 98h56"/>
+  </g>
+  {# the gap it left #}
+  <g>
+    <rect x="176" y="24" width="122" height="152" rx="6"
+          stroke="var(--seal-art, #0f2440)" stroke-width="2.5"
+          stroke-dasharray="9 9" fill="none"/>
+    <path d="M214 82l46 46M260 82l-46 46" stroke="var(--seal-art, #0f2440)"
+          stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>
+{% endmacro %}

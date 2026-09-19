@@ -15,7 +15,7 @@ def make_department(app, code="COM", name="Department of Commerce",
         db = get_db()
         db.departments.insert_one({
             "dept_code": code, "dept_name": name, "school": school,
-            "campus": "Bengaluru", "hod_name": "Test Head",
+            "campus": "Jain Global Campus", "hod_name": "Test Head",
             "hod_email": "head@example.edu", "hod_phone": "9999999999",
             "hod_designation": "Head of the Department",
             "active": True, "created_at": now(), "updated_at": now(),
@@ -84,9 +84,33 @@ def test_admin_can_sign_in_and_reach_the_dashboard(app, client):
 
 
 def test_bad_password_is_rejected(app, client):
+    """The form is on the home page, so the refusal goes back to it."""
     r = client.post("/login", data={"username": app.config["ADMIN_USERNAME"],
                                     "password": "wrong"})
-    assert "do not match" in r.get_data(as_text=True)
+    assert r.status_code == 302 and r.headers["Location"].endswith("#signin")
+    assert "do not match" in client.get("/").get_data(as_text=True)
+
+
+def test_there_is_no_separate_login_page(app, client):
+    """A GET lands on the form rather than on a second copy of it."""
+    r = client.get("/login")
+    assert r.status_code == 302
+    assert r.headers["Location"].endswith("#signin")
+
+    # and being sent here by a guard keeps where you were going
+    r = client.get("/department/", follow_redirects=False)
+    assert "/login?next=/department/" in r.headers["Location"]
+    r = client.get(r.headers["Location"], follow_redirects=False)
+    assert "next=/department/" in r.headers["Location"]
+    assert 'name="next" value="/department/"' in client.get(
+        r.headers["Location"]).get_data(as_text=True)
+
+
+def test_signing_in_lands_where_you_were_going(app, client):
+    u, p = make_department(app)
+    r = client.post("/login", data={"username": u, "password": p,
+                                    "next": "/department/stage/dept_info"})
+    assert r.headers["Location"].endswith("/department/stage/dept_info")
 
 
 def test_department_cannot_reach_the_admin_console(app, client):
@@ -203,8 +227,7 @@ def test_submitting_department_information_unlocks_pre_bos(app, client):
 
     payload = {
         "identity": {"dept_name": "Department of Commerce", "school": "School of Commerce",
-                     "dept_code": "COM", "campus": "Bengaluru",
-                     "campus_address": "Jain Global Campus, Bengaluru 562112"},
+                     "dept_code": "COM", "campus": "Jain Global Campus"},
         "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
                 "hod_email": "head@example.edu", "hod_phone": "9999999999"},
         "contact": {"office_email": "office@example.edu", "faculty_count": 24,
@@ -232,8 +255,7 @@ def test_an_invalid_submission_is_refused_with_reasons(app, client):
 
 DEPT_INFO_OK = {
     "identity": {"dept_name": "Department of Commerce", "school": "School of Commerce",
-                 "dept_code": "COM", "campus": "Bengaluru",
-                 "campus_address": "Jain Global Campus, Bengaluru 562112"},
+                 "dept_code": "COM", "campus": "Jain Global Campus"},
     "contact": {"office_email": "office@example.edu", "faculty_count": 24,
                 "programme_count": 3},
 }
@@ -387,7 +409,7 @@ def test_admin_can_return_a_stage_for_correction(app, client):
     login(client, u, p)
     client.post("/department/api/dept_info/submit", json={
         "identity": {"dept_name": "D", "school": "S", "dept_code": "COM",
-                     "campus": "Bengaluru", "campus_address": "Address here"},
+                     "campus": "Jain Global Campus"},
         "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
                 "hod_email": "head@example.edu", "hod_phone": "9999999999"},
         "contact": {"office_email": "office@example.edu", "faculty_count": 1,
@@ -481,3 +503,55 @@ def test_the_portal_is_named_ooa_data_portal(client):
     body = client.get("/").get_data(as_text=True)
     assert "OOA Data Portal" in body or "Office of Academics Data Portal" in body
     assert "BoS Data Repository" not in body
+
+
+def test_admin_can_filter_departments_by_city(app, client):
+    from app.db import get_db, now
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    with app.app_context():
+        get_db().departments.insert_many([
+            {"dept_code": "AAA", "dept_name": "Alpha", "school": "School of A",
+             "place": "Bangalore", "campus": "Jayanagar Campus", "active": True,
+             "created_at": now(), "updated_at": now()},
+            {"dept_code": "BBB", "dept_name": "Beta", "school": "School of B",
+             "place": "Kochi", "campus": "Kochi Campus", "active": True,
+             "created_at": now(), "updated_at": now()},
+        ])
+
+    both = client.get("/admin/departments").get_data(as_text=True)
+    assert "Alpha" in both and "Beta" in both
+
+    blr = client.get("/admin/departments?place=Bangalore").get_data(as_text=True)
+    assert "Alpha" in blr and "Beta" not in blr
+    # and the campus row only offers campuses that city has
+    assert "Jayanagar Campus" in blr and "Kochi Campus" not in blr
+
+    kochi = client.get("/admin/departments?place=Kochi").get_data(as_text=True)
+    assert "Beta" in kochi and "Alpha" not in kochi
+
+
+def test_clearing_the_master_needs_the_words(app, client):
+    from app.db import get_db
+    u, p = make_department(app)
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+
+    # a bare post does nothing
+    client.post("/admin/departments/clear", data={"confirm": "yes"})
+    with app.app_context():
+        assert get_db().departments.count_documents({}) == 1
+
+    client.post("/admin/departments/clear", data={"confirm": "remove all"})
+    with app.app_context():
+        db = get_db()
+        assert db.departments.count_documents({}) == 0
+        assert db.users.count_documents({"role": "department"}) == 0
+        # the admin is not a department, and stays
+        assert db.users.count_documents({"role": "admin"}) == 1
+
+
+def test_the_not_found_page_offers_a_way_onward(client):
+    r = client.get("/no-such-page")
+    assert r.status_code == 404
+    body = r.get_data(as_text=True)
+    assert "There is no page here" in body
+    assert "About the portal" in body and "The home page" in body

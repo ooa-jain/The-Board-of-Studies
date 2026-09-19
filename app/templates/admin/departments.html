@@ -24,23 +24,38 @@
 {% endblock %}
 
 {% block content %}
-{# Campus is the filter people reach for first, so it gets the pill row
-   rather than a dropdown; search and school stay in the form beneath. #}
+{# Two levels: the city first, because most of the time that is the whole
+   question, and then the campus within it. Choosing a city narrows the
+   campus row to the campuses that city actually has. #}
+<div class="filter-bar">
+  <nav class="place-toggle" aria-label="Filter by city">
+    <a href="{{ url_for('admin.departments', q=filters.q or None, school=filters.school or None) }}"
+       {% if not filters.place %}aria-current="true"{% endif %}>All</a>
+    {% for pl in places %}
+    <a href="{{ url_for('admin.departments', place=pl, q=filters.q or None, school=filters.school or None) }}"
+       {% if filters.place == pl %}aria-current="true"{% endif %}>{{ pl }}</a>
+    {% endfor %}
+  </nav>
+  <span class="spacer small muted">
+    {{ departments|length }} shown{% if departments|length != total %} of {{ total }}{% endif %}
+  </span>
+</div>
+
 <div class="filter-bar">
   <nav class="pill-tabs" aria-label="Filter by campus">
-    <a href="{{ url_for('admin.departments', q=filters.q or None, school=filters.school or None) }}"
-       {% if not filters.campus %}aria-current="true"{% endif %}>All</a>
+    <a href="{{ url_for('admin.departments', place=filters.place or None, q=filters.q or None, school=filters.school or None) }}"
+       {% if not filters.campus %}aria-current="true"{% endif %}>All campuses</a>
     {% for c in campuses %}
-    <a href="{{ url_for('admin.departments', campus=c, q=filters.q or None, school=filters.school or None) }}"
+    <a href="{{ url_for('admin.departments', place=filters.place or None, campus=c, q=filters.q or None, school=filters.school or None) }}"
        {% if filters.campus == c %}aria-current="true"{% endif %}>{{ c }}</a>
     {% endfor %}
   </nav>
-  <span class="spacer small muted">{{ departments|length }} shown</span>
 </div>
 
 <div class="card mb-2">
   <div class="card-body tight">
     <form class="flex flex-wrap" method="get">
+      <input type="hidden" name="place" value="{{ filters.place }}">
       <input type="hidden" name="campus" value="{{ filters.campus }}">
       <label class="sr-only" for="dept-q">Search departments</label>
       <input id="dept-q" type="search" name="q" value="{{ filters.q }}"
@@ -118,4 +133,29 @@
     </div>
   </div>
 </div>
+
+{# Emptying the master is the one thing on this page that cannot be undone by
+   clicking again, so it asks for the words rather than for a click, and it
+   sits at the foot rather than beside the everyday buttons. #}
+<details class="danger-zone">
+  <summary>Remove every department</summary>
+  <div class="danger-body">
+    <p class="small">
+      This removes all <strong>{{ total }}</strong> department records, every department
+      login, and every submission filed against them. The Office of Academics keeps no
+      other copy inside the portal.
+    </p>
+    <p class="small muted">
+      It is recoverable: <span class="mono">python seed.py --logins</span> rebuilds the
+      whole master from the Office of Academics workbook and issues fresh logins. What
+      does not come back is the submitted work.
+    </p>
+    <form method="post" action="{{ url_for('admin.departments_clear') }}" class="flex flex-wrap">
+      <label class="sr-only" for="confirm-clear">Type REMOVE ALL to confirm</label>
+      <input id="confirm-clear" type="text" name="confirm" autocomplete="off"
+             spellcheck="false" placeholder="Type REMOVE ALL" style="max-width:220px">
+      <button class="btn btn-danger btn-sm" type="submit">Remove every department</button>
+    </form>
+  </div>
+</details>
 {% endblock %}

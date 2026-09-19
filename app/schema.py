@@ -20,7 +20,11 @@ SECTION TYPES
 # Shared option lists
 # --------------------------------------------------------------------------
 
-CAMPUSES = ["Bengaluru", "Kochi"]
+# The campus list lives in the configuration, where the admin screens read it
+# from too; a second copy here would drift the moment a campus is added.
+from config import Config as _Config  # noqa: E402
+
+CAMPUSES = list(_Config.CAMPUSES)
 
 DEGREE_LEVELS = [
     "UG - 3 Year",
@@ -72,15 +76,14 @@ DEPARTMENT_INFORMATION = {
             "fields": [
                 {"name": "dept_name", "label": "Department name", "type": "text", "required": True,
                  "prefill": "dept_name", "help": "Exactly as it appears on official university records."},
-                {"name": "school", "label": "School / Faculty", "type": "text", "required": True,
+                {"name": "faculty", "label": "Faculty", "type": "text", "prefill": "faculty"},
+                {"name": "school", "label": "School", "type": "text", "required": True,
                  "prefill": "school"},
                 {"name": "dept_code", "label": "Department code", "type": "text", "required": True,
                  "prefill": "dept_code", "pattern": "^[A-Za-z0-9\\-/]{2,20}$",
                  "help": "Letters, numbers, hyphen or slash only."},
-                {"name": "campus", "label": "Campus / Location", "type": "select", "required": True,
+                {"name": "campus", "label": "Campus", "type": "select", "required": True,
                  "options": CAMPUSES, "prefill": "campus"},
-                {"name": "campus_address", "label": "Campus address", "type": "textarea", "required": True,
-                 "rows": 3},
                 {"name": "academic_year", "label": "Academic year", "type": "readonly", "prefill": "academic_year"},
             ],
         },

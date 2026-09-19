@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from functools import wraps
 
+from urllib.parse import quote
+
 from flask import (Blueprint, abort, flash, redirect, render_template,
                    request, session, url_for)
 
@@ -53,47 +55,63 @@ def department_required(fn):
 # routes
 # ---------------------------------------------------------------------------
 
+def _signin_url(nxt=None):
+    """The one place the sign-in form lives: the home page."""
+    base = url_for("public.landing")
+    if nxt and nxt.startswith("/"):
+        return f"{base}?next={quote(nxt, safe='/')}#signin"
+    return base + "#signin"
+
+
 @bp.route("/login", methods=["GET", "POST"])
 def login():
+    """POST only, in effect.
+
+    There is no separate login page any more — the form is on the home page —
+    so a GET here is somebody following an old link, or being sent by
+    @login_required, and it goes to the form, carrying `next` with it.
+    """
     if session.get("user"):
         return _home_for(session["user"])
 
-    error = None
-    if request.method == "POST":
-        username = (request.form.get("username") or "").strip().lower()
-        password = request.form.get("password") or ""
-        db = get_db()
-        user = db.users.find_one({"username": username, "active": True})
+    nxt = request.form.get("next") or request.args.get("next")
+    if request.method == "GET":
+        return redirect(_signin_url(nxt))
 
-        if not user or not check_password(password, user["password"]):
-            error = "That username and password do not match any account."
-            audit(username or "unknown", "login.failed", request.remote_addr or "")
-        else:
-            payload = {
-                "username": user["username"],
-                "role": user["role"],
-                "name": user.get("name") or user["username"],
-                "dept_code": user.get("dept_code"),
-                "must_change": bool(user.get("must_change")),
-            }
-            session["user"] = payload
-            session.permanent = True
-            db.users.update_one({"_id": user["_id"]},
-                                {"$set": {"last_login": now()},
-                                 "$inc": {"login_count": 1}})
-            if user["role"] == "department" and user.get("dept_code"):
-                # once the department has signed in, the admin no longer sees
-                # the generated password in the clear
-                db.departments.update_one(
-                    {"dept_code": user["dept_code"], "first_login_at": {"$exists": False}},
-                    {"$set": {"first_login_at": now()}, "$unset": {"initial_password": ""}})
-            audit(user["username"], "login.ok", request.remote_addr or "")
-            nxt = request.args.get("next")
-            if nxt and nxt.startswith("/"):
-                return redirect(nxt)
-            return _home_for(payload)
+    username = (request.form.get("username") or "").strip().lower()
+    password = request.form.get("password") or ""
+    db = get_db()
+    user = db.users.find_one({"username": username, "active": True})
 
-    return render_template("login.html", error=error)
+    if not user or not check_password(password, user["password"]):
+        audit(username or "unknown", "login.failed", request.remote_addr or "")
+        # the form lives on the home page, so the message has to go back there
+        flash("That username and password do not match any account.", "error")
+        return redirect(_signin_url(nxt))
+
+    payload = {
+        "username": user["username"],
+        "role": user["role"],
+        "name": user.get("name") or user["username"],
+        "dept_code": user.get("dept_code"),
+        "must_change": bool(user.get("must_change")),
+    }
+    session["user"] = payload
+    session.permanent = True
+    db.users.update_one({"_id": user["_id"]},
+                        {"$set": {"last_login": now()},
+                         "$inc": {"login_count": 1}})
+    if user["role"] == "department" and user.get("dept_code"):
+        # once the department has signed in, the admin no longer sees the
+        # generated password in the clear
+        db.departments.update_one(
+            {"dept_code": user["dept_code"], "first_login_at": {"$exists": False}},
+            {"$set": {"first_login_at": now()}, "$unset": {"initial_password": ""}})
+    audit(user["username"], "login.ok", request.remote_addr or "")
+
+    if nxt and nxt.startswith("/"):
+        return redirect(nxt)
+    return _home_for(payload)
 
 
 def _home_for(user):

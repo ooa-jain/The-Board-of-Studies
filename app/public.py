@@ -1,6 +1,6 @@
 """Public landing page and campus information."""
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request
 
 from .db import get_db
 
@@ -31,6 +31,10 @@ CAMPUS_INFO = [
 @bp.route("/")
 def landing():
     db = get_db()
+    # somewhere behind a login sent us here; the form carries it back
+    nxt = request.args.get("next")
+    if not (nxt or "").startswith("/"):
+        nxt = None
     schools = sorted(x for x in db.departments.distinct("school", {"active": True}) if x)
     stats = {
         "departments": db.departments.count_documents({"active": True}),
@@ -44,7 +48,8 @@ def landing():
           "count": db.departments.count_documents({"school": s, "active": True})}
          for s in schools),
         key=lambda x: (-x["count"], x["name"]))
-    return render_template("landing.html", stats=stats, by_school=by_school)
+    return render_template("landing.html", stats=stats, by_school=by_school,
+                           next_url=nxt)
 
 
 # What a department actually hands over, and the stage it hands it over at.

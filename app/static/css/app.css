@@ -171,26 +171,36 @@ h4 { font-size: 1rem; }
 /* ---------- the masthead ----------
    A floating rounded bar rather than a full-bleed strip, as on the reference:
    it sits on the page with air around it and rides the scroll. */
+/* The same bar on the home page and on every page inside: one floating white
+   rounded bar, the sections on the left, the wordmark in the middle, the
+   account on the right. Three zones rather than a row that drifts, so the
+   wordmark lands in the same place whatever is beside it. */
 .topbar {
-  position: sticky; top: 0; z-index: 40;
-  margin: 0 auto; padding: 0;
+  position: sticky; top: 14px; z-index: 40;
+  /* body is a column flex container, so an auto side margin here would
+     shrink-wrap the bar to its contents instead of centring it. The bar runs
+     the full width; the pill inside it is what is centred. */
+  align-self: stretch; margin: 14px 0 0; padding: 0;
   background: transparent; color: var(--ink-900); box-shadow: none;
 }
-body:not(.has-hero) .topbar { position: sticky; top: 14px; margin-top: 14px; }
-/* on the gold, the bar scrolls away with the hero rather than sticking */
-body.has-hero .topbar { position: absolute; left: 0; right: 0; }
 .topbar .wrap {
-  display: flex; align-items: center; gap: 22px; height: 78px;
-  max-width: 1240px; padding: 0 24px;
-  background: transparent; border: 0; border-radius: 0; box-shadow: none;
-}
-/* over the gold hero the bar is part of it; elsewhere it carries its own
-   surface so it does not float on nothing */
-body:not(.has-hero) .topbar .wrap {
-  height: 64px; background: rgba(253,251,247,.90); backdrop-filter: blur(14px);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  gap: 16px; height: 66px; max-width: 1200px; padding: 0 14px;
+  background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
   border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
-  max-width: 1200px; padding: 0 12px 0 22px;
+  position: relative;
 }
+/* display:contents lets the two groups sit in the bar's own grid on a wide
+   screen, and become one dropdown panel on a narrow one */
+.topnav { display: contents; }
+/* Every zone is pinned to row 1. Without that, grid auto-placement — which
+   never goes backwards — would push the left-hand links onto a second row,
+   because they come after the wordmark in the markup. */
+.nav-left { grid-area: 1 / 1; justify-self: start; display: flex; align-items: center; gap: 2px; }
+.brand { grid-area: 1 / 2; justify-self: center; }
+.nav-right { grid-area: 1 / 3; justify-self: end; display: flex; align-items: center; gap: 8px; }
+.nav-toggle { grid-area: 1 / 1; justify-self: start; }
+
 @media (max-width: 900px) {
   .topbar { top: 10px; margin-top: 10px; }
   .topbar .wrap { border-radius: 26px; }
@@ -202,21 +212,10 @@ body:not(.has-hero) .topbar .wrap {
 .brand-text strong { display: block; font-size: .92rem; letter-spacing: -.01em; line-height: 1.15; color: var(--ink-800); }
 .brand-text span { display: block; font-size: .72rem; color: var(--ink-faint); letter-spacing: .06em; text-transform: uppercase; }
 
-.topnav { display: flex; gap: 4px; margin-left: auto; align-items: center; }
 .topnav a {
-  color: var(--ink-soft); padding: 9px 16px; border-radius: 999px;
-  font-size: .87rem; font-weight: 600;
+  color: var(--ink-soft); padding: 9px 13px; border-radius: 999px;
+  font-size: .85rem; font-weight: 600; white-space: nowrap;
 }
-body.has-hero .topnav a { color: var(--ink-800); font-weight: 700; }
-/* the bar sits on white now, so it needs its own edge to sit against */
-body.has-hero .topbar { border-bottom: 1px solid var(--line); }
-body.has-hero .topbar .wrap { background: #fff; }
-/* the filled CTA keeps its knocked-out label — the rule above outranks
-   .topnav a.nav-cta and would paint navy text on a navy button */
-body.has-hero .topnav a.nav-cta { color: #fff; }
-body.has-hero .topnav a.nav-cta:hover { color: #fff; background: var(--ink-900); }
-body.has-hero .topnav a:hover { background: var(--ink-050); }
-body.has-hero .brand-text span { color: var(--ink-700); }
 .topnav a:hover { background: var(--ink-050); color: var(--ink-800); text-decoration: none; }
 .topnav a.active { background: var(--ink-100); color: var(--ink-800); }
 
@@ -232,9 +231,10 @@ body.has-hero .brand-text span { color: var(--ink-700); }
 .topnav a.nav-cta:hover .arrow { transform: translateX(3px); }
 
 .who {
-  display: flex; align-items: center; gap: 10px; padding-left: 16px; margin-left: 6px;
+  display: flex; align-items: center; gap: 10px; padding-left: 14px;
   border-left: 1px solid var(--line);
 }
+.who > a { padding: 9px 12px; }
 .who-avatar {
   width: 32px; height: 32px; border-radius: 50%; flex: none;
   background: var(--ink-800); color: #fff;
@@ -246,7 +246,7 @@ body.has-hero .brand-text span { color: var(--ink-700); }
 
 /* the menu button only exists below the breakpoint */
 .nav-toggle {
-  display: none; margin-left: auto; align-items: center; gap: 8px;
+  display: none; align-items: center; gap: 8px;
   background: var(--ink-800); border: 1px solid var(--ink-800);
   color: #fff; border-radius: 999px; padding: 9px 17px;
   font: 600 .84rem var(--font); cursor: pointer;
@@ -260,23 +260,33 @@ body.has-hero .brand-text span { color: var(--ink-700); }
    so below 900px the links collapse behind a Menu button and drop down as a
    full-width panel. */
 @media (max-width: 900px) {
-  .topbar .wrap { gap: 12px; height: 58px; }
+  /* the menu button takes the left zone, the wordmark keeps the middle, and
+     both groups drop together as one panel */
+  .topbar .wrap { gap: 12px; height: 58px; grid-template-columns: 1fr auto 1fr; }
   .brand-text strong { font-size: .88rem; }
   .brand-text span { font-size: .66rem; }
 
   .nav-toggle { display: inline-flex; }
+  .nav-left { display: none; }
 
   .topnav {
     display: none;
     position: absolute; left: 0; right: 0; top: calc(100% + 8px);
-    flex-direction: column; align-items: stretch; gap: 2px;
     margin: 0; padding: 12px;
     background: var(--surface); border: 1px solid var(--line); border-radius: 24px;
     box-shadow: var(--shadow-lg);
     max-height: calc(100vh - 110px); overflow-y: auto;
   }
-  .topnav[data-open="true"] { display: flex; }
+  .topnav[data-open="true"] { display: block; }
+  .topnav[data-open="true"] .nav-left {
+    display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+  }
+  .topnav .nav-right {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+    margin-top: 8px;
+  }
   .topnav a { padding: 11px 12px; font-size: .92rem; }
+  .nav-right .nav-cta { justify-content: center; }
 
   .who {
     border-left: 0; border-top: 1px solid rgba(255,255,255,.14);
@@ -619,7 +629,8 @@ input.is-bad, select.is-bad, textarea.is-bad {
 .hero {
   background: #fff;
   color: var(--ink);
-  padding: 104px 0 64px; position: relative; overflow: hidden;
+  /* the bar is in the flow above the hero now, not laid over it */
+  padding: 48px 0 64px; position: relative; overflow: hidden;
   border-radius: 0; margin: 0;
   border-bottom: 2px solid var(--gold-400);
 }
@@ -1531,6 +1542,60 @@ footer.site {
 footer.site .brand-logo { height: 26px; }
 footer.site .wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 footer.site a { color: rgba(255,255,255,.72); }
+
+/* ---------- the city toggle ----------
+   Two cities is a toggle, not a list: it sits above the campus pills and
+   decides which campuses those pills offer at all. */
+.place-toggle {
+  display: inline-flex; padding: 3px; gap: 3px;
+  background: var(--ink-050); border: 1px solid var(--line); border-radius: 999px;
+}
+.place-toggle a {
+  padding: 8px 20px; border-radius: 999px; font-size: .82rem; font-weight: 700;
+  color: var(--ink-soft); text-decoration: none; white-space: nowrap;
+}
+.place-toggle a:hover { color: var(--ink-900); background: #fff; }
+.place-toggle a[aria-current="true"] {
+  background: var(--ink-800); color: #fff; box-shadow: var(--shadow-sm);
+}
+
+/* ---------- the one irreversible control on the page ---------- */
+.danger-zone {
+  margin: 30px 0 10px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface);
+}
+.danger-zone > summary {
+  cursor: pointer; padding: 14px 18px; font-weight: 700; font-size: .88rem;
+  color: var(--err); list-style-position: inside;
+}
+.danger-zone > summary:hover { background: var(--err-bg); border-radius: var(--radius-sm); }
+.danger-zone[open] > summary { border-bottom: 1px solid var(--line); border-radius: 0; }
+.danger-body { padding: 16px 18px 18px; }
+.danger-body p { max-width: 70ch; }
+
+/* ---------- the not-found page, and its siblings ---------- */
+.error-page {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  gap: 40px; align-items: center; padding: 20px 0 40px;
+}
+@media (max-width: 820px) {
+  .error-page { grid-template-columns: 1fr; gap: 24px; }
+  .error-art { max-width: 260px; }
+}
+.error-code {
+  font-family: var(--font-mono); font-size: .82rem; letter-spacing: .3em;
+  color: var(--ink-faint); margin: 0 0 26px;
+}
+.error-h2 { font-family: var(--font-head); font-size: 1.3rem; margin: 0 0 14px; }
+.error-links { list-style: none; margin: 0 0 24px; padding: 0; max-width: 46ch; }
+.error-links li { padding: 14px 0; border-top: 1px solid var(--line); }
+.error-links li:first-child { border-top: 0; padding-top: 0; }
+.error-links a { font-weight: 700; }
+.error-links span { display: block; font-size: .83rem; color: var(--ink-faint); margin-top: 2px; }
+.error-art {
+  color: var(--ink-800);
+  --paper-art: #fff; --seal-art: var(--ink-800); --seal-tick: var(--gold-400);
+}
 
 /* ---------- the About page ---------- */
 .about-grid {
