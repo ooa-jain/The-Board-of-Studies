@@ -210,6 +210,97 @@
     return input;
   }
 
+  /* ---------------------------------------------------------------- preview
+     A file that has just been uploaded should be visible without leaving the
+     form: the wrong scan is otherwise found weeks later by somebody else.
+
+     A PDF previews for real — browsers render one natively, so a scaled-down
+     frame of the first page is the actual document. So does an image. A Word
+     or Excel file cannot be rendered in a browser without shipping a
+     converter, so it gets a page-shaped card carrying its type, its name and
+     its size, and opens in one click. */
+
+  const IMAGE = /\.(png|jpe?g|webp|gif)$/i;
+
+  function fileKind(name) {
+    const ext = (String(name).match(/\.([a-z0-9]+)$/i) || [, ""])[1].toLowerCase();
+    if (ext === "pdf") return { ext, kind: "pdf", label: "PDF" };
+    if (IMAGE.test("." + ext)) return { ext, kind: "image", label: ext.toUpperCase() };
+    if (ext === "doc" || ext === "docx") return { ext, kind: "doc", label: "WORD" };
+    if (ext === "xls" || ext === "xlsx" || ext === "csv")
+      return { ext, kind: "sheet", label: ext === "csv" ? "CSV" : "EXCEL" };
+    return { ext, kind: "other", label: (ext || "file").toUpperCase() };
+  }
+
+  function sizeLabel(bytes) {
+    if (!bytes && bytes !== 0) return "";
+    return bytes >= 1048576
+      ? (bytes / 1048576).toFixed(1) + " MB"
+      : Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  function filePreview(host, val) {
+    const old = host.querySelector(".file-preview");
+    if (old) old.remove();
+    if (!val || !val.name) return;
+
+    const info = fileKind(val.name);
+    const card = el("div", "file-preview kind-" + info.kind);
+
+    const thumb = el("div", "file-thumb");
+
+    // the card that stands in when the real thing cannot be shown: a page
+    // with its corner turned, carrying the file's type
+    function drawnPage() {
+      const d = el("span", "file-drawn");
+      d.appendChild(el("span", "file-ext", info.label));
+      return d;
+    }
+
+    if (val.thumb || (val.url && info.kind === "image")) {
+      /* A picture of the first page, drawn by the server. Whether a browser
+         will render a PDF inside the page is up to the browser; an image is
+         not. If it never arrives — no renderer on the server, an encrypted
+         file — the card takes its place. */
+      const img = document.createElement("img");
+      img.src = val.thumb || (val.url + "?inline=1");
+      img.alt = info.kind === "pdf"
+        ? "First page of " + val.name : "Preview of " + val.name;
+      img.loading = "lazy";
+      img.addEventListener("error", function () {
+        img.remove();
+        thumb.classList.add("is-drawn");
+        thumb.appendChild(drawnPage());
+      });
+      thumb.appendChild(img);
+    } else {
+      thumb.classList.add("is-drawn");
+      thumb.appendChild(drawnPage());
+    }
+    card.appendChild(thumb);
+
+    const meta = el("div", "file-meta");
+    meta.appendChild(el("strong", "file-name", val.name));
+    const facts = el("span", "file-facts");
+    facts.textContent = [info.label, sizeLabel(val.size)].filter(Boolean).join(" · ");
+    meta.appendChild(facts);
+
+    if (val.url) {
+      const open = el("a", "file-open", info.kind === "pdf" || info.kind === "image"
+        ? "Open full size" : "Open");
+      open.href = val.url;
+      open.target = "_blank";
+      open.rel = "noopener";
+      meta.appendChild(open);
+      if (info.kind === "doc" || info.kind === "sheet") {
+        meta.appendChild(el("span", "file-note",
+          "Word and Excel files cannot be shown in a browser — open it to check it."));
+      }
+    }
+    card.appendChild(meta);
+    host.appendChild(card);
+  }
+
   function uploadFile(input, def, onChange) {
     const file = input.files[0];
     if (!file) return;
@@ -226,9 +317,13 @@
       .then(r => r.json())
       .then(j => {
         if (j.ok) {
-          note.textContent = `Uploaded: ${j.name} (${Math.round(j.size / 1024)} KB)`;
+          // thumb comes along too, or the preview has no picture to show
+          const val = { name: j.name, stored: j.stored, size: j.size,
+                        url: j.url, thumb: j.thumb || null };
+          note.textContent = `Uploaded: ${j.name} (${sizeLabel(j.size)})`;
           note.className = "help upload-note is-ok";
-          onChange({ name: j.name, stored: j.stored, size: j.size, url: j.url });
+          filePreview(input.parentElement, val);
+          onChange(val);
         } else {
           note.textContent = j.error || "Upload failed.";
           note.className = "help upload-note is-bad-text";
@@ -279,6 +374,7 @@
       const n = el("span", "help upload-note", `Uploaded: ${value.name}`);
       n.classList.add("is-ok");
       wrap.appendChild(n);
+      filePreview(wrap, value);
     }
     if (def.help) {
       const help = el("span", "help", def.help);

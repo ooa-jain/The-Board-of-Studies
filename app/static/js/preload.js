@@ -2,12 +2,12 @@
    The loading screen.
 
    It covers the home page on every load, spells the university and the
-   office out of particles, holds for three seconds, and then gets out of the
-   way. Three rules it obeys:
+   office out of particles, and waits to be let past. Three rules it obeys:
 
-     · three seconds is a floor, not a wait for its own sake — the page keeps
-       loading underneath, and a click or a key gets past it at once;
-     · it never traps anybody: a hard cap lifts it even if the page itself
+     · ten seconds is the longest it will ever hold, not a sentence to serve:
+       a click anywhere, or Enter, or Escape, goes straight in, and the page
+       keeps loading underneath the whole time;
+     · it never traps anybody: the hard cap lifts it even if the page itself
        never finishes loading;
      · with JavaScript off it is never shown at all (the markup is hidden
        until this file reveals it), and with reduced motion the words are
@@ -20,9 +20,9 @@
   var el = document.getElementById("preload");
   if (!el) return;
 
-  var SHOW = 3000;      // the curtain is up for three seconds, every load
-  var FADE = 560;       // matches the CSS transition
-  var HARD_CAP = 5200;  // nothing keeps the page covered longer than this
+  var SHOW = 10000;      // the longest the curtain holds by itself
+  var FADE = 560;        // matches the CSS transition
+  var HARD_CAP = 12000;  // nothing keeps the page covered longer than this
 
   var canvas = el.querySelector(".preload-canvas");
   var engine = null;
@@ -55,9 +55,18 @@
     dismiss();
   }
 
-  /* Three seconds from the refresh — time the page spends loading is time
-     already served, not three seconds added on top of it. The animation and
-     the load event are still waited for, in case either runs past the three. */
+  /* The invitation only appears once there is something to look at, so it
+     does not flash up before the words have formed. */
+  function offerTheWayIn() {
+    el.classList.add("is-ready");
+    var enter = el.querySelector(".preload-enter");
+    if (enter) enter.removeAttribute("tabindex");
+  }
+
+  /* Ten seconds from the refresh — time the page spends loading is time
+     already served, not ten seconds added on top of it. Nobody should have to
+     wait it out, so the way in is on the screen from the moment the words
+     land. */
   var wantLoad = document.readyState !== "complete";
   var pending = wantLoad ? 2 : 1;
   function ready() {
@@ -78,13 +87,17 @@
         { text: "JAIN", fontSize: "clamp(3.5rem, 15vw, 9rem)", fontWeight: 800,
           fontFamily: 'inherit', letterSpacing: "-0.02em", density: 4,
           particleSize: 2.2 },
-        { text: "(Deemed-to-be University)", fontSize: "clamp(1rem, 3.4vw, 1.6rem)",
+        /* Sampled every pixel, not every second one: at this size a coarser
+           grid drops whole strokes and the words stop being words. The
+           particles are a shade wider than their cell so the strokes join
+           up rather than reading as dots. */
+        { text: "(Deemed-to-be University)", fontSize: "clamp(1.05rem, 3.6vw, 1.75rem)",
           fontWeight: 600, letterSpacing: "0.02em", lineHeight: 1.5,
-          density: 2, particleSize: 1.7 },
-        { text: "Office of Academics", fontSize: "clamp(.78rem, 2.4vw, 1.05rem)",
-          fontWeight: 600, letterSpacing: "0.34em", lineHeight: 1.6,
-          gapAbove: "0.9rem", textTransform: "uppercase",
-          density: 2, particleSize: 1.6 },
+          density: 1, particleSize: 1.5 },
+        { text: "Office of Academics", fontSize: "clamp(.85rem, 2.6vw, 1.15rem)",
+          fontWeight: 700, letterSpacing: "0.3em", lineHeight: 1.7,
+          gapAbove: "1rem", textTransform: "uppercase",
+          density: 1, particleSize: 1.5 },
       ],
       // the brief's greys swapped for the university's own two colours: the
       // particles fly in the roundel gold and settle to the warm ivory
@@ -98,7 +111,7 @@
       repelRadius: 120,
       idleDrift: 0.8,
       glow: true,
-      onSettle: ready
+      onSettle: function () { offerTheWayIn(); ready(); }
     });
 
     el.classList.add("is-live");

@@ -555,3 +555,99 @@ def test_the_not_found_page_offers_a_way_onward(client):
     body = r.get_data(as_text=True)
     assert "There is no page here" in body
     assert "About the portal" in body and "The home page" in body
+
+
+def _tiny_pdf():
+    """A valid one-page PDF, built here so the test needs no fixture file."""
+    objs = ["<< /Type /Catalog /Pages 2 0 R >>",
+            "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+            "/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>"]
+    stream = "BT /F1 24 Tf 60 760 Td (DIAC Composition) Tj ET\n"
+    objs.append(f"<< /Length {len(stream)} >>\nstream\n{stream}endstream")
+    objs.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    out, offsets = bytearray(b"%PDF-1.4\n"), []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    for off in offsets:
+        out += f"{off:010d} 00000 n \n".encode()
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    return bytes(out)
+
+
+def _upload(client, name, data):
+    import io
+    return client.post("/department/api/upload", data={
+        "file": (io.BytesIO(data), name), "stage": "pre_bos", "field": "diac_file",
+    }, content_type="multipart/form-data").get_json()
+
+
+def test_a_pdf_upload_is_given_a_picture_of_its_first_page(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+
+    j = _upload(client, "diac.pdf", _tiny_pdf())
+    assert j["ok"] and j["thumb"], j
+    r = client.get(j["thumb"])
+    assert r.status_code == 200
+    assert r.headers["Content-Type"] == "image/png"
+    assert r.get_data()[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
+
+    # drawn once, then kept: the second request is served from the same file
+    assert client.get(j["thumb"]).status_code == 200
+
+
+def test_a_word_upload_has_no_picture_and_does_not_pretend_to(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+
+    j = _upload(client, "minutes.docx", b"PK\x03\x04 not really a docx")
+    assert j["ok"]
+    assert j["thumb"] is None, "only a PDF can be drawn"
+    assert client.get(j["url"] + "?thumb=1").status_code == 404
+
+
+def test_files_download_unless_the_page_asks_to_show_them(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    j = _upload(client, "diac.pdf", _tiny_pdf())
+
+    plain = client.get(j["url"])
+    assert "attachment" in plain.headers["Content-Disposition"]
+
+    shown = client.get(j["url"] + "?inline=1")
+    assert "attachment" not in shown.headers.get("Content-Disposition", "")
+
+    # a Word file is never handed over to be displayed: the browser would only
+    # offer to download it again, under a worse name
+    w = _upload(client, "minutes.docx", b"PK\x03\x04")
+    assert "attachment" in client.get(w["url"] + "?inline=1").headers["Content-Disposition"]
+
+
+def test_a_signed_in_department_is_not_asked_to_sign_in_again(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    body = client.get("/").get_data(as_text=True)
+
+    assert 'name="password"' not in body, "the home page still asks for a password"
+    assert "Sign out" in body
+    assert ">Home</a>" in body, "no way back to the home page from the bar"
+    # and it shows where they had got to
+    assert "0 of 13 stages submitted" in body
+    assert "Your next step" in body and "Department Information" in body
+
+    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    body = client.get("/").get_data(as_text=True)
+    assert "1 of 13 stages submitted" in body
+    assert "Pre-BoS" in body
+
+
+def test_the_admin_gets_the_console_not_a_department_panel(app, client):
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    body = client.get("/").get_data(as_text=True)
+    assert 'name="password"' not in body
+    assert "The admin dashboard" in body
+    assert "stages submitted" not in body

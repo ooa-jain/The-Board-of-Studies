@@ -22,6 +22,16 @@
     Loading the OOA Data Portal — JAIN (Deemed-to-be University), Office of Academics.
   </p>
   <div class="preload-foot">
+    {# A real control, not a hint: it takes the focus ring, it answers to
+       Enter and to Space, and a screen reader calls it what it is. Clicking
+       anywhere else on the curtain does the same thing. #}
+    <button class="preload-enter" type="button" tabindex="-1">
+      Click to enter
+      <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
+              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
     <span class="preload-bar" aria-hidden="true"><i></i></span>
     <p class="preload-note">Office of Academics Data Portal</p>
   </div>
@@ -89,6 +99,100 @@
         </div>
       </div>
 
+      {% if resume %}
+      {# Already signed in: the thread you dropped, not a second sign-in. #}
+      <aside class="hero-panel hero-resume" id="signin">
+        <div class="resume-head">
+          <span class="resume-kicker">Signed in · {{ resume.year }}</span>
+          <h2 class="signin-title">{{ resume.dept.dept_name }}</h2>
+          <p class="resume-where">{{ resume.dept.campus }}{% if resume.dept.place %} · {{ resume.dept.place }}{% endif %}</p>
+        </div>
+
+        <div class="resume-bar">
+          <div class="bar" role="progressbar"
+               aria-valuenow="{{ resume.progress.done }}" aria-valuemin="0"
+               aria-valuemax="{{ resume.progress.total }}"
+               aria-label="Stages submitted"><i style="width:{{ resume.progress.percent }}%"></i></div>
+          <span class="resume-count">
+            {{ resume.progress.done }} of {{ resume.progress.total }} stages submitted
+          </span>
+        </div>
+
+        {% if resume.next %}
+        <a class="resume-next" href="{{ url_for('dept.stage', stage_key=resume.next.key) }}">
+          <span class="resume-label">
+            {% if resume.next.status == 'returned' %}Sent back — needs your correction
+            {% elif resume.next.status == 'draft' %}You left off here
+            {% else %}Your next step{% endif %}
+          </span>
+          <span class="resume-title">{{ resume.next.title }}</span>
+          <span class="resume-go">
+            {% if resume.next.status == 'draft' %}Continue{% else %}Start{% endif %}
+            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
+                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </a>
+        {% else %}
+        <div class="resume-next is-done">
+          <span class="resume-label">Every stage submitted</span>
+          <span class="resume-title">
+            {% if resume.sealed %}Sealed — the record is complete{% else %}Nothing left to file{% endif %}
+          </span>
+        </div>
+        {% endif %}
+
+        <p class="signin-note">
+          <a href="{{ url_for('dept.dashboard') }}">All {{ resume.progress.total }} stages</a>
+          · <a href="{{ url_for('dept.export_excel') }}">Excel</a>
+          · <a href="{{ url_for('dept.export_word') }}">Word report</a>
+        </p>
+      </aside>
+
+      {% elif current_user and current_user.role == 'admin' %}
+      {# The Office of Academics, signed in: straight to the console. Guarded
+         on the role, not merely on being signed in — a department must never
+         be pointed at the admin console because a lookup came back empty. #}
+      <aside class="hero-panel hero-resume" id="signin">
+        <div class="resume-head">
+          <span class="resume-kicker">Signed in</span>
+          <h2 class="signin-title">{{ current_user.name }}</h2>
+          <p class="resume-where">{{ stats.departments }} active departments</p>
+        </div>
+        <a class="resume-next" href="{{ url_for('admin.dashboard') }}">
+          <span class="resume-label">Where you were</span>
+          <span class="resume-title">The admin dashboard</span>
+          <span class="resume-go">
+            Open
+            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
+                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </a>
+        <p class="signin-note">
+          <a href="{{ url_for('admin.departments') }}">Departments</a>
+          · <a href="{{ url_for('admin.submissions') }}">Submissions</a>
+        </p>
+      </aside>
+
+      {% elif current_user %}
+      {# Signed in, but with nothing to resume — a department whose record has
+         been removed, say. Say so plainly rather than offering a sign-in they
+         do not need. #}
+      <aside class="hero-panel hero-resume" id="signin">
+        <div class="resume-head">
+          <span class="resume-kicker">Signed in</span>
+          <h2 class="signin-title">{{ current_user.name }}</h2>
+        </div>
+        <p class="signin-note">
+          There is no department record against this login. Write to the Office
+          of Academics, or <a href="{{ url_for('auth.logout') }}">sign out</a>.
+        </p>
+      </aside>
+
+      {% else %}
       {# Signing in is the only thing anybody comes here to do, so it happens
          here rather than one page further on. The form posts to the same
          endpoint as the standalone login page, which is where a wrong
@@ -136,6 +240,7 @@
           will be issued. <a href="{{ url_for('public.about') }}">What happens after you sign in</a>
         </p>
       </aside>
+      {% endif %}
     </div>
   </div>
 </section>

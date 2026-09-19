@@ -56,6 +56,11 @@
 
     <div class="topnav" id="topnav">
       <nav class="nav-left" aria-label="Main">
+        {# Home is in the bar for anyone signed in: the wordmark goes there
+           too, but a named link is what people look for. #}
+        {% if current_user %}
+          {{ nav_link(url_for('public.landing'), 'Home', request.endpoint == 'public.landing') }}
+        {% endif %}
         {% if current_user and current_user.role == 'admin' %}
           {{ nav_link(url_for('admin.dashboard'), 'Dashboard', request.endpoint == 'admin.dashboard') }}
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
@@ -65,7 +70,6 @@
           {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
           <a href="{{ url_for('dept.export_excel') }}">Excel</a>
           <a href="{{ url_for('dept.export_word') }}">Report</a>
-          {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
         {% else %}
           {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
         {% endif %}

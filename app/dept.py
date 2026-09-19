@@ -220,8 +220,51 @@ def api_upload():
            "size": size, "uploaded_by": _me()["username"], "uploaded_at": now()}
     get_db().files.insert_one(rec)
 
-    return jsonify({"ok": True, "name": f.filename, "stored": stored, "size": size,
-                    "url": url_for("dept.download", stage_key=stage_key, stored=stored)})
+    url = url_for("dept.download", stage_key=stage_key, stored=stored)
+    return jsonify({
+        "ok": True, "name": f.filename, "stored": stored, "size": size, "url": url,
+        # drawn on the first request for it, then kept; the page falls back to
+        # a card if it never arrives
+        "thumb": url + "?thumb=1" if ext == ".pdf" else None,
+    })
+
+
+# The browser renders a PDF or an image itself, but only if it is handed one
+# inline; as an attachment it downloads instead. Anything else stays an
+# attachment, because a browser asked to display a .docx offers to download
+# it anyway — with a worse filename.
+INLINE_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"}
+THUMB_MAX = (420, 560)
+
+
+def _thumbnail(source: Path) -> Path | None:
+    """Draw the first page of a PDF, once, and keep it beside the file.
+
+    Returns the image's path, or None if it cannot be drawn — an encrypted
+    PDF, a damaged one, or a deployment without the renderer installed. The
+    caller falls back to the drawn card, so a failure here costs a picture
+    and nothing else.
+    """
+    thumb = source.with_suffix(source.suffix + ".thumb.png")
+    if thumb.exists():
+        return thumb
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:          # renderer not installed on this deployment
+        current_app.logger.info("No PDF renderer; previews fall back to a card.")
+        return None
+    try:
+        doc = pdfium.PdfDocument(source)
+        try:
+            image = doc[0].render(scale=1.4).to_pil()
+        finally:
+            doc.close()
+        image.thumbnail(THUMB_MAX)
+        image.save(thumb, "PNG", optimize=True)
+        return thumb
+    except Exception:
+        current_app.logger.warning("Could not draw a preview of %s", source.name)
+        return None
 
 
 @bp.route("/file/<stage_key>/<stored>")
@@ -234,7 +277,19 @@ def download(stage_key, stored):
     path = current_app.config["UPLOAD_ROOT"] / _year() / dept["dept_code"] / stage_key / stored
     if not path.exists():
         abort(404)
-    return send_file(path, as_attachment=True, download_name=rec["original_name"])
+    suffix = Path(rec["original_name"]).suffix.lower()
+
+    if request.args.get("thumb") == "1":
+        if suffix != ".pdf":
+            abort(404)
+        drawn = _thumbnail(path)
+        if not drawn:
+            abort(404)
+        return send_file(drawn, mimetype="image/png", max_age=86400)
+
+    inline = request.args.get("inline") == "1" and suffix in INLINE_EXT
+    return send_file(path, as_attachment=not inline,
+                     download_name=rec["original_name"])
 
 
 # ---------------------------------------------------------------------------
