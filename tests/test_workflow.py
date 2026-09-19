@@ -46,15 +46,31 @@ def test_landing_page_does_not_name_the_campuses(client):
 def test_seed_list_is_usable_as_a_department_master(app):
     """Codes become usernames, so they have to be unique and so do the names."""
     from seed import SEED_DEPARTMENTS
-    codes = [c for _, _, c in SEED_DEPARTMENTS]
-    names = [n for _, n, _ in SEED_DEPARTMENTS]
+    faculties = [f for f, _, _, _ in SEED_DEPARTMENTS]
+    schools = [s for _, s, _, _ in SEED_DEPARTMENTS]
+    names = [n for _, _, n, _ in SEED_DEPARTMENTS]
+    codes = [c for _, _, _, c in SEED_DEPARTMENTS]
+
     assert len(codes) == len(set(codes)), "duplicate department code"
     assert len(names) == len(set(names)), "duplicate department name"
+    assert all(codes) and all(names), "every department needs a name and a code"
+    assert all(faculties), "every department sits under a faculty"
+    assert all(schools), "every department sits under a school"
 
     from app.db import slugify_username
-    usernames = [slugify_username(c, n) for _, n, c in SEED_DEPARTMENTS]
+    usernames = [slugify_username(c, n) for _, _, n, c in SEED_DEPARTMENTS]
     assert len(usernames) == len(set(usernames)), "two departments would share a login"
-    assert all(codes), "every department needs a code"
+
+
+def test_seed_matches_the_contact_directory(app):
+    """The counts the directory actually contains, so a bad edit is caught."""
+    from seed import SEED_DEPARTMENTS
+    assert len(SEED_DEPARTMENTS) == 30
+    assert len({f for f, _, _, _ in SEED_DEPARTMENTS}) == 6
+    # nothing about a person belongs in the department master
+    flat = " ".join(" ".join(r) for r in SEED_DEPARTMENTS).lower()
+    for word in ("dr.", "director", "hod", "dean", "@"):
+        assert word not in flat, f"{word!r} leaked into the department list"
 
 
 def test_admin_can_sign_in_and_reach_the_dashboard(app, client):

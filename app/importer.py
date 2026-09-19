@@ -18,7 +18,8 @@ from openpyxl import load_workbook
 # Candidate header keywords, in priority order, for each target field.
 HEADER_HINTS = {
     "dept_name": ["department name", "department", "dept name", "dept"],
-    "school": ["school", "faculty", "college", "institute"],
+    "faculty": ["faculty"],
+    "school": ["school", "college", "institute"],
     "dept_code": ["department code", "dept code", "code", "abbreviation", "abbr"],
     "campus": ["campus", "location", "city", "centre", "center"],
 }
@@ -147,6 +148,7 @@ def parse_workbook(file_bytes: bytes, sheet_name: str | None = None,
 
         rows.append({
             "dept_name": name,
+            "faculty": cell("faculty"),
             "school": cell("school") or "—",
             "dept_code": code,
             "campus": normalise_campus(cell("campus"), default_campus),

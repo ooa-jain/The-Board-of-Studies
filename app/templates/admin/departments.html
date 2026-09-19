@@ -74,7 +74,10 @@
               <strong>{{ d.dept_name }}</strong>
               <div class="small muted mono">{{ d.dept_code }}</div>
             </td>
-            <td class="small">{{ d.school }}</td>
+            <td class="small">
+              {% if d.faculty %}<div class="muted" style="font-size:.78rem">{{ d.faculty }}</div>{% endif %}
+              {{ d.school }}
+            </td>
             <td><span class="pill">{{ d.campus }}</span></td>
             <td class="mono small">{{ d.username or '—' }}</td>
             <td>

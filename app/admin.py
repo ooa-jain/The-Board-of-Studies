@@ -95,7 +95,8 @@ def departments():
     if search:
         q["$or"] = [{"dept_name": {"$regex": search, "$options": "i"}},
                     {"dept_code": {"$regex": search, "$options": "i"}},
-                    {"school": {"$regex": search, "$options": "i"}}]
+                    {"school": {"$regex": search, "$options": "i"}},
+                    {"faculty": {"$regex": search, "$options": "i"}}]
     depts = list(db.departments.find(q).sort([("campus", 1), ("school", 1), ("dept_name", 1)]))
     return render_template("admin/departments.html", departments=depts,
                            schools=sorted(x for x in db.departments.distinct("school") if x),
@@ -112,22 +113,30 @@ def department_form(dept_code=None):
     if dept_code and not dept:
         abort(404)
 
+    # existing values offered as suggestions, so a new department lands in an
+    # existing faculty and school rather than a near-miss spelling of one
+    def _form(d):
+        return render_template(
+            "admin/department_form.html", dept=d,
+            campuses=current_app.config["CAMPUSES"],
+            faculties=sorted(x for x in db.departments.distinct("faculty") if x),
+            schools=sorted(x for x in db.departments.distinct("school") if x))
+
     if request.method == "POST":
         f = request.form
         code = (f.get("dept_code") or "").strip().upper()
         if not code:
             flash("Department code is required.", "error")
-            return render_template("admin/department_form.html", dept=dept or f,
-                                   campuses=current_app.config["CAMPUSES"])
+            return _form(dept or f)
         clash = db.departments.find_one({"dept_code": code})
         if clash and (not dept or clash["_id"] != dept["_id"]):
             flash(f"Department code “{code}” is already in use.", "error")
-            return render_template("admin/department_form.html", dept=f,
-                                   campuses=current_app.config["CAMPUSES"])
+            return _form(f)
 
         payload = {
             "dept_code": code,
             "dept_name": (f.get("dept_name") or "").strip(),
+            "faculty": (f.get("faculty") or "").strip(),
             "school": (f.get("school") or "").strip(),
             "campus": f.get("campus") or current_app.config["CAMPUSES"][0],
             "active": f.get("active") == "on",
@@ -145,8 +154,7 @@ def department_form(dept_code=None):
                   f"Generate its login from the department list.", "success")
         return redirect(url_for("admin.departments"))
 
-    return render_template("admin/department_form.html", dept=dept,
-                           campuses=current_app.config["CAMPUSES"])
+    return _form(dept)
 
 
 @bp.route("/departments/<dept_code>/toggle", methods=["POST"])
@@ -277,6 +285,8 @@ def import_commit():
         existing = db.departments.find_one({"dept_code": r["dept_code"]})
         payload = {k: r[k] for k in
                    ("dept_name", "school", "dept_code", "campus")}
+        if r.get("faculty"):
+            payload["faculty"] = r["faculty"]
         payload["active"] = True
         payload["updated_at"] = now()
         if existing and not overwrite:
