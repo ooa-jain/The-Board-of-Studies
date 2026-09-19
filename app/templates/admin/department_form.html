@@ -40,6 +40,15 @@
             {% endfor %}
           </select>
         </div>
+        <div class="field">
+          {# The city, not the campus: several campuses share one. #}
+          <label>Place<span class="req">*</span></label>
+          <select name="place" required>
+            {% for pl in places %}
+            <option value="{{ pl }}" {{ 'selected' if dept and dept.place == pl }}>{{ pl }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
 
       <label class="check mb-2">

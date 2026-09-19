@@ -47,6 +47,7 @@ def create_app(config_object=Config):
             "STAGES": STAGES,
             "GROUP_ORDER": GROUP_ORDER,
             "CAMPUSES": app.config["CAMPUSES"],
+            "PLACES": app.config["PLACES"],
         }
 
     @app.errorhandler(403)

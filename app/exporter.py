@@ -77,8 +77,10 @@ def department_excel(dept_code: str, year: str) -> io.BytesIO:
     meta = [
         ("Department", dept.get("dept_name")),
         ("Department code", dept.get("dept_code")),
-        ("School / Faculty", dept.get("school")),
+        ("Faculty", dept.get("faculty")),
+        ("School", dept.get("school")),
         ("Campus", dept.get("campus")),
+        ("Place", dept.get("place")),
         ("Overall progress", f"{progress(sub)['done']} of {progress(sub)['total']} stages"),
         ("Generated on", datetime.now().strftime("%d %b %Y, %H:%M")),
     ]
@@ -194,7 +196,8 @@ def department_excel(dept_code: str, year: str) -> io.BytesIO:
 
 def institution_excel(year: str) -> io.BytesIO:
     db = get_db()
-    depts = list(db.departments.find({"active": True}).sort([("campus", 1), ("dept_name", 1)]))
+    depts = list(db.departments.find({"active": True})
+                 .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
     subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
 
     wb = Workbook()
@@ -203,15 +206,15 @@ def institution_excel(year: str) -> io.BytesIO:
     ws["A1"] = f"OOA Data Portal — institution status, {year}"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
 
-    header = ["Campus", "School", "Department", "Code", "Progress"] + \
+    header = ["Place", "Campus", "School", "Department", "Code", "Progress"] + \
              [s["title"] for s in STAGES]
     _head(ws, 3, header)
     r = 4
     for d in depts:
         sub = subs.get(d["dept_code"], {})
         p = progress(sub) if sub else {"done": 0, "total": len(STAGES)}
-        row = [d.get("campus"), d.get("school"), d.get("dept_name"), d.get("dept_code"),
-               f"{p['done']}/{p['total']}"]
+        row = [d.get("place"), d.get("campus"), d.get("school"), d.get("dept_name"),
+               d.get("dept_code"), f"{p['done']}/{p['total']}"]
         for s in STAGES:
             row.append(compute_status(sub, s["key"]).title() if sub else "Not started")
         for i, v in enumerate(row, start=1):

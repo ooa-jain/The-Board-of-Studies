@@ -47,6 +47,18 @@ def landing():
     return render_template("landing.html", stats=stats, by_school=by_school)
 
 
+# What a department actually hands over, and the stage it hands it over at.
+# Drawn from the schema's file fields, in the order they are asked for.
+FILINGS = [
+    {"name": "DIAC composition, signed", "stage": "Pre-BoS"},
+    {"name": "Board of Studies composition, signed", "stage": "Pre-BoS"},
+    {"name": "PAC composition, signed", "stage": "Pre-BoS"},
+    {"name": "Meeting agenda and minutes", "stage": "Meeting Documents"},
+    {"name": "Approved BoS file", "stage": "Final BoS Repository"},
+    {"name": "Consolidated PDF of everything", "stage": "Final BoS Repository"},
+]
+
+
 @bp.route("/about")
 def about():
-    return render_template("about.html", campuses=CAMPUS_INFO)
+    return render_template("about.html", campuses=CAMPUS_INFO, filings=FILINGS)

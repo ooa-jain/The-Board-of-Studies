@@ -8,12 +8,13 @@ def login(client, username, password):
                        follow_redirects=False)
 
 
-def make_department(app, code="COM", name="Department of Commerce"):
+def make_department(app, code="COM", name="Department of Commerce",
+                    school="School of Commerce"):
     from app.db import generate_password, get_db, hash_password, now
     with app.app_context():
         db = get_db()
         db.departments.insert_one({
-            "dept_code": code, "dept_name": name, "school": "School of Commerce",
+            "dept_code": code, "dept_name": name, "school": school,
             "campus": "Bengaluru", "hod_name": "Test Head",
             "hod_email": "head@example.edu", "hod_phone": "9999999999",
             "hod_designation": "Head of the Department",
@@ -44,29 +45,32 @@ def test_landing_page_does_not_name_the_campuses(client):
 
 
 def test_seed_list_is_usable_as_a_department_master(app):
-    """Codes become usernames, so they have to be unique and so do the names."""
+    """A submission hangs off the code, so no two records may share one."""
     from seed import SEED_DEPARTMENTS
-    faculties = [f for f, _, _, _ in SEED_DEPARTMENTS]
-    schools = [s for _, s, _, _ in SEED_DEPARTMENTS]
-    names = [n for _, _, n, _ in SEED_DEPARTMENTS]
-    codes = [c for _, _, _, c in SEED_DEPARTMENTS]
+    codes = [c for *_, c in SEED_DEPARTMENTS]
 
     assert len(codes) == len(set(codes)), "duplicate department code"
-    assert len(names) == len(set(names)), "duplicate department name"
-    assert all(codes) and all(names), "every department needs a name and a code"
-    assert all(faculties), "every department sits under a faculty"
-    assert all(schools), "every department sits under a school"
+    assert all(codes), "every department needs a code"
+    for faculty, school, name, place, campus, code in SEED_DEPARTMENTS:
+        assert faculty and school and name and place and campus, code
+        # the same department at a second campus is a second record, and the
+        # pair is what has to be unique, not the name
+        assert campus.strip() == campus
 
-    from app.db import slugify_username
-    usernames = [slugify_username(c, n) for _, _, n, c in SEED_DEPARTMENTS]
-    assert len(usernames) == len(set(usernames)), "two departments would share a login"
+    # a department can sit under two schools at one campus (Management Studies
+    # does), so the triple is what has to be unique, not the pair
+    triples = [(n, s, c) for _, s, n, _, c, _ in SEED_DEPARTMENTS]
+    assert len(triples) == len(set(triples)), "the same record twice"
 
 
-def test_seed_matches_the_contact_directory(app):
-    """The counts the directory actually contains, so a bad edit is caught."""
+def test_seed_matches_the_workbook(app):
+    """The counts the workbook actually contains, so a bad edit is caught."""
     from seed import SEED_DEPARTMENTS
-    assert len(SEED_DEPARTMENTS) == 30
-    assert len({f for f, _, _, _ in SEED_DEPARTMENTS}) == 6
+    assert len(SEED_DEPARTMENTS) == 54
+    assert len({d for _, _, d, _, _, _ in SEED_DEPARTMENTS}) == 30
+    assert len({s for _, s, _, _, _, _ in SEED_DEPARTMENTS}) == 13
+    assert len({f for f, _, _, _, _, _ in SEED_DEPARTMENTS}) == 6
+    assert {p for _, _, _, p, _, _ in SEED_DEPARTMENTS} == {"Bangalore", "Kochi"}
     # nothing about a person belongs in the department master
     flat = " ".join(" ".join(r) for r in SEED_DEPARTMENTS).lower()
     for word in ("dr.", "director", "hod", "dean", "@"):
@@ -116,13 +120,31 @@ def test_credentials_are_generated_and_shown_once(app, client):
     assert payload["password"] not in listing
 
 
-def test_login_is_derived_from_the_department_code(app, client):
-    """No person's details are involved — the code decides the username."""
-    make_department(app, "COM-BBA", "Department of Business Administration")
+def test_login_is_department_school_and_a_number(app, client):
+    """No person's details are involved: the department and its school decide
+    the name, and a number keeps two campuses of one department apart."""
+    import re
+
+    make_department(app, "BBA-JYN", "Department of Business Administration")
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
-    r = client.post("/admin/departments/COM-BBA/credentials",
+    r = client.post("/admin/departments/BBA-JYN/credentials",
                     headers={"Accept": "application/json"})
-    assert r.get_json()["username"] == "com.bba"
+    username = r.get_json()["username"]
+    assert re.fullmatch(r"ba\.sc\.\d{4}", username), username
+
+
+def test_two_campuses_of_one_department_get_different_logins(app, client):
+    from app.db import get_db
+    school = "School of Computer Science and Engineering"
+    make_department(app, "CSE-JGC", "Department of Computer Science and Engineering", school)
+    make_department(app, "CSE-KCH", "Department of Computer Science and Engineering", school)
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    client.post("/admin/credentials/bulk")
+    with app.app_context():
+        names = [d["username"] for d in get_db().departments.find(
+            {"dept_code": {"$in": ["CSE-JGC", "CSE-KCH"]}})]
+    assert len(names) == 2 and names[0] != names[1], names
+    assert all(n.startswith("cse.scse.") for n in names), names
 
 
 def test_bulk_and_single_issue_the_same_shape_of_login(app, client):
@@ -139,16 +161,20 @@ def test_bulk_and_single_issue_the_same_shape_of_login(app, client):
         psy = get_db().departments.find_one({"dept_code": "PSY"})
         eco = get_db().departments.find_one({"dept_code": "ECO"})
 
-    assert eco["username"] == single["username"] == "eco"
-    assert psy["username"] == "psy"
+    import re
+
+    assert eco["username"] == single["username"]
+    for d in (eco, psy):
+        assert re.fullmatch(r"[a-z]+\.[a-z]+\.\d{4}", d["username"]), d["username"]
     # both routes leave the password in the clear for the slip, and a user row
     assert len(psy["initial_password"]) >= 10
     with app.app_context():
-        assert get_db().users.find_one({"username": "psy", "role": "department"})
+        assert get_db().users.find_one({"username": psy["username"],
+                                        "role": "department"})
 
     # the bulk-issued password works
     client.get("/logout")
-    assert login(client, "psy", psy["initial_password"]).status_code == 302
+    assert login(client, psy["username"], psy["initial_password"]).status_code == 302
 
 
 def test_a_department_record_holds_no_personal_details(app, client):

@@ -208,11 +208,14 @@ body:not(.has-hero) .topbar .wrap {
   font-size: .87rem; font-weight: 600;
 }
 body.has-hero .topnav a { color: var(--ink-800); font-weight: 700; }
+/* the bar sits on white now, so it needs its own edge to sit against */
+body.has-hero .topbar { border-bottom: 1px solid var(--line); }
+body.has-hero .topbar .wrap { background: #fff; }
 /* the filled CTA keeps its knocked-out label — the rule above outranks
    .topnav a.nav-cta and would paint navy text on a navy button */
 body.has-hero .topnav a.nav-cta { color: #fff; }
 body.has-hero .topnav a.nav-cta:hover { color: #fff; background: var(--ink-900); }
-body.has-hero .topnav a:hover { background: rgba(9,19,36,.10); }
+body.has-hero .topnav a:hover { background: var(--ink-050); }
 body.has-hero .brand-text span { color: var(--ink-700); }
 .topnav a:hover { background: var(--ink-050); color: var(--ink-800); text-decoration: none; }
 .topnav a.active { background: var(--ink-100); color: var(--ink-800); }
@@ -296,26 +299,26 @@ body.has-hero .brand-text span { color: var(--ink-700); }
    The signed-in screens open the way the home page does: the gold band, the
    ink on top of it, a square rule underneath. */
 .page-head {
-  background: var(--gold-400);
-  border-bottom: 2px solid var(--ink-800);
+  background: #fff;
+  border-bottom: 2px solid var(--gold-400);
   padding: 34px 0 30px;
 }
 .page-head h1 { color: var(--ink-900); }
-.page-head p { color: var(--ink-800); }
-.page-head .crumbs, .page-head .crumbs a { color: var(--ink-700); }
+.page-head p { color: var(--ink-soft); }
+.page-head .crumbs, .page-head .crumbs a { color: var(--ink-faint); }
 .page-head .crumbs a:hover { color: var(--ink-900); }
-.page-head .bar { background: rgba(9,19,36,.18); }
-.page-head .bar-label, .page-head .small, .page-head .muted { color: var(--ink-700); }
+.page-head .bar { background: var(--ink-100); }
+.page-head .bar-label, .page-head .small, .page-head .muted { color: var(--ink-faint); }
 .page-head .btn-ghost {
   background: transparent; border-color: var(--ink-800); color: var(--ink-800);
 }
 .page-head .btn-ghost:hover { background: var(--ink-800); color: #fff; }
-.page-head .pill { background: rgba(9,19,36,.12); color: var(--ink-800); }
+.page-head .pill { background: var(--ink-050); color: var(--ink-800); border: 1px solid var(--line); }
 .page-head .pill-ok { background: var(--ok); color: #fff; }
 .page-head .pill-err { background: var(--err); color: #fff; }
-.page-head .pill-warn { background: var(--ink-800); color: var(--gold-300); }
-.page-head .pill-gold { background: var(--ink-800); color: var(--gold-300); }
-.page-head .pill-lock { background: rgba(9,19,36,.16); color: var(--ink-700); }
+.page-head .pill-warn { background: var(--warn-bg); color: var(--warn); border-color: #efdcae; }
+.page-head .pill-gold { background: var(--ink-800); color: var(--gold-300); border-color: var(--ink-800); }
+.page-head .pill-lock { background: var(--lock-bg); color: var(--ink-faint); }
 .page-head .wrap { display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
 .page-head h1 { margin: 0 0 4px; }
 .page-head p { margin: 0; color: var(--ink-soft); font-size: .93rem; max-width: 70ch; }
@@ -610,14 +613,15 @@ input.is-bad, select.is-bad, textarea.is-bad {
 /* ---------- landing ---------- */
 
 /* ---------- hero ----------
-   The reference puts its brightest colour edge to edge and sets everything on
-   it in the dark brand ink — the masthead included. Ours does the same with
-   the JAIN gold. */
+   White, edge to edge. The gold is now a rule and an accent rather than the
+   ground: on a page whose job is to be signed into, the eye should land on
+   the form, and a full-bleed colour was competing with it. */
 .hero {
-  background: var(--gold-400);
-  color: var(--ink-900);
+  background: #fff;
+  color: var(--ink);
   padding: 104px 0 64px; position: relative; overflow: hidden;
   border-radius: 0; margin: 0;
+  border-bottom: 2px solid var(--gold-400);
 }
 .hero .wrap { position: relative; z-index: 1; }
 
@@ -636,9 +640,9 @@ input.is-bad, select.is-bad, textarea.is-bad {
 .hero .eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: .74rem; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--ink-800); margin-bottom: 18px; font-weight: 700;
+  color: var(--gold-700); margin-bottom: 18px; font-weight: 700;
 }
-.hero .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--ink-800); }
+.hero .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--gold-500); }
 
 /* ---------- availability chip ---------- */
 .chip {
@@ -669,17 +673,22 @@ input.is-bad, select.is-bad, textarea.is-bad {
   letter-spacing: -.035em; margin: 0 0 22px; max-width: 16ch;
 }
 .hero-display { color: var(--ink-900); }
-.hero-display em { font-style: normal; color: var(--ink-800); text-decoration: underline; text-decoration-thickness: .07em; text-underline-offset: .1em; }
-/* on the gold hero the emphasis is the ink, not a second gold */
-.hero h1 em, .hero .hero-display em { color: var(--ink-800); }
-.hero p { font-size: 1.02rem; color: var(--ink-800); max-width: 58ch; margin-bottom: 28px; }
+/* the emphasised words keep the gold, but as a rule under ink rather than as
+   a colour the text itself has to survive */
+.hero-display em {
+  font-style: normal; color: var(--ink-900);
+  text-decoration: underline; text-decoration-color: var(--gold-400);
+  text-decoration-thickness: .09em; text-underline-offset: .12em;
+}
+.hero h1 em, .hero .hero-display em { color: var(--ink-900); }
+.hero p { font-size: 1.02rem; color: var(--ink-soft); max-width: 58ch; margin-bottom: 28px; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .hero .btn-ghost { border-color: rgba(255,255,255,.28); color: #fff; }
 .hero .btn-ghost:hover { background: rgba(255,255,255,.1); color: #fff; }
 
 .hero-stats { display: flex; gap: 42px; margin-top: 46px; flex-wrap: wrap; }
 .hero-stats div .n { font-family: var(--font-head); font-size: 2.1rem; color: var(--ink-900); line-height: 1; font-weight: 700; }
-.hero-stats div .l { font-size: .76rem; color: var(--ink-700); text-transform: uppercase; letter-spacing: .09em; margin-top: 7px; font-weight: 600; }
+.hero-stats div .l { font-size: .76rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .09em; margin-top: 7px; font-weight: 600; }
 
 /* campus cards */
 .campus-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
@@ -776,15 +785,15 @@ input.is-bad, select.is-bad, textarea.is-bad {
 }
 .stories-stamp {
   font-family: var(--font); font-size: .78rem; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--ink-700); margin-bottom: 20px;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 20px;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
-.stories-stamp .sep { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-700); }
+.stories-stamp .sep { width: 4px; height: 4px; border-radius: 50%; background: var(--gold-500); }
 
 .story-list { display: flex; flex-direction: column; }
 .story-item {
   display: grid; grid-template-columns: 34px 1fr; gap: 16px; align-items: start;
-  padding: 18px 0; border-top: 1px solid rgba(9,19,36,.22);
+  padding: 18px 0; border-top: 1px solid var(--line);
   text-decoration: none; color: inherit;
 }
 .story-item:first-child { border-top: 0; padding-top: 4px; }
@@ -796,7 +805,7 @@ input.is-bad, select.is-bad, textarea.is-bad {
 }
 .story-kicker {
   display: block; font-size: .74rem; font-weight: 700; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--ink-700); margin-bottom: 4px;
+  text-transform: uppercase; color: var(--gold-700); margin-bottom: 4px;
 }
 .story-line {
   display: block; font-family: var(--font-head); font-weight: 700;
@@ -805,8 +814,9 @@ input.is-bad, select.is-bad, textarea.is-bad {
 }
 
 /* ---------- the panel beside the hero ----------
-   The reference runs a photograph off the right edge. With no photography to
-   hand, this carries the sequence itself — more use than a stock image. */
+   The reference runs a photograph off the right edge. This carries the sign-in
+   form: on a portal whose only public action is to sign in, asking people to
+   go and find a login page first was a step for nothing. */
 .hero-panel {
   background: var(--ink-800); color: #fff;
   border-radius: 4px; padding: 30px 32px;
@@ -832,8 +842,49 @@ input.is-bad, select.is-bad, textarea.is-bad {
 .seq-group {
   font-family: var(--font); font-size: .68rem; font-weight: 700;
   letter-spacing: .12em; text-transform: uppercase;
-  color: rgba(255,255,255,.55); padding: 14px 0 4px;
+  color: var(--ink-faint); padding: 14px 0 4px;
 }
+
+/* ---------- signing in, on the home page ---------- */
+/* The decorative panel ran off the right edge of the page. A form cannot:
+   its fields and its button have to stay where they can be used. */
+.hero-signin { padding: 34px 32px 32px; margin-right: 0; min-height: 0; }
+.hero-signin .field { margin-bottom: 14px; }
+.hero-signin label {
+  display: block; font-size: .74rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--gold-300); margin-bottom: 7px;
+}
+.hero-signin input[type="text"],
+.hero-signin input[type="password"] {
+  width: 100%; padding: 13px 14px; font: inherit; font-size: .95rem;
+  color: var(--ink); background: #fff;
+  border: 1px solid rgba(255,255,255,.25); border-radius: 3px;
+}
+.hero-signin input::placeholder { color: var(--ink-faint); }
+.hero-signin input:focus-visible {
+  outline: 3px solid var(--gold-400); outline-offset: 2px; border-color: transparent;
+}
+.hero-signin .pw-wrap { position: relative; }
+.hero-signin .pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  border: 0; background: var(--ink-050); color: var(--ink-700);
+  font: inherit; font-size: .74rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; padding: 7px 10px; border-radius: 2px; cursor: pointer;
+}
+.hero-signin .pw-toggle:hover { background: var(--ink-100); color: var(--ink-900); }
+.hero-signin .btn { width: 100%; margin-top: 6px; }
+.hero-signin .signin-note {
+  font-size: .8rem; color: rgba(255,255,255,.72); margin: 16px 0 0; line-height: 1.5;
+}
+.hero-signin .signin-note a { color: var(--gold-300); }
+.hero-signin .alert { margin-bottom: 16px; }
+.signin-title {
+  font-family: var(--font-head); font-size: 1.5rem; font-weight: 700;
+  color: #fff; margin: 0 0 4px; letter-spacing: -.02em;
+}
+/* scoped: .hero p is (0,1,1) and would otherwise win, putting the hero's
+   dark body colour on the navy panel */
+.hero-signin .signin-sub { font-size: .86rem; color: rgba(255,255,255,.76); margin: 0 0 22px; }
 
 /* ---------- landing sections, after the reference ---------------------- */
 
@@ -1480,6 +1531,162 @@ footer.site {
 footer.site .brand-logo { height: 26px; }
 footer.site .wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 footer.site a { color: rgba(255,255,255,.72); }
+
+/* ---------- the About page ---------- */
+.about-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 30px; align-items: start; padding-bottom: 20px;
+}
+@media (max-width: 980px) { .about-grid { grid-template-columns: 1fr; } }
+.about-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 86px; }
+@media (max-width: 980px) { .about-side { position: static; } }
+.about-h2 {
+  font-family: var(--font-head); font-size: 1.5rem; letter-spacing: -.02em;
+  margin: 38px 0 6px; padding-top: 22px; border-top: 2px solid var(--gold-400);
+}
+.lede { font-size: 1.05rem; color: var(--ink-soft); max-width: 68ch; margin-top: 0; }
+.tick-list { margin: 0; padding-left: 18px; }
+.tick-list li { margin-bottom: 7px; }
+.tick-list li::marker { color: var(--gold-600); }
+
+/* the sequence, moved here from beside the home page's headline */
+.seq-panel {
+  background: var(--ink-800); color: #fff;
+  border-radius: 4px; padding: 26px 28px; margin-top: 18px;
+}
+.seq-panel .hero-panel-title { color: var(--gold-300); }
+.seq-panel .seq-group { color: rgba(255,255,255,.55); }
+.seq-blurb {
+  display: block; font-size: .8rem; color: rgba(255,255,255,.62);
+  line-height: 1.45; margin-top: 3px;
+}
+.seq-panel .seq-item { align-items: start; padding: 12px 0; }
+
+/* ---------- FolderFloat ----------
+   A folder that fans its papers out on hover, on focus or on a click. The
+   measurements are the ones specified — width, height, radius, spread, lift,
+   tilt, the two flap angles, the open duration, the stagger and the bounce —
+   and they arrive as custom properties set by the script. The specification's
+   greys suit a dark page; here the folder is the navy and the papers the
+   ivory, so it belongs to this site rather than to its own. */
+.folder-float {
+  --fw: 200px; --fh: 148px; --fr: 14px;
+  --flap: 34deg; --rest: 16deg; --dur: 520ms; --drift: 0px;
+  --ease: cubic-bezier(.34, 1.6, .5, .9);
+  margin: 22px 0 8px; width: 100%;
+}
+
+/* before the script runs, and if it never does */
+.folder-items { list-style: none; margin: 0; padding: 0; }
+.folder-items:not(.is-fanned) li {
+  padding: 9px 0; border-top: 1px solid var(--line);
+}
+.folder-items:not(.is-fanned) .folder-item-where {
+  display: block; font-size: .78rem; color: var(--ink-faint);
+}
+
+.folder-stage {
+  position: relative; width: var(--fw); height: var(--fh);
+  margin: 60px auto 0; perspective: 900px;
+}
+/* The drift is for a folder at rest. Once it is open the papers are
+   targets, and a target that never stops moving is a poor one. */
+.folder-float.has-drift:not(.is-open) .folder-stage {
+  animation: folder-drift 5.5s ease-in-out infinite;
+}
+@keyframes folder-drift {
+  50% { transform: translateY(calc(var(--drift) * -1)); }
+}
+
+.folder-back, .folder-front, .folder-tab {
+  position: absolute; left: 0; right: 0; display: block;
+}
+.folder-back {
+  top: 0; bottom: 0; background: var(--ink-800);
+  border-radius: var(--fr); box-shadow: var(--shadow);
+}
+.folder-tab {
+  top: -16px; left: 0; width: 42%; height: 22px;
+  background: var(--ink-800); border-radius: var(--fr) var(--fr) 0 0;
+}
+/* the front is the flap: it tips forward as the folder opens */
+.folder-front {
+  bottom: 0; height: 74%; background: var(--ink-700);
+  border-radius: 4px 4px var(--fr) var(--fr);
+  transform-origin: bottom center; transform: rotateX(var(--rest));
+  transition: transform var(--dur) var(--ease);
+  box-shadow: 0 -2px 10px rgba(9,19,36,.28);
+}
+.folder-float.is-open .folder-front { transform: rotateX(var(--flap)); }
+
+.folder-items.is-fanned {
+  position: absolute; inset: 0; margin: 0; padding: 0; list-style: none;
+}
+.folder-paper {
+  position: absolute; left: 50%; top: 14px; width: 150px;
+  transform: translate(-50%, 0) rotate(0deg);
+  transition: transform var(--dur) var(--ease), opacity 220ms ease;
+  transition-delay: var(--pdelay, 0ms);
+  opacity: 0;
+}
+.folder-float.is-open .folder-paper {
+  transform: translate(calc(-50% + var(--px)), var(--py)) rotate(var(--prot));
+  opacity: 1;
+}
+.folder-paper-btn {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  background: var(--ink-050); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 3px;
+  padding: 10px 12px; font: inherit; font-size: .82rem; line-height: 1.3;
+  box-shadow: 0 6px 18px rgba(9,19,36,.16);
+}
+/* the paper you are pointing at comes to the front, so an overlapped title
+   can always be read */
+.folder-float.is-open .folder-paper:hover,
+.folder-float.is-open .folder-paper:focus-within { z-index: 60; }
+.folder-float.is-open .folder-paper:hover .folder-paper-btn,
+.folder-float.is-open .folder-paper:focus-within .folder-paper-btn {
+  transform: translateY(-6px);
+}
+.folder-paper-btn { transition: transform 160ms ease, background 160ms ease; }
+.folder-paper-btn:hover { background: #fff; border-color: var(--gold-400); }
+.folder-paper.is-chosen .folder-paper-btn {
+  border-color: var(--gold-400); box-shadow: 0 0 0 2px var(--gold-100);
+}
+.folder-item-name { display: block; font-weight: 600; }
+.folder-item-where {
+  display: block; font-size: .72rem; color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: .06em; margin-top: 2px;
+}
+
+.folder-open-btn {
+  display: block; margin: 18px auto 0; cursor: pointer;
+  background: none; border: 0; font: inherit; text-align: center;
+  padding: 6px 10px; border-radius: 3px;
+}
+.folder-label strong {
+  display: block; font-size: .82rem; font-weight: 700; color: var(--ink-900);
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.folder-label span {
+  display: block; font-family: var(--font-mono); font-size: .72rem;
+  color: var(--ink-faint); margin-top: 3px;
+}
+.folder-open-btn:hover .folder-label strong { color: var(--gold-700); }
+.folder-chosen {
+  min-height: 1.3em; margin: 10px 0 0; text-align: center;
+  font-size: .8rem; color: var(--ink-soft);
+}
+.folder-chosen:empty { min-height: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* the fan still happens, it simply does not animate into place */
+  .folder-paper, .folder-front { transition-delay: 0ms; }
+}
+@media (max-width: 560px) {
+  /* the fan narrows itself to the room it has; it only needs the headroom */
+  .folder-stage { margin-top: 44px; }
+}
 
 /* ---------- the loading curtain ----------
    Shown over the home page while the display face and the page arrive, then

@@ -64,7 +64,10 @@
         <a href="{{ url_for('dept.export_word') }}">Download report</a>
       {% else %}
         {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
-        <a class="nav-cta" href="{{ url_for('auth.login') }}">
+        {# On the home page the form is already on the page, so the button
+           takes you to it rather than to a second copy of it. #}
+        <a class="nav-cta" href="{{ '#signin' if request.endpoint == 'public.landing'
+                                   else url_for('auth.login') }}">
           Sign in
           <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"

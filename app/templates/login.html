@@ -17,9 +17,9 @@
     </a>
     <p class="aside-title">Board of Studies submissions, in one place.</p>
     <p>Use the department login issued to you by the Office of Academics. If you do not have one, or
-       the password no longer works, write to the Office and a new one will be generated.</p>
+       the password no longer works, write to the Office and a new one will be issued.</p>
     <ul>
-      <li>Your username is your department code</li>
+      <li>Your username is your department, its school and a number</li>
       <li>Stages unlock in order — Pre-BoS opens first</li>
       <li>Work is saved as you type; nothing is lost if you close the tab</li>
       <li>Credit totals are checked against UGC Table 2 before submission</li>
@@ -43,7 +43,7 @@
         <div class="field">
           <label for="username">Username</label>
           <input type="text" id="username" name="username" required autofocus
-                 autocapitalize="none" spellcheck="false" placeholder="e.g. com.bba">
+                 autocapitalize="none" spellcheck="false" placeholder="e.g. cse.scse.4821">
         </div>
         <div class="field">
           <label for="password">Password</label>
@@ -60,7 +60,8 @@
       {# The explanatory panel is hidden on narrow screens, so the one line
          people actually need has to survive here. #}
       <p class="small muted mt-2 login-hint">
-        Your username is your department code, for example <span class="mono">com.bba</span>.
+        Your username is your department, its school and a number, for example
+        <span class="mono">cse.scse.4821</span>.
       </p>
 
       <p class="small muted mt-2 center">

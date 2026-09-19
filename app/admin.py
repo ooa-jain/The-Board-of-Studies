@@ -119,6 +119,7 @@ def department_form(dept_code=None):
         return render_template(
             "admin/department_form.html", dept=d,
             campuses=current_app.config["CAMPUSES"],
+            places=current_app.config["PLACES"],
             faculties=sorted(x for x in db.departments.distinct("faculty") if x),
             schools=sorted(x for x in db.departments.distinct("school") if x))
 
@@ -139,6 +140,7 @@ def department_form(dept_code=None):
             "faculty": (f.get("faculty") or "").strip(),
             "school": (f.get("school") or "").strip(),
             "campus": f.get("campus") or current_app.config["CAMPUSES"][0],
+            "place": f.get("place") or current_app.config["PLACES"][0],
             "active": f.get("active") == "on",
             "updated_at": now(),
         }
@@ -151,7 +153,8 @@ def department_form(dept_code=None):
             db.departments.insert_one(payload)
             audit(_actor(), "department.created", code)
             flash(f"{payload['dept_name']} has been added. "
-                  f"Generate its login from the department list.", "success")
+                  f"Use “Issue every missing login” on the department list "
+                  f"to give it one.", "success")
         return redirect(url_for("admin.departments"))
 
     return _form(dept)
@@ -215,7 +218,11 @@ def bulk_credentials():
         issue_department_login(db, dept, actor=_actor())
         made += 1
     audit(_actor(), "credentials.bulk", detail={"count": made})
-    flash(f"Generated logins for {made} department(s).", "success")
+    if made:
+        flash(f"Issued a login for {made} department(s). The passwords are on "
+              f"the credential sheet until each department signs in.", "success")
+    else:
+        flash("Every active department already has a login.", "info")
     return redirect(url_for("admin.departments"))
 
 
@@ -247,9 +254,13 @@ def import_departments():
 
     data = upload.read()
     sheet = request.form.get("sheet") or None
-    default_campus = request.form.get("default_campus") or "Bengaluru"
+    default_campus = (request.form.get("default_campus")
+                      or current_app.config["CAMPUSES"][0])
+    default_place = (request.form.get("default_place")
+                     or current_app.config["PLACES"][0])
     try:
-        rows, meta = parse_workbook(data, sheet, default_campus=default_campus)
+        rows, meta = parse_workbook(data, sheet, default_campus=default_campus,
+                                    default_place=default_place)
     except Exception as exc:
         flash(f"That file could not be read: {exc}", "error")
         return redirect(url_for("admin.import_departments"))
@@ -262,7 +273,9 @@ def import_departments():
     session["import_rows"] = rows[:500]
     return render_template("admin/import.html", preview=rows, meta=meta,
                            default_campus=default_campus,
-                           campuses=current_app.config["CAMPUSES"])
+                           default_place=default_place,
+                           campuses=current_app.config["CAMPUSES"],
+                           places=current_app.config["PLACES"])
 
 
 @bp.route("/import/commit", methods=["POST"])
@@ -285,6 +298,8 @@ def import_commit():
         existing = db.departments.find_one({"dept_code": r["dept_code"]})
         payload = {k: r[k] for k in
                    ("dept_name", "school", "dept_code", "campus")}
+        if r.get("place"):
+            payload["place"] = r["place"]
         if r.get("faculty"):
             payload["faculty"] = r["faculty"]
         payload["active"] = True

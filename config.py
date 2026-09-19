@@ -35,7 +35,15 @@ class Config:
     SESSION_COOKIE_SECURE = _bool("SESSION_COOKIE_SECURE", not DEBUG)
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 10  # 10 hours
 
-    CAMPUSES = ["Bengaluru", "Kochi"]
+    # The campuses as the Office of Academics workbook spells them, and the
+    # two cities they sit in.
+    PLACES = ["Bangalore", "Kochi"]
+    CAMPUSES = [
+        "Jain Global Campus", "Jayanagar Campus", "JC Road Campus",
+        "JP Nagar Campus", "Lalbagh Campus", "Lalbagh Campus (Jainology)",
+        "Sheshadri Road Campus", "Whitefield Campus", "Yelahanka Campus",
+        "The Sports School", "Kochi Campus",
+    ]
 
     ALLOWED_UPLOAD_EXT = {
         ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv",

@@ -7,13 +7,14 @@
     <div>
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Departments</div>
       <h1>Department master</h1>
-      <p>Click a department to generate its login. The username is the department code; the password
-         is generated here and shown once until the department signs in.</p>
+      <p>Logins are issued in one go, not one department at a time. The username is the
+         department, its school and a number; the password is generated alongside it and
+         shown once, until that department signs in.</p>
     </div>
     <div class="spacer flex flex-wrap">
       <a class="btn btn-ghost" href="{{ url_for('admin.credential_sheet') }}">Credential sheet</a>
       <form method="post" action="{{ url_for('admin.bulk_credentials') }}" style="display:inline">
-        <button class="btn btn-ghost" type="submit">Generate all missing logins</button>
+        <button class="btn btn-gold" type="submit">Issue every missing login</button>
       </form>
       <a class="btn btn-ghost" href="{{ url_for('admin.import_departments') }}">Import from Excel</a>
       <a class="btn" href="{{ url_for('admin.department_form') }}">Add department</a>
@@ -78,7 +79,10 @@
               {% if d.faculty %}<div class="muted" style="font-size:.78rem">{{ d.faculty }}</div>{% endif %}
               {{ d.school }}
             </td>
-            <td><span class="pill">{{ d.campus }}</span></td>
+            <td>
+              <span class="pill">{{ d.campus }}</span>
+              {% if d.place %}<div class="small muted">{{ d.place }}</div>{% endif %}
+            </td>
             <td class="mono small">{{ d.username or '—' }}</td>
             <td>
               {% if d.initial_password %}
