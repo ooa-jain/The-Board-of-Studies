@@ -4,13 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Board of Studies Data Repository — the Office of Academics portal where JAIN departments file their Board of Studies record for the academic year.">
-  <meta name="theme-color" content="#0f2a4a">
+  <meta name="theme-color" content="#1a1c1f">
   <title>{% block title %}BoS Data Repository{% endblock %} · JAIN Office of Academics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Fragment+Mono&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f2a4a'/><text y='70' x='50' text-anchor='middle' font-size='56' font-family='Georgia' fill='%23c8a44b'>J</text></svg>">
+
+  {# the JGI roundel, the only square part of the lockup #}
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32"
+        href="{{ url_for('static', filename='img/favicon-32.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512"
+        href="{{ url_for('static', filename='img/favicon-512.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180"
+        href="{{ url_for('static', filename='img/favicon-180.png') }}">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -24,10 +32,12 @@
 <header class="topbar">
   <div class="wrap">
     <a class="brand" href="{{ url_for('public.landing') }}">
-      <span class="brand-mark" aria-hidden="true">J</span>
+      <img class="brand-logo" alt="JAIN (Deemed-to-be University)"
+           src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
+           width="1103" height="319">
       <span class="brand-text">
         <strong>BoS Data Repository</strong>
-        <span>JAIN · Office of Academics</span>
+        <span>Office of Academics</span>
       </span>
     </a>
 
@@ -101,6 +111,9 @@
 {% if not hide_chrome %}
 <footer class="site">
   <div class="wrap">
+    <img class="brand-logo" alt=""
+         src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
+         width="1103" height="319">
     <span>JAIN (Deemed-to-be University) · Office of Academics</span>
     <span class="spacer">Bengaluru &amp; Kochi</span>
     <span>{{ app_settings.academic_year if app_settings else '' }}</span>
