@@ -68,8 +68,7 @@
     <div class="table-wrap">
       <table class="data">
         <thead>
-          <tr><th scope="col">Department</th><th scope="col">School</th><th scope="col">Campus</th>
-              <th scope="col">HoD</th><th scope="col" style="width:190px">Progress</th>
+          <tr><th scope="col">Department</th><th scope="col">School</th><th scope="col">Campus</th><th scope="col" style="width:190px">Progress</th>
               <th scope="col"><span class="sr-only">Actions</span></th></tr>
         </thead>
         <tbody>
@@ -81,7 +80,6 @@
             </td>
             <td class="small">{{ r.dept.school }}</td>
             <td><span class="pill">{{ r.dept.campus }}</span></td>
-            <td class="small">{{ r.dept.hod_name or '—' }}</td>
             <td>
               <div class="flex">
                 <div class="bar" role="progressbar" aria-valuenow="{{ r.progress.done }}"
@@ -96,7 +94,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="empty">
+          <tr><td colspan="5" class="empty">
             <div class="big">◇</div>
             No departments yet.
             <div class="mt-1"><a class="btn btn-sm" href="{{ url_for('admin.import_departments') }}">Import the contact directory</a></div>

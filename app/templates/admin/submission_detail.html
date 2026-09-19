@@ -10,7 +10,7 @@
         {{ dept.campus }} <span>›</span> {{ dept.school }}
       </div>
       <h1>{{ dept.dept_name }}</h1>
-      <p>{{ dept.dept_code }} · HoD {{ dept.hod_name or '—' }} · {{ dept.hod_email or '' }}</p>
+      <p>{{ dept.dept_code }} · {{ dept.school }} · {{ dept.campus }}</p>
     </div>
     <div class="spacer" style="text-align:right">
       <div class="flex" style="justify-content:flex-end">
@@ -78,7 +78,7 @@
 
       {% if state.data %}
       <details class="mt-1">
-        <summary class="small" style="cursor:pointer;color:var(--navy-600)">View what was submitted</summary>
+        <summary class="small" style="cursor:pointer;color:var(--forest-600)">View what was submitted</summary>
         <div class="mt-1" style="max-height:420px;overflow:auto">
           {% for section in STAGE_BY_KEY[s.key].sections %}
             {% set payload = state.data.get(section.key) %}

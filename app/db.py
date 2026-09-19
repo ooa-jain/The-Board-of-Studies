@@ -75,11 +75,52 @@ def generate_password(length: int = 12) -> str:
 
 
 def slugify_username(dept_code: str, dept_name: str = "") -> str:
+    """A login name derived from the department code — never from a person."""
     base = (dept_code or dept_name or "dept").strip().lower()
     base = "".join(ch if ch.isalnum() else "." for ch in base)
     while ".." in base:
         base = base.replace("..", ".")
     return base.strip(".")[:40]
+
+
+def issue_department_login(db, dept, actor="system", reset=False):
+    """Create or reset one department's login and return (username, password).
+
+    Both halves come from the department itself: the username from its code,
+    the password freshly generated. Single, bulk and import all call this, so
+    a login issued one way is identical to one issued another.
+    """
+    dept_code = dept["dept_code"]
+    username = dept.get("username") or slugify_username(dept_code, dept.get("dept_name", ""))
+
+    # Only a *different* department holding this name forces a suffix.
+    clash = db.users.find_one({"username": username})
+    if clash and clash.get("dept_code") != dept_code:
+        username = f"{username}.{dept_code.lower()}"
+
+    password = generate_password()
+    db.users.update_one(
+        {"username": username},
+        {"$set": {"username": username,
+                  "password": hash_password(password),
+                  "role": "department",
+                  "name": dept.get("dept_name", dept_code),
+                  "dept_code": dept_code,
+                  "active": dept.get("active", True),
+                  "must_change": False,
+                  "updated_at": now()},
+         "$setOnInsert": {"created_at": now()}},
+        upsert=True)
+
+    db.departments.update_one(
+        {"_id": dept["_id"]},
+        {"$set": {"username": username,
+                  "initial_password": password,
+                  "credentials_generated_at": now(),
+                  "credentials_generated_by": actor},
+         "$unset": {"first_login_at": ""}})
+
+    return username, password
 
 
 # ---------------------------------------------------------------------------

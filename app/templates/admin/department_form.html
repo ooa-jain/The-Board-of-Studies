@@ -28,23 +28,6 @@
             {% endfor %}
           </select>
         </div>
-        <div class="field">
-          <label>Head of the Department</label>
-          <input type="text" name="hod_name" value="{{ dept.hod_name if dept else '' }}">
-        </div>
-        <div class="field">
-          <label>Designation</label>
-          <input type="text" name="hod_designation"
-                 value="{{ dept.hod_designation if dept else 'Head of the Department' }}">
-        </div>
-        <div class="field">
-          <label>HoD email</label>
-          <input type="email" name="hod_email" value="{{ dept.hod_email if dept else '' }}">
-        </div>
-        <div class="field">
-          <label>HoD mobile</label>
-          <input type="tel" name="hod_phone" value="{{ dept.hod_phone if dept else '' }}">
-        </div>
       </div>
 
       <label class="check mb-2">

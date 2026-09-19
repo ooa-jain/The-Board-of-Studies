@@ -81,6 +81,51 @@ def test_credentials_are_generated_and_shown_once(app, client):
     assert payload["password"] not in listing
 
 
+def test_login_is_derived_from_the_department_code(app, client):
+    """No person's details are involved — the code decides the username."""
+    make_department(app, "COM-BBA", "Department of Business Administration")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    r = client.post("/admin/departments/COM-BBA/credentials",
+                    headers={"Accept": "application/json"})
+    assert r.get_json()["username"] == "com.bba"
+
+
+def test_bulk_and_single_issue_the_same_shape_of_login(app, client):
+    make_department(app, "ECO", "Department of Economics")
+    make_department(app, "PSY", "Department of Psychology")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+
+    single = client.post("/admin/departments/ECO/credentials",
+                         headers={"Accept": "application/json"}).get_json()
+    client.post("/admin/credentials/bulk")
+
+    from app.db import get_db
+    with app.app_context():
+        psy = get_db().departments.find_one({"dept_code": "PSY"})
+        eco = get_db().departments.find_one({"dept_code": "ECO"})
+
+    assert eco["username"] == single["username"] == "eco"
+    assert psy["username"] == "psy"
+    # both routes leave the password in the clear for the slip, and a user row
+    assert len(psy["initial_password"]) >= 10
+    with app.app_context():
+        assert get_db().users.find_one({"username": "psy", "role": "department"})
+
+    # the bulk-issued password works
+    client.get("/logout")
+    assert login(client, "psy", psy["initial_password"]).status_code == 302
+
+
+def test_a_department_record_holds_no_personal_details(app, client):
+    make_department(app, "LAW", "Department of Law")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    page = client.get("/admin/departments").get_data(as_text=True)
+    assert "HoD" not in page
+    form = client.get("/admin/departments/LAW/edit").get_data(as_text=True)
+    for field in ("hod_name", "hod_email", "hod_phone", "hod_designation"):
+        assert field not in form
+
+
 def test_stages_after_the_first_are_locked(app, client):
     u, p = make_department(app)
     login(client, u, p)
@@ -128,30 +173,50 @@ DEPT_INFO_OK = {
     "identity": {"dept_name": "Department of Commerce", "school": "School of Commerce",
                  "dept_code": "COM", "campus": "Bengaluru",
                  "campus_address": "Jain Global Campus, Bengaluru 562112"},
-    "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
-            "hod_email": "head@example.edu", "hod_phone": "9999999999"},
     "contact": {"office_email": "office@example.edu", "faculty_count": 24,
                 "programme_count": 3},
 }
 
 
-def test_pre_bos_composition_rules_are_enforced(app, client):
+PRE_BOS_FILES_OK = {
+    "pre_bos_files": {
+        "diac_signed": {"name": "diac.pdf", "stored": "a.pdf", "size": 1024},
+        "bos_signed": {"name": "bos.pdf", "stored": "b.pdf", "size": 1024},
+        "pac_signed": {"name": "pac.pdf", "stored": "c.pdf", "size": 1024},
+    },
+}
+
+
+def test_pre_bos_requires_all_three_signed_documents(app, client):
     u, p = make_department(app)
     login(client, u, p)
     assert client.post("/department/api/dept_info/submit",
                        json=DEPT_INFO_OK).get_json()["ok"]
 
-    thin = {
-        "diac": [{"name": "A Person", "designation": "Prof", "organisation": "JAIN",
-                  "email": "a@example.edu", "role": "Convener"}],
-        "bos": [], "pac": [],
-    }
-    r = client.post("/department/api/pre_bos/validate", json=thin)
+    # nothing uploaded — all three are named as missing
+    r = client.post("/department/api/pre_bos/validate", json={})
     msgs = [i["message"] for i in r.get_json()["issues"]]
-    assert any("at least 4 members" in m for m in msgs)
-    assert any("Industry Member" in m for m in msgs)
-    assert any("exactly one Chairperson (HoD)" in m for m in msgs)
-    assert any("at least 3 members" in m for m in msgs)
+    assert any("Department Industry-Academia Cell" in m for m in msgs)
+    assert any("Board of Studies" in m for m in msgs)
+    assert any("Programme Assessment Committee" in m for m in msgs)
+
+    # one still missing — the submit is refused
+    partial = {"pre_bos_files": dict(PRE_BOS_FILES_OK["pre_bos_files"])}
+    partial["pre_bos_files"].pop("pac_signed")
+    assert not client.post("/department/api/pre_bos/submit", json=partial).get_json()["ok"]
+
+    # all three present — it goes through
+    assert client.post("/department/api/pre_bos/submit",
+                       json=PRE_BOS_FILES_OK).get_json()["ok"]
+
+
+def test_pre_bos_no_longer_collects_composition_tables(app, client):
+    """The three tables were replaced by uploads; their rules are gone with them."""
+    from app.schema import STAGE_BY_KEY
+    keys = {s["key"] for s in STAGE_BY_KEY["pre_bos"]["sections"]}
+    assert keys == {"pre_bos_files", "pre_bos_extra"}
+    assert not any(s.get("type") == "table"
+                   for s in STAGE_BY_KEY["pre_bos"]["sections"])
 
 
 def test_autosave_keeps_a_draft(app, client):
