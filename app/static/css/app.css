@@ -1520,7 +1520,7 @@ html.is-preloading .preload.is-done { opacity: 0; pointer-events: none; }
 }
 .preload-bar i {
   display: block; height: 100%; width: 0; background: var(--gold-400);
-  animation: preload-fill 2.05s cubic-bezier(.22,.8,.2,1) forwards;
+  animation: preload-fill 2.9s cubic-bezier(.22,.8,.2,1) forwards;
 }
 @keyframes preload-fill { from { width: 0; } to { width: 100%; } }
 @media (prefers-reduced-motion: reduce) {

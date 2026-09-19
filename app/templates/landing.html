@@ -7,14 +7,11 @@
 {% block head %}
 <script>
   /* Set before the first paint so the curtain is up from the very first frame
-     rather than appearing over a page that has already drawn. Only ever set
-     by this script: with JavaScript off the curtain stays display:none, so the
-     home page is never covered by something that cannot be lifted. It shows
-     once a session — coming back to the home page is instant. */
-  (function () {
-    try { if (sessionStorage.getItem("ooa.preloaded")) return; } catch (e) { /* private mode */ }
-    document.documentElement.className += " is-preloading";
-  })();
+     rather than appearing over a page that has already drawn. Every load of
+     the home page gets it, a refresh included. Only ever set by this script:
+     with JavaScript off the curtain stays display:none, so the home page is
+     never covered by something that cannot be lifted. */
+  document.documentElement.className += " is-preloading";
 </script>
 {% endblock %}
 

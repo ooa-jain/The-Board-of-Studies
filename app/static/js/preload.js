@@ -1,13 +1,14 @@
 /* =========================================================================
    The loading screen.
 
-   It covers the home page while the fonts and the page settle, spells the
-   university and the office out of particles, and then gets out of the way.
-   Three rules it obeys:
+   It covers the home page on every load, spells the university and the
+   office out of particles, holds for three seconds, and then gets out of the
+   way. Three rules it obeys:
 
-     · it never traps anybody — a click, a key, the load event or a hard
-       four-second cap all dismiss it, whichever comes first;
-     · it shows once a session, so coming back to the home page is instant;
+     · three seconds is a floor, not a wait for its own sake — the page keeps
+       loading underneath, and a click or a key gets past it at once;
+     · it never traps anybody: a hard cap lifts it even if the page itself
+       never finishes loading;
      · with JavaScript off it is never shown at all (the markup is hidden
        until this file reveals it), and with reduced motion the words are
        drawn in place rather than flown in.
@@ -19,21 +20,27 @@
   var el = document.getElementById("preload");
   if (!el) return;
 
-  var HOLD = 420;       // after the words land, before the curtain lifts
+  var SHOW = 3000;      // the curtain is up for three seconds, every load
   var FADE = 560;       // matches the CSS transition
-  var HARD_CAP = 4200;  // nothing keeps the page covered longer than this
+  var HARD_CAP = 5200;  // nothing keeps the page covered longer than this
 
   var canvas = el.querySelector(".preload-canvas");
   var engine = null;
   var gone = false;
-  var started = Date.now();
+
+  /* performance.now() is milliseconds since the navigation started, so the
+     three seconds are counted from the refresh rather than from whenever this
+     file happened to run. On a slow connection that makes the curtain shorter,
+     not the page slower. */
+  var since = (window.performance && performance.now)
+    ? function () { return performance.now(); }
+    : (function (t0) { return function () { return Date.now() - t0; }; })(Date.now());
 
   function dismiss() {
     if (gone) return;
     gone = true;
     el.classList.add("is-done");
     root.classList.remove("is-preloading");
-    try { sessionStorage.setItem("ooa.preloaded", "1"); } catch (e) { /* private mode */ }
     window.setTimeout(function () {
       if (engine) engine.destroy();
       if (el.parentNode) el.parentNode.removeChild(el);
@@ -48,15 +55,20 @@
     dismiss();
   }
 
-  /* Both the animation and the page have to be ready; the cap wins regardless. */
+  /* Three seconds from the refresh — time the page spends loading is time
+     already served, not three seconds added on top of it. The animation and
+     the load event are still waited for, in case either runs past the three. */
   var wantLoad = document.readyState !== "complete";
   var pending = wantLoad ? 2 : 1;
-  function ready() { if (--pending <= 0) window.setTimeout(dismiss, HOLD); }
+  function ready() {
+    if (--pending > 0) return;
+    window.setTimeout(dismiss, Math.max(0, SHOW - since()));
+  }
   if (wantLoad) window.addEventListener("load", ready);
 
   window.addEventListener("keydown", skip);
   el.addEventListener("click", skip);
-  window.setTimeout(dismiss, HARD_CAP);
+  window.setTimeout(dismiss, Math.max(600, HARD_CAP - since()));
 
   function mount() {
     if (gone || !canvas || !window.ParticleText) { dismiss(); return; }
