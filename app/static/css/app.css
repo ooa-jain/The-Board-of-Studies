@@ -816,12 +816,6 @@ input.is-bad, select.is-bad, textarea.is-bad {
   letter-spacing: .14em; text-transform: uppercase; color: var(--ink-800);
   margin-bottom: 6px;
 }
-.stories-stamp {
-  font-family: var(--font); font-size: .78rem; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--ink-faint); margin-bottom: 20px;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-}
-.stories-stamp .sep { width: 4px; height: 4px; border-radius: 50%; background: var(--gold-500); }
 
 .story-list { display: flex; flex-direction: column; }
 .story-item {
