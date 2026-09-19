@@ -9,12 +9,14 @@
       <h1>{{ dept.dept_name }}</h1>
       <p>Board of Studies submission for {{ year }}. Stages open in order — finish one to unlock the next.</p>
     </div>
-    <div class="spacer" style="text-align:right">
-      <div class="flex" style="justify-content:flex-end;gap:14px">
-        <div class="bar" style="width:170px"><i style="width:{{ progress.percent }}%"></i></div>
+    <div class="spacer head-aside">
+      <div class="flex head-aside-row">
+        <div class="bar" role="progressbar" aria-valuenow="{{ progress.done }}" aria-valuemin="0"
+             aria-valuemax="{{ progress.total }}" aria-label="Stages submitted"
+             style="width:170px"><i style="width:{{ progress.percent }}%"></i></div>
         <span class="bar-label">{{ progress.done }} / {{ progress.total }} stages</span>
       </div>
-      <div class="flex mt-1" style="justify-content:flex-end">
+      <div class="flex mt-1 head-aside-row">
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.change_password') }}">Password</a>
@@ -76,7 +78,7 @@
         <strong>{{ s.title }}</strong>
         <span>{{ s.blurb }}</span>
         {% if s.source_templates %}
-        <span class="small" style="color:var(--gold-600);margin-top:3px">
+        <span class="small note-gold">
           Replaces {{ s.source_templates|length }} template{{ 's' if s.source_templates|length > 1 }}
         </span>
         {% endif %}
@@ -89,7 +91,9 @@
           <span class="pill pill-ok">Submitted</span>
           <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">View</a>
         {% elif s.status == 'locked' %}
+          {# "Locked" on its own reads like a fault — name what opens it. #}
           <span class="pill pill-lock">Locked</span>
+          <span class="small muted stage-why">Opens once the stage above is submitted</span>
         {% elif s.status == 'returned' %}
           <span class="pill pill-err">Returned</span>
           <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Correct</a>

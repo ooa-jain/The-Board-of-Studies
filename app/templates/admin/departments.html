@@ -23,21 +23,34 @@
 {% endblock %}
 
 {% block content %}
+{# Campus is the filter people reach for first, so it gets the pill row
+   rather than a dropdown; search and school stay in the form beneath. #}
+<div class="filter-bar">
+  <nav class="pill-tabs" aria-label="Filter by campus">
+    <a href="{{ url_for('admin.departments', q=filters.q or None, school=filters.school or None) }}"
+       {% if not filters.campus %}aria-current="true"{% endif %}>All</a>
+    {% for c in campuses %}
+    <a href="{{ url_for('admin.departments', campus=c, q=filters.q or None, school=filters.school or None) }}"
+       {% if filters.campus == c %}aria-current="true"{% endif %}>{{ c }}</a>
+    {% endfor %}
+  </nav>
+  <span class="spacer small muted">{{ departments|length }} shown</span>
+</div>
+
 <div class="card mb-2">
   <div class="card-body tight">
     <form class="flex flex-wrap" method="get">
-      <input type="search" name="q" value="{{ filters.q }}" placeholder="Search name, code or HoD" style="max-width:280px">
-      <select name="campus" style="max-width:170px">
-        <option value="">All campuses</option>
-        {% for c in campuses %}<option value="{{ c }}" {{ 'selected' if filters.campus == c }}>{{ c }}</option>{% endfor %}
-      </select>
-      <select name="school" style="max-width:260px">
+      <input type="hidden" name="campus" value="{{ filters.campus }}">
+      <label class="sr-only" for="dept-q">Search departments</label>
+      <input id="dept-q" type="search" name="q" value="{{ filters.q }}"
+             placeholder="Search name, code or school" style="max-width:280px">
+      <label class="sr-only" for="dept-school">School</label>
+      <select id="dept-school" name="school" style="max-width:260px">
         <option value="">All schools</option>
         {% for s in schools %}<option value="{{ s }}" {{ 'selected' if filters.school == s }}>{{ s }}</option>{% endfor %}
       </select>
       <button class="btn btn-sm" type="submit">Filter</button>
       <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.departments') }}">Clear</a>
-      <span class="spacer small muted">{{ departments|length }} shown</span>
     </form>
   </div>
 </div>
@@ -48,8 +61,10 @@
       <table class="data">
         <thead>
           <tr>
-            <th>Department</th><th>School</th><th>Campus</th><th>HoD</th>
-            <th>Login</th><th>Password</th><th></th>
+            <th scope="col">Department</th><th scope="col">School</th>
+            <th scope="col">Campus</th>
+            <th scope="col">Login</th><th scope="col">Password</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -61,16 +76,14 @@
             </td>
             <td class="small">{{ d.school }}</td>
             <td><span class="pill">{{ d.campus }}</span></td>
-            <td class="small">
-              {{ d.hod_name or '—' }}
-              {% if d.hod_email %}<div class="small muted">{{ d.hod_email }}</div>{% endif %}
-            </td>
             <td class="mono small">{{ d.username or '—' }}</td>
             <td>
               {% if d.initial_password %}
-                <span class="mono small" data-pw="{{ d.initial_password }}">{{ d.initial_password }}</span>
+                <span class="mono small">{{ d.initial_password }}</span>
                 <button class="copy-btn" type="button"
-                        onclick="navigator.clipboard.writeText('{{ d.username }}\t{{ d.initial_password }}');this.textContent='Copied';this.classList.add('done')">Copy</button>
+                        data-copy="{{ d.username }}&#9;{{ d.initial_password }}"
+                        data-copy-label="Copied"
+                        aria-label="Copy the login for {{ d.dept_name }}">Copy</button>
               {% elif d.username %}
                 <span class="pill pill-ok">Signed in</span>
               {% else %}
@@ -89,7 +102,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="empty">
+          <tr><td colspan="6" class="empty">
             <div class="big">◇</div>No departments match.
           </td></tr>
           {% endfor %}

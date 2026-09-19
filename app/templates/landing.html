@@ -2,10 +2,15 @@
 {% block title %}Board of Studies Data Repository{% endblock %}
 
 {% block body %}
+<main id="main-content">
 <section class="hero">
   <div class="wrap">
+    <span class="chip">
+      <span class="chip-dot" aria-hidden="true"></span>
+      Open for {{ app_settings.academic_year if app_settings else 'this academic year' }}
+    </span>
     <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
-    <h1>The Board of Studies record, <em>filled once and checked as you type</em>.</h1>
+    <h1 class="hero-display">Filled once,<br><em>checked as you type</em>.</h1>
     <p>
       Every department submits its Board of Studies documentation here, in one sequence, on one form.
       The templates that used to travel as Word and Excel attachments are now typed fields, and the
@@ -28,6 +33,7 @@
 <section class="section">
   <div class="wrap">
     <div class="section-head">
+      <span class="eyebrow">The campuses</span>
       <h2>Two campuses, one submission process</h2>
       <p>Departments at both campuses follow the same stage order and the same credit rules.</p>
     </div>
@@ -165,9 +171,10 @@
   </div>
 </section>
 
-<section class="section" id="how" style="background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+<section class="section section-dark" id="how">
   <div class="wrap">
     <div class="section-head">
+      <span class="eyebrow">Behind the scenes</span>
       <h2>How a submission moves</h2>
       <p>Each stage unlocks the next. Nothing is accepted until it passes validation, so a
          department never finds out weeks later that a credit total was short.</p>
@@ -201,6 +208,7 @@
   <div class="wrap">
     <div class="grid grid-2" style="align-items:center;gap:40px">
       <div>
+        <span class="eyebrow">The checking</span>
         <h2>The credit rules live in the portal, not in a reviewer's head</h2>
         <p class="muted">
           UGC Table 2 sets the minimum credits a degree must award in each category. The portal holds
@@ -219,7 +227,7 @@
         <div class="card-body" style="padding:0">
           <table class="credits">
             <thead>
-              <tr><th>Category</th><th class="num">3-year UG</th><th class="num">4-Year UG</th></tr>
+              <tr><th scope="col">Category</th><th scope="col" class="num">3-year UG</th><th scope="col" class="num">4-Year UG</th></tr>
             </thead>
             <tbody>
               <tr><td>Major (Core)</td><td class="num">60</td><td class="num">80</td></tr>
@@ -242,4 +250,5 @@
     </div>
   </div>
 </section>
+</main>
 {% endblock %}

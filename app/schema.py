@@ -43,16 +43,6 @@ NEP_CATEGORIES = [
 
 COURSE_TYPES = ["Theory", "Practical", "Theory + Practical", "Project", "Internship", "Seminar"]
 
-MEMBER_CATEGORIES = [
-    "Chairperson (HoD)",
-    "Internal Member - Faculty",
-    "External Expert - Academia",
-    "External Expert - Industry",
-    "Alumni Representative",
-    "Student Representative",
-    "Special Invitee",
-]
-
 FEEDBACK_SOURCES = ["Faculty", "Student", "Alumni", "Employer", "Industry", "Parent", "Academic Peer"]
 
 APPROVAL_LEVELS = [
@@ -95,22 +85,6 @@ DEPARTMENT_INFORMATION = {
             ],
         },
         {
-            "key": "hod",
-            "title": "Head of the Department",
-            "type": "fields",
-            "fields": [
-                {"name": "hod_name", "label": "Name of the Head of the Department", "type": "text",
-                 "required": True, "prefill": "hod_name", "pattern": "^[A-Za-z .'\\-]{3,80}$",
-                 "help": "Letters, spaces, full stops, apostrophes and hyphens only."},
-                {"name": "hod_designation", "label": "Designation", "type": "text", "required": True},
-                {"name": "hod_email", "label": "Official email address", "type": "email", "required": True,
-                 "prefill": "hod_email"},
-                {"name": "hod_phone", "label": "Mobile number", "type": "phone", "required": True,
-                 "prefill": "hod_phone", "pattern": "^[0-9+ ]{10,15}$"},
-                {"name": "hod_since", "label": "Heading the department since", "type": "date"},
-            ],
-        },
-        {
             "key": "contact",
             "title": "Department contact",
             "type": "fields",
@@ -132,21 +106,12 @@ DEPARTMENT_INFORMATION = {
 # Stage 2 — Pre-BoS  (the three composition templates)
 # --------------------------------------------------------------------------
 
-_PERSON_COLUMNS_BASE = [
-    {"name": "sl", "label": "S. No.", "type": "integer", "width": "70px", "auto_index": True},
-    {"name": "name", "label": "Name", "type": "text", "required": True,
-     "pattern": "^[A-Za-z .'\\-]{3,80}$"},
-    {"name": "designation", "label": "Designation", "type": "text", "required": True},
-    {"name": "organisation", "label": "Department / Organisation", "type": "text", "required": True},
-    {"name": "email", "label": "Email address", "type": "email", "required": True},
-    {"name": "phone", "label": "Mobile number", "type": "phone", "pattern": "^[0-9+ ]{10,15}$"},
-]
-
 PRE_BOS = {
     "key": "pre_bos",
     "group": "Pre-BoS",
     "title": "Pre-BoS",
-    "blurb": "The three composition templates. Nothing else opens until this stage is submitted.",
+    "blurb": "Upload the three signed composition documents. Nothing else opens until "
+             "this stage is submitted.",
     "source_templates": [
         "[Template] Composition of DIAC.docx",
         "[Template] Composition of the Board of Studies - Template.docx",
@@ -154,70 +119,39 @@ PRE_BOS = {
     ],
     "sections": [
         {
-            "key": "diac",
-            "title": "Composition of the Department Industry-Academia Cell (DIAC)",
-            "help": "From [Template] Composition of DIAC.docx. Minimum four members, "
-                    "of whom at least one must be from industry.",
-            "type": "table",
-            "min_rows": 4,
-            "columns": _PERSON_COLUMNS_BASE + [
-                {"name": "role", "label": "Role in the Cell", "type": "select", "required": True,
-                 "options": ["Convener", "Member", "Industry Member", "Member Secretary"]},
-            ],
-            "rules": ["diac_min_members", "diac_needs_industry", "diac_single_convener"],
-        },
-        {
-            "key": "diac_meta",
-            "title": "DIAC constitution details",
-            "type": "fields",
-            "fields": [
-                {"name": "constituted_on", "label": "Cell constituted on", "type": "date", "required": True},
-                {"name": "tenure_years", "label": "Tenure (years)", "type": "integer", "required": True,
-                 "min": 1, "max": 5},
-                {"name": "objectives", "label": "Objectives of the Cell", "type": "textarea", "required": True,
-                 "rows": 4, "min_words": 30,
-                 "help": "At least 30 words. Follow the wording of the DIAC draft note of 24 Sept 2024."},
-            ],
-        },
-        {
-            "key": "bos",
-            "title": "Composition of the Board of Studies",
-            "help": "From [Template] Composition of the Board of Studies - Template.docx. "
-                    "The Board must have a Chairperson, at least two internal faculty members, "
-                    "at least one external academic expert, one industry expert and one alumnus.",
-            "type": "table",
-            "min_rows": 6,
-            "columns": _PERSON_COLUMNS_BASE + [
-                {"name": "category", "label": "Member category", "type": "select", "required": True,
-                 "options": MEMBER_CATEGORIES},
-                {"name": "nomination_ref", "label": "Nomination letter reference", "type": "text"},
-            ],
-            "rules": ["bos_composition_min", "bos_single_chair", "bos_unique_emails"],
-        },
-        {
-            "key": "pac",
-            "title": "Composition of the Programme Assessment Committee (PAC)",
-            "help": "From [Template] Composition of the Program Assessment Committee Template.docx. "
-                    "Minimum three members.",
-            "type": "table",
-            "min_rows": 3,
-            "columns": _PERSON_COLUMNS_BASE + [
-                {"name": "role", "label": "Role in the Committee", "type": "select", "required": True,
-                 "options": ["Chairperson", "Member", "Member Secretary"]},
-            ],
-            "rules": ["pac_min_members", "pac_single_chair"],
-        },
-        {
             "key": "pre_bos_files",
-            "title": "Signed copies (optional but recommended)",
+            "title": "Signed composition documents",
+            "help": "Fill the three university templates offline, have them signed, and upload "
+                    "them here as PDF or Word files. Use the template names above so the Office "
+                    "of Academics can match them.",
             "type": "fields",
             "fields": [
-                {"name": "diac_signed", "label": "Signed DIAC composition (PDF)", "type": "file",
-                 "accept": ".pdf,.docx"},
-                {"name": "bos_signed", "label": "Signed Board of Studies composition (PDF)", "type": "file",
-                 "accept": ".pdf,.docx"},
-                {"name": "pac_signed", "label": "Signed PAC composition (PDF)", "type": "file",
-                 "accept": ".pdf,.docx"},
+                {"name": "diac_signed",
+                 "label": "Composition of the Department Industry-Academia Cell (DIAC)",
+                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                 "help": "Signed copy of [Template] Composition of DIAC.docx"},
+                {"name": "bos_signed",
+                 "label": "Composition of the Board of Studies",
+                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                 "help": "Signed copy of [Template] Composition of the Board of Studies."},
+                {"name": "pac_signed",
+                 "label": "Composition of the Programme Assessment Committee (PAC)",
+                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                 "help": "Signed copy of [Template] Composition of the Program Assessment "
+                         "Committee."},
+            ],
+        },
+        {
+            "key": "pre_bos_extra",
+            "title": "Anything else (optional)",
+            "type": "fields",
+            "fields": [
+                {"name": "nomination_letters", "label": "Nomination letters", "type": "file",
+                 "accept": ".pdf,.docx,.doc", "wide": True,
+                 "help": "Optional. Nomination or appointment letters for external members."},
+                {"name": "notes", "label": "Note to the Office of Academics", "type": "textarea",
+                 "rows": 3, "wide": True,
+                 "help": "Optional. Anything the Office should know about these documents."},
             ],
         },
     ],
@@ -260,7 +194,7 @@ BOS_COMMITTEE = {
                 {"name": "consent", "label": "Consent received", "type": "checkbox", "required": True},
                 {"name": "cv", "label": "Profile / CV", "type": "file", "accept": ".pdf,.docx"},
             ],
-            "rules": ["experts_unique_emails", "experts_match_bos"],
+            "rules": ["experts_unique_emails"],
         },
     ],
 }

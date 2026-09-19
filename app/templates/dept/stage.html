@@ -13,12 +13,12 @@
       <h1>{{ stage.title }}</h1>
       <p>{{ stage.blurb }}</p>
       {% if stage.source_templates %}
-      <p class="small" style="color:var(--gold-600);margin-top:6px">
+      <p class="small note-gold">
         Replaces: {{ stage.source_templates|join(' · ') }}
       </p>
       {% endif %}
     </div>
-    <div class="spacer" style="text-align:right">
+    <div class="spacer head-aside">
       {% if status == 'submitted' %}<span class="pill pill-ok">Submitted — read only</span>
       {% elif status == 'returned' %}<span class="pill pill-err">Returned for correction</span>
       {% elif status == 'draft' %}<span class="pill pill-warn">In progress</span>
@@ -40,29 +40,43 @@
 
 <div class="stage-layout">
   <div>
+    <noscript>
+      <div class="alert alert-error">
+        <span class="alert-icon" aria-hidden="true">!</span>
+        <div>
+          <strong>This form needs JavaScript.</strong>
+          The stage fields, the live checks and the credit tally are all built in the browser.
+          Turn JavaScript on for this site, or write to the Office of Academics and they will
+          take your submission another way.
+        </div>
+      </div>
+    </noscript>
+
     <form id="stage-form" autocomplete="off">
-      <div id="sections"></div>
+      <div id="sections">
+        <p class="muted small" id="sections-placeholder">Loading the form…</p>
+      </div>
     </form>
   </div>
 
   <aside class="stage-side">
     <div class="card">
       <div class="card-head">
-        <h3 style="font-size:1rem">Checks</h3>
-        <span class="spacer" id="issue-counts"></span>
+        <h3 class="card-title-sm">Checks</h3>
+        <span class="spacer issue-counts" id="issue-counts"></span>
       </div>
       <div class="card-body tight">
-        <div id="issues" class="issues">
-          <p class="small muted" style="margin:0">Fill the form — problems appear here as you type.</p>
+        <div id="issues" class="issues" role="status" aria-live="polite" aria-atomic="true">
+          <p class="small muted issue-note">Fill the form — problems appear here when you check or submit.</p>
         </div>
       </div>
     </div>
 
     {% if credit_matrix and credit_matrix.track %}
     <div class="card">
-      <div class="card-head"><h3 style="font-size:1rem">UGC Table 2</h3></div>
+      <div class="card-head"><h3 class="card-title-sm">UGC Table 2</h3></div>
       <div class="card-body tight">
-        <p class="small muted" style="margin:0 0 8px">
+        <p class="small muted mb-half">
           Applying the <strong>{{ credit_matrix.track_label }}</strong> column.
           Total required: <strong>{{ credit_matrix.total }}</strong> credits.
         </p>
@@ -72,15 +86,17 @@
     {% endif %}
 
     <div class="card">
-      <div class="card-head"><h3 style="font-size:1rem">Stages</h3></div>
-      <div class="card-body tight" style="max-height:300px;overflow:auto">
-        {% for s in board %}
-        <div class="flex small" style="padding:5px 0;{{ 'opacity:.5' if s.status == 'locked' }}">
-          <span class="pill {{ 'pill-ok' if s.status=='submitted' else ('pill-lock' if s.status=='locked' else 'pill-warn') }}"
-                style="width:8px;height:8px;padding:0;border-radius:50%"></span>
-          <span style="{{ 'font-weight:600;color:var(--navy-800)' if s.key == stage.key }}">{{ s.title }}</span>
-        </div>
-        {% endfor %}
+      <div class="card-head"><h3 class="card-title-sm">Stages</h3></div>
+      <div class="card-body tight scroll-300">
+        <ol class="mini-board">
+          {% for s in board %}
+          <li class="flex small{{ ' is-locked' if s.status == 'locked' }}{{ ' is-here' if s.key == stage.key }}">
+            <span class="mini-dot mini-{{ s.status }}" aria-hidden="true"></span>
+            <span>{{ s.title }}</span>
+            <span class="sr-only">— {{ s.status }}{{ ', this stage' if s.key == stage.key }}</span>
+          </li>
+          {% endfor %}
+        </ol>
       </div>
     </div>
   </aside>
@@ -89,7 +105,7 @@
 {% if not readonly %}
 <div class="savebar">
   <div class="wrap">
-    <span class="save-note" id="save-note">Not saved yet</span>
+    <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
     <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back</a>
     <button class="btn btn-ghost" type="button" id="btn-check">Check now</button>

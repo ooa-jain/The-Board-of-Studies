@@ -187,69 +187,12 @@ def _vals(data, section_key):
     return v if isinstance(v, dict) else {}
 
 
-def r_diac_min_members(data, ctx, sk):
-    rows = _rows(data, sk)
-    if len(rows) < 4:
-        return [err(f"The Department Industry-Academia Cell needs at least 4 members. "
-                    f"You have listed {len(rows)}.", section=sk)]
-    return []
 
 
-def r_diac_needs_industry(data, ctx, sk):
-    rows = _rows(data, sk)
-    if not any(str(r.get("role", "")).startswith("Industry") for r in rows):
-        return [err("At least one member of the Department Industry-Academia Cell must be "
-                    "marked as an Industry Member.", section=sk)]
-    return []
 
 
-def r_diac_single_convener(data, ctx, sk):
-    n = sum(1 for r in _rows(data, sk) if r.get("role") == "Convener")
-    if n != 1:
-        return [err(f"The Cell must have exactly one Convener. You have marked {n}.", section=sk)]
-    return []
 
 
-def r_bos_composition_min(data, ctx, sk):
-    rows = _rows(data, sk)
-    out = []
-    counts = {}
-    for r in rows:
-        counts[r.get("category")] = counts.get(r.get("category"), 0) + 1
-    for cat, need in U.DEFAULT_OTHER_RULES["bos_min"].items():
-        have = counts.get(cat, 0)
-        if have < need:
-            out.append(err(f"The Board of Studies needs at least {need} member(s) in the category "
-                           f"“{cat}”. You have {have}.", section=sk))
-    return out
-
-
-def r_bos_single_chair(data, ctx, sk):
-    n = sum(1 for r in _rows(data, sk) if r.get("category") == "Chairperson (HoD)")
-    if n != 1:
-        return [err(f"The Board of Studies must have exactly one Chairperson (HoD). "
-                    f"You have marked {n}.", section=sk)]
-    return []
-
-
-def r_bos_unique_emails(data, ctx, sk):
-    return _unique_emails(_rows(data, sk), sk, "No two Board of Studies members may share an email address")
-
-
-def r_pac_min_members(data, ctx, sk):
-    rows = _rows(data, sk)
-    if len(rows) < 3:
-        return [err(f"The Programme Assessment Committee needs at least 3 members. "
-                    f"You have listed {len(rows)}.", section=sk)]
-    return []
-
-
-def r_pac_single_chair(data, ctx, sk):
-    n = sum(1 for r in _rows(data, sk) if r.get("role") == "Chairperson")
-    if n != 1:
-        return [err(f"The Programme Assessment Committee must have exactly one Chairperson. "
-                    f"You have marked {n}.", section=sk)]
-    return []
 
 
 def _unique_emails(rows, sk, message):
@@ -269,20 +212,6 @@ def _unique_emails(rows, sk, message):
 def r_experts_unique_emails(data, ctx, sk):
     return _unique_emails(_rows(data, sk), sk, "No two experts may share an email address")
 
-
-def r_experts_match_bos(data, ctx, sk):
-    """Every external member named in Pre-BoS should have a profile here."""
-    prior = (ctx.get("prior") or {}).get("pre_bos") or {}
-    bos_rows = prior.get("bos") or []
-    external = {str(r.get("email", "")).strip().lower() for r in bos_rows
-                if str(r.get("category", "")).startswith(("External", "Alumni", "Student"))
-                and r.get("email")}
-    have = {str(r.get("email", "")).strip().lower() for r in _rows(data, sk) if r.get("email")}
-    missing = sorted(external - have)
-    if missing:
-        return [warn("These external members were named in your Board of Studies but have no "
-                     "expert profile here: " + ", ".join(missing), section=sk)]
-    return []
 
 
 def r_programme_duration_semesters(data, ctx, sk):

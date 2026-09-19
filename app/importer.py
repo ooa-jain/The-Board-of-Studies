@@ -21,11 +21,6 @@ HEADER_HINTS = {
     "school": ["school", "faculty", "college", "institute"],
     "dept_code": ["department code", "dept code", "code", "abbreviation", "abbr"],
     "campus": ["campus", "location", "city", "centre", "center"],
-    "hod_name": ["hod name", "head of the department", "head of department", "hod",
-                 "name of the hod", "name", "faculty name"],
-    "hod_designation": ["designation", "position", "role"],
-    "hod_email": ["email", "e-mail", "mail id", "email id", "official email"],
-    "hod_phone": ["mobile", "phone", "contact number", "contact no", "cell"],
 }
 
 CAMPUS_ALIASES = {
@@ -155,10 +150,6 @@ def parse_workbook(file_bytes: bytes, sheet_name: str | None = None,
             "school": cell("school") or "—",
             "dept_code": code,
             "campus": normalise_campus(cell("campus"), default_campus),
-            "hod_name": cell("hod_name"),
-            "hod_designation": cell("hod_designation") or "Head of the Department",
-            "hod_email": cell("hod_email").lower(),
-            "hod_phone": cell("hod_phone"),
         })
 
     meta = {

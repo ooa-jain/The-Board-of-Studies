@@ -10,8 +10,7 @@ from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
 
 from . import ugc_rules as U
 from .auth import admin_required
-from .db import (audit, generate_password, get_db, hash_password, now,
-                 rules_doc, slugify_username)
+from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
 from .schema import STAGE_BY_KEY, STAGES
@@ -96,7 +95,7 @@ def departments():
     if search:
         q["$or"] = [{"dept_name": {"$regex": search, "$options": "i"}},
                     {"dept_code": {"$regex": search, "$options": "i"}},
-                    {"hod_name": {"$regex": search, "$options": "i"}}]
+                    {"school": {"$regex": search, "$options": "i"}}]
     depts = list(db.departments.find(q).sort([("campus", 1), ("school", 1), ("dept_name", 1)]))
     return render_template("admin/departments.html", departments=depts,
                            schools=sorted(x for x in db.departments.distinct("school") if x),
@@ -131,10 +130,6 @@ def department_form(dept_code=None):
             "dept_name": (f.get("dept_name") or "").strip(),
             "school": (f.get("school") or "").strip(),
             "campus": f.get("campus") or current_app.config["CAMPUSES"][0],
-            "hod_name": (f.get("hod_name") or "").strip(),
-            "hod_designation": (f.get("hod_designation") or "").strip(),
-            "hod_email": (f.get("hod_email") or "").strip().lower(),
-            "hod_phone": (f.get("hod_phone") or "").strip(),
             "active": f.get("active") == "on",
             "updated_at": now(),
         }
@@ -178,35 +173,10 @@ def generate_credentials(dept_code):
     db = get_db()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
 
-    username = dept.get("username") or slugify_username(dept["dept_code"], dept["dept_name"])
-    password = generate_password()
-    existing = db.users.find_one({"username": username})
+    had_login = bool(dept.get("username"))
+    username, password = issue_department_login(db, dept, actor=_actor())
 
-    if existing and existing.get("dept_code") != dept_code:
-        username = f"{username}.{dept_code.lower()}"
-
-    db.users.update_one(
-        {"username": username},
-        {"$set": {"username": username,
-                  "password": hash_password(password),
-                  "role": "department",
-                  "name": dept["dept_name"],
-                  "dept_code": dept_code,
-                  "active": dept.get("active", True),
-                  "must_change": False,
-                  "updated_at": now()},
-         "$setOnInsert": {"created_at": now()}},
-        upsert=True)
-
-    db.departments.update_one(
-        {"_id": dept["_id"]},
-        {"$set": {"username": username,
-                  "initial_password": password,
-                  "credentials_generated_at": now(),
-                  "credentials_generated_by": _actor()},
-         "$unset": {"first_login_at": ""}})
-
-    audit(_actor(), "credentials.generated" if not existing else "credentials.reset", dept_code)
+    audit(_actor(), "credentials.reset" if had_login else "credentials.generated", dept_code)
 
     if request.headers.get("Accept", "").startswith("application/json"):
         return jsonify({"ok": True, "username": username, "password": password})
@@ -233,20 +203,8 @@ def bulk_credentials():
     """Generate logins for every active department that has none."""
     db = get_db()
     made = 0
-    for dept in db.departments.find({"active": True, "username": {"$exists": False}}):
-        username = slugify_username(dept["dept_code"], dept["dept_name"])
-        if db.users.find_one({"username": username}):
-            username = f"{username}.{dept['dept_code'].lower()}"
-        password = generate_password()
-        db.users.insert_one({"username": username, "password": hash_password(password),
-                             "role": "department", "name": dept["dept_name"],
-                             "dept_code": dept["dept_code"], "active": True,
-                             "must_change": False, "created_at": now()})
-        db.departments.update_one({"_id": dept["_id"]},
-                                  {"$set": {"username": username,
-                                            "initial_password": password,
-                                            "credentials_generated_at": now(),
-                                            "credentials_generated_by": _actor()}})
+    for dept in list(db.departments.find({"active": True, "username": {"$exists": False}})):
+        issue_department_login(db, dept, actor=_actor())
         made += 1
     audit(_actor(), "credentials.bulk", detail={"count": made})
     flash(f"Generated logins for {made} department(s).", "success")
@@ -318,8 +276,7 @@ def import_commit():
             continue
         existing = db.departments.find_one({"dept_code": r["dept_code"]})
         payload = {k: r[k] for k in
-                   ("dept_name", "school", "dept_code", "campus",
-                    "hod_name", "hod_designation", "hod_email", "hod_phone")}
+                   ("dept_name", "school", "dept_code", "campus")}
         payload["active"] = True
         payload["updated_at"] = now()
         if existing and not overwrite:
@@ -336,19 +293,7 @@ def import_commit():
         if make_logins:
             dept = db.departments.find_one({"dept_code": r["dept_code"]})
             if not dept.get("username"):
-                username = slugify_username(dept["dept_code"], dept["dept_name"])
-                if db.users.find_one({"username": username}):
-                    username = f"{username}.{dept['dept_code'].lower()}"
-                password = generate_password()
-                db.users.insert_one({"username": username, "password": hash_password(password),
-                                     "role": "department", "name": dept["dept_name"],
-                                     "dept_code": dept["dept_code"], "active": True,
-                                     "must_change": False, "created_at": now()})
-                db.departments.update_one({"_id": dept["_id"]},
-                                          {"$set": {"username": username,
-                                                    "initial_password": password,
-                                                    "credentials_generated_at": now(),
-                                                    "credentials_generated_by": _actor()}})
+                issue_department_login(db, dept, actor=_actor())
                 logins += 1
 
     audit(_actor(), "departments.imported",

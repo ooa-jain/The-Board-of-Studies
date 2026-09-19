@@ -31,8 +31,10 @@
     <div class="card-body">
       {% for campus, c in by_campus.items() %}
       <div class="flex mb-1">
-        <strong style="width:110px">{{ campus }}</strong>
-        <div class="bar" style="flex:1"><i style="width:{{ (c.complete * 100 / c.total)|round if c.total else 0 }}%"></i></div>
+        <strong class="row-key">{{ campus }}</strong>
+        <div class="bar" role="progressbar" aria-valuenow="{{ c.complete }}" aria-valuemin="0"
+             aria-valuemax="{{ c.total }}" aria-label="{{ campus }} departments complete"
+             style="flex:1"><i style="width:{{ (c.complete * 100 / c.total)|round if c.total else 0 }}%"></i></div>
         <span class="bar-label nowrap">{{ c.complete }} / {{ c.total }}</span>
       </div>
       {% else %}
@@ -46,8 +48,10 @@
     <div class="card-body" style="max-height:300px;overflow:auto">
       {% for s in stage_counts %}
       <div class="flex mb-1">
-        <span class="small" style="width:180px;color:var(--ink-soft)">{{ s.title }}</span>
-        <div class="bar" style="flex:1"><i style="width:{{ (s.done * 100 / s.total)|round if s.total else 0 }}%"></i></div>
+        <span class="small row-key row-key-wide">{{ s.title }}</span>
+        <div class="bar" role="progressbar" aria-valuenow="{{ s.done }}" aria-valuemin="0"
+             aria-valuemax="{{ s.total }}" aria-label="Departments that submitted {{ s.title }}"
+             style="flex:1"><i style="width:{{ (s.done * 100 / s.total)|round if s.total else 0 }}%"></i></div>
         <span class="bar-label nowrap">{{ s.done }}</span>
       </div>
       {% endfor %}
@@ -64,7 +68,8 @@
     <div class="table-wrap">
       <table class="data">
         <thead>
-          <tr><th>Department</th><th>School</th><th>Campus</th><th>HoD</th><th style="width:190px">Progress</th><th></th></tr>
+          <tr><th scope="col">Department</th><th scope="col">School</th><th scope="col">Campus</th><th scope="col" style="width:190px">Progress</th>
+              <th scope="col"><span class="sr-only">Actions</span></th></tr>
         </thead>
         <tbody>
           {% for r in rows %}
@@ -75,10 +80,11 @@
             </td>
             <td class="small">{{ r.dept.school }}</td>
             <td><span class="pill">{{ r.dept.campus }}</span></td>
-            <td class="small">{{ r.dept.hod_name or '—' }}</td>
             <td>
               <div class="flex">
-                <div class="bar" style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
+                <div class="bar" role="progressbar" aria-valuenow="{{ r.progress.done }}"
+                     aria-valuemin="0" aria-valuemax="{{ r.progress.total }}"
+                     aria-label="Stages submitted" style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
                 <span class="bar-label nowrap">{{ r.progress.done }}/{{ r.progress.total }}</span>
               </div>
             </td>
@@ -88,7 +94,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="empty">
+          <tr><td colspan="5" class="empty">
             <div class="big">◇</div>
             No departments yet.
             <div class="mt-1"><a class="btn btn-sm" href="{{ url_for('admin.import_departments') }}">Import the contact directory</a></div>
@@ -105,10 +111,16 @@
     <span class="spacer"><a class="small" href="{{ url_for('admin.audit_log') }}">Full log</a></span></div>
   <div class="card-body" style="padding:0">
     <table class="data">
+      <thead>
+        <tr>
+          <th scope="col" style="width:150px">When</th><th scope="col">Who</th>
+          <th scope="col">Action</th><th scope="col">Target</th>
+        </tr>
+      </thead>
       <tbody>
         {% for e in recent %}
         <tr>
-          <td class="small mono" style="width:150px">{{ e.at.strftime('%d %b %H:%M') }}</td>
+          <td class="small mono">{{ e.at.strftime('%d %b %H:%M') }}</td>
           <td class="small">{{ e.actor }}</td>
           <td class="small"><span class="pill">{{ e.action }}</span></td>
           <td class="small muted">{{ e.target }}</td>

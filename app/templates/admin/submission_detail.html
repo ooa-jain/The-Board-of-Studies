@@ -10,11 +10,13 @@
         {{ dept.campus }} <span>›</span> {{ dept.school }}
       </div>
       <h1>{{ dept.dept_name }}</h1>
-      <p>{{ dept.dept_code }} · HoD {{ dept.hod_name or '—' }} · {{ dept.hod_email or '' }}</p>
+      <p>{{ dept.dept_code }} · {{ dept.school }} · {{ dept.campus }}</p>
     </div>
     <div class="spacer" style="text-align:right">
       <div class="flex" style="justify-content:flex-end">
-        <div class="bar" style="width:160px"><i style="width:{{ progress.percent }}%"></i></div>
+        <div class="bar" role="progressbar" aria-valuenow="{{ progress.done }}" aria-valuemin="0"
+             aria-valuemax="{{ progress.total }}" aria-label="Stages submitted"
+             style="width:160px"><i style="width:{{ progress.percent }}%"></i></div>
         <span class="bar-label">{{ progress.done }} / {{ progress.total }}</span>
       </div>
       <div class="flex mt-1" style="justify-content:flex-end">
@@ -76,7 +78,7 @@
 
       {% if state.data %}
       <details class="mt-1">
-        <summary class="small" style="cursor:pointer;color:var(--navy-600)">View what was submitted</summary>
+        <summary class="small" style="cursor:pointer;color:var(--ink-600)">View what was submitted</summary>
         <div class="mt-1" style="max-height:420px;overflow:auto">
           {% for section in STAGE_BY_KEY[s.key].sections %}
             {% set payload = state.data.get(section.key) %}
@@ -92,7 +94,7 @@
             {% elif payload is iterable %}
               <div class="table-wrap">
                 <table class="data">
-                  <thead><tr>{% for c in section.columns %}<th>{{ c.label }}</th>{% endfor %}</tr></thead>
+                  <thead><tr>{% for c in section.columns %}<th scope="col">{{ c.label }}</th>{% endfor %}</tr></thead>
                   <tbody>
                     {% for row in payload %}
                     <tr>{% for c in section.columns %}

@@ -35,7 +35,7 @@
       </p>
       <p class="small muted">{{ p.semesters }} semesters · batch {{ p.batch }} · intake {{ p.intake }}</p>
       {% if st.summary and st.summary.errors %}
-        <div class="alert alert-error small mt-1" style="margin-bottom:0">
+        <div class="alert alert-error small mt-1 mb-0">
           {{ st.summary.errors }} item(s) still to fix.
         </div>
       {% endif %}

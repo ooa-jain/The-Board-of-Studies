@@ -71,11 +71,10 @@
     });
   }
 
-  let flashTimer;
   function flash(input) {
     input.style.borderColor = "var(--err)";
-    clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => { input.style.borderColor = ""; }, 380);
+    clearTimeout(input._flashTimer);
+    input._flashTimer = setTimeout(() => { input.style.borderColor = ""; }, 380);
   }
 
   // Mirror of validation.validate_field, for immediate feedback only.
@@ -115,12 +114,25 @@
     return null;
   }
 
+  let errSeq = 0;
+
   function attachLiveCheck(input, def, wrap) {
     const show = () => {
       const msg = checkField(def, readInput(input, def));
       wrap.querySelectorAll(":scope > .field-error").forEach(n => n.remove());
       input.classList.toggle("is-bad", !!msg);
-      if (msg) wrap.appendChild(el("span", "field-error", msg));
+      if (msg) {
+        if (!input.id) input.id = `fld-${++errSeq}`;
+        const errId = `${input.id}-error`;
+        const node = el("span", "field-error", msg);
+        node.id = errId;
+        wrap.appendChild(node);
+        input.setAttribute("aria-invalid", "true");
+        describe(input, errId);
+      } else {
+        input.removeAttribute("aria-invalid");
+        undescribe(input, `${input.id}-error`);
+      }
     };
     input.addEventListener("blur", show);
     input.addEventListener("input", () => {
@@ -128,6 +140,20 @@
       touch();
     });
     input.addEventListener("change", show);
+  }
+
+  /** aria-describedby is a token list — add and remove without clobbering it. */
+  function describe(input, id) {
+    const ids = (input.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (!ids.includes(id)) ids.push(id);
+    input.setAttribute("aria-describedby", ids.join(" "));
+  }
+
+  function undescribe(input, id) {
+    const ids = (input.getAttribute("aria-describedby") || "")
+      .split(/\s+/).filter(Boolean).filter(x => x !== id);
+    if (ids.length) input.setAttribute("aria-describedby", ids.join(" "));
+    else input.removeAttribute("aria-describedby");
   }
 
   function readInput(input, def) {
@@ -171,6 +197,7 @@
     }
 
     if (def.placeholder) input.placeholder = def.placeholder;
+    if (def.required) input.setAttribute("aria-required", "true");
     if (CTX.readonly) { input.disabled = true; }
     constrain(input, def);
 
@@ -192,20 +219,25 @@
     fd.append("field", def.name);
     const note = input.parentElement.querySelector(".upload-note") ||
                  input.parentElement.appendChild(el("span", "help upload-note"));
+    note.className = "help upload-note";
+    note.setAttribute("role", "status");
     note.textContent = "Uploading…";
     fetch(CTX.urls.upload, { method: "POST", body: fd })
       .then(r => r.json())
       .then(j => {
         if (j.ok) {
           note.textContent = `Uploaded: ${j.name} (${Math.round(j.size / 1024)} KB)`;
-          note.style.color = "var(--ok)";
+          note.className = "help upload-note is-ok";
           onChange({ name: j.name, stored: j.stored, size: j.size, url: j.url });
         } else {
           note.textContent = j.error || "Upload failed.";
-          note.style.color = "var(--err)";
+          note.className = "help upload-note is-bad-text";
         }
       })
-      .catch(() => { note.textContent = "Upload failed."; note.style.color = "var(--err)"; });
+      .catch(() => {
+        note.textContent = "Upload failed — check your connection and choose the file again.";
+        note.className = "help upload-note is-bad-text";
+      });
   }
 
   function fieldBlock(def, value, onChange) {
@@ -215,16 +247,28 @@
     if (def.type === "checkbox") {
       const lab = el("label", "check");
       const input = makeInput(def, value, onChange);
+      input.id = `f-${def.name}`;
       lab.appendChild(input);
       lab.appendChild(el("span", null, def.label + (def.required ? " *" : "")));
       wrap.appendChild(lab);
-      if (def.help) wrap.appendChild(el("span", "help", def.help));
+      if (def.help) {
+        const help = el("span", "help", def.help);
+        help.id = `f-${def.name}-help`;
+        wrap.appendChild(help);
+        describe(input, help.id);
+      }
       return wrap;
     }
 
     const lab = el("label", null, def.label);
     lab.setAttribute("for", `f-${def.name}`);
-    if (def.required) lab.appendChild(el("span", "req", "*"));
+    if (def.required) {
+      const star = el("span", "req");
+      star.setAttribute("aria-hidden", "true");
+      star.textContent = "*";
+      lab.appendChild(star);
+      lab.appendChild(el("span", "sr-only", " (required)"));
+    }
     wrap.appendChild(lab);
 
     const input = makeInput(def, value, onChange);
@@ -233,10 +277,15 @@
 
     if (value && def.type === "file" && typeof value === "object") {
       const n = el("span", "help upload-note", `Uploaded: ${value.name}`);
-      n.style.color = "var(--ok)";
+      n.classList.add("is-ok");
       wrap.appendChild(n);
     }
-    if (def.help) wrap.appendChild(el("span", "help", def.help));
+    if (def.help) {
+      const help = el("span", "help", def.help);
+      help.id = `f-${def.name}-help`;
+      wrap.appendChild(help);
+      describe(input, help.id);
+    }
     attachLiveCheck(input, def, wrap);
     return wrap;
   }
@@ -255,7 +304,11 @@
       if (c.help) th.title = c.help;
       htr.appendChild(th);
     });
-    if (!section.fixed_rows && !CTX.readonly) htr.appendChild(el("th", null, ""));
+    if (!section.fixed_rows && !CTX.readonly) {
+      const actions = el("th");
+      actions.appendChild(el("span", "sr-only", "Remove row"));
+      htr.appendChild(actions);
+    }
     thead.appendChild(htr);
     table.appendChild(thead);
 
@@ -266,6 +319,9 @@
 
     const foot = el("div", "rt-foot");
     const count = el("span", "rt-count");
+    // Row-count problems belong next to the table, not in a modal dialog.
+    const rowNote = el("span", "rt-note");
+    rowNote.setAttribute("role", "status");
     if (!section.fixed_rows && !CTX.readonly) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add row");
       add.type = "button";
@@ -273,6 +329,7 @@
       foot.appendChild(add);
     }
     foot.appendChild(count);
+    foot.appendChild(rowNote);
     host.appendChild(foot);
 
     // seed fixed rows
@@ -322,14 +379,24 @@
           const b = el("button", null, "×");
           b.type = "button";
           b.title = "Remove this row";
+          b.setAttribute("aria-label", `Remove row ${i + 1}`);
           b.addEventListener("click", () => {
             if (data.length <= (section.min_rows || 0)) {
-              alert(`This table must keep at least ${section.min_rows} row(s).`);
+              rowNote.textContent =
+                `This table has to keep at least ${section.min_rows} row` +
+                `${section.min_rows === 1 ? "" : "s"}.`;
               return;
             }
             data.splice(i, 1);
+            rowNote.textContent = "";
             draw();
             touch();
+            // The row under the caret is gone — put focus somewhere sensible.
+            const rowsLeft = tbody.querySelectorAll("tr").length;
+            const nextRow = tbody.querySelectorAll("tr")[Math.min(i, rowsLeft - 1)];
+            const target = nextRow && nextRow.querySelector("input, select, textarea");
+            if (target) target.focus();
+            else { const add = foot.querySelector("button"); if (add) add.focus(); }
           });
           td.appendChild(b);
           tr.appendChild(td);
@@ -357,11 +424,24 @@
 
     const table = el("table", "credits");
     const thead = el("thead");
-    thead.innerHTML =
-      `<tr><th style="width:44px">S. No.</th><th>Broad Category of Course</th>
-       <th class="num" style="width:150px">UGC minimum (${CREDIT.track_label || "—"})</th>
-       <th class="num" style="width:130px">Your credits</th>
-       <th class="num" style="width:70px"></th></tr>`;
+    // Built as nodes, not markup: track_label comes from the editable credit
+    // rules, so it must never be parsed as HTML.
+    const headRow = el("tr");
+    [["S. No.", "44px", false],
+     ["Broad Category of Course", null, false],
+     [`UGC minimum (${CREDIT.track_label || "—"})`, "150px", true],
+     ["Your credits", "130px", true]].forEach(([label, width, num]) => {
+      const th = el("th", num ? "num" : null, label);
+      th.scope = "col";
+      if (width) th.style.width = width;
+      headRow.appendChild(th);
+    });
+    const tickHead = el("th", "num");
+    tickHead.scope = "col";
+    tickHead.style.width = "70px";
+    tickHead.appendChild(el("span", "sr-only", "Meets the minimum"));
+    headRow.appendChild(tickHead);
+    thead.appendChild(headRow);
     table.appendChild(thead);
     const tbody = el("tbody");
     table.appendChild(tbody);
@@ -405,12 +485,8 @@
     });
 
     if (CREDIT.needs_in_lieu) {
-      const note = el("tr");
-      note.innerHTML =
-        `<td class="num">8a</td>
-         <td>In lieu of research — courses <span class="muted small">(${CREDIT.in_lieu.courses} required)</span></td>
-         <td class="num minmax">${CREDIT.in_lieu.courses}</td>
-         <td class="num"></td><td class="num tick"></td>`;
+      const note = inLieuRow("8a", "In lieu of research — courses",
+                             `(${CREDIT.in_lieu.courses} required)`, CREDIT.in_lieu.courses);
       const ci = el("input");
       ci.type = "text"; ci.inputMode = "numeric";
       ci.value = data.in_lieu_courses ?? "";
@@ -419,12 +495,7 @@
       note.children[3].appendChild(ci);
       tbody.appendChild(note);
 
-      const note2 = el("tr");
-      note2.innerHTML =
-        `<td class="num">8b</td>
-         <td>In lieu of research — credits</td>
-         <td class="num minmax">${CREDIT.in_lieu.credits}</td>
-         <td class="num"></td><td class="num tick"></td>`;
+      const note2 = inLieuRow("8b", "In lieu of research — credits", null, CREDIT.in_lieu.credits);
       const cr = el("input");
       cr.type = "text"; cr.inputMode = "numeric";
       cr.value = data.in_lieu_credits ?? "";
@@ -434,9 +505,13 @@
       tbody.appendChild(note2);
     }
 
-    totalRow.innerHTML = `<td></td><td>Total</td>
-      <td class="num minmax">${CREDIT.total ?? "—"}</td>
-      <td class="num" id="credit-total">0</td><td class="num tick"></td>`;
+    totalRow.appendChild(el("td"));
+    totalRow.appendChild(el("td", null, "Total"));
+    totalRow.appendChild(el("td", "num minmax", String(CREDIT.total ?? "—")));
+    const totalCell = el("td", "num", "0");
+    totalCell.id = "credit-total";
+    totalRow.appendChild(totalCell);
+    totalRow.appendChild(el("td", "num tick"));
     tbody.appendChild(totalRow);
 
     host.appendChild(table);
@@ -449,6 +524,21 @@
     }
 
     function pad(n) { return String(n).padStart(2, "0"); }
+
+    function inLieuRow(sl, label, hint, minimum) {
+      const tr = el("tr");
+      tr.appendChild(el("td", "num", sl));
+      const labelCell = el("td", null, label);
+      if (hint) {
+        labelCell.appendChild(document.createTextNode(" "));
+        labelCell.appendChild(el("span", "muted small", hint));
+      }
+      tr.appendChild(labelCell);
+      tr.appendChild(el("td", "num minmax", String(minimum)));
+      tr.appendChild(el("td", "num"));
+      tr.appendChild(el("td", "num tick"));
+      return tr;
+    }
 
     function tally() {
       let sum = 0;
@@ -471,16 +561,20 @@
       const cell = document.getElementById("credit-total");
       if (cell) {
         cell.textContent = String(sum);
-        cell.style.color = CREDIT.total && sum < CREDIT.total ? "var(--err)" : "var(--ok)";
+        cell.className = "num " + (CREDIT.total && sum < CREDIT.total ? "bad-tick" : "ok-tick");
       }
       const side = document.getElementById("credit-tally");
       if (side && CREDIT.total) {
         const short = CREDIT.total - sum;
-        side.innerHTML = short > 0
-          ? `<span style="color:var(--err);font-weight:600">${short} credit(s) short</span>
-             <div class="muted">${sum} entered of ${CREDIT.total} required</div>`
-          : `<span style="color:var(--ok);font-weight:600">Total requirement met</span>
-             <div class="muted">${sum} credits entered</div>`;
+        side.textContent = "";
+        const head = el("span", short > 0 ? "tally-short" : "tally-met",
+                        short > 0
+                          ? `${short} credit${short === 1 ? "" : "s"} short`
+                          : "Total requirement met");
+        side.appendChild(head);
+        side.appendChild(el("div", "muted",
+          short > 0 ? `${sum} entered of ${CREDIT.total} required`
+                    : `${sum} credits entered`));
       }
     }
     tally();
@@ -489,7 +583,14 @@
   // ------------------------------------------------------------------ render
 
   function render() {
-    root.innerHTML = "";
+    root.textContent = "";
+    if (!STAGE.sections || !STAGE.sections.length) {
+      const note = el("div", "alert alert-warning");
+      note.appendChild(el("div", null,
+        "This stage has no fields to fill in. Tell the Office of Academics if that looks wrong."));
+      root.appendChild(note);
+      return;
+    }
     STAGE.sections.forEach(section => {
       const block = el("div", "section-block");
       block.id = `sec-${section.key}`;
@@ -551,38 +652,53 @@
   }
 
   function paintIssues(issues, summary) {
-    issuesBox.innerHTML = "";
-    document.querySelectorAll(".is-bad").forEach(n => n.classList.remove("is-bad"));
+    issuesBox.textContent = "";
+    document.querySelectorAll(".is-bad").forEach(n => {
+      n.classList.remove("is-bad");
+      n.removeAttribute("aria-invalid");
+    });
 
     if (!issues.length) {
-      const p = el("p", "small", "Everything checks out. You can submit this stage.");
-      p.style.color = "var(--ok)";
-      issuesBox.appendChild(p);
-      countsBox.innerHTML = '<span class="pill pill-ok">Clear</span>';
+      issuesBox.appendChild(el("p", "small issue-clear",
+        "Everything checks out. You can submit this stage."));
+      countsBox.textContent = "";
+      countsBox.appendChild(pill("pill-ok", "Clear"));
       return;
     }
 
-    countsBox.innerHTML =
-      (summary.errors ? `<span class="pill pill-err">${summary.errors} to fix</span> ` : "") +
-      (summary.warnings ? `<span class="pill pill-warn">${summary.warnings} to check</span>` : "");
+    countsBox.textContent = "";
+    if (summary.errors) countsBox.appendChild(pill("pill-err", `${summary.errors} to fix`));
+    if (summary.warnings) countsBox.appendChild(pill("pill-warn", `${summary.warnings} to check`));
 
     issues.forEach(iss => {
-      const d = el("div", "issue " + iss.level);
+      // A button, not a clickable div: this is the fastest route to a bad
+      // field and it has to be reachable from the keyboard.
+      const d = el("button", "issue " + iss.level);
+      d.type = "button";
       d.appendChild(el("span", null, iss.message));
       const sec = STAGE.sections.find(s => s.key === iss.section);
       const where = [sec ? sec.title : null,
                      iss.row !== null && iss.row !== undefined ? `row ${iss.row + 1}` : null]
                     .filter(Boolean).join(" · ");
       if (where) d.appendChild(el("span", "where", where));
+      d.setAttribute("aria-label",
+        `${iss.level === "error" ? "Error" : "Check"}: ${iss.message}${where ? " — " + where : ""}. Go to the field.`);
       d.addEventListener("click", () => focusIssue(iss));
       issuesBox.appendChild(d);
 
       const target = locate(iss);
       if (target && iss.level === "error") {
         const input = target.querySelector("input, select, textarea");
-        if (input) input.classList.add("is-bad");
+        if (input) {
+          input.classList.add("is-bad");
+          input.setAttribute("aria-invalid", "true");
+        }
       }
     });
+  }
+
+  function pill(cls, text) {
+    return el("span", "pill " + cls, text);
   }
 
   function locate(iss) {
@@ -608,14 +724,33 @@
   }
 
   function check(cb) {
+    const btn = document.getElementById("btn-check");
+    if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
+    const done = () => {
+      if (btn) { btn.disabled = false; btn.textContent = "Check now"; }
+    };
     fetch(CTX.urls.validate, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
+      done();
       if (j.ok) paintIssues(j.issues, j.summary);
+      else showPanelMessage(j.error || "The checks could not be run. Try again in a moment.");
       if (cb) cb(j);
+    }).catch(() => {
+      // Silence here used to look exactly like "no problems found".
+      done();
+      showPanelMessage("Could not reach the server to run the checks. Your answers are still in this tab.");
+      if (cb) cb({ ok: false });
     });
+  }
+
+  /** A message in the Checks panel, for when we have no issue list to show. */
+  function showPanelMessage(text) {
+    issuesBox.textContent = "";
+    issuesBox.appendChild(el("p", "small issue-note", text));
+    countsBox.textContent = "";
   }
 
   function submit() {
@@ -628,24 +763,27 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
+      if (j.ok) {
+        // The dashboard flashes the confirmation, so keep the button busy
+        // through the navigation rather than flicking it back to "Submit".
+        btn.textContent = "Submitted";
+        dirty = false;
+        window.location = j.redirect || CTX.urls.dashboard;
+        return;
+      }
       paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
       btn.disabled = false;
       btn.textContent = "Submit this stage";
-      if (j.ok) {
-        const msg = j.next
-          ? `Submitted. “${j.next.title}” is now open.`
-          : "Submitted. Your Board of Studies record is complete.";
-        alert(msg);
-        window.location = j.redirect || CTX.urls.dashboard;
-      } else {
-        const first = (j.issues || []).find(i => i.level === "error");
-        if (first) focusIssue(first);
-        issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
+      saveNote.textContent = "Not submitted — there are answers still to fix";
+      saveNote.className = "save-note save-note-bad";
+      const first = (j.issues || []).find(i => i.level === "error");
+      if (first) focusIssue(first);
+      else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }).catch(() => {
       btn.disabled = false;
       btn.textContent = "Submit this stage";
-      alert("Could not reach the server. Try again in a moment.");
+      saveNote.textContent = "Could not reach the server — nothing was submitted. Try again in a moment.";
+      saveNote.className = "save-note save-note-bad";
     });
   }
 

@@ -79,8 +79,6 @@ def department_excel(dept_code: str, year: str) -> io.BytesIO:
         ("Department code", dept.get("dept_code")),
         ("School / Faculty", dept.get("school")),
         ("Campus", dept.get("campus")),
-        ("Head of the Department", dept.get("hod_name")),
-        ("Email", dept.get("hod_email")),
         ("Overall progress", f"{progress(sub)['done']} of {progress(sub)['total']} stages"),
         ("Generated on", datetime.now().strftime("%d %b %Y, %H:%M")),
     ]
@@ -205,7 +203,7 @@ def institution_excel(year: str) -> io.BytesIO:
     ws["A1"] = f"BoS Data Repository — institution status, {year}"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
 
-    header = ["Campus", "School", "Department", "Code", "HoD", "Progress"] + \
+    header = ["Campus", "School", "Department", "Code", "Progress"] + \
              [s["title"] for s in STAGES]
     _head(ws, 3, header)
     r = 4
@@ -213,7 +211,7 @@ def institution_excel(year: str) -> io.BytesIO:
         sub = subs.get(d["dept_code"], {})
         p = progress(sub) if sub else {"done": 0, "total": len(STAGES)}
         row = [d.get("campus"), d.get("school"), d.get("dept_name"), d.get("dept_code"),
-               d.get("hod_name"), f"{p['done']}/{p['total']}"]
+               f"{p['done']}/{p['total']}"]
         for s in STAGES:
             row.append(compute_status(sub, s["key"]).title() if sub else "Not started")
         for i, v in enumerate(row, start=1):
@@ -302,7 +300,6 @@ def submission_word(dept_code: str, year: str) -> io.BytesIO:
                  ("Department code", dept.get("dept_code")),
                  ("School / Faculty", dept.get("school")),
                  ("Campus", dept.get("campus")),
-                 ("Head of the Department", dept.get("hod_name")),
                  ("Academic year", year),
                  ("Report generated", datetime.now().strftime("%d %B %Y, %H:%M"))]:
         row = t.add_row().cells
