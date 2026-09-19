@@ -14,7 +14,8 @@ from .auth import department_required
 from .db import audit, get_db, now, rules_doc, settings
 from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
-from .workflow import (OPENABLE, compute_status, get_or_create_submission, next_action,
+from .workflow import (OPENABLE, compute_status, get_or_create_submission,
+                       grouped_board, next_action,
                        prefill_for, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only)
@@ -104,11 +105,12 @@ def stage(stage_key, programme_code=None):
             "needs_in_lieu": (programme or {}).get("degree_level") == U.HONOURS_NO_RESEARCH,
         }
 
+    board = stage_board(sub)
     return render_template("dept/stage.html", stage=stage_def, dept=dept, submission=sub,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"),
-                           board=stage_board(sub))
+                           board=board, groups=grouped_board(board))
 
 
 # ---------------------------------------------------------------------------

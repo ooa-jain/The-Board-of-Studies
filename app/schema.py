@@ -1,5 +1,5 @@
 """
-Declarative field schema for the BoS Data Repository.
+Declarative field schema for the OOA Data Portal.
 
 Every Word/Excel template in the "BOS DATA REPOSITORY" sheet is expressed here as
 typed fields instead of a document to download, fill offline and re-upload.
@@ -745,7 +745,10 @@ DESIGN_DEVELOPMENT_PLAN = {
 
 FINAL_REPOSITORY = {
     "key": "final_repo",
-    "group": "Approval",
+    # Its own group: it is the sealing of the record, not another approval,
+    # and labelling it "Approval" put that heading on the board twice with
+    # Planning in between them.
+    "group": "Repository",
     "title": "Final BoS Repository",
     "blurb": "The consolidated, signed bundle. Once submitted the whole record is sealed and "
              "only the Office of Academics can reopen it.",

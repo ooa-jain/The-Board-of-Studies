@@ -71,7 +71,7 @@ def department_excel(dept_code: str, year: str) -> io.BytesIO:
 
     ws["A1"] = "JAIN (Deemed-to-be University) — Office of Academics"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
-    ws["A2"] = f"Board of Studies Data Repository · {year}"
+    ws["A2"] = f"Office of Academics Data Portal · {year}"
     ws["A2"].font = Font(size=11, color="53627A")
 
     meta = [
@@ -200,7 +200,7 @@ def institution_excel(year: str) -> io.BytesIO:
     wb = Workbook()
     ws = wb.active
     ws.title = "Status"
-    ws["A1"] = f"BoS Data Repository — institution status, {year}"
+    ws["A1"] = f"OOA Data Portal — institution status, {year}"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
 
     header = ["Campus", "School", "Department", "Code", "Progress"] + \
@@ -289,7 +289,7 @@ def submission_word(dept_code: str, year: str) -> io.BytesIO:
 
     sub_t = doc.add_paragraph()
     sub_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r2 = sub_t.add_run("Office of Academics · Board of Studies Data Repository")
+    r2 = sub_t.add_run("JAIN (Deemed-to-be University) · Office of Academics Data Portal")
     r2.font.size = Pt(11)
     r2.font.color.rgb = RGBColor(0x53, 0x62, 0x7A)
 

@@ -387,3 +387,71 @@ def test_department_cannot_touch_another_departments_stage(app, client):
     # so there is no route that accepts another department's code
     r = client.get("/department/")
     assert "Department of English" not in r.get_data(as_text=True)
+
+
+def test_the_stage_side_menu_branches_by_group(app, client):
+    """The side menu groups the thirteen stages, and renders them.
+
+    Asserting on the titles matters as much as on the groups: the group dict
+    is walked in the template, and a mis-named key there fails silently by
+    rendering an empty menu rather than by raising.
+    """
+    from html import escape
+
+    from app.schema import STAGES
+    u, p = make_department(app)
+    login(client, u, p)
+    body = client.get("/department/stage/dept_info").get_data(as_text=True)
+
+    groups = []
+    for s in STAGES:
+        if s["group"] not in groups:
+            groups.append(s["group"])
+    # a group heading appearing twice with other groups in between would give
+    # the menu two branches of the same name
+    assert len(groups) == len(set(groups)), "group names have to be unique"
+    for g in groups:
+        assert f'<span class="branch-label">{escape(g)}</span>' in body, g
+    for s in STAGES:
+        assert escape(s["title"]) in body, s["title"]
+
+    # the group you are in is the open one, and the rest are folded
+    assert body.count('data-open="true"') == 1
+    assert body.count('data-open="false"') == len(groups) - 1
+
+    # the stage being filled is marked, and a locked stage is not a link
+    assert 'class="branch-row is-open is-here"' in body
+    assert 'class="branch-row is-locked"' in body
+
+
+def test_grouped_board_counts_each_group(app):
+    from app.db import get_db
+    from app.workflow import get_or_create_submission, grouped_board, stage_board
+    make_department(app)
+    with app.app_context():
+        sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
+        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
+            "stages.dept_info.status": "submitted"}})
+        sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
+
+        groups = grouped_board(stage_board(sub))
+        assert [g["name"] for g in groups][0] == "Department"
+        assert groups[0]["done"] == groups[0]["total"] and groups[0]["complete"]
+        assert groups[1]["done"] == 0 and not groups[1]["complete"]
+        assert sum(g["total"] for g in groups) == len(stage_board(sub))
+
+
+def test_the_home_page_carries_the_loading_screen(client):
+    """It is inert markup until the page's own script reveals it."""
+    body = client.get("/").get_data(as_text=True)
+    assert 'id="preload-canvas"' in body
+    assert "is-preloading" in body
+    assert "js/particle-text.js" in body
+    # and it never appears on a page a department is working in
+    assert 'id="preload-canvas"' not in client.get("/login").get_data(as_text=True)
+
+
+def test_the_portal_is_named_ooa_data_portal(client):
+    body = client.get("/").get_data(as_text=True)
+    assert "OOA Data Portal" in body or "Office of Academics Data Portal" in body
+    assert "BoS Data Repository" not in body

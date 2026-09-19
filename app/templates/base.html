@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Board of Studies Data Repository — the Office of Academics portal where JAIN departments file their Board of Studies record for the academic year.">
+  <meta name="description" content="OOA Data Portal — where JAIN departments file their Board of Studies record with the Office of Academics for the academic year.">
   <meta name="theme-color" content="#091324">
-  <title>{% block title %}BoS Data Repository{% endblock %} · JAIN Office of Academics</title>
+  <title>{% block title %}OOA Data Portal{% endblock %} · JAIN Office of Academics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Fragment+Mono&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -23,6 +23,10 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
 
+{# A page may put a loading curtain here. It is display:none unless the page's
+   own head script reveals it, so it can never cover the site by accident. #}
+{% block curtain %}{% endblock %}
+
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
 {% if not hide_chrome %}
@@ -36,7 +40,7 @@
            src="{{ url_for('static', filename='img/jain-logo.png') }}"
            width="1103" height="319">
       <span class="brand-text">
-        <strong>BoS Data Repository</strong>
+        <strong>OOA Data Portal</strong>
         <span>Office of Academics</span>
       </span>
     </a>
@@ -121,7 +125,7 @@
          src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
          width="1103" height="319">
     <span>JAIN (Deemed-to-be University) · Office of Academics</span>
-    <span class="spacer">Board of Studies Data Repository</span>
+    <span class="spacer">Office of Academics Data Portal</span>
     <span>{{ app_settings.academic_year if app_settings else '' }}</span>
   </div>
 </footer>

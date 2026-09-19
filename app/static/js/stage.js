@@ -514,7 +514,14 @@
     totalRow.appendChild(el("td", "num tick"));
     tbody.appendChild(totalRow);
 
-    host.appendChild(table);
+    // Five columns will not fit a phone, so the table gets the same scrolling
+    // box as the repeating tables — and a keyboard user can reach the scroll.
+    const wrap = el("div", "rt-wrap");
+    wrap.tabIndex = 0;
+    wrap.setAttribute("role", "region");
+    wrap.setAttribute("aria-label", "UGC Table 2 credit matrix");
+    wrap.appendChild(table);
+    host.appendChild(wrap);
 
     if (CREDIT.needs_in_lieu) {
       const p = el("p", "small muted");

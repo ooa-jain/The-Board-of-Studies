@@ -1,4 +1,4 @@
-"""Configuration for the JAIN OoA BoS Data Repository Portal."""
+"""Configuration for the JAIN Office of Academics Data Portal."""
 import os
 from pathlib import Path
 

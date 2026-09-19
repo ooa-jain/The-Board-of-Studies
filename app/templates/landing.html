@@ -1,8 +1,35 @@
 {% extends "base.html" %}
 {% import "_art.html" as art %}
-{% block title %}Board of Studies Data Repository{% endblock %}
+{% block title %}Office of Academics Data Portal{% endblock %}
 
 {% block body_class %}has-hero{% endblock %}
+
+{% block head %}
+<script>
+  /* Set before the first paint so the curtain is up from the very first frame
+     rather than appearing over a page that has already drawn. Only ever set
+     by this script: with JavaScript off the curtain stays display:none, so the
+     home page is never covered by something that cannot be lifted. It shows
+     once a session — coming back to the home page is instant. */
+  (function () {
+    try { if (sessionStorage.getItem("ooa.preloaded")) return; } catch (e) { /* private mode */ }
+    document.documentElement.className += " is-preloading";
+  })();
+</script>
+{% endblock %}
+
+{% block curtain %}
+<div class="preload" id="preload">
+  <canvas class="preload-canvas" id="preload-canvas" aria-hidden="true"></canvas>
+  <p class="sr-only" role="status">
+    Loading the OOA Data Portal — JAIN (Deemed-to-be University), Office of Academics.
+  </p>
+  <div class="preload-foot">
+    <span class="preload-bar" aria-hidden="true"><i></i></span>
+    <p class="preload-note">Office of Academics Data Portal</p>
+  </div>
+</div>
+{% endblock %}
 
 {% block body %}
 <main id="main-content">
@@ -227,4 +254,9 @@
 </section>
 
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/particle-text.js') }}"></script>
+<script src="{{ url_for('static', filename='js/preload.js') }}"></script>
 {% endblock %}

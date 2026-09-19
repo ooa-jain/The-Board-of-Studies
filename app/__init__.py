@@ -1,4 +1,4 @@
-"""Application factory for the JAIN OoA BoS Data Repository Portal."""
+"""Application factory for the JAIN Office of Academics Data Portal."""
 
 from __future__ import annotations
 

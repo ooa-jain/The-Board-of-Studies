@@ -1,5 +1,5 @@
 /* ==========================================================================
-   JAIN OoA — BoS Data Repository Portal
+   JAIN — OOA Data Portal
 
    JAIN navy against a warm ivory, with the gold from the roundel as the only
    accent. Navy #091324 and gold #eebd1b are sampled straight from the supplied
@@ -1135,6 +1135,11 @@ a.next-step:hover {
 /* ---------- stage form ---------- */
 
 .stage-layout { display: grid; grid-template-columns: 1fr 312px; gap: 22px; align-items: start; }
+/* A grid track sized 1fr will not go narrower than its widest content unless
+   it is told it may. Without this the wide credit and syllabus tables stretch
+   the whole page sideways on a phone instead of scrolling inside their own
+   box. */
+.stage-layout > * { min-width: 0; }
 @media (max-width: 1080px) { .stage-layout { grid-template-columns: 1fr; } }
 .stage-side { position: sticky; top: 86px; display: flex; flex-direction: column; gap: 16px; }
 
@@ -1155,7 +1160,15 @@ a.next-step:hover {
 .fields-grid .field.wide { grid-column: 1 / -1; }
 
 /* repeating table */
-.rt-wrap { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: auto; background: #fff; }
+/* position: relative matters as much as the overflow here. The visually
+   hidden column labels inside these tables are position:absolute, and an
+   absolute box is only clipped by an ancestor that is itself positioned —
+   without this, an invisible label 400px along a scrolled table was dragging
+   the whole page sideways on a phone. */
+.rt-wrap {
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  overflow: auto; background: #fff; position: relative;
+}
 table.rt { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .84rem; }
 table.rt th {
   background: var(--ink-050); padding: 9px 10px; text-align: left;
@@ -1221,26 +1234,159 @@ table.credits .bad-tick { color: var(--err); font-weight: 700; }
 .tally-short { color: var(--err); font-weight: 600; }
 .tally-met { color: var(--ok); font-weight: 600; }
 
-/* the stage list in the side panel */
-.mini-board { list-style: none; margin: 0; padding: 0; }
-.mini-board li { padding: 5px 0; }
-.mini-board li.is-locked { color: var(--ink-faint); }
-.mini-board li.is-here > span:not(.mini-dot) { font-weight: 600; color: var(--ink-800); }
-.mini-dot {
-  width: 9px; height: 9px; border-radius: 50%; flex: none;
-  background: var(--lock); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+/* ---------- the branched stage menu, in the side panel ----------
+   Thirteen stages in seven groups. A flat list of thirteen said nothing about
+   which belong together or what a stage is waiting on; branches do both.
+
+   The measurements are the ones from the specification — row height, indent,
+   trunk offset, elbow radius, stroke width, and the draw and fold durations —
+   held as tokens so they can be changed in one place. The specification's
+   greys are for a dark panel; on the ivory card the line takes the navy scale
+   and each branch takes the colour of its own state, so a finished stage reads
+   as finished from the line alone. */
+.branch {
+  --row-h: 36px;        /* rowHeight */
+  --indent: 40px;       /* indent */
+  --trunk: 14px;        /* trunk */
+  --elbow-r: 10px;      /* radius */
+  --line-w: 1.5px;      /* lineWidth */
+  --branch-fs: 14px;    /* fontSize */
+  --draw: 400ms;        /* drawDuration */
+  --fold: 300ms;        /* foldDuration */
+  --branch-line: #cfd6e0;
+  list-style: none; margin: 0; padding: 0;
+  font-size: var(--branch-fs);
 }
-.mini-submitted { background: var(--ok); }
-.mini-draft, .mini-returned { background: var(--warn); }
-.mini-open { background: var(--gold-500); }
-.mini-locked { background: transparent; box-shadow: inset 0 0 0 1.5px var(--lock); }
+
+/* ---- the group, and its fold ---- */
+.branch-group + .branch-group { margin-top: 2px; }
+.branch-parent {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  min-height: var(--row-h); padding: 4px 4px 4px 0;
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-weight: 700; color: var(--ink-800);
+  font-family: var(--font-mono); font-size: .72rem;
+  letter-spacing: .1em; text-transform: uppercase;
+}
+.branch-parent:hover .branch-label { text-decoration: underline; }
+.branch-caret {
+  width: 14px; height: 14px; flex: none; position: relative;
+  transition: transform var(--fold) ease;
+}
+.branch-caret::before {
+  content: ""; position: absolute; left: 3px; top: 2px;
+  width: 6px; height: 6px; border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor; transform: rotate(45deg);
+}
+.branch-parent[aria-expanded="false"] .branch-caret { transform: rotate(-90deg); }
+.branch-label { flex: 1; min-width: 0; }
+.branch-tally {
+  font-family: var(--font-mono); font-size: .68rem; letter-spacing: 0;
+  color: var(--ink-faint); flex: none;
+}
+.branch-group.is-done .branch-tally { color: var(--ok); }
+
+.branch-children {
+  list-style: none; margin: 0 0 4px; padding: 0; position: relative;
+  overflow: hidden; max-height: 40rem;
+  transition: max-height var(--fold) ease, visibility 0s;
+}
+/* A folded group must not be reachable by tab, so it is hidden as well as
+   collapsed — held visible until the fold finishes on the way out, and shown
+   at once on the way in. */
+.branch-children[data-open="false"] {
+  max-height: 0; margin-bottom: 0; visibility: hidden;
+  transition: max-height var(--fold) ease, visibility 0s linear var(--fold);
+}
+
+/* ---- the rows, and the line that joins them ----
+   Each row draws its own elbow (down from the trunk, then right, rounded at
+   the turn) and, unless it is the last, the length of trunk that carries on
+   to the row below. Stacked, they make one continuous line whatever height
+   the titles wrap to. */
+.branch-row { position: relative; padding-left: var(--indent); }
+.branch-row::before {
+  content: ""; position: absolute; left: var(--trunk); top: 0;
+  width: calc(var(--indent) - var(--trunk) - 10px);
+  height: calc(var(--row-h) / 2);
+  border-left: var(--line-w) solid var(--branch-line);
+  border-bottom: var(--line-w) solid var(--branch-line);
+  border-bottom-left-radius: var(--elbow-r);
+}
+.branch-row:not(:last-child)::after {
+  content: ""; position: absolute; left: var(--trunk);
+  top: calc(var(--row-h) / 2); bottom: -1px;
+  border-left: var(--line-w) solid var(--branch-line);
+}
+
+/* the line is drawn rather than simply present: the trunk grows down, the
+   elbow reaches right, one row after another */
+.branch-children.is-drawing .branch-row::before {
+  animation: branch-draw var(--draw) ease both;
+  animation-delay: calc(var(--i, 0) * (var(--draw) / 5));
+}
+.branch-children.is-drawing .branch-row::after {
+  animation: branch-trunk var(--draw) ease both;
+  animation-delay: calc(var(--i, 0) * (var(--draw) / 5));
+  transform-origin: top;
+}
+.branch-children.is-drawing .branch-link,
+.branch-children.is-drawing .branch-dead {
+  animation: branch-fade var(--draw) ease both;
+  animation-delay: calc(var(--i, 0) * (var(--draw) / 5) + var(--draw) / 2);
+}
+@keyframes branch-draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+@keyframes branch-trunk { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes branch-fade { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+
+/* ---- the row itself ---- */
+.branch-link, .branch-dead {
+  /* Aligned to the top, not the middle: the elbow meets the row half a row
+     down, so a title that wraps to two lines has to keep its first line — and
+     its icon — on that same line rather than drifting below it. */
+  display: flex; align-items: flex-start; gap: 9px;
+  min-height: var(--row-h); padding: 9px 6px 7px 0;
+  color: var(--ink); line-height: 1.3;
+}
+.branch-link { text-decoration: none; border-radius: 3px; }
+.branch-link:hover { color: var(--ink-800); text-decoration: underline; }
+.branch-dead { color: var(--ink-faint); }
+.branch-text { min-width: 0; }
+.branch-icon { width: 15px; height: 15px; flex: none; }
+.branch-icon svg { display: block; width: 100%; height: 100%; }
+
+/* ---- state: the branch takes the colour of the stage it leads to ---- */
+.branch-row.is-submitted::before, .branch-row.is-submitted::after { border-color: var(--ok); }
+.branch-row.is-submitted .branch-icon { color: var(--ok); }
+.branch-row.is-draft::before, .branch-row.is-draft::after,
+.branch-row.is-returned::before, .branch-row.is-returned::after { border-color: var(--warn); }
+.branch-row.is-draft .branch-icon, .branch-row.is-returned .branch-icon { color: var(--warn); }
+.branch-row.is-open::before, .branch-row.is-open::after { border-color: var(--gold-500); }
+.branch-row.is-open .branch-icon { color: var(--gold-700); }
+/* A dashed 1.5px border renders as coarse blocks around the elbow's
+   curve; a paler solid line says "not yet" more quietly. */
+.branch-row.is-locked::before, .branch-row.is-locked::after { border-color: #dfe4ea; }
+.branch-row.is-locked .branch-icon { color: var(--lock); }
+
+/* where you are: a filled marker in the gutter and the only bold row */
+.branch-row.is-here > .branch-link { font-weight: 700; color: var(--ink-900); }
+.branch-row.is-here > .branch-link::before {
+  content: ""; position: absolute; left: calc(var(--trunk) - 3.5px);
+  top: calc(var(--row-h) / 2 - 4px);
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--gold-400); box-shadow: 0 0 0 2px var(--surface);
+}
+.branch-card .card-body { padding-top: 10px; }
 
 /* small shared helpers, replacing per-element inline styles */
 .card-title-sm { font-size: 1rem; margin: 0; }
 .head-aside { text-align: right; }
 .note-gold { color: var(--gold-700); margin-top: 6px; }
 .mb-half { margin: 0 0 8px; }
-.scroll-300 { max-height: 300px; overflow: auto; }
+.scroll-300 { max-height: 300px; overflow: auto; position: relative; }
 @media (max-width: 720px) {
   /* right-aligning a stacked column reads as a mistake once it wraps */
   .head-aside { text-align: left; }
@@ -1252,7 +1398,14 @@ table.credits .bad-tick { color: var(--err); font-weight: 700; }
   backdrop-filter: blur(8px); border-top: 1px solid var(--line);
   padding: 13px 0; margin-top: 22px; z-index: 30;
 }
-.savebar .wrap { display: flex; align-items: center; gap: 12px; }
+.savebar .wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  /* Back, Check and Submit do not fit a phone in one row; the note takes its
+     own line and the buttons share the next. */
+  .savebar .save-note { width: 100%; }
+  .savebar .spacer { margin-left: 0; }
+  .savebar .btn { flex: 1 1 auto; }
+}
 .save-note { font-size: .8rem; color: var(--ink-faint); }
 .save-note.saving { color: var(--ink-600); }
 .save-note.saved { color: var(--ok); }
@@ -1328,8 +1481,55 @@ footer.site .brand-logo { height: 26px; }
 footer.site .wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 footer.site a { color: rgba(255,255,255,.72); }
 
+/* ---------- the loading curtain ----------
+   Shown over the home page while the display face and the page arrive, then
+   removed from the document. It is display:none until the inline script in
+   the head adds .is-preloading, so a browser without JavaScript never sees
+   it and can never be trapped behind it. */
+.preload { display: none; }
+html.is-preloading, html.is-preloading body { overflow: hidden; }
+html.is-preloading .preload {
+  display: grid; place-items: center; align-content: center;
+  position: fixed; inset: 0; z-index: 300;
+  background:
+    radial-gradient(820px 460px at 50% 44%, rgba(238,189,27,.17), transparent 72%),
+    var(--ink-900);
+  opacity: 1; transition: opacity .56s ease;
+}
+html.is-preloading .preload.is-done { opacity: 0; pointer-events: none; }
+.preload-canvas {
+  display: block; width: min(1180px, 94vw);
+  height: clamp(210px, 44vh, 440px);
+}
+/* until the particles are running, the words are held at nothing rather than
+   flashed in the fallback face */
+.preload-canvas { opacity: 0; transition: opacity .3s ease; }
+.preload.is-live .preload-canvas { opacity: 1; }
+.preload-foot {
+  position: absolute; left: 0; right: 0; bottom: clamp(26px, 7vh, 54px);
+  display: grid; justify-items: center; gap: 13px; padding: 0 16px;
+}
+.preload-note {
+  margin: 0; font-family: var(--font-mono); font-size: .66rem;
+  letter-spacing: .3em; text-transform: uppercase; color: var(--gold-300);
+  text-align: center;
+}
+.preload-bar {
+  display: block; width: min(260px, 58vw); height: 2px;
+  background: rgba(245,241,232,.16); overflow: hidden;
+}
+.preload-bar i {
+  display: block; height: 100%; width: 0; background: var(--gold-400);
+  animation: preload-fill 2.05s cubic-bezier(.22,.8,.2,1) forwards;
+}
+@keyframes preload-fill { from { width: 0; } to { width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  /* the words are drawn in place; the bar has nothing to report */
+  .preload-bar i { width: 100%; }
+}
+
 @media print {
-  .topbar, footer.site, .savebar, .no-print { display: none !important; }
+  .topbar, footer.site, .savebar, .no-print, .preload { display: none !important; }
   body { background: #fff; }
   .slip { border-color: #333; box-shadow: none; }
   .card { box-shadow: none; border-color: #ccc; break-inside: avoid; }

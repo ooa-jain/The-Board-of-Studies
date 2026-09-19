@@ -95,6 +95,29 @@ def stage_board(submission: dict):
     return board
 
 
+def grouped_board(board):
+    """The same stage list, folded into its groups.
+
+    Thirteen stages read as thirteen unrelated errands when they are listed
+    flat. Grouped, the side menu can say which ones belong together, how many
+    of each group are done, and which group you are working inside.
+
+    The key is "stages" rather than "items": a template asking a dict for
+    .items gets the dict's own method, silently, and renders nothing.
+    """
+    groups = []
+    for s in board:
+        if not groups or groups[-1]["name"] != s["group"]:
+            groups.append({"name": s["group"], "stages": []})
+        groups[-1]["stages"].append(s)
+
+    for g in groups:
+        g["total"] = len(g["stages"])
+        g["done"] = sum(1 for s in g["stages"] if s["status"] in DONE)
+        g["complete"] = g["done"] == g["total"]
+    return groups
+
+
 def next_action(submission: dict):
     """The one stage a department should work on next, or None when done.
 
