@@ -3,6 +3,10 @@
 
 {% block body %}
 <main id="main-content">
+
+{# ---------------------------------------------------------------- hero --
+   The reference leads with one very large two-tone statement: a plain first
+   half and an emphasised second. Everything else waits below it. #}
 <section class="hero">
   <div class="wrap">
     <span class="chip">
@@ -10,14 +14,25 @@
       Open for {{ app_settings.academic_year if app_settings else 'this academic year' }}
     </span>
     <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
-    <h1 class="hero-display">Filled once,<br><em>checked as you type</em>.</h1>
+
+    <h1 class="hero-display">
+      The Board of Studies record,<br><em>filled once</em>
+    </h1>
+
     <p>
-      Every department submits its Board of Studies documentation here, in one sequence, on one form.
-      The templates that used to travel as Word and Excel attachments are now typed fields, and the
-      UGC credit rules are applied by the portal before anything is accepted.
+      Every department files its documentation here, in one sequence, on one form.
+      The templates that used to travel as email attachments are typed fields now,
+      and the UGC credit rules are applied before anything is accepted.
     </p>
+
     <div class="hero-actions">
-      <a class="btn btn-gold btn-lg" href="{{ url_for('auth.login') }}">Sign in to your department</a>
+      <a class="btn btn-gold btn-lg" href="{{ url_for('auth.login') }}">
+        Sign in to your department
+        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
+                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
       <a class="btn btn-ghost btn-lg" href="#how">How the submission works</a>
     </div>
 
@@ -29,6 +44,69 @@
   </div>
 </section>
 
+{# ------------------------------------------------------- what's in front --
+   The reference's story row: a dated strip, then short bold cards that each
+   say one thing. #}
+<section class="section">
+  <div class="wrap">
+    <div class="row-head">
+      <h2>What the portal does</h2>
+      <span class="row-stamp">
+        {{ app_settings.academic_year if app_settings else '' }} · Office of Academics
+      </span>
+    </div>
+
+    <div class="story-grid">
+      <article class="story">
+        <h3>Thirteen stages, in order</h3>
+        <p>Each one opens when the last is submitted, so nothing is filled out of sequence
+           and nothing is forgotten.</p>
+      </article>
+      <article class="story">
+        <h3>Checked as you type</h3>
+        <p>Credit totals, course codes, contact hours and category sums are validated at the
+           keystroke, not weeks later by a reviewer.</p>
+      </article>
+      <article class="story">
+        <h3>Signed copies, uploaded once</h3>
+        <p>Pre-BoS takes the three composition documents as files. Fill the templates offline,
+           sign them, upload them.</p>
+      </article>
+      <article class="story">
+        <h3>One login per department</h3>
+        <p>The username is the department code. The Office of Academics issues the password
+           and it is shown once.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------- chooser ----
+   The reference offers a way to find your own way in. Ours lists the schools,
+   so a department can find itself at a glance. #}
+{% if by_school %}
+<section class="section section-tint">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Who files here</span>
+      <h2>Every department, <em>one sequence</em></h2>
+      <p>{{ stats.departments }} departments across {{ stats.schools }} schools and faculties
+         file the same thirteen stages against the same credit rules.</p>
+    </div>
+
+    <div class="school-grid">
+      {% for s in by_school %}
+      <div class="school">
+        <span class="school-name">{{ s.name }}</span>
+        <span class="school-count">{{ s.count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ----------------------------------------------------------------- how ---#}
 <section class="section section-dark" id="how">
   <div class="wrap">
     <div class="section-head">
@@ -40,13 +118,13 @@
     <div class="flow">
       <div>
         <h4>The Office of Academics issues a login</h4>
-        <p>One account per department, named after the department code. The Office generates the
-           password and hands it over.</p>
+        <p>One account per department, named after the department code. The Office generates
+           the password and hands it over.</p>
       </div>
       <div>
         <h4>Pre-BoS is filled first</h4>
-        <p>DIAC, Board of Studies and Programme Assessment Committee compositions. Everything else
-           stays locked until these are submitted.</p>
+        <p>The three signed composition documents — DIAC, Board of Studies and PAC. Everything
+           else stays locked until they are uploaded.</p>
       </div>
       <div>
         <h4>UGC Mandatory Disclosure opens</h4>
@@ -55,58 +133,94 @@
       </div>
       <div>
         <h4>Evidence, approval, repository</h4>
-        <p>Feedback, meeting papers and the approval chain, ending in a sealed consolidated record
-           for the academic year.</p>
+        <p>Feedback, meeting papers and the approval chain, ending in a sealed consolidated
+           record for the academic year.</p>
       </div>
     </div>
   </div>
 </section>
 
+{# ------------------------------------------------------------ the rules ---
+   The reference tells its research story with a big figure and a sentence
+   built around it. The credit rules take the same shape. #}
 <section class="section">
   <div class="wrap">
-    <div class="grid grid-2" style="align-items:center;gap:40px">
-      <div>
-        <span class="eyebrow">The checking</span>
-        <h2>The credit rules live in the portal, not in a reviewer's head</h2>
-        <p class="muted">
-          UGC Table 2 sets the minimum credits a degree must award in each category. The portal holds
-          that table, applies the right column for a three-year or four-year programme, adds the
-          in-lieu rule for Honours students who do not take research, and refuses a submission whose
-          totals do not reconcile with the course list.
+    <div class="section-head">
+      <span class="eyebrow">The checking</span>
+      <h2>The credit rules live in the portal, <em>not in a reviewer's head</em></h2>
+    </div>
+
+    <div class="fact-grid">
+      <article class="fact">
+        <span class="fact-n">120</span>
+        <p>credits is the floor for a <strong>three-year UG degree</strong>. The portal holds
+           UGC Table 2 and applies the right column for the programme in front of it.</p>
+      </article>
+      <article class="fact">
+        <span class="fact-n">160</span>
+        <p>for a <strong>four-year Honours degree</strong>, with the in-lieu rule applied
+           automatically for students who do not take research.</p>
+      </article>
+      <article class="fact">
+        <span class="fact-n">1:25</span>
+        <p>one credit to twenty-five marks. <strong>Marks are checked against credits</strong>,
+           contact hours against credits, and category totals against the courses listed.</p>
+      </article>
+      <article class="fact">
+        <span class="fact-n">0</span>
+        <p>submissions accepted with a total that does not reconcile.
+           <strong>A short category is refused</strong> at the point of submission, not after.</p>
+      </article>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-head"><h3>UGC Table 2 — minimum credits</h3></div>
+      <div class="card-body" style="padding:0">
+        <table class="credits">
+          <thead>
+            <tr><th scope="col">Category</th><th scope="col" class="num">3-year UG</th>
+                <th scope="col" class="num">4-Year UG</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Major (Core)</td><td class="num">60</td><td class="num">80</td></tr>
+            <tr><td>Minor Stream</td><td class="num">24</td><td class="num">32</td></tr>
+            <tr><td>Multidisciplinary</td><td class="num">09</td><td class="num">09</td></tr>
+            <tr><td>Ability Enhancement (AEC)</td><td class="num">08</td><td class="num">08</td></tr>
+            <tr><td>Skill Enhancement (SEC)</td><td class="num">09</td><td class="num">09</td></tr>
+            <tr><td>Value Added Courses</td><td class="num">06 – 08</td><td class="num">06 – 08</td></tr>
+            <tr><td>Summer Internship</td><td class="num">02 – 04</td><td class="num">02 – 04</td></tr>
+            <tr><td>Research Project / Dissertation</td><td class="num">—</td><td class="num">12</td></tr>
+            <tr class="total"><td>Total</td><td class="num">120</td><td class="num">160</td></tr>
+          </tbody>
+        </table>
+        <p class="small muted" style="padding:14px 18px;margin:0;border-top:1px solid var(--line)">
+          Honours students not undertaking research do 3 courses for 12 credits in lieu of a
+          research project or dissertation.
         </p>
-        <p class="muted">
-          Marks are checked against credits at 1 credit = 25 marks, contact hours are checked against
-          credits, course codes must be unique and correctly formed, and category totals in the
-          summary must equal the sum of the courses actually listed.
-        </p>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>UGC Table 2 — minimum credits</h3></div>
-        <div class="card-body" style="padding:0">
-          <table class="credits">
-            <thead>
-              <tr><th scope="col">Category</th><th scope="col" class="num">3-year UG</th><th scope="col" class="num">4-Year UG</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Major (Core)</td><td class="num">60</td><td class="num">80</td></tr>
-              <tr><td>Minor Stream</td><td class="num">24</td><td class="num">32</td></tr>
-              <tr><td>Multidisciplinary</td><td class="num">09</td><td class="num">09</td></tr>
-              <tr><td>Ability Enhancement (AEC)</td><td class="num">08</td><td class="num">08</td></tr>
-              <tr><td>Skill Enhancement (SEC)</td><td class="num">09</td><td class="num">09</td></tr>
-              <tr><td>Value Added Courses</td><td class="num">06 – 08</td><td class="num">06 – 08</td></tr>
-              <tr><td>Summer Internship</td><td class="num">02 – 04</td><td class="num">02 – 04</td></tr>
-              <tr><td>Research Project / Dissertation</td><td class="num">—</td><td class="num">12</td></tr>
-              <tr class="total"><td>Total</td><td class="num">120</td><td class="num">160</td></tr>
-            </tbody>
-          </table>
-          <p class="small muted" style="padding:12px 16px;margin:0;border-top:1px solid var(--line)">
-            Honours students not undertaking research do 3 courses for 12 credits in lieu of a
-            research project or dissertation.
-          </p>
-        </div>
       </div>
     </div>
   </div>
 </section>
+
+{# ------------------------------------------------------------------ cta ---#}
+<section class="section">
+  <div class="wrap">
+    <div class="cta-band">
+      <div>
+        <h2>Ready to file?</h2>
+        <p>Sign in with the department login issued by the Office of Academics.
+           Your username is your department code.</p>
+      </div>
+      <a class="btn btn-gold btn-lg" href="{{ url_for('auth.login') }}">
+        Sign in
+        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
+                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>
+
 </main>
 {% endblock %}

@@ -31,12 +31,20 @@ CAMPUS_INFO = [
 @bp.route("/")
 def landing():
     db = get_db()
+    schools = sorted(x for x in db.departments.distinct("school", {"active": True}) if x)
     stats = {
         "departments": db.departments.count_documents({"active": True}),
-        "schools": len(db.departments.distinct("school", {"active": True})),
+        "schools": len(schools),
         "submitted": db.submissions.count_documents({"status": {"$in": ["submitted", "sealed"]}}),
     }
-    return render_template("landing.html", stats=stats)
+    # departments per school, biggest first, so the chooser leads with the
+    # schools most people are looking for rather than with whatever sorts first
+    by_school = sorted(
+        ({"name": s,
+          "count": db.departments.count_documents({"school": s, "active": True})}
+         for s in schools),
+        key=lambda x: (-x["count"], x["name"]))
+    return render_template("landing.html", stats=stats, by_school=by_school)
 
 
 @bp.route("/about")
