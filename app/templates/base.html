@@ -61,7 +61,6 @@
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
           {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
           {{ nav_link(url_for('admin.rules'), 'Rules', request.endpoint == 'admin.rules') }}
-          {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint == 'admin.app_settings') }}
         {% elif current_user and current_user.role == 'department' %}
           {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
           <a href="{{ url_for('dept.export_excel') }}">Excel</a>
@@ -73,13 +72,21 @@
       </nav>
 
       <div class="nav-right">
+        {# Settings sits with the account rather than with the sections: it is
+           configuration, and five links on the left would push the wordmark
+           off the centre of the bar. #}
+        {% if current_user and current_user.role == 'admin' %}
+          {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint == 'admin.app_settings') }}
+        {% endif %}
         {% if current_user %}
         <div class="who">
           <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
           <span class="who-text">
             <span class="sr-only">Signed in as </span>
             <strong>{{ current_user.name }}</strong>
-            <span>{{ 'Office of Academics' if current_user.role == 'admin' else current_user.dept_code }}</span>
+            {# the admin's name already is the office; a second line saying so
+               again only takes room off the bar #}
+            {% if current_user.role != 'admin' %}<span>{{ current_user.dept_code }}</span>{% endif %}
           </span>
           <a href="{{ url_for('auth.logout') }}">Sign out</a>
         </div>
@@ -88,10 +95,12 @@
         <a class="nav-cta" href="{{ '#signin' if request.endpoint == 'public.landing'
                                    else url_for('public.landing') ~ '#signin' }}">
           Sign in
-          <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
-                  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <span class="nav-cta-arrow" aria-hidden="true">
+            <svg class="arrow" viewBox="0 0 24 24" focusable="false">
+              <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
+                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
         </a>
         {% endif %}
       </div>
