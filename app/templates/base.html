@@ -21,7 +21,7 @@
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 

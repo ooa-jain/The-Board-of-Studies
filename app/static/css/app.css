@@ -172,16 +172,24 @@ h4 { font-size: 1rem; }
    A floating rounded bar rather than a full-bleed strip, as on the reference:
    it sits on the page with air around it and rides the scroll. */
 .topbar {
-  position: sticky; top: 14px; z-index: 40;
-  margin: 14px auto 0; padding: 0;
-  background: transparent; color: #fff; box-shadow: none;
+  position: sticky; top: 0; z-index: 40;
+  margin: 0 auto; padding: 0;
+  background: transparent; color: var(--ink-900); box-shadow: none;
 }
+body:not(.has-hero) .topbar { position: sticky; top: 14px; margin-top: 14px; }
+/* on the gold, the bar scrolls away with the hero rather than sticking */
+body.has-hero .topbar { position: absolute; left: 0; right: 0; }
 .topbar .wrap {
-  display: flex; align-items: center; gap: 22px; height: 64px;
+  display: flex; align-items: center; gap: 22px; height: 78px;
+  max-width: 1240px; padding: 0 24px;
+  background: transparent; border: 0; border-radius: 0; box-shadow: none;
+}
+/* over the gold hero the bar is part of it; elsewhere it carries its own
+   surface so it does not float on nothing */
+body:not(.has-hero) .topbar .wrap {
+  height: 64px; background: rgba(253,251,247,.90); backdrop-filter: blur(14px);
+  border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
   max-width: 1200px; padding: 0 12px 0 22px;
-  background: rgba(253, 251, 247, .88); backdrop-filter: blur(14px);
-  border: 1px solid var(--line); border-radius: 999px;
-  box-shadow: var(--shadow);
 }
 @media (max-width: 900px) {
   .topbar { top: 10px; margin-top: 10px; }
@@ -199,13 +207,22 @@ h4 { font-size: 1rem; }
   color: var(--ink-soft); padding: 9px 16px; border-radius: 999px;
   font-size: .87rem; font-weight: 600;
 }
+body.has-hero .topnav a { color: var(--ink-800); font-weight: 700; }
+/* the filled CTA keeps its knocked-out label — the rule above outranks
+   .topnav a.nav-cta and would paint navy text on a navy button */
+body.has-hero .topnav a.nav-cta { color: #fff; }
+body.has-hero .topnav a.nav-cta:hover { color: #fff; background: var(--ink-900); }
+body.has-hero .topnav a:hover { background: rgba(9,19,36,.10); }
+body.has-hero .brand-text span { color: var(--ink-700); }
 .topnav a:hover { background: var(--ink-050); color: var(--ink-800); text-decoration: none; }
 .topnav a.active { background: var(--ink-100); color: var(--ink-800); }
 
 /* the primary action sits in the bar as a filled pill, as on the reference */
 .topnav a.nav-cta {
   background: var(--ink-800); color: #fff; font-weight: 700;
-  padding: 10px 20px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 22px; border-radius: 3px;
+  font-size: .78rem; letter-spacing: .06em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 8px;
 }
 .topnav a.nav-cta:hover { background: var(--ink-700); color: #fff; }
 .topnav a.nav-cta .arrow { width: 16px; height: 16px; transition: transform .22s ease; }
@@ -336,14 +353,17 @@ main > .hero:first-child { margin-top: -26px; }
 
 /* ---------- buttons ---------- */
 
+/* The reference's buttons are solid rectangles with a hair of rounding and
+   uppercase labels, not pills. */
 .btn {
-  display: inline-flex; align-items: center; gap: 8px; justify-content: center;
-  padding: 10px 20px; border-radius: 999px; border: 1px solid transparent;
-  font-family: var(--font); font-size: .87rem; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 10px; justify-content: center;
+  padding: 14px 26px; border-radius: 3px; border: 1px solid transparent;
+  font-family: var(--font); font-size: .82rem; font-weight: 700; cursor: pointer;
+  letter-spacing: .06em; text-transform: uppercase;
   background: var(--ink-800); color: #fff; transition: .18s ease;
   text-decoration: none; line-height: 1.3;
 }
-.btn:hover { background: var(--ink-700); text-decoration: none; color: #fff; transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn:hover { background: var(--ink-900); text-decoration: none; color: #fff; transform: none; box-shadow: var(--shadow); }
 .btn:active { transform: none; }
 .btn[disabled], .btn.disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn-gold { background: var(--gold-500); color: var(--ink-900); }
@@ -352,8 +372,8 @@ main > .hero:first-child { margin-top: -26px; }
 .btn-ghost:hover { background: var(--ink-050); color: var(--ink-800); }
 .btn-danger { background: var(--err); }
 .btn-danger:hover { background: #a53024; }
-.btn-sm { padding: 7px 15px; font-size: .79rem; }
-.btn-lg { padding: 14px 30px; font-size: .95rem; }
+.btn-sm { padding: 9px 16px; font-size: .72rem; letter-spacing: .05em; }
+.btn-lg { padding: 17px 34px; font-size: .86rem; }
 .btn-block { width: 100%; }
 
 /* ---------- pill filter row ----------
@@ -570,40 +590,50 @@ input.is-bad, select.is-bad, textarea.is-bad {
 
 /* ---------- landing ---------- */
 
+/* ---------- hero ----------
+   The reference puts its brightest colour edge to edge and sets everything on
+   it in the dark brand ink — the masthead included. Ours does the same with
+   the JAIN gold. */
 .hero {
-  background: var(--wash-deep);
-  color: #fff; padding: 104px 0 108px; position: relative; overflow: hidden;
-  border-radius: var(--radius-lg); margin: 0 14px;
+  background: var(--gold-400);
+  color: var(--ink-900);
+  padding: 104px 0 64px; position: relative; overflow: hidden;
+  border-radius: 0; margin: 0;
 }
-@media (max-width: 700px) { .hero { margin: 0 8px; padding: 72px 0 76px; } }
-.hero::after {
-  content: ""; position: absolute; inset: 0;
-  background:
-    radial-gradient(760px 340px at 88% -10%, rgba(221,196,137,.24), transparent 62%),
-    radial-gradient(560px 300px at 2% 110%, rgba(75,163,200,.20), transparent 60%);
-  pointer-events: none;
+.hero .wrap { position: relative; z-index: 1; }
+
+/* text on the left, a panel that bleeds off the right edge */
+.hero-split {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46%);
+  gap: 56px; align-items: start;
 }
+@media (max-width: 960px) {
+  .hero-split { grid-template-columns: 1fr; gap: 30px; }
+}
+
+.hero-lede { max-width: 30ch; }
+.hero::after { content: none; }
 .hero .wrap { position: relative; z-index: 1; }
 .hero .eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: .74rem; letter-spacing: .16em; text-transform: uppercase;
-  color: var(--gold-300); margin-bottom: 18px; font-weight: 600;
+  color: var(--ink-800); margin-bottom: 18px; font-weight: 700;
 }
-.hero .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--gold-300); }
+.hero .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--ink-800); }
 
 /* ---------- availability chip ---------- */
 .chip {
   display: inline-flex; align-items: center; gap: 9px; width: fit-content;
   padding: 7px 15px 7px 12px; border-radius: 999px;
-  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.16);
+  background: rgba(9,19,36,.08); border: 1px solid rgba(9,19,36,.18);
   font-family: var(--font-mono); font-size: .76rem; letter-spacing: -.01em;
-  color: rgba(255,255,255,.88); margin-bottom: 18px;
+  color: var(--ink-800); margin-bottom: 18px;
 }
 /* it is a block in the hero so the eyebrow starts a new line under it */
 .hero .chip { display: flex; }
 .chip-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #56d08a; flex: none;
-  box-shadow: 0 0 0 3px rgba(86,208,138,.22);
+  width: 8px; height: 8px; border-radius: 50%; background: #147a42; flex: none;
+  box-shadow: 0 0 0 3px rgba(20,122,66,.20);
 }
 @media (prefers-reduced-motion: no-preference) {
   .chip-dot { animation: chipPulse 2.4s ease-in-out infinite; }
@@ -611,23 +641,26 @@ input.is-bad, select.is-bad, textarea.is-bad {
     50% { box-shadow: 0 0 0 6px rgba(86,208,138,.10); }
   }
 }
-.hero h1 { color: #fff; font-size: clamp(2rem, 4.4vw, 3.1rem); line-height: 1.1; margin-bottom: 18px; max-width: 18ch; }
+/* the hero ground is the bright one now, so its heading is the ink */
+.hero h1 { color: var(--ink-900); font-size: clamp(2rem, 4.4vw, 3.1rem); line-height: 1.1; margin-bottom: 18px; max-width: 18ch; }
 /* the masthead setting — large, light and tight, as on the reference */
 .hero-display {
   font-family: var(--font-head); font-weight: 400; color: #fff;
   font-size: clamp(2.6rem, 6.4vw, 4.6rem); line-height: 1.03;
   letter-spacing: -.035em; margin: 0 0 22px; max-width: 16ch;
 }
-.hero-display em { font-style: normal; color: var(--gold-300); }
-.hero h1 em { font-style: normal; color: var(--gold-300); }
-.hero p { font-size: 1.02rem; color: rgba(255,255,255,.88); max-width: 62ch; margin-bottom: 30px; }
+.hero-display { color: var(--ink-900); }
+.hero-display em { font-style: normal; color: var(--ink-800); text-decoration: underline; text-decoration-thickness: .07em; text-underline-offset: .1em; }
+/* on the gold hero the emphasis is the ink, not a second gold */
+.hero h1 em, .hero .hero-display em { color: var(--ink-800); }
+.hero p { font-size: 1.02rem; color: var(--ink-800); max-width: 58ch; margin-bottom: 28px; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .hero .btn-ghost { border-color: rgba(255,255,255,.28); color: #fff; }
 .hero .btn-ghost:hover { background: rgba(255,255,255,.1); color: #fff; }
 
 .hero-stats { display: flex; gap: 42px; margin-top: 46px; flex-wrap: wrap; }
-.hero-stats div .n { font-family: var(--font-head); font-size: 2.1rem; color: var(--gold-300); line-height: 1; }
-.hero-stats div .l { font-size: .76rem; color: rgba(255,255,255,.82); text-transform: uppercase; letter-spacing: .09em; margin-top: 7px; }
+.hero-stats div .n { font-family: var(--font-head); font-size: 2.1rem; color: var(--ink-900); line-height: 1; font-weight: 700; }
+.hero-stats div .l { font-size: .76rem; color: var(--ink-700); text-transform: uppercase; letter-spacing: .09em; margin-top: 7px; font-weight: 600; }
 
 /* campus cards */
 .campus-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
@@ -688,6 +721,77 @@ input.is-bad, select.is-bad, textarea.is-bad {
 .section-dark .flow p { color: rgba(234,227,213,.76); }
 .flow h4 { margin-bottom: 6px; }
 .flow p { font-size: .84rem; color: var(--ink-soft); margin: 0; }
+
+/* ---------- the numbered story list ----------
+   The reference's "Top Stories": a dated line, then items each led by a solid
+   numbered square, an uppercase kicker and a bold headline, divided by
+   hairlines. #}
+*/
+.stories-head {
+  font-family: var(--font); font-size: .78rem; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink-800);
+  margin-bottom: 6px;
+}
+.stories-stamp {
+  font-family: var(--font); font-size: .78rem; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-700); margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.stories-stamp .sep { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-700); }
+
+.story-list { display: flex; flex-direction: column; }
+.story-item {
+  display: grid; grid-template-columns: 34px 1fr; gap: 16px; align-items: start;
+  padding: 18px 0; border-top: 1px solid rgba(9,19,36,.22);
+  text-decoration: none; color: inherit;
+}
+.story-item:first-child { border-top: 0; padding-top: 4px; }
+.story-num {
+  width: 34px; height: 34px; flex: none; border-radius: 2px;
+  background: var(--ink-800); color: #fff;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 1rem;
+}
+.story-kicker {
+  display: block; font-size: .74rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-700); margin-bottom: 4px;
+}
+.story-line {
+  display: block; font-family: var(--font-head); font-weight: 700;
+  font-size: clamp(1.05rem, 1.7vw, 1.3rem); line-height: 1.24;
+  letter-spacing: -.024em; color: var(--ink-900);
+}
+
+/* ---------- the panel beside the hero ----------
+   The reference runs a photograph off the right edge. With no photography to
+   hand, this carries the sequence itself — more use than a stock image. */
+.hero-panel {
+  background: var(--ink-800); color: #fff;
+  border-radius: 4px; padding: 30px 32px;
+  margin-right: calc(50% - 50vw);   /* bleed to the right edge */
+  min-height: 100%;
+}
+@media (max-width: 960px) { .hero-panel { margin-right: 0; } }
+.hero-panel-title {
+  font-family: var(--font); font-size: .74rem; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--gold-300);
+  margin-bottom: 18px;
+}
+.seq { display: flex; flex-direction: column; }
+.seq-item {
+  display: grid; grid-template-columns: 30px 1fr; gap: 14px; align-items: baseline;
+  padding: 9px 0; border-top: 1px solid rgba(255,255,255,.12);
+}
+.seq-item:first-child { border-top: 0; }
+.seq-n {
+  font-family: var(--font-mono); font-size: .78rem; color: var(--gold-300);
+}
+.seq-t { font-size: .92rem; color: rgba(255,255,255,.90); line-height: 1.3; }
+.seq-group {
+  font-family: var(--font); font-size: .68rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(255,255,255,.55); padding: 14px 0 4px;
+}
 
 /* ---------- landing sections, after the reference ---------------------- */
 

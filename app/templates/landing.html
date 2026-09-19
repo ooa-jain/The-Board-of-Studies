@@ -1,82 +1,99 @@
 {% extends "base.html" %}
 {% block title %}Board of Studies Data Repository{% endblock %}
 
+{% block body_class %}has-hero{% endblock %}
+
 {% block body %}
 <main id="main-content">
 
 {# ---------------------------------------------------------------- hero --
-   The reference leads with one very large two-tone statement: a plain first
-   half and an emphasised second. Everything else waits below it. #}
+   The reference runs its brightest colour edge to edge, sets the masthead and
+   everything else on it in the brand ink, and splits the space: a solid
+   square call to action and a numbered list on the left, a panel bleeding off
+   the right edge. #}
 <section class="hero">
   <div class="wrap">
-    <span class="chip">
-      <span class="chip-dot" aria-hidden="true"></span>
-      Open for {{ app_settings.academic_year if app_settings else 'this academic year' }}
-    </span>
-    <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
+    <div class="hero-split">
+      <div>
+        <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
+        <h1 class="hero-display">
+          The Board of Studies record,<br><em>filled once</em>
+        </h1>
+        <p class="hero-lede">
+          One sequence, one form, checked before anything is accepted.
+        </p>
 
-    <h1 class="hero-display">
-      The Board of Studies record,<br><em>filled once</em>
-    </h1>
+        <a class="btn btn-lg" href="{{ url_for('auth.login') }}">
+          Sign in to your department
+          <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
+                  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
 
-    <p>
-      Every department files its documentation here, in one sequence, on one form.
-      The templates that used to travel as email attachments are typed fields now,
-      and the UGC credit rules are applied before anything is accepted.
-    </p>
+        <div class="mt-3">
+          <div class="stories-head">What the portal does</div>
+          <div class="stories-stamp">
+            {{ app_settings.academic_year if app_settings else '' }}
+            <span class="sep" aria-hidden="true"></span>
+            {{ stats.departments }} departments
+            <span class="sep" aria-hidden="true"></span>
+            {{ STAGES|length }} stages
+          </div>
 
-    <div class="hero-actions">
-      <a class="btn btn-gold btn-lg" href="{{ url_for('auth.login') }}">
-        Sign in to your department
-        <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
-                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </a>
-      <a class="btn btn-ghost btn-lg" href="#how">How the submission works</a>
-    </div>
+          <div class="story-list">
+            <div class="story-item">
+              <span class="story-num">1</span>
+              <span>
+                <span class="story-kicker">In order</span>
+                <span class="story-line">Each stage opens when the last is submitted,
+                  so nothing is filled out of sequence</span>
+              </span>
+            </div>
+            <div class="story-item">
+              <span class="story-num">2</span>
+              <span>
+                <span class="story-kicker">Checked as you type</span>
+                <span class="story-line">Credit totals and course codes are validated at the
+                  keystroke, not weeks later by a reviewer</span>
+              </span>
+            </div>
+            <div class="story-item">
+              <span class="story-num">3</span>
+              <span>
+                <span class="story-kicker">Uploaded once</span>
+                <span class="story-line">Pre-BoS takes the three signed composition documents
+                  as files — fill them offline, upload them here</span>
+              </span>
+            </div>
+            <div class="story-item">
+              <span class="story-num">4</span>
+              <span>
+                <span class="story-kicker">One login per department</span>
+                <span class="story-line">The username is your department code, and the
+                  Office of Academics issues the password</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    <div class="hero-stats">
-      <div><div class="n">{{ stats.departments }}</div><div class="l">Departments</div></div>
-      <div><div class="n">{{ stats.schools }}</div><div class="l">Schools &amp; faculties</div></div>
-      <div><div class="n">{{ STAGES|length }}</div><div class="l">Submission stages</div></div>
-    </div>
-  </div>
-</section>
-
-{# ------------------------------------------------------- what's in front --
-   The reference's story row: a dated strip, then short bold cards that each
-   say one thing. #}
-<section class="section">
-  <div class="wrap">
-    <div class="row-head">
-      <h2>What the portal does</h2>
-      <span class="row-stamp">
-        {{ app_settings.academic_year if app_settings else '' }} · Office of Academics
-      </span>
-    </div>
-
-    <div class="story-grid">
-      <article class="story">
-        <h3>Thirteen stages, in order</h3>
-        <p>Each one opens when the last is submitted, so nothing is filled out of sequence
-           and nothing is forgotten.</p>
-      </article>
-      <article class="story">
-        <h3>Checked as you type</h3>
-        <p>Credit totals, course codes, contact hours and category sums are validated at the
-           keystroke, not weeks later by a reviewer.</p>
-      </article>
-      <article class="story">
-        <h3>Signed copies, uploaded once</h3>
-        <p>Pre-BoS takes the three composition documents as files. Fill the templates offline,
-           sign them, upload them.</p>
-      </article>
-      <article class="story">
-        <h3>One login per department</h3>
-        <p>The username is the department code. The Office of Academics issues the password
-           and it is shown once.</p>
-      </article>
+      <aside class="hero-panel">
+        <div class="hero-panel-title">The sequence</div>
+        <div class="seq">
+          {% set ns = namespace(group=None) %}
+          {% for s in STAGES %}
+            {% if s.group != ns.group %}
+              {% set ns.group = s.group %}
+              <div class="seq-group">{{ s.group }}</div>
+            {% endif %}
+            <div class="seq-item">
+              <span class="seq-n">{{ '%02d' % loop.index }}</span>
+              <span class="seq-t">{{ s.title }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </aside>
     </div>
   </div>
 </section>
