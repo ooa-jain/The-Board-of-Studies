@@ -1,60 +1,63 @@
 /* ==========================================================================
    JAIN OoA — BoS Data Repository Portal
 
-   Near-black charcoal against a warm cream, with the gold from the JAIN
-   roundel as the only accent. Tokens are named for tone, not hue, so a change
-   of palette is a change of value here and nothing else.
+   JAIN navy against a warm ivory, with the gold from the roundel as the only
+   accent. Navy #091324 and gold #eebd1b are sampled straight from the supplied
+   logo, so the page and the mark agree. No black anywhere — the darkest ground
+   is the navy itself.
 
-   Every text colour clears WCAG AA on the surface it is used on; the notes
-   beside each one give the measured ratio.
+   Tokens are named for tone, not hue, so a change of palette is a change of
+   value here and nothing else. Every text colour clears WCAG AA on the surface
+   it is used on; the notes give the measured ratio.
    ========================================================================== */
 
 :root {
-  /* the neutral scale: ink at one end, cream at the other */
-  --ink-900: #131415;   /* deepest ground — hero, footer */
-  --ink-800: #1a1c1f;   /* primary ground and primary buttons (15.8:1 on cream) */
-  --ink-700: #262626;   /* secondary dark surfaces */
-  --ink-600: #3d3b39;   /* links and strong body text (9.7:1 on cream) */
-  --ink-100: #e9ded8;   /* the warm cream the design is built on */
-  --ink-050: #f7f2eb;   /* the lighter cream — page ground */
+  /* the navy scale — the roundel's own colour at the deep end */
+  --ink-900: #091324;   /* the logo navy — hero, footer, deepest ground */
+  --ink-800: #0f2440;   /* primary ground and primary buttons (15.7:1 under white) */
+  --ink-700: #1b3b63;   /* secondary dark surfaces */
+  --ink-600: #2c5488;   /* links and strong body text (6.0:1 on ivory) */
+  --ink-100: #eae3d5;   /* the warm ivory the design is built on */
+  --ink-050: #f5f1e8;   /* the lighter ivory — page ground */
 
   /* gold, taken from the dot in the roundel */
   --gold-700: #7a5e05;  /* gold that can carry small text (5.6:1 on gold-100) */
   --gold-600: #9c7a09;
   --gold-500: #c79c10;
-  --gold-400: #eebd1b;  /* the logo gold — accents, never small text on light */
-  --gold-300: #f5d266;  /* gold for text ON the dark grounds (9.2:1 on ink-800) */
+  --gold-400: #eebd1b;  /* the logo gold — accents and solid buttons under navy */
+  --gold-300: #f5d266;  /* gold for text ON the navy (10.7:1 on ink-800) */
   --gold-100: #fbf1d6;
 
   --sky-500: #4b90c8;
 
-  --ink: #1b1c1c;
-  --ink-soft: #55504d;   /* 7.6:1 on cream */
-  --ink-faint: #665f5c;  /* 5.8:1 on the page ground, 4.7:1 on the deepest cream */
-  --line: #e2d9d2;
-  --surface: #fbf9f8;
-  --canvas: #f7f2eb;
+  --ink: #17202e;        /* navy-tinted, never black */
+  --ink-soft: #46536a;   /* 6.0:1 on the deepest ivory */
+  --ink-faint: #566275;  /* 4.9:1 on the deepest ivory */
+  --line: #e2dacb;
+  --surface: #fdfbf7;
+  --canvas: #f5f1e8;
 
   --ok: #1d6b3e;
   --ok-bg: #e4f2e8;
   --warn: #85560a;
   --warn-bg: #fbf0da;
-  --err: #ad3325;   /* 4.9:1 on the deepest cream, 6.5:1 under white */
+  --err: #ad3325;
   --err-bg: #fbeae8;
-  --lock: #665f5c;
-  --lock-bg: #ece6e1;
+  --lock: #566275;
+  --lock-bg: #e9e6dd;
 
   /* generous rounding, as on the reference */
   --radius-lg: 28px;
   --radius: 20px;
   --radius-sm: 12px;
 
-  --shadow-sm: 0 1px 2px rgba(22, 16, 4, .05), 0 1px 3px rgba(22, 16, 4, .04);
-  --shadow: 0 6px 22px rgba(22, 16, 4, .07);
-  --shadow-lg: 0 24px 64px rgba(22, 16, 4, .16);
+  /* shadows tinted with the navy rather than a warm brown */
+  --shadow-sm: 0 1px 2px rgba(9, 19, 36, .06), 0 1px 3px rgba(9, 19, 36, .05);
+  --shadow: 0 6px 22px rgba(9, 19, 36, .09);
+  --shadow-lg: 0 24px 64px rgba(9, 19, 36, .20);
 
-  --wash-deep: linear-gradient(150deg, var(--ink-900) 0%, #1f2124 60%, var(--ink-700) 100%);
-  --wash-soft: linear-gradient(180deg, #fbf9f8 0%, var(--ink-050) 55%, var(--ink-100) 100%);
+  --wash-deep: linear-gradient(150deg, var(--ink-900) 0%, #122c4e 58%, var(--ink-700) 100%);
+  --wash-soft: linear-gradient(180deg, #fdfbf7 0%, var(--ink-050) 55%, var(--ink-100) 100%);
 
   /* Bricolage carries the display sizes, Fragment Mono the micro-labels, and
      Inter the running text — a grotesque this chunky is hard work in a table. */
@@ -484,7 +487,7 @@ input[type=file] {
   border: 1.5px dashed var(--line); border-radius: var(--radius-sm);
   transition: .18s ease;
 }
-input[type=file]:hover { border-color: var(--ink-600); background: #f2ece4; }
+input[type=file]:hover { border-color: var(--ink-600); background: #f0ece0; }
 input[type=file]:focus-visible { outline: 2px solid var(--ink-600); outline-offset: 2px; }
 input[type=file]::file-selector-button {
   margin-right: 14px; padding: 8px 16px; border: 0; border-radius: 999px;
@@ -647,8 +650,8 @@ input.is-bad, select.is-bad, textarea.is-bad {
   border-radius: var(--radius-lg); margin: 0 14px;
 }
 .section-dark h2, .section-dark h3, .section-dark h4 { color: #fff; }
-.section-dark p { color: rgba(233,222,216,.76); }
-.section-dark .section-head p { color: rgba(233,222,216,.76); }
+.section-dark p { color: rgba(234,227,213,.80); }
+.section-dark .section-head p { color: rgba(234,227,213,.80); }
 @media (max-width: 700px) { .section-dark { margin: 0 8px; } }
 .section-head { text-align: center; max-width: 60ch; margin: 0 auto 44px; }
 .section-head .eyebrow {
@@ -677,7 +680,7 @@ input.is-bad, select.is-bad, textarea.is-bad {
 }
 .section-dark .flow > div::before { color: var(--gold-300); }
 .section-dark .flow h4 { color: #fff; }
-.section-dark .flow p { color: rgba(233,222,216,.72); }
+.section-dark .flow p { color: rgba(234,227,213,.76); }
 .flow h4 { margin-bottom: 6px; }
 .flow p { font-size: .84rem; color: var(--ink-soft); margin: 0; }
 
@@ -708,7 +711,7 @@ input.is-bad, select.is-bad, textarea.is-bad {
 @media (max-width: 900px) { .login-card { grid-template-columns: 1fr; max-width: 460px; } }
 
 .login-aside {
-  background: linear-gradient(165deg, #fbf9f8 0%, var(--ink-050) 52%, var(--ink-100) 100%);
+  background: linear-gradient(165deg, #fdfbf7 0%, var(--ink-050) 52%, var(--ink-100) 100%);
   color: var(--ink); padding: 48px 44px;
   display: flex; flex-direction: column; justify-content: center;
   position: relative; overflow: hidden;
@@ -767,7 +770,7 @@ footer.site .wrap { align-items: center; }
   padding: 17px 20px; transition: .18s; position: relative;
 }
 .stage-row.open, .stage-row.draft, .stage-row.returned { border-left: 3px solid var(--gold-500); }
-.stage-row.submitted { border-left: 3px solid var(--ok); background: #fbfaf7; }
+.stage-row.submitted { border-left: 3px solid var(--ok); background: #fbfbf6; }
 .stage-row.locked { opacity: .62; background: var(--ink-050); }
 .stage-row:not(.locked):hover { box-shadow: var(--shadow); transform: translateX(2px); }
 .stage-num {
