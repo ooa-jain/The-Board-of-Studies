@@ -64,8 +64,8 @@
         {% if current_user and current_user.role == 'admin' %}
           {{ nav_link(url_for('admin.dashboard'), 'Dashboard', request.endpoint == 'admin.dashboard') }}
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
+          {{ nav_link(url_for('admin.analysis'), 'Analysis', request.endpoint == 'admin.analysis') }}
           {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
-          {{ nav_link(url_for('admin.rules'), 'Rules', request.endpoint == 'admin.rules') }}
         {% elif current_user and current_user.role == 'department' %}
           {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
           <a href="{{ url_for('dept.export_excel') }}">Excel</a>
@@ -80,6 +80,7 @@
            configuration, and five links on the left would push the wordmark
            off the centre of the bar. #}
         {% if current_user and current_user.role == 'admin' %}
+          {{ nav_link(url_for('admin.rules'), 'Rules', request.endpoint == 'admin.rules') }}
           {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint == 'admin.app_settings') }}
         {% endif %}
         {% if current_user %}

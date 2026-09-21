@@ -651,3 +651,114 @@ def test_the_admin_gets_the_console_not_a_department_panel(app, client):
     assert 'name="password"' not in body
     assert "The admin dashboard" in body
     assert "stages submitted" not in body
+
+
+def test_the_analysis_tells_each_department_apart(app, client):
+    """Six states, and they must not be confused with one another."""
+    from app.db import get_db, now
+    from app.schema import STAGE_KEYS
+
+    make_department(app, "AAA", "Alpha")          # login, never signed in
+    make_department(app, "BBB", "Beta")           # will sign in and file
+    make_department(app, "CCC", "Gamma")          # login, signed in, nothing filed
+    with app.app_context():
+        db = get_db()
+        db.departments.insert_one({"dept_code": "DDD", "dept_name": "Delta",
+                                   "school": "School of D", "campus": "Kochi Campus",
+                                   "active": True, "created_at": now(),
+                                   "updated_at": now()})   # no login at all
+        db.users.update_one({"username": "ccc"}, {"$set": {"last_login": now()}})
+
+    u, p = "bbb", "DeptPassword1!"
+    login(client, u, p)
+    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    client.get("/logout")
+
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    body = client.get("/admin/analysis").get_data(as_text=True)
+
+    assert "No login issued" in body      # Delta
+    assert "Never signed in" in body      # Alpha
+    assert "In progress" in body          # Beta
+    assert "Signed in, nothing filed" in body   # Gamma
+
+    # and the filters cut it down without changing the totals
+    only = client.get("/admin/analysis?state=never_in").get_data(as_text=True)
+    assert "Alpha" in only and "Beta" not in only
+
+
+def test_the_analysis_counts_the_whole_institution(app):
+    from app.workflow import (department_analysis, get_or_create_submission,
+                              institution_analysis)
+    from app.db import get_db, now
+    make_department(app, "AAA", "Alpha")
+    make_department(app, "BBB", "Beta")
+    with app.app_context():
+        db = get_db()
+        year = app.config["ACADEMIC_YEAR"]
+        sub = get_or_create_submission("AAA", year)
+        db.submissions.update_one({"_id": sub["_id"]}, {"$set": {
+            "stages.dept_info.status": "submitted",
+            "stages.pre_bos.status": "draft",
+            "stages.pre_bos.summary": {"errors": 2, "warnings": 1},
+        }})
+        db.users.update_one({"username": "aaa"}, {"$set": {"last_login": now()}})
+
+        rows = []
+        for code in ("AAA", "BBB"):
+            d = db.departments.find_one({"dept_code": code})
+            rows.append(department_analysis(
+                d, get_or_create_submission(code, year),
+                db.users.find_one({"dept_code": code})))
+
+    alpha = next(r for r in rows if r["dept"]["dept_code"] == "AAA")
+    assert alpha["done"] == 1 and alpha["half"] == 1 and alpha["errors"] == 2
+    assert alpha["state"] == "in_progress"
+    assert alpha["next"]["key"] == "pre_bos", "the half-filled stage is what is next"
+
+    totals = institution_analysis(rows)
+    assert totals["departments"] == 2
+    assert totals["stages_done"] == 1
+    assert totals["half_filled"] == 1
+    assert totals["errors"] == 2
+    assert totals["with_errors"] == 1
+    assert totals["never_in"] == 1, "Beta has a login but has never used it"
+
+
+def test_the_demo_tab_is_made_up_and_says_so(app, client):
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+
+    live = client.get("/admin/analysis").get_data(as_text=True)
+    assert "made-up departments" not in live, "the live tab must never carry the banner"
+
+    demo = client.get("/admin/analysis?demo=1").get_data(as_text=True)
+    assert "These are made-up departments" in demo
+    assert "Switch to live data" in demo
+    # it fills the screen, and nothing it shows came from the database
+    assert demo.count('class="an-') > 10
+    with_db = client.get("/admin/analysis").get_data(as_text=True)
+    assert "Department of Computer Science and Engineering" not in with_db
+
+
+def test_the_demo_numbers_do_not_move_between_refreshes(app):
+    """A demonstration that changes its figures on a reload is not a
+    demonstration. Same seed, same story."""
+    from app.demo import demo_analysis
+    with app.app_context():
+        a_rows, a_totals, a_stages = demo_analysis()
+        b_rows, b_totals, b_stages = demo_analysis()
+    assert a_totals == b_totals
+    assert [r["done"] for r in a_rows] == [r["done"] for r in b_rows]
+    assert [s["submitted"] for s in a_stages] == [s["submitted"] for s in b_stages]
+    assert all(r["demo"] for r in a_rows)
+    assert a_totals["departments"] == len(a_rows)
+
+
+def test_every_stage_row_adds_up_to_the_department_count(app):
+    """A table whose rows do not sum invites doubt about all of it."""
+    from app.demo import demo_analysis
+    with app.app_context():
+        rows, totals, stages = demo_analysis()
+    for s in stages:
+        counted = s["submitted"] + s["draft"] + s["returned"] + s["open"] + s["locked"]
+        assert counted == totals["departments"], (s["title"], counted)

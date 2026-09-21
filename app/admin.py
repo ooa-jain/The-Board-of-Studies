@@ -14,7 +14,8 @@ from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
 from .schema import STAGE_BY_KEY, STAGES
-from .workflow import (compute_status, get_or_create_submission, progress,
+from .workflow import (compute_status, department_analysis, get_or_create_submission,
+                       institution_analysis, progress, stage_analysis, stage_board,
                        return_stage, stage_board, unlock_stage)
 
 bp = Blueprint("admin", __name__)
@@ -74,6 +75,58 @@ def dashboard():
                            by_campus=by_campus, stage_counts=stage_counts,
                            year=year, total=len(departments),
                            recent=list(db.audit.find().sort("at", -1).limit(12)))
+
+
+# ---------------------------------------------------------------------------
+# analysis
+# ---------------------------------------------------------------------------
+
+@bp.route("/analysis")
+@admin_required
+def analysis():
+    """Every department in one reading: done, part-done, untouched, failing.
+
+    The Office's standing question is "who still owes me what", and it used to
+    be answered by opening departments one at a time. This answers it once.
+    """
+    db = get_db()
+    year = _year()
+
+    # Demonstration mode. Everything it needs lives in app/demo.py; delete that
+    # module and this branch and the page is live-only.
+    if request.args.get("demo") == "1":
+        from .demo import demo_analysis
+        rows, totals, stages = demo_analysis()
+        return render_template("admin/analysis.html", rows=rows, totals=totals,
+                               stages=stages, year=year, demo=True,
+                               filters={"state": None, "q": ""})
+
+    departments = list(db.departments.find({"active": True})
+                       .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department"})}
+
+    rows = [department_analysis(d, subs.get(d["dept_code"]), users.get(d["dept_code"]))
+            for d in departments]
+    totals = institution_analysis(rows)
+    stages = stage_analysis([stage_board(subs.get(d["dept_code"]) or {})
+                             for d in departments])
+
+    # filtering happens after the totals, so the summary always describes the
+    # whole institution and not whatever slice is on screen
+    state = request.args.get("state")
+    search = (request.args.get("q") or "").strip().lower()
+    if state:
+        rows = [r for r in rows if r["state"] == state]
+    if search:
+        rows = [r for r in rows
+                if search in (r["dept"].get("dept_name", "") + " "
+                              + r["dept"].get("school", "") + " "
+                              + r["dept"].get("dept_code", "")).lower()]
+
+    return render_template("admin/analysis.html", rows=rows, totals=totals,
+                           stages=stages, year=year, demo=False,
+                           filters={"state": state, "q": search})
 
 
 # ---------------------------------------------------------------------------

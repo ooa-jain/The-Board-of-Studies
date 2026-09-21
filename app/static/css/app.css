@@ -1475,6 +1475,40 @@ footer.site .brand-logo { height: 26px; }
 footer.site .wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 footer.site a { color: rgba(255,255,255,.72); }
 
+/* ---------- the analysis table ----------
+   Six columns of mixed content: a name, a state, a bar, a sentence and two
+   numbers. It scrolls inside its own box rather than squeezing, and the rows
+   that need chasing carry a colour down their left edge. */
+.an-table { width: 100%; border-collapse: collapse; font-size: .86rem; background: #fff; }
+.an-table th, .an-table td {
+  text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.an-table thead th {
+  background: var(--ink-050); font-family: var(--font-mono); font-size: .68rem;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--ink-700);
+  position: sticky; top: 0; z-index: 1;
+}
+.an-table tbody tr:last-child td { border-bottom: 0; }
+.an-table td.num, .an-table th.num { text-align: right; white-space: nowrap; }
+.an-table .bar { width: 100%; margin-bottom: 5px; }
+.an-table strong { color: var(--ink-900); }
+
+/* a hairline down the left edge, so the eye can sort the rows without
+   reading every pill */
+.an-table tbody tr > td:first-child { border-left: 4px solid transparent; }
+.an-complete > td:first-child { border-left-color: var(--ok) !important; }
+.an-in_progress > td:first-child { border-left-color: var(--gold-500) !important; }
+.an-returned > td:first-child { border-left-color: var(--err) !important; }
+.an-not_started > td:first-child { border-left-color: var(--line) !important; }
+.an-never_in > td:first-child { border-left-color: var(--lock) !important; }
+.an-no_login > td:first-child { border-left-color: var(--err) !important; }
+
+@media (max-width: 760px) {
+  .an-table th, .an-table td { padding: 9px 10px; }
+  .an-table { font-size: .8rem; }
+}
+
 /* ---------- the city toggle ----------
    Two cities is a toggle, not a list: it sits above the campus pills and
    decides which campuses those pills offer at all. */

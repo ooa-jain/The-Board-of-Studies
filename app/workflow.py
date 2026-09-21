@@ -118,6 +118,118 @@ def grouped_board(board):
     return groups
 
 
+def department_analysis(dept, submission, user=None):
+    """Where one department stands, as one row.
+
+    Everything the Office asks about a department — has it started, how far
+    has it got, is a stage half-filled, has anyone even signed in, is anything
+    failing validation — answered from the submission rather than from a
+    conversation.
+    """
+    board = stage_board(submission or {})
+    by_status = {}
+    for s in board:
+        by_status[s["status"]] = by_status.get(s["status"], 0) + 1
+
+    done = by_status.get("submitted", 0)
+    total = len(board)
+    errors = sum(s["errors"] for s in board)
+    warnings = sum(s["warnings"] for s in board)
+
+    # A stage that is a draft has been opened and left part-filled; that is a
+    # different thing from one nobody has touched, and the Office chases them
+    # differently.
+    half = by_status.get("draft", 0)
+    returned = by_status.get("returned", 0)
+
+    signed_in = bool((user or {}).get("last_login"))
+    # The user record is what decides whether a login exists; the department's
+    # own `username` field is a copy of it, and a copy can be missing.
+    has_login = bool(user) or bool(dept.get("username"))
+
+    if not has_login:
+        state, label = "no_login", "No login issued"
+    elif not signed_in:
+        state, label = "never_in", "Never signed in"
+    elif done == total and total:
+        state, label = "complete", "All stages submitted"
+    elif returned:
+        state, label = "returned", "Sent back for correction"
+    elif done or half:
+        state, label = "in_progress", "In progress"
+    else:
+        state, label = "not_started", "Signed in, nothing filed"
+
+    nxt = next_action(submission or {})
+    return {
+        "dept": dept,
+        "state": state,
+        "label": label,
+        "done": done,
+        "total": total,
+        "percent": round(done * 100 / total) if total else 0,
+        "half": half,
+        "returned": returned,
+        "locked": by_status.get("locked", 0),
+        "open": by_status.get("open", 0),
+        "errors": errors,
+        "warnings": warnings,
+        "next": nxt,
+        "has_login": has_login,
+        "signed_in": signed_in,
+        "last_login": (user or {}).get("last_login"),
+        "updated_at": (submission or {}).get("updated_at"),
+        "sealed": (submission or {}).get("status") == "sealed",
+    }
+
+
+def institution_analysis(rows):
+    """The totals across every department, from the rows themselves.
+
+    Counted here rather than re-queried, so the summary can never disagree
+    with the table underneath it.
+    """
+    totals = {
+        "departments": len(rows),
+        "complete": 0, "in_progress": 0, "not_started": 0,
+        "returned": 0, "never_in": 0, "no_login": 0,
+        "stages_done": 0, "stages_total": 0,
+        "half_filled": 0, "errors": 0, "warnings": 0,
+        "sealed": 0,
+    }
+    for r in rows:
+        totals[r["state"]] = totals.get(r["state"], 0) + 1
+        totals["stages_done"] += r["done"]
+        totals["stages_total"] += r["total"]
+        totals["half_filled"] += r["half"]
+        totals["errors"] += r["errors"]
+        totals["warnings"] += r["warnings"]
+        totals["sealed"] += 1 if r["sealed"] else 0
+
+    totals["percent"] = (round(totals["stages_done"] * 100 / totals["stages_total"])
+                         if totals["stages_total"] else 0)
+    totals["with_errors"] = sum(1 for r in rows if r["errors"])
+    totals["untouched"] = totals["not_started"] + totals["never_in"] + totals["no_login"]
+    return totals
+
+
+def stage_analysis(rows_of_boards):
+    """How far the whole institution has got, stage by stage."""
+    out = []
+    for i, stage in enumerate(STAGES):
+        tally = {"submitted": 0, "draft": 0, "returned": 0, "open": 0, "locked": 0}
+        for board in rows_of_boards:
+            st = board[i]["status"]
+            tally[st] = tally.get(st, 0) + 1
+        total = max(1, len(rows_of_boards))
+        out.append({
+            "key": stage["key"], "title": stage["title"], "group": stage["group"],
+            "n": i + 1, **tally,
+            "percent": round(tally["submitted"] * 100 / total),
+        })
+    return out
+
+
 def next_action(submission: dict):
     """The one stage a department should work on next, or None when done.
 
