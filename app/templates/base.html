@@ -114,6 +114,22 @@
 </header>
 {% endif %}
 
+{# Developer mode is easy to switch on and easy to forget, and while it is on
+   the portal is not behaving as departments will see it. So it says so, on
+   every page, to everyone — not only to the admin who set it. #}
+{% if app_settings and app_settings.dev_mode %}
+<div class="dev-banner" role="status">
+  <div class="wrap">
+    <strong>Developer mode is on.</strong>
+    Every stage is unlocked and can be opened in any order. Nothing else
+    changes — what you file is saved and validated as usual.
+    {% if current_user and current_user.role == 'admin' %}
+      <a href="{{ url_for('admin.app_settings') }}">Turn it off</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 {% if app_settings and app_settings.banner %}
 <div class="site-banner" role="status">
   <div class="wrap">{{ app_settings.banner }}</div>

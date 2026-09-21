@@ -20,6 +20,35 @@
         <input type="checkbox" name="submissions_open" {{ 'checked' if settings.submissions_open }}>
         <span>Submissions are open</span>
       </label>
+
+      {# Developer mode. It lifts the sequential lock for every department at
+         once, so it is set apart from the ordinary settings and says plainly
+         what it does and what it does not do. #}
+      <div class="dev-box {{ 'is-on' if settings.dev_mode }}">
+        <label class="check">
+          <input type="checkbox" name="dev_mode" {{ 'checked' if settings.dev_mode }}>
+          <span><strong>Developer mode</strong> — unlock every stage</span>
+        </label>
+        <p class="help">
+          Normally a department opens one stage at a time: each unlocks when the
+          one before it has been submitted. With this on, all
+          {{ stage_count }} stages are open to every department straight away,
+          in any order.
+        </p>
+        <p class="help">
+          It changes what can be opened and nothing else. Validation still runs,
+          submissions are still recorded, and everything filed while it is on
+          stays filed when it goes off — switching it back simply returns the
+          untouched stages to waiting their turn.
+        </p>
+        {% if settings.dev_mode %}
+        <p class="dev-live" role="status">
+          It is on now. Every department sees every stage unlocked, and a
+          notice saying so appears at the top of every page.
+        </p>
+        {% endif %}
+      </div>
+
       <button class="btn" type="submit">Save settings</button>
       <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change my password</a>
     </form>

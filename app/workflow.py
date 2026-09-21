@@ -20,7 +20,7 @@ Stage status values
 
 from __future__ import annotations
 
-from .db import get_db, now, rules_doc
+from .db import get_db, now, rules_doc, settings
 from .schema import STAGE_BY_KEY, STAGE_KEYS, STAGES, stage_index
 from .validation import build_context, validate_stage
 
@@ -55,8 +55,36 @@ def programme_stage_state(submission: dict, programme_code: str, stage_key: str)
             .get(stage_key) or {})
 
 
-def compute_status(submission: dict, stage_key: str) -> str:
-    """Resolve the live status of a stage, applying the sequential lock."""
+def dev_mode() -> bool:
+    """Is the sequential lock switched off?
+
+    Developer mode opens every stage of every department at once, so the
+    portal can be walked through, shown or tested without filing twelve
+    stages to reach the thirteenth. It is a view of the same data, not a
+    different one: nothing is written differently while it is on, and a
+    stage filled during it stays filled after it goes off.
+    """
+    try:
+        from flask import g
+        # Cached for the request. The analysis screen builds a board for every
+        # department in the institution; without this, each one would go back
+        # to the database to ask the same question.
+        if not hasattr(g, "_dev_mode"):
+            g._dev_mode = bool(settings().get("dev_mode"))
+        return g._dev_mode
+    except Exception:
+        # Called with no application context — a script, or a test
+        # exercising these functions directly. The lock is the safe answer.
+        return False
+
+
+def compute_status(submission: dict, stage_key: str, dev: bool | None = None) -> str:
+    """Resolve the live status of a stage, applying the sequential lock.
+
+    `dev` is the developer-mode flag. Leave it None and it is looked up;
+    pass it when resolving a whole board, so thirteen stages cost one
+    lookup rather than thirteen.
+    """
     stored = stage_state(submission, stage_key).get("status")
     if stored in ("submitted", "returned", "draft"):
         return stored
@@ -65,16 +93,23 @@ def compute_status(submission: dict, stage_key: str) -> str:
     if idx <= 0:
         return "open"
 
+    # Developer mode lifts the lock and nothing else. A stage that has been
+    # submitted or sent back kept that status above and never reaches here.
+    if dev_mode() if dev is None else dev:
+        return "open"
+
     prev_key = STAGE_KEYS[idx - 1]
-    prev = compute_status(submission, prev_key)
+    prev = compute_status(submission, prev_key, dev)
     return "open" if prev in DONE else "locked"
 
 
-def stage_board(submission: dict):
+def stage_board(submission: dict, dev: bool | None = None):
     """The full stage list with live status, for the department dashboard."""
+    if dev is None:
+        dev = dev_mode()
     board, unlocked_upto = [], True
     for s in STAGES:
-        st = compute_status(submission, s["key"])
+        st = compute_status(submission, s["key"], dev)
         state = stage_state(submission, s["key"])
         board.append({
             "key": s["key"],

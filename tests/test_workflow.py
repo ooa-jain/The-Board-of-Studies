@@ -762,3 +762,104 @@ def test_every_stage_row_adds_up_to_the_department_count(app):
     for s in stages:
         counted = s["submitted"] + s["draft"] + s["returned"] + s["open"] + s["locked"]
         assert counted == totals["departments"], (s["title"], counted)
+
+
+# ---------------------------------------------------------- developer mode
+
+def set_dev_mode(app, on):
+    from app.db import get_db
+    with app.app_context():
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": on}},
+                                     upsert=True)
+
+
+def test_developer_mode_opens_a_stage_the_lock_would_have_held(app, client):
+    """The point of the switch: reach stage thirteen without filing twelve."""
+    u, p = make_department(app)
+    login(client, u, p)
+
+    # the lock holds, as it does for a department in the ordinary way
+    r = client.get("/department/stage/pre_bos", follow_redirects=True)
+    assert "opens once you have submitted" in r.get_data(as_text=True)
+
+    set_dev_mode(app, True)
+    assert client.get("/department/stage/pre_bos").status_code == 200
+    # not merely the next one along — the last stage of all opens too
+    from app.schema import STAGE_KEYS
+    assert client.get("/department/stage/" + STAGE_KEYS[-1]).status_code == 200
+
+    # and turning it off puts the lock back
+    set_dev_mode(app, False)
+    r = client.get("/department/stage/pre_bos", follow_redirects=True)
+    assert "opens once you have submitted" in r.get_data(as_text=True)
+
+
+def test_developer_mode_does_not_rewrite_what_is_already_filed(app):
+    """It is a view of the data, not a change to it.
+
+    A stage that was submitted stays submitted, and one that was sent back
+    stays sent back — the switch only ever turns `locked` into `open`.
+    """
+    from app.workflow import compute_status, get_or_create_submission, stage_board
+    from app.db import get_db
+    from app.schema import STAGE_KEYS
+
+    with app.app_context():
+        sub = get_or_create_submission("COM", "2027-28")
+        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
+            "stages." + STAGE_KEYS[0]: {"status": "submitted"},
+            "stages." + STAGE_KEYS[1]: {"status": "returned"},
+        }})
+        sub = get_db().submissions.find_one({"_id": sub["_id"]})
+
+        off = {s["key"]: s["status"] for s in stage_board(sub, dev=False)}
+        on = {s["key"]: s["status"] for s in stage_board(sub, dev=True)}
+
+        assert off[STAGE_KEYS[0]] == on[STAGE_KEYS[0]] == "submitted"
+        assert off[STAGE_KEYS[1]] == on[STAGE_KEYS[1]] == "returned"
+        # every difference between the two is a lock that was lifted
+        for key in off:
+            if off[key] != on[key]:
+                assert (off[key], on[key]) == ("locked", "open"), key
+        assert "locked" not in on.values()
+        assert compute_status(sub, STAGE_KEYS[-1], dev=True) == "open"
+
+
+def test_developer_mode_says_so_on_every_page(app, client):
+    """It is easy to switch on and easy to forget, so it announces itself."""
+    u, p = make_department(app)
+    login(client, u, p)
+    assert "Developer mode is on" not in client.get("/department/").get_data(as_text=True)
+
+    set_dev_mode(app, True)
+    for path in ("/department/", "/department/stage/dept_info"):
+        assert "Developer mode is on" in client.get(path).get_data(as_text=True), path
+
+
+def test_the_switch_is_on_the_settings_page_and_is_logged(app, client):
+    """Unlocking every department at once leaves a trace in the audit log."""
+    from app.db import get_db
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+
+    assert 'name="dev_mode"' in client.get("/admin/settings").get_data(as_text=True)
+
+    client.post("/admin/settings", data={"academic_year": "2027-28",
+                                         "dev_mode": "on", "banner": ""})
+    with app.app_context():
+        assert get_db().settings.find_one({"_id": "app"})["dev_mode"] is True
+        assert get_db().audit.find_one({"action": "settings.dev_mode.on"})
+
+    # saving the form again without the box ticked turns it off
+    client.post("/admin/settings", data={"academic_year": "2027-28", "banner": ""})
+    with app.app_context():
+        assert get_db().settings.find_one({"_id": "app"})["dev_mode"] is False
+        assert get_db().audit.find_one({"action": "settings.dev_mode.off"})
+
+
+def test_a_department_still_cannot_reach_the_switch(app, client):
+    """Developer mode unlocks stages, not the admin console."""
+    u, p = make_department(app)
+    login(client, u, p)
+    set_dev_mode(app, True)
+    assert client.get("/admin/settings").status_code == 403
+    assert client.post("/admin/settings", data={"dev_mode": "on"}).status_code == 403

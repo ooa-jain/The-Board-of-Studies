@@ -642,6 +642,36 @@ input.is-bad, select.is-bad, textarea.is-bad {
   padding: 9px 0; font-size: .85rem; color: var(--gold-700);
 }
 
+/* ---------- developer mode ----------
+   The notice has to read as a state the portal is in rather than as news, so
+   it is striped: unmistakable at a glance, and different from the gold
+   announcement banner directly beneath it. */
+.dev-banner {
+  background-color: var(--ink-900);
+  background-image: repeating-linear-gradient(135deg,
+    var(--ink-900) 0 14px, var(--ink-800) 14px 28px);
+  color: #fff; padding: 9px 0; font-size: .85rem;
+  border-bottom: 1px solid var(--ink-900);
+}
+.dev-banner strong { color: var(--gold-300); }
+.dev-banner a { color: #fff; text-decoration: underline; margin-left: 6px; }
+.dev-banner a:hover { text-decoration: none; }
+
+/* The toggle itself, set apart from the ordinary settings around it. */
+.dev-box {
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 14px 16px; margin: 0 0 18px;
+  background: var(--canvas);
+}
+.dev-box.is-on { border-color: var(--ink-700); background: var(--gold-100); }
+.dev-box .check { margin: 0 0 8px; }
+.dev-box .help { margin: 0 0 8px; }
+.dev-box .help:last-child { margin-bottom: 0; }
+.dev-live {
+  margin: 10px 0 0; padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--ink-800); color: #fff; font-size: .82rem;
+}
+
 /* ---------- landing ---------- */
 
 /* ---------- hero ----------
