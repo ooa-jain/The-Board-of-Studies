@@ -210,6 +210,14 @@
     return input;
   }
 
+  /** The session's CSRF token, as the server expects it on every write. */
+  function csrfHeaders(extra) {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    const headers = Object.assign({}, extra || {});
+    if (meta) headers["X-CSRF-Token"] = meta.getAttribute("content");
+    return headers;
+  }
+
   function uploadFile(input, def, onChange) {
     const file = input.files[0];
     if (!file) return;
@@ -222,7 +230,7 @@
     note.className = "help upload-note";
     note.setAttribute("role", "status");
     note.textContent = "Uploading…";
-    fetch(CTX.urls.upload, { method: "POST", body: fd })
+    fetch(CTX.urls.upload, { method: "POST", headers: csrfHeaders(), body: fd })
       .then(r => r.json())
       .then(j => {
         if (j.ok) {
@@ -635,7 +643,7 @@
     saveNote.className = "save-note saving";
     fetch(CTX.urls.save, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: csrfHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
       if (j.ok) {
@@ -731,7 +739,7 @@
     };
     fetch(CTX.urls.validate, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: csrfHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
       done();
@@ -760,7 +768,7 @@
     save();
     fetch(CTX.urls.submit, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: csrfHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
       if (j.ok) {

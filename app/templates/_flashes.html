@@ -1,0 +1,14 @@
+{#- Flash messages. Shared by the chrome and by the pages that hide it. -#}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-stack" role="alert" aria-live="polite">
+    {% for category, message in messages %}
+      {% set kind = 'error' if category == 'error' else category %}
+      <div class="alert alert-{{ kind }}" data-dismissible>
+        <span class="alert-icon" aria-hidden="true">{{ {'error': '!', 'warning': '!', 'success': '✓'}.get(kind, 'i') }}</span>
+        <div><span class="sr-only">{{ {'error': 'Error: ', 'warning': 'Warning: ', 'success': 'Success: '}.get(kind, '') }}</span>{{ message }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}

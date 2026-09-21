@@ -1,28 +1,75 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Settings</div>
+      <h1>Portal settings</h1>
+      <p>The academic year every new submission is filed against, and the notice that sits at the
+         top of every page.</p>
+    </div>
+    <div class="spacer flex flex-wrap">
+      <a class="btn btn-ghost" href="{{ url_for('admin.audit_log') }}">Audit log</a>
+      <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change my password</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="card" style="max-width:620px;margin:24px auto">
-  <div class="card-head"><h3>Portal settings</h3></div>
+<div class="card form-card">
+  <div class="card-head">
+    <h3>Submission cycle</h3>
+    <span class="spacer small muted">
+      {% if settings.updated_at %}Last saved {{ settings.updated_at.strftime('%d %b %Y, %H:%M') }}
+        {%- if settings.updated_by %} by {{ settings.updated_by }}{% endif %}{% endif %}
+    </span>
+  </div>
   <div class="card-body">
     <form method="post">
-      <div class="field">
-        <label>Active academic year</label>
-        <input type="text" name="academic_year" value="{{ settings.academic_year }}" required>
-        <span class="help">New submissions are filed against this year. Changing it starts a fresh
-          cycle — existing records stay under their own year.</span>
+      {% include "_csrf.html" %}
+      <div class="field {{ 'is-bad' if year_error }}">
+        <label for="academic_year">Active academic year<span class="req">*</span></label>
+        <input type="text" id="academic_year" name="academic_year" required
+               value="{{ settings.academic_year }}"
+               pattern="\d{4}-\d{2}(\d{2})?" placeholder="2027-28" style="max-width:220px">
+        <span class="help">Written as 2027-28 or 2027-2028. New submissions are filed against
+          this year; changing it starts a fresh cycle and leaves earlier years intact.</span>
+        {% if year_error %}
+        <span class="field-error">That is not a year the portal can file against.</span>
+        {% endif %}
       </div>
+
       <div class="field">
-        <label>Banner message</label>
-        <textarea name="banner" rows="2"
+        <label for="banner">Banner message</label>
+        <textarea id="banner" name="banner" rows="2" maxlength="280"
                   placeholder="Shown at the top of every page, e.g. a submission deadline">{{ settings.banner }}</textarea>
+        <span class="help">Up to 280 characters. Leave it empty for no banner.</span>
       </div>
+
       <label class="check mb-2">
         <input type="checkbox" name="submissions_open" {{ 'checked' if settings.submissions_open }}>
         <span>Submissions are open</span>
       </label>
+
       <button class="btn" type="submit">Save settings</button>
-      <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change my password</a>
     </form>
   </div>
 </div>
+
+{% if TEST_MODE %}
+<div class="card form-card mt-2">
+  <div class="card-head"><h3>Test mode</h3><span class="spacer"><span class="pill pill-gold">On</span></span></div>
+  <div class="card-body">
+    <p class="muted small mb-2">
+      This portal is running as a sandbox: anybody can sign in as any account without a password.
+      Turn it off by removing <span class="mono">TEST_MODE</span> from the environment and
+      restarting the service.
+    </p>
+    <a class="btn btn-ghost" href="{{ url_for('test.console') }}">Open the test console</a>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

@@ -3,6 +3,15 @@
 
 {% block body %}
 <main id="main-content">
+{% if revisit %}
+{# Somebody who has been here before asked for the introduction again. Keep
+   the way back to the actual work one click away. #}
+<div class="site-banner" role="status">
+  <div class="wrap">
+    You have seen this page before — <a href="{{ url_for('auth.login') }}">go straight to sign in</a>.
+  </div>
+</div>
+{% endif %}
 <section class="hero">
   <div class="wrap">
     <span class="chip">

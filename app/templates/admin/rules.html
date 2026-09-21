@@ -12,7 +12,8 @@
     </div>
     <div class="spacer">
       <form method="post" action="{{ url_for('admin.rules_reset') }}"
-            onsubmit="return confirm('Restore the published UGC Table 2 values?')">
+            data-confirm="Restore the published UGC Table 2 values? Anything edited here is replaced.">
+        {% include "_csrf.html" %}
         <button class="btn btn-ghost" type="submit">Restore published values</button>
       </form>
     </div>
@@ -22,6 +23,7 @@
 
 {% block content %}
 <form method="post">
+  {% include "_csrf.html" %}
   <div class="card">
     <div class="card-head"><h3>Minimum credits by category</h3>
       <span class="spacer small muted">Last updated

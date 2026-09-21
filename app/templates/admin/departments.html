@@ -13,6 +13,7 @@
     <div class="spacer flex flex-wrap">
       <a class="btn btn-ghost" href="{{ url_for('admin.credential_sheet') }}">Credential sheet</a>
       <form method="post" action="{{ url_for('admin.bulk_credentials') }}" style="display:inline">
+        {% include "_csrf.html" %}
         <button class="btn btn-ghost" type="submit">Generate all missing logins</button>
       </form>
       <a class="btn btn-ghost" href="{{ url_for('admin.import_departments') }}">Import from Excel</a>
@@ -92,7 +93,9 @@
             </td>
             <td class="right nowrap">
               <form method="post" style="display:inline"
-                    action="{{ url_for('admin.generate_credentials', dept_code=d.dept_code) }}">
+                    action="{{ url_for('admin.generate_credentials', dept_code=d.dept_code) }}"
+                    {% if d.username %}data-confirm="Reset the login for {{ d.dept_name }}? The current password stops working immediately."{% endif %}>
+                {% include "_csrf.html" %}
                 <button class="btn btn-ghost btn-sm" type="submit">
                   {{ 'Reset' if d.username else 'Generate' }}
                 </button>

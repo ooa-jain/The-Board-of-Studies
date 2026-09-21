@@ -1,27 +1,83 @@
 {% extends "base.html" %}
 {% block title %}Audit log{% endblock %}
-{% block content %}
-<h1>Audit log</h1>
-<p class="muted">The last 300 actions taken in the portal.</p>
-<div class="card mt-2">
-  <div class="card-body" style="padding:0">
-    <table class="data">
-      <thead><tr><th scope="col" style="width:170px">When</th><th scope="col">Who</th>
-        <th scope="col">Action</th><th scope="col">Target</th><th scope="col">Detail</th></tr></thead>
-      <tbody>
-        {% for e in entries %}
-        <tr>
-          <td class="small mono">{{ e.at.strftime('%d %b %Y %H:%M') }}</td>
-          <td class="small">{{ e.actor }}</td>
-          <td><span class="pill">{{ e.action }}</span></td>
-          <td class="small mono">{{ e.target }}</td>
-          <td class="small muted">{{ e.detail if e.detail else '' }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="5" class="empty">Nothing recorded yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Audit log</div>
+      <h1>Audit log</h1>
+      <p>Every sign-in, credential, stage and rule change recorded by the portal —
+         {{ '{:,}'.format(total) }} entr{{ 'y' if total == 1 else 'ies' }} in all.</p>
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-2">
+  <div class="card-body tight">
+    <form class="flex flex-wrap" method="get" data-autosubmit>
+      <label class="sr-only" for="f-actor">Who</label>
+      <select id="f-actor" name="actor" style="max-width:240px">
+        <option value="">Everyone</option>
+        {% for a in actors %}<option value="{{ a }}" {{ 'selected' if filters.actor == a }}>{{ a }}</option>{% endfor %}
+      </select>
+      <label class="sr-only" for="f-action">What</label>
+      <select id="f-action" name="action" style="max-width:240px">
+        <option value="">Every kind of action</option>
+        {% for a in actions %}<option value="{{ a }}" {{ 'selected' if filters.action == a }}>{{ a }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Filter</button>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.audit_log') }}">Clear</a>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col" style="width:170px">When</th><th scope="col">Who</th>
+          <th scope="col">Action</th><th scope="col">Target</th><th scope="col">Detail</th></tr></thead>
+        <tbody>
+          {% for e in entries %}
+          <tr>
+            <td class="small mono nowrap">{{ e.at.strftime('%d %b %Y %H:%M') if e.at else '—' }}</td>
+            <td class="small">{{ e.actor }}</td>
+            <td><span class="pill">{{ e.action }}</span></td>
+            <td class="small mono">{{ e.target or '—' }}</td>
+            <td class="small muted">
+              {% if e.detail %}
+                {% for k, v in e.detail.items() %}{% if v not in (None, '', [], {}) %}
+                  <span class="detail-chip">{{ k }}: {{ v }}</span>
+                {% endif %}{% endfor %}
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">
+            <div class="big">◇</div>
+            {{ 'Nothing matches that filter.' if filters.actor or filters.action else 'Nothing recorded yet.' }}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if pages > 1 %}
+<nav class="pager" aria-label="Audit log pages">
+  {% if page > 1 %}
+  <a class="btn btn-ghost btn-sm"
+     href="{{ url_for('admin.audit_log', page=page-1, actor=filters.actor or None, action=filters.action or None) }}">← Newer</a>
+  {% endif %}
+  <span class="small muted">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}
+  <a class="btn btn-ghost btn-sm"
+     href="{{ url_for('admin.audit_log', page=page+1, actor=filters.actor or None, action=filters.action or None) }}">Older →</a>
+  {% endif %}
+</nav>
+{% endif %}
 {% endblock %}

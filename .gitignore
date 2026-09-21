@@ -9,3 +9,4 @@ tests/_uploads/
 .DS_Store
 .idea/
 .vscode/
+.venv/

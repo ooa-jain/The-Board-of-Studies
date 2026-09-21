@@ -57,9 +57,16 @@ def programme_stage_state(submission: dict, programme_code: str, stage_key: str)
 
 def compute_status(submission: dict, stage_key: str) -> str:
     """Resolve the live status of a stage, applying the sequential lock."""
-    stored = stage_state(submission, stage_key).get("status")
+    state = stage_state(submission, stage_key)
+    stored = state.get("status")
     if stored in ("submitted", "returned", "draft"):
         return stored
+
+    # An Office of Academics override outranks the sequential lock — that is
+    # the whole point of it. Without this the "open this stage anyway" button
+    # wrote a status nothing ever read.
+    if state.get("force_opened_at") or state.get("force_opened_by"):
+        return "open"
 
     idx = stage_index(stage_key)
     if idx <= 0:
@@ -72,7 +79,7 @@ def compute_status(submission: dict, stage_key: str) -> str:
 
 def stage_board(submission: dict):
     """The full stage list with live status, for the department dashboard."""
-    board, unlocked_upto = [], True
+    board = []
     for s in STAGES:
         st = compute_status(submission, s["key"])
         state = stage_state(submission, s["key"])
@@ -89,9 +96,9 @@ def stage_board(submission: dict):
             "warnings": (state.get("summary") or {}).get("warnings", 0),
             "submitted_at": state.get("submitted_at"),
             "returned_note": state.get("returned_note"),
+            "forced_open": bool(state.get("force_opened_at")),
+            "forced_open_by": state.get("force_opened_by"),
         })
-        if st not in DONE:
-            unlocked_upto = False
     return board
 
 
@@ -169,6 +176,7 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
 
 def return_stage(dept_code, academic_year, stage_key, note, actor=""):
     """Office of Academics sends a submitted stage back for correction."""
+    get_or_create_submission(dept_code, academic_year)
     get_db().submissions.update_one(
         {"dept_code": dept_code, "academic_year": academic_year},
         {"$set": {f"stages.{stage_key}.status": "returned",
@@ -181,12 +189,28 @@ def return_stage(dept_code, academic_year, stage_key, note, actor=""):
 
 def unlock_stage(dept_code, academic_year, stage_key, actor=""):
     """Admin override: force a stage open without submitting its predecessor."""
+    get_or_create_submission(dept_code, academic_year)
     get_db().submissions.update_one(
         {"dept_code": dept_code, "academic_year": academic_year},
         {"$set": {f"stages.{stage_key}.status": "open",
                   f"stages.{stage_key}.force_opened_by": actor,
                   f"stages.{stage_key}.force_opened_at": now(),
                   "updated_at": now()}}, upsert=True)
+
+
+def relock_stage(dept_code, academic_year, stage_key, actor=""):
+    """Undo an override, putting the stage back under the sequential lock.
+
+    Only the override is removed. A stage that has been filled or submitted
+    keeps its own status, so nobody loses work to a mis-click.
+    """
+    get_db().submissions.update_one(
+        {"dept_code": dept_code, "academic_year": academic_year,
+         f"stages.{stage_key}.status": {"$nin": ["draft", "submitted", "returned"]}},
+        {"$unset": {f"stages.{stage_key}.status": "",
+                    f"stages.{stage_key}.force_opened_by": "",
+                    f"stages.{stage_key}.force_opened_at": ""},
+         "$set": {"updated_at": now(), "relocked_by": actor}})
 
 
 def prefill_for(stage_key, department, academic_year):

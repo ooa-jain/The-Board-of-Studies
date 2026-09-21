@@ -101,6 +101,9 @@
           <span class="pill pill-warn">In progress</span>
           <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Continue</a>
         {% else %}
+          {% if s.forced_open %}
+          <span class="pill pill-gold" title="The Office of Academics opened this stage ahead of its turn">Opened early</span>
+          {% endif %}
           <a class="btn btn-gold btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Start</a>
         {% endif %}
       </div>

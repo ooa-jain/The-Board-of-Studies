@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Board of Studies Data Repository — the Office of Academics portal where JAIN departments file their Board of Studies record for the academic year.">
   <meta name="theme-color" content="#1a1c1f">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}BoS Data Repository{% endblock %} · JAIN Office of Academics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,9 +22,20 @@
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body{% if TEST_MODE %} class="is-test-mode"{% endif %}>
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
+
+{% if TEST_MODE %}
+{# A sandbox has to announce itself on every screen, signed in or not. #}
+<div class="test-ribbon" role="status">
+  <div class="wrap">
+    <span class="test-ribbon-tag">Test mode</span>
+    <span class="test-ribbon-text">Sandbox data. Nothing filed here is a real Board of Studies record.</span>
+    <a class="test-ribbon-link" href="{{ url_for('test.console') }}">Test console</a>
+  </div>
+</div>
+{% endif %}
 
 {% if not hide_chrome %}
 {% macro nav_link(href, label, is_active=false) -%}
@@ -31,7 +43,9 @@
 {%- endmacro %}
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="{{ url_for('public.landing') }}">
+    {# Home is wherever this person's work is: the dashboard when signed in,
+       the public introduction otherwise. #}
+    <a class="brand" href="{{ home_url }}">
       <img class="brand-logo" alt="JAIN (Deemed-to-be University)"
            src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
            width="1103" height="319">
@@ -52,13 +66,15 @@
         {{ nav_link(url_for('admin.dashboard'), 'Dashboard', request.endpoint == 'admin.dashboard') }}
         {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
         {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
-        {{ nav_link(url_for('admin.rules'), 'Credit rules', request.endpoint == 'admin.rules') }}
+        {{ nav_link(url_for('admin.rules'), 'Credit rules', 'rules' in (request.endpoint or '')) }}
+        {{ nav_link(url_for('admin.audit_log'), 'Audit log', request.endpoint == 'admin.audit_log') }}
         {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint == 'admin.app_settings') }}
       {% elif current_user and current_user.role == 'department' %}
         {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
         <a href="{{ url_for('dept.export_excel') }}">Download Excel</a>
         <a href="{{ url_for('dept.export_word') }}">Download report</a>
       {% else %}
+        {{ nav_link(url_for('public.landing', home=1), 'Portal home', request.endpoint == 'public.landing') }}
         {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
         {{ nav_link(url_for('auth.login'), 'Sign in', request.endpoint == 'auth.login') }}
       {% endif %}
@@ -85,24 +101,21 @@
 </div>
 {% endif %}
 
+{% if current_user and current_user.must_change and request.endpoint != 'auth.change_password' %}
+<div class="site-banner site-banner-warn" role="status">
+  <div class="wrap">
+    You are still on the password you were issued.
+    <a href="{{ url_for('auth.change_password') }}">Change it now</a>.
+  </div>
+</div>
+{% endif %}
+
 {% block header %}{% endblock %}
 
 {% block body %}
 <main id="main-content">
   <div class="wrap">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-      <div class="flash-stack" role="alert" aria-live="polite">
-        {% for category, message in messages %}
-          {% set kind = 'error' if category == 'error' else category %}
-          <div class="alert alert-{{ kind }}">
-            <span class="alert-icon" aria-hidden="true">{{ {'error': '!', 'warning': '!', 'success': '✓'}.get(kind, 'i') }}</span>
-            <div><span class="sr-only">{{ {'error': 'Error: ', 'warning': 'Warning: ', 'success': 'Success: '}.get(kind, '') }}</span>{{ message }}</div>
-          </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-    {% endwith %}
+    {% include "_flashes.html" %}
     {% block content %}{% endblock %}
   </div>
 </main>
@@ -116,45 +129,16 @@
          width="1103" height="319">
     <span>JAIN (Deemed-to-be University) · Office of Academics</span>
     <span class="spacer">Bengaluru &amp; Kochi</span>
+    <a href="{{ url_for('public.landing', home=1) }}">Portal home</a>
     <span>{{ app_settings.academic_year if app_settings else '' }}</span>
   </div>
 </footer>
 {% endif %}
 
-{% if not hide_chrome %}
-<script>
-  (function () {
-    var btn = document.getElementById("nav-toggle");
-    var nav = document.getElementById("topnav");
-    if (!btn || !nav) return;
-    function setOpen(open) {
-      nav.dataset.open = open ? "true" : "false";
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    }
-    setOpen(false);
-    btn.addEventListener("click", function () {
-      setOpen(nav.dataset.open !== "true");
-    });
-    // Escape closes it from anywhere on the page, not only from inside the
-    // menu, and returns the caret to the button.
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && nav.dataset.open === "true") { setOpen(false); btn.focus(); }
-    });
-    // A click outside, or a jump back to the wide layout, closes it too.
-    document.addEventListener("click", function (e) {
-      if (nav.dataset.open === "true" && !nav.contains(e.target) && !btn.contains(e.target)) setOpen(false);
-    });
-    window.addEventListener("resize", function () {
-      if (window.innerWidth > 900) setOpen(false);
-    });
-  })();
-
-  // Print buttons, so no page needs an inline onclick.
-  document.addEventListener("click", function (e) {
-    if (e.target.closest("[data-print]")) { e.preventDefault(); window.print(); }
-  });
-</script>
-{% endif %}
+<script src="{{ url_for('static', filename='js/chrome.js') }}" defer></script>
+{# Copy buttons appear on the department list as well as on the printed slip,
+   so the script that makes them work belongs with the chrome. #}
+<script src="{{ url_for('static', filename='js/copy.js') }}" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

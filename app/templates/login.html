@@ -6,7 +6,7 @@
 <div class="login-page" id="main-content">
   <div class="login-card">
   <aside class="login-aside">
-    <a class="brand" href="{{ url_for('public.landing') }}" style="margin-bottom:34px">
+    <a class="brand" href="{{ url_for('public.landing', home=1) }}" style="margin-bottom:34px">
       <img class="brand-logo" alt="JAIN (Deemed-to-be University)"
            src="{{ url_for('static', filename='img/jain-logo.png') }}"
            width="1103" height="319">
@@ -31,15 +31,12 @@
       <h1 class="login-title">Sign in</h1>
       <p class="muted small mb-2">Bengaluru and Kochi campuses.</p>
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ 'error' if category == 'error' else category }}">{{ message }}</div>
-        {% endfor %}
-      {% endwith %}
+      {% include "_flashes.html" %}
 
       {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
 
       <form method="post" autocomplete="on">
+        {% include "_csrf.html" %}
         <div class="field">
           <label for="username">Username</label>
           <input type="text" id="username" name="username" required autofocus
@@ -64,8 +61,31 @@
       </p>
 
       <p class="small muted mt-2 center">
-        <a href="{{ url_for('public.landing') }}">Back to the portal home</a>
+        <a href="{{ url_for('public.landing', home=1) }}">Back to the portal home</a>
       </p>
+
+      {% if TEST_MODE and accounts %}
+      {# Test mode only: the sandbox is meant to be walked into, not
+         unlocked. These accounts disappear the moment TEST_MODE is off. #}
+      <div class="test-signin mt-2">
+        <div class="test-signin-head">
+          <span class="pill pill-gold">Test mode</span>
+          <span class="small muted">Sign in as anyone, no password</span>
+        </div>
+        <div class="test-signin-list">
+          {% for a in accounts[:8] %}
+          <form method="post" action="{{ url_for('test.signin') }}">
+            {% include "_csrf.html" %}
+            <input type="hidden" name="username" value="{{ a.username }}">
+            <button class="btn btn-ghost btn-sm" type="submit" {{ 'disabled' if not a.active }}>
+              {{ a.name }}<span class="mono">{{ a.username }}</span>
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+        <a class="small" href="{{ url_for('test.console') }}">Open the test console</a>
+      </div>
+      {% endif %}
     </div>
   </div>
   </div>

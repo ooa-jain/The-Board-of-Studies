@@ -47,11 +47,12 @@
         {% elif s.status == 'returned' %}<span class="pill pill-err">Returned</span>
         {% elif s.status == 'draft' %}<span class="pill pill-warn">In progress</span>
         {% elif s.status == 'locked' %}<span class="pill pill-lock">Locked</span>
+        {% elif s.forced_open %}<span class="pill pill-gold">Opened by the Office</span>
         {% else %}<span class="pill pill-gold">Open</span>{% endif %}
       </span>
     </div>
 
-    {% set state = submission.stages.get(s.key, {}) %}
+    {% set state = (submission.stages or {}).get(s.key, {}) %}
     {% if state.data or s.status in ('submitted','returned','locked') %}
     <div class="card-body tight">
       <div class="flex flex-wrap small muted">
@@ -61,14 +62,23 @@
 
         {% if s.status == 'locked' %}
         <form method="post" action="{{ url_for('admin.submission_unlock', dept_code=dept.dept_code, stage_key=s.key) }}">
+          {% include "_csrf.html" %}
           <button class="btn btn-ghost btn-sm" type="submit">Open this stage anyway</button>
         </form>
+        {% elif s.forced_open %}
+        <form method="post" action="{{ url_for('admin.submission_relock', dept_code=dept.dept_code, stage_key=s.key) }}">
+          {% include "_csrf.html" %}
+          <button class="btn btn-ghost btn-sm" type="submit">Put back in stage order</button>
+        </form>
         {% elif s.status == 'submitted' %}
-        <details>
+        <details class="send-back">
           <summary class="btn btn-ghost btn-sm" style="display:inline-flex">Send back</summary>
           <form method="post" class="mt-1"
                 action="{{ url_for('admin.submission_return', dept_code=dept.dept_code, stage_key=s.key) }}">
-            <textarea name="note" rows="2" placeholder="What must the department correct?" required
+            {% include "_csrf.html" %}
+            <label class="sr-only" for="note-{{ s.key }}">What must the department correct?</label>
+            <textarea id="note-{{ s.key }}" name="note" rows="2" minlength="5" required
+                      placeholder="What must the department correct?"
                       style="min-width:340px"></textarea>
             <button class="btn btn-danger btn-sm mt-1" type="submit">Return for correction</button>
           </form>

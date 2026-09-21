@@ -21,11 +21,13 @@
   <div class="card-head"><h3>Upload a workbook</h3></div>
   <div class="card-body">
     <form method="post" enctype="multipart/form-data">
+      {% include "_csrf.html" %}
       <div class="field">
         <label>Excel workbook (.xlsx)<span class="req">*</span></label>
         <input type="file" name="workbook" accept=".xlsx,.xlsm" required>
-        <span class="help">The importer looks for columns named like Department, School, Campus,
-          and Campus. Any HoD columns in the sheet are ignored. It does not matter which row the headings are on.</span>
+        <span class="help">The importer looks for columns named like Department, Code, School
+          and Campus. Any contact columns in the sheet are ignored. It does not matter which
+          row the headings are on.</span>
       </div>
       <div class="field">
         <label>Sheet name (optional)</label>
@@ -55,6 +57,7 @@
 </div>
 
 <form method="post" action="{{ url_for('admin.import_commit') }}">
+  {% include "_csrf.html" %}
   <div class="card mb-2">
     <div class="card-body tight flex flex-wrap">
       <label class="check"><input type="checkbox" name="overwrite"><span>Update departments that already exist</span></label>

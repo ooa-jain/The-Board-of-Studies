@@ -9,9 +9,10 @@
       <h1>Board of Studies — {{ year }}</h1>
       <p>Where every department stands, across Bengaluru and Kochi.</p>
     </div>
-    <div class="spacer flex">
+    <div class="spacer flex flex-wrap">
       <a class="btn btn-ghost" href="{{ url_for('admin.export_institution') }}">Export institution Excel</a>
-      <a class="btn" href="{{ url_for('admin.import_departments') }}">Import departments</a>
+      <a class="btn btn-ghost" href="{{ url_for('admin.import_departments') }}">Import departments</a>
+      <a class="btn" href="{{ url_for('admin.submissions') }}">Submission monitor</a>
     </div>
   </div>
 </div>
@@ -25,7 +26,57 @@
   <div class="stat"><div class="n">{{ counts.not_started }}</div><div class="l">Not started</div><div class="sub">no stage submitted</div></div>
 </div>
 
-<div class="grid grid-2">
+{# The things that want doing today, before the charts. #}
+{% if returned or no_login or unused_passwords %}
+<div class="card mb-2 card-attention">
+  <div class="card-head"><h3>Needs attention</h3></div>
+  <div class="card-body">
+    <ul class="todo">
+      {% if returned %}
+      <li>
+        <span class="todo-n">{{ returned_total }}</span>
+        <div>
+          <strong>stage{{ '' if returned_total == 1 else 's' }} sent back and not yet resubmitted</strong>
+          <div class="small muted">
+            {% for r in returned %}
+              <a href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">{{ r.dept.dept_code }} · {{ r.stage }}</a>{{ ', ' if not loop.last }}
+            {% endfor %}
+            {% if returned_total > returned|length %} and {{ returned_total - returned|length }} more{% endif %}
+          </div>
+        </div>
+      </li>
+      {% endif %}
+      {% if no_login %}
+      <li>
+        <span class="todo-n">{{ no_login|length }}</span>
+        <div>
+          <strong>active department{{ '' if no_login|length == 1 else 's' }} without a login</strong>
+          <div class="small muted">
+            {% for d in no_login[:6] %}{{ d.dept_code }}{{ ', ' if not loop.last }}{% endfor %}
+            {% if no_login|length > 6 %} and {{ no_login|length - 6 }} more{% endif %}
+            — <a href="{{ url_for('admin.departments') }}">generate them</a>
+          </div>
+        </div>
+      </li>
+      {% endif %}
+      {% if unused_passwords %}
+      <li>
+        <span class="todo-n">{{ unused_passwords }}</span>
+        <div>
+          <strong>issued password{{ '' if unused_passwords == 1 else 's' }} not yet used</strong>
+          <div class="small muted">
+            Still visible to the Office until the department signs in —
+            <a href="{{ url_for('admin.credential_sheet') }}">print the credential sheet</a>
+          </div>
+        </div>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid grid-2 grid-top">
   <div class="card">
     <div class="card-head"><h3>By campus</h3></div>
     <div class="card-body">
@@ -44,8 +95,9 @@
   </div>
 
   <div class="card">
-    <div class="card-head"><h3>Stage completion</h3></div>
-    <div class="card-body" style="max-height:300px;overflow:auto">
+    <div class="card-head"><h3>Stage completion</h3>
+      <span class="spacer small muted">of {{ total }} department{{ '' if total == 1 else 's' }}</span></div>
+    <div class="card-body">
       {% for s in stage_counts %}
       <div class="flex mb-1">
         <span class="small row-key row-key-wide">{{ s.title }}</span>
@@ -120,11 +172,13 @@
       <tbody>
         {% for e in recent %}
         <tr>
-          <td class="small mono">{{ e.at.strftime('%d %b %H:%M') }}</td>
+          <td class="small mono nowrap">{{ e.at.strftime('%d %b %H:%M') if e.at else '—' }}</td>
           <td class="small">{{ e.actor }}</td>
           <td class="small"><span class="pill">{{ e.action }}</span></td>
           <td class="small muted">{{ e.target }}</td>
         </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">Nothing recorded yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

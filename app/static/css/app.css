@@ -196,7 +196,23 @@ h4 { font-size: 1rem; }
   color: rgba(255,255,255,.82); padding: 8px 15px; border-radius: 999px;
   font-size: .87rem; font-weight: 500;
 }
+.topnav a { white-space: nowrap; }
 .topnav a:hover { background: rgba(255,255,255,.1); color: #fff; text-decoration: none; }
+
+/* Six links, a name and a sign-out do not fit a 62px row at every width.
+   Between the phone breakpoint and a wide desktop, tighten rather than wrap:
+   a two-line masthead reads as a fault, a slightly closer one does not. */
+@media (max-width: 1320px) {
+  .topbar .wrap { gap: 14px; }
+  .topnav a { padding: 8px 11px; font-size: .84rem; }
+  .who { padding-left: 12px; margin-left: 2px; gap: 8px; }
+}
+@media (max-width: 1140px) {
+  .topnav a { padding: 7px 9px; font-size: .8rem; }
+  .brand-text { display: none; }
+  .who-text { max-width: 132px; }
+  .who-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .topnav a.active {
   background: rgba(255,255,255,.16); color: #fff;
   box-shadow: inset 0 0 0 1px rgba(230,210,160,.5);
@@ -303,6 +319,7 @@ main > .hero:first-child { margin-top: -26px; }
 .card-body.tight { padding: 14px 20px; }
 
 .grid { display: grid; gap: 18px; }
+.grid-top { align-items: start; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
@@ -430,8 +447,9 @@ table.data td.col-progress { min-width: 130px; }
 
 /* stage names turned on their side, so thirteen columns fit */
 table.data th.col-vertical {
-  writing-mode: vertical-rl; height: 130px; padding: 8px 4px;
+  writing-mode: vertical-rl; height: 176px; padding: 10px 4px;
   font-weight: 600; text-transform: none; letter-spacing: 0;
+  white-space: nowrap; vertical-align: bottom;
 }
 
 /* status grid: a glyph as well as a hue, so the matrix reads in greyscale
@@ -1001,8 +1019,130 @@ footer.site .brand-logo { height: 26px; }
 footer.site .wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 footer.site a { color: rgba(255,255,255,.72); }
 
+/* ==========================================================================
+   Test mode, page chrome additions and the console
+   ========================================================================== */
+
+/* ---------- the test-mode ribbon ----------
+   A sandbox that looks like the live portal is a trap. This sits above the
+   masthead on every page, signed in or not, and is the one place in the
+   design where the gold is used as a ground rather than an accent. */
+.test-ribbon {
+  background: repeating-linear-gradient(
+    135deg, var(--gold-400) 0 14px, var(--gold-500) 14px 28px);
+  color: var(--ink-900);
+  font-size: .8rem;
+  padding: 7px 0;
+  position: relative;
+  z-index: 40;
+}
+.test-ribbon .wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.test-ribbon-tag {
+  font-family: var(--font-mono); font-size: .7rem; letter-spacing: .1em;
+  text-transform: uppercase; font-weight: 700;
+  background: var(--ink-900); color: var(--gold-300);
+  padding: 3px 10px; border-radius: 99px;
+}
+.test-ribbon-text { font-weight: 500; }
+.test-ribbon-link {
+  margin-left: auto; color: var(--ink-900); font-weight: 600;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.test-ribbon-link:hover { color: #000; }
+@media (max-width: 620px) {
+  .test-ribbon-text { flex: 1 1 100%; order: 3; }
+  .test-ribbon-link { margin-left: 0; }
+}
+
+/* the one-click sign-in panel on the login screen */
+.test-signin {
+  border: 1px dashed var(--gold-500); border-radius: var(--radius-sm);
+  padding: 14px; background: var(--gold-100);
+}
+.test-signin-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.test-signin-list { display: grid; gap: 6px; margin-bottom: 10px; }
+.test-signin-list form { display: block; }
+.test-signin-list .btn {
+  width: 100%; justify-content: flex-start; gap: 8px;
+  background: var(--surface); border-color: var(--line); color: var(--ink-700);
+  text-align: left;
+}
+.test-signin-list .btn:hover { background: #fff; color: var(--ink-900); }
+.test-signin-list .btn .mono { margin-left: auto; color: var(--ink-faint); }
+
+/* ---------- a warning banner, beside the announcement one ---------- */
+.site-banner-warn { background: var(--warn-bg); color: var(--warn); }
+.site-banner-warn a { color: inherit; text-decoration: underline; }
+
+/* ---------- dismissible flash messages ---------- */
+.alert { position: relative; }
+.alert[data-dismissible] { padding-right: 44px; }
+.alert-close {
+  position: absolute; top: 6px; right: 8px;
+  border: 0; background: transparent; cursor: pointer;
+  font-size: 1.25rem; line-height: 1; padding: 4px 8px; border-radius: var(--radius-sm);
+  color: inherit; opacity: .6;
+}
+.alert-close:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
+.alert.is-going { opacity: 0; transform: translateY(-4px); transition: opacity .2s, transform .2s; }
+
+/* ---------- cards with a job ---------- */
+.form-card { max-width: 720px; margin-inline: auto; }
+.card-attention { border-color: var(--gold-500); box-shadow: var(--shadow); }
+.card-attention .card-head { background: var(--gold-100); }
+.card-danger { border-color: #e9c4bf; }
+.card-danger .card-head { background: var(--err-bg); }
+.card-danger .card-head h3 { color: var(--err); }
+.scroll-panel { max-height: 320px; overflow: auto; }
+
+/* the "needs attention" list */
+.todo { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.todo li { display: flex; gap: 14px; align-items: flex-start; }
+.todo-n {
+  font-family: var(--font-head); font-size: 1.5rem; font-weight: 600;
+  color: var(--gold-700); line-height: 1.1; min-width: 42px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.todo strong { display: block; font-weight: 600; }
+
+/* ---------- error page ---------- */
+.error-card { max-width: 560px; margin: 60px auto; text-align: center; }
+.error-card .card-body { padding: 48px 32px; }
+.error-code {
+  font-family: var(--font-head); font-size: 3.4rem; line-height: 1;
+  color: var(--gold-500);
+}
+
+/* ---------- audit detail chips and paging ---------- */
+.detail-chip {
+  display: inline-block; background: var(--ink-050); border: 1px solid var(--line);
+  border-radius: 99px; padding: 1px 9px; margin: 1px 3px 1px 0;
+  font-size: .74rem; color: var(--ink-soft);
+}
+.pager { display: flex; align-items: center; gap: 14px; justify-content: center; margin-top: 18px; }
+
+/* ---------- the status legend under the monitor filters ---------- */
+.legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.legend .mx-dot { margin-left: 8px; }
+.legend .mx-dot:first-child { margin-left: 0; }
+
+/* ---------- a header row that survives a long table ---------- */
+.table-wrap { max-height: 76vh; overflow: auto; }
+table.data-sticky thead th { position: sticky; top: 0; z-index: 4; }
+table.data-sticky thead th.col-frozen { z-index: 5; }
+
+/* a disabled account or department, greyed but still legible */
+tr.is-off td { opacity: .55; }
+
+/* ---------- send-back disclosure ---------- */
+.send-back summary { list-style: none; }
+.send-back summary::-webkit-details-marker { display: none; }
+.send-back[open] summary { margin-bottom: 6px; }
+
 @media print {
-  .topbar, footer.site, .savebar, .no-print { display: none !important; }
+  .table-wrap { max-height: none; overflow: visible; }
+  .topbar, footer.site, .savebar, .no-print,
+  .test-ribbon, .site-banner, .filter-bar, .pager { display: none !important; }
   body { background: #fff; }
   .slip { border-color: #333; box-shadow: none; }
   .card { box-shadow: none; border-color: #ccc; break-inside: avoid; }

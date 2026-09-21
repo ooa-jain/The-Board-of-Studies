@@ -30,6 +30,21 @@ class Config:
     PORT = int(os.getenv("PORT", "8102"))
     DEBUG = _bool("FLASK_DEBUG", False)
 
+    # Test mode — a sandbox for training and for checking the flow end to end.
+    # It seeds demo departments, allows one-click sign-in as any demo account
+    # and lets the whole cycle be wiped and started again. It must never be on
+    # for the live portal, so every page it touches carries a standing ribbon.
+    TEST_MODE = _bool("TEST_MODE", False)
+
+    # How long the landing page stays "seen" before a visitor is shown it
+    # again. The marketing page is an introduction, not a doorway you walk
+    # through every morning.
+    LANDING_SEEN_DAYS = int(os.getenv("LANDING_SEEN_DAYS", "180"))
+
+    # Off only for the test suite, where the client has no browser to hold a
+    # token. Never turn this off for a deployment.
+    CSRF_PROTECT = _bool("CSRF_PROTECT", True)
+
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = _bool("SESSION_COOKIE_SECURE", not DEBUG)

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Test console{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">Test mode</div>
+      <h1>Test console</h1>
+      <p>A sandbox of the portal. Seed a demo institution, sign in as anyone without a password,
+         open any stage out of order, and wipe the lot when you are done. None of this exists
+         when <span class="mono">TEST_MODE</span> is off.</p>
+    </div>
+    <div class="spacer flex flex-wrap">
+      {% if current_user %}
+      <a class="btn btn-ghost" href="{{ home_url }}">Go to my dashboard</a>
+      <a class="btn btn-ghost" href="{{ url_for('auth.logout') }}">Sign out</a>
+      {% else %}
+      <a class="btn btn-ghost" href="{{ url_for('auth.login') }}">Normal sign-in</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-4 mb-2">
+  <div class="stat"><div class="n">{{ counts.departments }}</div><div class="l">Departments</div><div class="sub">in the sandbox</div></div>
+  <div class="stat"><div class="n">{{ counts.logins }}</div><div class="l">Department logins</div><div class="sub">issued</div></div>
+  <div class="stat"><div class="n">{{ counts.submissions }}</div><div class="l">Submissions</div><div class="sub">{{ year }}</div></div>
+  <div class="stat"><div class="n">{{ counts.audit }}</div><div class="l">Audit entries</div><div class="sub">recorded</div></div>
+</div>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-head"><h3>Demo data</h3>
+      <span class="spacer">
+        {% if seeded %}<span class="pill pill-ok">Seeded</span>
+        {% else %}<span class="pill pill-warn">Not seeded</span>{% endif %}
+      </span>
+    </div>
+    <div class="card-body">
+      <p class="muted small mb-2">
+        Seven departments across both campuses, five schools, each with a login. Seeding twice
+        changes nothing — anything already there is left alone.
+      </p>
+      <form method="post" action="{{ url_for('test.seed') }}">
+        {% include "_csrf.html" %}
+        <button class="btn" type="submit">
+          {{ 'Seed any that are missing' if seeded else 'Seed the demo departments' }}
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Open every stage</h3></div>
+    <div class="card-body">
+      <p class="muted small mb-2">
+        Stages normally unlock one at a time. This opens all {{ STAGES|length }} for one
+        department, so a late stage can be exercised without filling the ones before it.
+      </p>
+      {% if departments %}
+      <form method="post" class="flex flex-wrap" id="open-all-form"
+            action="{{ url_for('test.open_all', dept_code=departments[0].dept_code) }}">
+        {% include "_csrf.html" %}
+        <label class="sr-only" for="open-all-dept">Department</label>
+        <select id="open-all-dept" style="max-width:280px">
+          {% for d in departments %}
+          <option value="{{ url_for('test.open_all', dept_code=d.dept_code) }}">
+            {{ d.dept_name }} ({{ d.dept_code }})
+          </option>
+          {% endfor %}
+        </select>
+        <button class="btn" type="submit">Open every stage</button>
+      </form>
+      {% else %}
+      <p class="muted small mb-0">Seed the demo departments first.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card mt-2">
+  <div class="card-head"><h3>Sign in as</h3>
+    <span class="spacer small muted">No password needed while test mode is on</span></div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th scope="col">Account</th><th scope="col">Role</th><th scope="col">Username</th>
+              <th scope="col">Issued password</th><th scope="col"><span class="sr-only">Sign in</span></th></tr>
+        </thead>
+        <tbody>
+          {% for a in accounts %}
+          <tr{{ ' class=is-off' if not a.active }}>
+            <td><strong>{{ a.name }}</strong><div class="small muted">{{ a.detail }}</div></td>
+            <td><span class="pill {{ 'pill-gold' if a.role == 'admin' }}">{{ a.role }}</span></td>
+            <td class="mono small">{{ a.username }}</td>
+            <td class="mono small">
+              {% if a.password %}{{ a.password }}
+                <button class="copy-btn" type="button" data-copy="{{ a.username }}&#9;{{ a.password }}"
+                        data-copy-label="Copied" aria-label="Copy the login for {{ a.name }}">Copy</button>
+              {% elif a.role == 'admin' %}<span class="muted">from the environment</span>
+              {% else %}<span class="muted">already signed in once</span>{% endif %}
+            </td>
+            <td class="right">
+              <form method="post" action="{{ url_for('test.signin') }}">
+                {% include "_csrf.html" %}
+                <input type="hidden" name="username" value="{{ a.username }}">
+                <button class="btn btn-ghost btn-sm" type="submit"
+                        {{ 'disabled' if not a.active }}>Sign in</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">
+            <div class="big">◇</div>
+            No accounts yet. Seed the demo departments above.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-2 card-danger">
+  <div class="card-head"><h3>Clear the sandbox</h3></div>
+  <div class="card-body">
+    <p class="muted small mb-2">
+      Deletes every department, department login, submission, uploaded-file record and import
+      preview — {{ counts.submissions }} submission(s) and {{ counts.files }} file record(s) as
+      things stand. The administrator account, the credit rules and the portal settings survive,
+      so you can still get back in.
+    </p>
+    <form method="post" action="{{ url_for('test.reset') }}" class="flex flex-wrap"
+          data-confirm="Delete all sandbox data? This cannot be undone.">
+      {% include "_csrf.html" %}
+      <label class="sr-only" for="confirm">Type RESET to confirm</label>
+      <input type="text" id="confirm" name="confirm" placeholder="Type RESET to confirm"
+             autocomplete="off" style="max-width:220px">
+      <label class="check"><input type="checkbox" name="reseed" checked><span>Seed the demo departments again afterwards</span></label>
+      <button class="btn btn-danger" type="submit">Clear everything</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // The department picker rewrites the form's action, so one form covers the
+  // whole list rather than one form per department.
+  (function () {
+    var form = document.getElementById("open-all-form");
+    var select = document.getElementById("open-all-dept");
+    if (!form || !select) return;
+    var sync = function () { form.action = select.value; };
+    select.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

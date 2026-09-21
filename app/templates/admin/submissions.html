@@ -7,21 +7,61 @@
     <div>
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Submissions</div>
       <h1>Submission monitor — {{ year }}</h1>
-      <p>Every department against every stage. Green is submitted, amber is in progress, red came back
-         for correction, grey is still locked.</p>
+      <p>Every active department against every stage, whether or not it has started.</p>
     </div>
-    <div class="spacer">
+    <div class="spacer flex flex-wrap">
       <a class="btn btn-ghost" href="{{ url_for('admin.export_institution') }}">Export Excel</a>
+      <a class="btn btn-ghost" href="{{ url_for('admin.departments') }}">Departments</a>
     </div>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+<div class="filter-bar">
+  <nav class="pill-tabs" aria-label="Filter by state">
+    <a href="{{ url_for('admin.submissions', campus=filters.campus or None, q=filters.q or None) }}"
+       {% if not filters.state %}aria-current="true"{% endif %}>All</a>
+    {% for key, label in [('not_started', 'Not started'), ('in_progress', 'In progress'), ('complete', 'Complete')] %}
+    <a href="{{ url_for('admin.submissions', state=key, campus=filters.campus or None, q=filters.q or None) }}"
+       {% if filters.state == key %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <span class="spacer small muted">
+    {{ rows|length }} shown{% if returned_total %} · {{ returned_total }} stage(s) returned for correction{% endif %}
+  </span>
+</div>
+
+<div class="card mb-2">
+  <div class="card-body tight">
+    <form class="flex flex-wrap" method="get">
+      <input type="hidden" name="state" value="{{ filters.state or '' }}">
+      <label class="sr-only" for="sub-q">Search departments</label>
+      <input id="sub-q" type="search" name="q" value="{{ filters.q }}"
+             placeholder="Search name, code or school" style="max-width:280px">
+      <label class="sr-only" for="sub-campus">Campus</label>
+      <select id="sub-campus" name="campus" style="max-width:200px">
+        <option value="">Both campuses</option>
+        {% for c in campuses %}<option value="{{ c }}" {{ 'selected' if filters.campus == c }}>{{ c }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">Filter</button>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submissions') }}">Clear</a>
+      <span class="spacer"></span>
+      <span class="legend small muted" aria-hidden="true">
+        <span class="mx-dot mx-submitted">✓</span> submitted
+        <span class="mx-dot mx-draft">·</span> in progress
+        <span class="mx-dot mx-returned">!</span> returned
+        <span class="mx-dot mx-open">○</span> open
+        <span class="mx-dot mx-locked">–</span> locked
+      </span>
+    </form>
+  </div>
+</div>
+
 <div class="card">
   <div class="card-body" style="padding:0">
     <div class="table-wrap">
-      <table class="data">
+      <table class="data data-sticky">
         <thead>
           <tr>
             <th scope="col" class="col-frozen">Department</th>
@@ -45,6 +85,7 @@
                      style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
                 <span class="bar-label nowrap">{{ r.progress.done }}/{{ r.progress.total }}</span>
               </div>
+              {% if not r.started %}<div class="small muted">Not started</div>{% endif %}
             </td>
             {% for b in r.board %}
             {# A glyph as well as a hue: the grid has to be readable without colour. #}
@@ -61,7 +102,15 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="{{ stages|length + 3 }}" class="empty">No submissions started yet.</td></tr>
+          <tr><td colspan="{{ stages|length + 3 }}" class="empty">
+            <div class="big">◇</div>
+            {% if filters.q or filters.campus or filters.state %}
+              No department matches that filter.
+            {% else %}
+              No active departments yet.
+              <div class="mt-1"><a class="btn btn-sm" href="{{ url_for('admin.import_departments') }}">Import the contact directory</a></div>
+            {% endif %}
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>

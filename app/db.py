@@ -47,6 +47,16 @@ def _ensure_indexes():
     d.submissions.create_index([("dept_code", ASCENDING), ("academic_year", ASCENDING)], unique=True)
     d.audit.create_index([("at", ASCENDING)])
     d.files.create_index([("dept_code", ASCENDING), ("stage", ASCENDING)])
+    d.login_attempts.create_index([("username", ASCENDING), ("at", ASCENDING)])
+    d.import_batches.create_index([("at", ASCENDING)])
+    try:
+        # Failed attempts and import previews are both scratch; let the server
+        # sweep them up. Not every deployment (or mongomock) supports TTL
+        # indexes, and neither collection depends on one.
+        d.login_attempts.create_index([("at", ASCENDING)], expireAfterSeconds=24 * 3600)
+        d.import_batches.create_index([("at", ASCENDING)], expireAfterSeconds=6 * 3600)
+    except Exception:  # pragma: no cover - depends on the server
+        pass
 
 
 # ---------------------------------------------------------------------------
