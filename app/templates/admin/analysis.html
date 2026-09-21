@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Analysis{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Analysis</div>
+      <h1>Every department, {{ year }}</h1>
+      <p>
+        Who has finished, who is part-way, who has never signed in, and what is
+        failing validation — in one reading rather than department by department.
+      </p>
+    </div>
+    <div class="spacer head-aside">
+      <div class="flex head-aside-row">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submissions') }}">Submissions</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.departments') }}">Departments</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# The demonstration tab. It shows invented departments so the screen can be
+   shown before any real filing has happened. It says so, loudly, and it
+   cannot be reached without asking for it. #}
+<nav class="pill-tabs mb-2" aria-label="Which data">
+  <a href="{{ url_for('admin.analysis') }}" {% if not demo %}aria-current="true"{% endif %}>Live data</a>
+  <a href="{{ url_for('admin.analysis', demo=1) }}" {% if demo %}aria-current="true"{% endif %}>Demo data</a>
+</nav>
+
+{% if demo %}
+<div class="alert alert-warning" role="status">
+  <span class="alert-icon" aria-hidden="true">!</span>
+  <div>
+    <strong>These are made-up departments.</strong>
+    Nothing on this tab is real — no department here has filed anything, and none of
+    these figures came from the database. It exists to show what the analysis looks
+    like with a cycle under way.
+    <a href="{{ url_for('admin.analysis') }}">Switch to live data</a>.
+  </div>
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------- the totals -#}
+<div class="grid grid-4 mb-2">
+  <div class="stat">
+    <div class="n">{{ totals.percent }}%</div>
+    <div class="l">Of all stages filed</div>
+    <div class="sub">{{ totals.stages_done }} of {{ totals.stages_total }}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ totals.complete }}</div>
+    <div class="l">Departments finished</div>
+    <div class="sub">of {{ totals.departments }}{% if totals.sealed %} · {{ totals.sealed }} sealed{% endif %}</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ totals.untouched }}</div>
+    <div class="l">Nothing filed yet</div>
+    <div class="sub">{{ totals.never_in }} never signed in</div>
+  </div>
+  <div class="stat">
+    <div class="n">{{ totals.errors }}</div>
+    <div class="l">Open validation errors</div>
+    <div class="sub">across {{ totals.with_errors }} department(s)</div>
+  </div>
+</div>
+
+{# A row of states, each one a filter. The count is the whole institution even
+   when the table below is filtered, so the two never contradict each other. #}
+<div class="filter-bar">
+  <nav class="pill-tabs" aria-label="Filter by state">
+    <a href="{{ url_for('admin.analysis', demo=1 if demo else None, q=filters.q or None) }}"
+       {% if not filters.state %}aria-current="true"{% endif %}>All {{ totals.departments }}</a>
+    {% for key, label in [('complete', 'Finished'), ('returned', 'Sent back'),
+                          ('in_progress', 'In progress'), ('not_started', 'Nothing filed'),
+                          ('never_in', 'Never signed in'), ('no_login', 'No login')] %}
+      {% if totals[key] %}
+      <a href="{{ url_for('admin.analysis', state=key, demo=1 if demo else None, q=filters.q or None) }}"
+         {% if filters.state == key %}aria-current="true"{% endif %}>{{ label }} {{ totals[key] }}</a>
+      {% endif %}
+    {% endfor %}
+  </nav>
+  <span class="spacer small muted">
+    {{ rows|length }} shown{% if rows|length != totals.departments %} of {{ totals.departments }}{% endif %}
+  </span>
+</div>
+
+{% if not demo %}
+<div class="card mb-2">
+  <div class="card-body tight">
+    <form class="flex flex-wrap" method="get">
+      {% if filters.state %}<input type="hidden" name="state" value="{{ filters.state }}">{% endif %}
+      <label class="sr-only" for="an-q">Search departments</label>
+      <input id="an-q" type="search" name="q" value="{{ filters.q }}"
+             placeholder="Search department, school or code" style="max-width:300px">
+      <button class="btn btn-sm" type="submit">Filter</button>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.analysis') }}">Clear</a>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{# --------------------------------------------------------- the departments -#}
+<div class="card mb-2">
+  <div class="card-head">
+    <h3 class="card-title-sm">Department by department</h3>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div class="rt-wrap" tabindex="0" role="region" aria-label="Every department's progress">
+      <table class="an-table">
+        <thead>
+          <tr>
+            <th scope="col">Department</th>
+            <th scope="col">State</th>
+            <th scope="col" style="width:190px">Stages filed</th>
+            <th scope="col">Next / left</th>
+            <th scope="col" class="num">Errors</th>
+            <th scope="col">Last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="an-{{ r.state }}">
+            <td>
+              <strong>{{ r.dept.dept_name }}</strong>
+              <div class="small muted">
+                {{ r.dept.school }}{% if r.dept.campus %} · {{ r.dept.campus }}{% endif %}
+              </div>
+              <div class="small mono muted">{{ r.dept.dept_code }}</div>
+            </td>
+            <td>
+              <span class="pill pill-{{ {'complete': 'ok', 'returned': 'err',
+                                         'in_progress': 'warn', 'not_started': 'lock',
+                                         'never_in': 'lock', 'no_login': 'err'}[r.state] }}">
+                {{ r.label }}
+              </span>
+              {% if r.sealed %}<div class="small muted mt-0">Sealed</div>{% endif %}
+            </td>
+            <td>
+              <div class="bar" role="progressbar" aria-valuenow="{{ r.done }}"
+                   aria-valuemin="0" aria-valuemax="{{ r.total }}"
+                   aria-label="{{ r.dept.dept_name }}: stages submitted"><i
+                   style="width:{{ r.percent }}%"></i></div>
+              <div class="small muted mt-0">
+                {{ r.done }} of {{ r.total }}
+                {%- if r.half %} · {{ r.half }} half-filled{% endif %}
+                {%- if r.returned %} · {{ r.returned }} sent back{% endif %}
+              </div>
+            </td>
+            <td class="small">
+              {% if r.next %}
+                <strong>{{ r.next.title }}</strong>
+                <div class="muted">{{ r.locked }} stage(s) still locked</div>
+              {% elif r.state == 'complete' %}
+                <span class="muted">Nothing left</span>
+              {% else %}
+                <span class="muted">Cannot start — {{ r.label|lower }}</span>
+              {% endif %}
+            </td>
+            <td class="num">
+              {% if r.errors %}<span class="pill pill-err">{{ r.errors }}</span>
+              {% elif r.warnings %}<span class="pill pill-warn">{{ r.warnings }} to check</span>
+              {% else %}<span class="muted">—</span>{% endif %}
+            </td>
+            <td class="small muted nowrap">
+              {% if r.last_login %}{{ r.last_login.strftime('%d %b, %H:%M') }}
+              {% else %}Never{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6">
+            <div class="empty">
+              <div class="big" aria-hidden="true">·</div>
+              Nothing matches that filter.
+            </div>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# --------------------------------------------------------- stage by stage -#}
+<div class="card">
+  <div class="card-head">
+    <h3 class="card-title-sm">Where the institution is stuck</h3>
+    <span class="spacer small muted">
+      Each stage across all {{ totals.departments }} departments — the four
+      counts add up to that number
+    </span>
+  </div>
+  <div class="card-body" style="padding:0">
+    <div class="rt-wrap" tabindex="0" role="region" aria-label="Progress by stage">
+      <table class="an-table">
+        <thead>
+          <tr>
+            <th scope="col" style="width:46px">#</th>
+            <th scope="col">Stage</th>
+            <th scope="col" style="width:200px">Submitted</th>
+            <th scope="col" class="num">Half-filled</th>
+            <th scope="col" class="num">Sent back</th>
+            <th scope="col" class="num">Open, untouched</th>
+            <th scope="col" class="num">Not open yet</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in stages %}
+          <tr>
+            <td class="mono small muted">{{ '%02d' % s.n }}</td>
+            <td>
+              <strong>{{ s.title }}</strong>
+              <div class="small muted">{{ s.group }}</div>
+            </td>
+            <td>
+              <div class="bar" role="progressbar" aria-valuenow="{{ s.submitted }}"
+                   aria-valuemin="0" aria-valuemax="{{ totals.departments }}"
+                   aria-label="{{ s.title }}: departments submitted"><i
+                   style="width:{{ s.percent }}%"></i></div>
+              <div class="small muted mt-0">{{ s.submitted }} of {{ totals.departments }}</div>
+            </td>
+            <td class="num">{{ s.draft or '—' }}</td>
+            <td class="num">{{ s.returned or '—' }}</td>
+            <td class="num">{{ s.open or '—' }}</td>
+            <td class="num">{{ s.locked or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
