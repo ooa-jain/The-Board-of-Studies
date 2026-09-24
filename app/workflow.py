@@ -443,6 +443,26 @@ def sync_programme_rows(existing, offered):
     return out
 
 
+def programme_fill_source(submission, department):
+    """Programmes for the "fill in all" button in Programme Information:
+    the list confirmed in Department Information, or — if that was never
+    saved — the department's programmes from the Office of Academics
+    workbook."""
+    offered = offered_programmes(submission)
+    if offered is None:
+        offered = catalogue_rows(department)
+    out = []
+    for p in offered:
+        code = str(p.get("programme_code") or "").strip()
+        if not code:
+            continue
+        row = {"programme_code": code, "programme_name": p.get("programme_name", "")}
+        if _DEGREE_LEVEL.get(p.get("degree")):
+            row["degree_level"] = _DEGREE_LEVEL[p["degree"]]
+        out.append(row)
+    return out
+
+
 def form_data(stage_key, submission, department, academic_year, editable):
     """What a stage's form opens with: the saved draft, with the prefill for
     any section it has never held, and — for Programme Information — the

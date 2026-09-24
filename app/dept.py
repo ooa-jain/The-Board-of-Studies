@@ -16,7 +16,8 @@ from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
-                       form_data, prefill_for, programme_stage_state, programmes_of,
+                       form_data, prefill_for, programme_fill_source,
+                       programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only)
 
@@ -118,8 +119,11 @@ def stage(stage_key, programme_code=None):
         "required_total": (credit_matrix or {}).get("total"),
     }
 
+    fill = (programme_fill_source(sub, dept)
+            if stage_key == "ugc_programme" and status in OPENABLE else [])
+
     board = stage_board(sub)
-    return render_template("dept/stage.html", calc=calc, stage=stage_def, dept=dept, submission=sub,
+    return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,

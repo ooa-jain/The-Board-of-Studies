@@ -243,6 +243,8 @@ PROGRAMME_INFORMATION = {
             # rows come from Department Information → Programmes offered;
             # code and name are fixed here, the rest is filled per programme
             "synced_from": "dept_info",
+            # one framed card per programme rather than a wide table row
+            "display": "cards",
             "columns": [
                 {"name": "sl", "label": "S. No.", "type": "integer", "width": "70px", "auto_index": True},
                 {"name": "programme_name", "label": "Programme name", "type": "text", "required": True,

@@ -2347,3 +2347,18 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
   .frame { padding-left: 16px; padding-right: 16px; }
   .frame-flush { padding: 30px 0 0; }
 }
+
+/* ---------- row cards (Programme Information) ---------- */
+.rc-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.rc-note { font-size: .84rem; color: var(--ok); font-weight: 600; }
+.rc-fill:disabled { background: var(--ok-bg); color: var(--ok); cursor: default; }
+.rc-list { display: grid; gap: 30px; }
+.rc-card { margin-top: 24px; padding-top: 38px; }
+.rc-title { font-weight: 700; font-size: 1.02rem; color: var(--ink-800); margin: 0 44px 14px 0; }
+.rc-title.is-empty { color: var(--ink-faint); font-style: italic; font-weight: 500; }
+.rc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rc-grid .field.wide { grid-column: 1 / -1; }
+.rc-del { position: absolute; top: 14px; right: 14px; }
+.rc-add { margin-top: 0; }
+@media (max-width: 900px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .rc-grid { grid-template-columns: minmax(0, 1fr); } }

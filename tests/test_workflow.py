@@ -946,3 +946,21 @@ def test_a_removed_programme_needs_a_reason(app, client):
     rows[1]["removal_note"] = "Folded into BCMREG"
     assert client.post("/department/api/dept_info/submit",
                        json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()["ok"]
+
+
+def test_programme_information_offers_every_programme_in_one_click(app, client):
+    """Without a saved Programmes offered list, the one-click fill falls back
+    to the department's programmes in the Office of Academics workbook."""
+    from app.db import get_db
+    u, p = make_department(app, code="COMM-JYN")
+    with app.app_context():
+        get_db().departments.update_one({"dept_code": "COMM-JYN"},
+                                        {"$set": {"campus": "Jayanagar Campus"}})
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
+    login(client, u, p)
+    body = client.get("/department/stage/ugc_programme").get_data(as_text=True)
+    fill = json.loads(body.split("fill: ")[1].split(",\n")[0])
+    codes = [r["programme_code"] for r in fill]
+    assert "BCMREG" in codes and "MCMREG" in codes
+    assert next(r for r in fill if r["programme_code"] == "MCMREG")["degree_level"] == "PG - 2 Year"
+    assert "synced: false" in body

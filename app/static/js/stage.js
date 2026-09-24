@@ -764,6 +764,189 @@
     draw();
   }
 
+  // ------------------------------------------------------------ row cards
+  /* A repeating section shown as one framed card per row — navy for UG,
+     orange for PG — with the fields laid out as a form rather than a table
+     that scrolls sideways. Programme Information uses it, with a button
+     that brings in every programme the department offers in one go. */
+
+  function renderRowCards(section, host) {
+    const synced = !!(section.synced_from && CTX.synced);
+    const LOCKED_COLS = ["programme_code", "programme_name"];
+    const RULES = derivedRules(section);
+    const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
+    const data = rows(section.key);
+    const cols = section.columns.filter(c => !c.auto_index);
+    const isBlank = r => cols.every(c => num(r[c.name]) === null &&
+                                         String(r[c.name] ?? "").trim() === "");
+
+    if (synced) {
+      const note = el("div", "sync-note");
+      note.appendChild(el("span", null,
+        "These programmes come from Department Information. To add or remove one, "));
+      const a = el("a", null, "change the list there");
+      a.href = CTX.urls.dept_info;
+      note.appendChild(a);
+      note.appendChild(el("span", null, "."));
+      host.appendChild(note);
+    }
+
+    const bar = el("div", "rc-bar");
+    const fillNote = el("span", "rc-note");
+    fillNote.setAttribute("role", "status");
+    let fillBtn = null;
+    if (!CTX.readonly && !synced && (CTX.fill || []).length) {
+      fillBtn = el("button", "btn btn-gold rc-fill");
+      fillBtn.type = "button";
+      fillBtn.addEventListener("click", fillAll);
+      bar.appendChild(fillBtn);
+    }
+    bar.appendChild(fillNote);
+    if (bar.childNodes.length > 1 || fillBtn) host.appendChild(bar);
+
+    const list = el("div", "rc-list");
+    host.appendChild(list);
+
+    const foot = el("div", "rt-foot");
+    const count = el("span", "rt-count");
+    const rowNote = el("span", "rt-note");
+    rowNote.setAttribute("role", "status");
+    if (!synced && !CTX.readonly) {
+      const add = el("button", "pl-panel-add rc-add");
+      add.type = "button";
+      add.innerHTML = ICON.plus;
+      add.appendChild(el("span", null, "Add another programme"));
+      add.addEventListener("click", () => {
+        data.push({});
+        draw();
+        touch();
+        list.lastElementChild?.querySelector("input, select")?.focus();
+      });
+      foot.appendChild(add);
+    }
+    foot.appendChild(count);
+    foot.appendChild(rowNote);
+    host.appendChild(foot);
+
+    while (data.length < (section.min_rows || 0)) data.push({});
+
+    function missing() {
+      const have = new Set(data.map(r => String(r.programme_code || "").trim().toUpperCase()));
+      return (CTX.fill || []).filter(p => !have.has(p.programme_code.toUpperCase()));
+    }
+
+    function fillAll() {
+      const add = missing();
+      if (!add.length) return;
+      // an untouched blank card is replaced rather than left at the top
+      for (let k = data.length - 1; k >= 0; k--) if (isBlank(data[k])) data.splice(k, 1);
+      add.forEach(p => data.push(Object.assign({}, p)));
+      draw();
+      touch();
+      fillNote.textContent = `Added ${add.length} programme${add.length === 1 ? "" : "s"}. ` +
+        "Fill in the rest of each card below.";
+    }
+
+    function draw() {
+      list.textContent = "";
+      data.forEach((row, i) => {
+        const pg = /^PG/.test(row.degree_level || "");
+        const card = el("div", `frame frame-${pg ? "orange" : "navy"} rc-card`);
+        card.dataset.row = i;
+        const tab = el("span", "frame-tab");
+        const title = el("div", "rc-title");
+        const paint = () => {
+          const isPg = /^PG/.test(row.degree_level || "");
+          card.classList.toggle("frame-orange", isPg);
+          card.classList.toggle("frame-navy", !isPg);
+          tab.textContent = `${String(i + 1).padStart(2, "0")} · ` +
+                            (row.programme_code || "New programme");
+          title.textContent = row.programme_name || "Programme name not given yet";
+          title.classList.toggle("is-empty", !row.programme_name);
+        };
+        card.appendChild(tab);
+        card.appendChild(title);
+
+        const grid = el("div", "fields-grid rc-grid");
+        const cells = {};
+        section.columns.forEach(c => {
+          if (c.auto_index) { row[c.name] = i + 1; return; }
+          const holder = el("div", "field" + (c.name === "programme_name" ? " wide" : ""));
+          holder.dataset.field = c.name;
+          const id = `rc-${section.key}-${i}-${c.name}`;
+          if (c.type === "checkbox") {
+            const lab = el("label", "check");
+            const input = makeInput(c, row[c.name], v => { row[c.name] = v; touch(); });
+            input.id = id;
+            lab.appendChild(input);
+            lab.appendChild(el("span", null, c.label));
+            holder.appendChild(lab);
+            grid.appendChild(holder);
+            return;
+          }
+          const lab = el("label", null, c.label);
+          lab.setAttribute("for", id);
+          if (c.required) {
+            const star = el("span", "req", "*");
+            star.setAttribute("aria-hidden", "true");
+            lab.appendChild(star);
+          }
+          holder.appendChild(lab);
+          const input = makeInput(c, row[c.name], v => {
+            row[c.name] = v;
+            if (DERIVED[c.name]) markManual(row, c.name, cells);
+            derive(RULES, row, cells);
+            if (["programme_code", "programme_name", "degree_level"].includes(c.name)) paint();
+            touch();
+          });
+          input.id = id;
+          if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) input.readOnly = true;
+          cells[c.name] = input;
+          holder.appendChild(input);
+          if (c.help) holder.appendChild(el("span", "help", c.help));
+          if (DERIVED[c.name]) {
+            if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
+            hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, paint));
+          }
+          attachLiveCheck(input, c, holder);
+          grid.appendChild(holder);
+        });
+        card.appendChild(grid);
+
+        if (!synced && !CTX.readonly) {
+          const del = iconButton("pl-icon pl-minus rc-del", "minus", `Remove programme ${i + 1}`);
+          del.addEventListener("click", () => {
+            if (data.length <= (section.min_rows || 0)) {
+              rowNote.textContent = `Keep at least ${section.min_rows} programme` +
+                                    `${section.min_rows === 1 ? "" : "s"}.`;
+              return;
+            }
+            data.splice(i, 1);
+            rowNote.textContent = "";
+            draw();
+            touch();
+          });
+          card.appendChild(del);
+        }
+        paint();
+        list.appendChild(card);
+        if (!CTX.readonly && derive(RULES, row, cells)) touch();
+      });
+
+      const min = section.min_rows || 0;
+      count.textContent = `${data.length} programme${data.length === 1 ? "" : "s"}` +
+                          (min ? ` · minimum ${min}` : "");
+      if (fillBtn) {
+        const left = missing().length;
+        fillBtn.disabled = !left;
+        fillBtn.textContent = left
+          ? `Fill in all programmes (${left} to add)`
+          : `All ${(CTX.fill || []).length} programmes are in`;
+      }
+    }
+    draw();
+  }
+
   // ------------------------------------------------------------ credit matrix
 
   function renderCreditMatrix(section, host) {
@@ -1368,7 +1551,9 @@
       block.appendChild(h);
       if (section.help) block.appendChild(el("div", "section-help", section.help));
 
-      if (section.type === "table") {
+      if (section.type === "table" && section.display === "cards") {
+        renderRowCards(section, block);
+      } else if (section.type === "table") {
         renderTable(section, block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
