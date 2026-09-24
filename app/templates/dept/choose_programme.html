@@ -30,18 +30,29 @@
     </div>
     <div class="card-body">
       <p class="small muted mb-1">
-        <span class="mono">{{ p.programme_code }}</span> · {{ p.degree_level }}
-        {% if p.specialisation %} · {{ p.specialisation }}{% endif %}
+        <span class="mono">{{ p.programme_code }}</span>
+        {%- if p.degree_level %} · {{ p.degree_level }}{% endif %}
+        {%- if p.specialisation %} · {{ p.specialisation }}{% endif %}
       </p>
-      <p class="small muted">{{ p.semesters }} semesters · batch {{ p.batch }} · intake {{ p.intake }}</p>
+      {% set facts = [] %}
+      {% if p.semesters %}{% set _ = facts.append(p.semesters ~ ' semesters') %}{% endif %}
+      {% if p.batch %}{% set _ = facts.append('batch ' ~ p.batch) %}{% endif %}
+      {% if p.intake %}{% set _ = facts.append('intake ' ~ p.intake) %}{% endif %}
+      {% if facts %}<p class="small muted">{{ facts|join(' · ') }}</p>{% endif %}
+      {% if programmes|selectattr('programme_code', 'equalto', p.programme_code)|list|length > 1 %}
+        <div class="alert alert-warning small mt-1 mb-0">
+          Another programme also uses the code {{ p.programme_code }}. Give each programme its
+          own code in Programme Information, or both will open the same record.
+        </div>
+      {% endif %}
       {% if st.summary and st.summary.errors %}
         <div class="alert alert-error small mt-1 mb-0">
           {{ st.summary.errors }} item(s) still to fix.
         </div>
       {% endif %}
-      <a class="btn btn-block mt-2"
+      <a class="btn btn-block mt-2 btn-prog"
          href="{{ url_for('dept.stage', stage_key=stage.key, programme_code=p.programme_code) }}">
-        {{ 'Review' if st.status == 'submitted' else 'Open' }} {{ p.programme_code }}
+        {{ 'Review' if st.status == 'submitted' else 'Open' }} {{ p.programme_name or p.programme_code }}
       </a>
     </div>
   </div>

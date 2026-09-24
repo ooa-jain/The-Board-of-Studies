@@ -1012,6 +1012,8 @@
       }
     }
     tally();
+    // the course table may already have rendered above this one
+    followCourses();
   }
 
   // --------------------------------------------------------------- cards

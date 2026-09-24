@@ -310,14 +310,6 @@ CURRICULUM_REGULATIONS = {
     "per_programme": True,
     "sections": [
         {
-            "key": "credit_summary",
-            "title": "Section B — Credit classification",
-            "help": "Enter the credits your programme awards in each UGC category. "
-                    "The minimum column is fixed by UGC Table 2 and cannot be edited.",
-            "type": "credit_matrix",
-            "rules": ["ugc_table2_minimums", "ugc_total_credits", "ugc_research_or_lieu"],
-        },
-        {
             "key": "semester_structure",
             "title": "Section C — Semester-wise programme structure",
             "help": "One row per course, for every semester of the programme.",
@@ -358,6 +350,15 @@ CURRICULUM_REGULATIONS = {
                 "unique_course_codes",
                 "category_totals_match_summary",
             ],
+        },
+        {
+            "key": "credit_summary",
+            "title": "Section B — Credit classification",
+            "help": "Filled in from the courses above, category by category. Change a "
+                    "figure only if it should differ; the minimum column is fixed by UGC "
+                    "Table 2.",
+            "type": "credit_matrix",
+            "rules": ["ugc_table2_minimums", "ugc_total_credits", "ugc_research_or_lieu"],
         },
         {
             "key": "regulations",

@@ -2195,3 +2195,6 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .tot-met { font-size: .82rem; color: #9be3b4; font-weight: 600; }
 .tot-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .tot-chip { padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: .76rem; }
+
+/* "Open <programme name>": a name, so it keeps its own capitals */
+.btn-prog { text-transform: none; letter-spacing: 0; font-size: .92rem; line-height: 1.35; text-align: center; }
