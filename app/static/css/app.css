@@ -2257,3 +2257,93 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 @media (max-width: 900px) {
   .pl-cols { grid-template-columns: minmax(0, 1fr); gap: 34px; }
 }
+
+/* ======================================================================
+   Frames — the portal's panel style.
+   A box outlined in navy or orange with a solid offset shadow in the same
+   colour, a label tab breaking its top-left edge, and large faint numerals.
+   Programmes offered started it; the home page, the dashboard and the
+   programme cards use it too.
+   ====================================================================== */
+.frame {
+  --fc: var(--ink-800); --fc-soft: #aab4d6; --fc-wash: #eef1f9;
+  position: relative; background: var(--surface);
+  border: 2px solid var(--fc); border-radius: 18px;
+  box-shadow: 8px 8px 0 var(--fc);
+  padding: 40px 22px 20px; margin: 22px 8px 8px 0;
+}
+.frame-orange { --fc: #e8620f; --fc-soft: #f4b98c; --fc-wash: #fdf0e6; }
+.frame-tab {
+  position: absolute; top: -20px; left: -8px; z-index: 1; margin: 0;
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 9px 18px; background: var(--fc); color: #fff;
+  border-radius: 4px; font: 700 .98rem/1.2 var(--font); letter-spacing: 0; text-transform: none;
+  max-width: calc(100% - 8px);
+}
+.frame-tab-n {
+  min-width: 26px; padding: 2px 8px; border-radius: 999px; text-align: center;
+  background: rgba(255, 255, 255, .22); font-size: .76rem;
+}
+.frame-num {
+  font: 700 1.7rem/1 Georgia, "Times New Roman", serif; color: var(--fc-soft);
+  font-variant-numeric: tabular-nums;
+}
+.frame-flush { padding: 30px 0 0; margin-top: 52px; }
+/* the table's corners are rounded here, so the tab above can still overhang */
+.frame-flush > div { overflow: hidden; border-radius: 0 0 16px 16px; }
+.frame-flush table { margin: 0; }
+.frame-flush > div > p { border-top: 1px solid var(--line); }
+
+/* home: "What the portal does" */
+.frame-stories { margin-top: 42px; max-width: 560px; }
+.frame-stories .story-item { grid-template-columns: 52px 1fr; }
+.frame-stories .story-num {
+  width: auto; height: auto; background: none; border-radius: 0; place-items: start;
+}
+.frame-stories .story-kicker { color: #e8620f; }
+
+/* home: the navy sign-in panel, framed in orange */
+.hero-panel.frame-panel {
+  position: relative; margin: 22px 10px 10px 0; padding-top: 44px;
+  border: 2px solid #e8620f; border-radius: 18px; box-shadow: 10px 10px 0 #e8620f;
+  --fc: #e8620f;
+}
+
+/* home: the four credit facts */
+.fact-grid { gap: 30px; }
+.fact.frame { border-top: 2px solid var(--fc); padding-top: 40px; }
+.fact.frame .fact-n { color: var(--fc); }
+
+/* dashboard: stat tiles and one framed panel per stage group */
+.stat.frame { padding-top: 22px; border-radius: 14px; box-shadow: 6px 6px 0 var(--fc); margin: 0 6px 6px 0; }
+.stat.frame::before { display: none; }
+.stat.frame .n { color: var(--fc); }
+.stat.frame:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--fc); }
+.stage-frames { gap: 34px; }
+.stage-frame { padding: 34px 16px 12px; }
+.stage-frame-rows { display: flex; flex-direction: column; }
+.stage-frame .stage-row {
+  border: 0; border-bottom: 1px dashed var(--line); border-radius: 0;
+  background: none; padding: 16px 6px;
+}
+.stage-frame .stage-row:last-child { border-bottom: 0; }
+.stage-frame .stage-row:not(.locked):hover { box-shadow: none; transform: none; background: var(--fc-wash); }
+.stage-frame .stage-num.frame-num,
+.stage-frame .stage-row.open .stage-num, .stage-frame .stage-row.draft .stage-num,
+.stage-frame .stage-row.returned .stage-num, .stage-frame .stage-row.locked .stage-num {
+  width: 46px; height: auto; background: none; color: var(--fc-soft); place-items: start;
+}
+.stage-frame .stage-row.submitted .stage-num { background: none; color: var(--ok); }
+.stage-frame .stage-row.open .stage-num,
+.stage-frame .stage-row.draft .stage-num,
+.stage-frame .stage-row.returned .stage-num { color: var(--fc); }
+
+/* programme cards */
+.prog-frame.card { overflow: visible; border-radius: 18px; }
+.grid .prog-frame { margin-top: 26px; }
+.card + .card.prog-frame { margin-top: 26px; }
+
+@media (max-width: 640px) {
+  .frame { padding-left: 16px; padding-right: 16px; }
+  .frame-flush { padding: 30px 0 0; }
+}

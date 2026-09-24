@@ -19,7 +19,8 @@
 <div class="grid grid-2">
   {% for p in programmes %}
   {% set st = (submission.programmes.get(p.programme_code, {}).get(stage.key, {})) %}
-  <div class="card">
+  <div class="card frame frame-{{ 'navy' if loop.index is odd else 'orange' }} prog-frame">
+    <span class="frame-tab">{{ p.programme_code }}</span>
     <div class="card-head">
       <h3>{{ p.programme_name }}</h3>
       <span class="spacer">

@@ -56,32 +56,32 @@
         </h1>
         <p class="hero-lede">Thirteen stages. One form. Checked as you type.</p>
 
-        <div class="mt-3">
-          <div class="stories-head">What the portal does</div>
+        <div class="frame frame-navy frame-stories">
+          <h3 class="frame-tab">What the portal does</h3>
           <div class="story-list">
             <div class="story-item">
-              <span class="story-num">1</span>
+              <span class="story-num frame-num">01</span>
               <span>
                 <span class="story-kicker">In order</span>
                 <span class="story-line">Each stage opens when the last is submitted</span>
               </span>
             </div>
             <div class="story-item">
-              <span class="story-num">2</span>
+              <span class="story-num frame-num">02</span>
               <span>
                 <span class="story-kicker">Checked live</span>
                 <span class="story-line">Credit totals validated at the keystroke, not weeks later</span>
               </span>
             </div>
             <div class="story-item">
-              <span class="story-num">3</span>
+              <span class="story-num frame-num">03</span>
               <span>
                 <span class="story-kicker">Uploaded once</span>
                 <span class="story-line">The three signed composition documents, as files</span>
               </span>
             </div>
             <div class="story-item">
-              <span class="story-num">4</span>
+              <span class="story-num frame-num">04</span>
               <span>
                 <span class="story-kicker">One login</span>
                 <span class="story-line">Issued to the department, not to a person</span>
@@ -93,7 +93,8 @@
 
       {% if resume %}
       {# Already signed in: the thread you dropped, not a second sign-in. #}
-      <aside class="hero-panel hero-resume" id="signin">
+      <aside class="hero-panel hero-resume frame-panel" id="signin">
+        <span class="frame-tab">Signed in</span>
         <div class="resume-head">
           <span class="resume-kicker">Signed in · {{ resume.year }}</span>
           <h2 class="signin-title">{{ resume.dept.dept_name }}</h2>
@@ -146,7 +147,8 @@
       {# The Office of Academics, signed in: straight to the console. Guarded
          on the role, not merely on being signed in — a department must never
          be pointed at the admin console because a lookup came back empty. #}
-      <aside class="hero-panel hero-resume" id="signin">
+      <aside class="hero-panel hero-resume frame-panel" id="signin">
+        <span class="frame-tab">Signed in</span>
         <div class="resume-head">
           <span class="resume-kicker">Signed in</span>
           <h2 class="signin-title">{{ current_user.name }}</h2>
@@ -173,7 +175,8 @@
       {# Signed in, but with nothing to resume — a department whose record has
          been removed, say. Say so plainly rather than offering a sign-in they
          do not need. #}
-      <aside class="hero-panel hero-resume" id="signin">
+      <aside class="hero-panel hero-resume frame-panel" id="signin">
+        <span class="frame-tab">Signed in</span>
         <div class="resume-head">
           <span class="resume-kicker">Signed in</span>
           <h2 class="signin-title">{{ current_user.name }}</h2>
@@ -189,7 +192,8 @@
          here rather than one page further on. The form posts to the same
          endpoint as the standalone login page, which is where a wrong
          password lands, error and all. #}
-      <aside class="hero-panel hero-signin" id="signin">
+      <aside class="hero-panel hero-signin frame-panel" id="signin">
+        <span class="frame-tab">Department login</span>
         <h2 class="signin-title">Sign in</h2>
         <p class="signin-sub">Use the login issued to your department by the Office of Academics.</p>
 
@@ -279,27 +283,31 @@
     </div>
 
     <div class="fact-grid">
-      <article class="fact">
+      <article class="fact frame frame-navy">
+        <span class="frame-tab">3-year UG</span>
         <span class="fact-n">120</span>
         <p>credits, the floor for a <strong>three-year UG degree</strong>.</p>
       </article>
-      <article class="fact">
+      <article class="fact frame frame-orange">
+        <span class="frame-tab">4-year Honours</span>
         <span class="fact-n">160</span>
         <p>for a <strong>four-year Honours degree</strong>, in-lieu rule applied.</p>
       </article>
-      <article class="fact">
+      <article class="fact frame frame-navy">
+        <span class="frame-tab">Credits to marks</span>
         <span class="fact-n">1:25</span>
         <p>credits to marks. <strong>Checked against every course listed.</strong></p>
       </article>
-      <article class="fact">
+      <article class="fact frame frame-orange">
+        <span class="frame-tab">Mismatches</span>
         <span class="fact-n">0</span>
         <p>submissions accepted that do not reconcile. <strong>Refused on the spot.</strong></p>
       </article>
     </div>
 
-    <div class="card mt-3">
-      <div class="card-head"><h3>UGC Table 2 — minimum credits</h3></div>
-      <div class="card-body" style="padding:0">
+    <div class="frame frame-navy frame-flush mt-4">
+      <h3 class="frame-tab">UGC Table 2 — minimum credits</h3>
+      <div>
         <table class="credits">
           <thead>
             <tr><th scope="col">Category</th><th scope="col" class="num">3-year UG</th>

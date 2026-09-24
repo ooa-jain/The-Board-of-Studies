@@ -76,33 +76,42 @@
 {% endif %}
 
 <div class="grid grid-4 mb-2">
-  <div class="stat">
+  <div class="stat frame frame-navy">
     <div class="n">{{ progress.done }}</div><div class="l">Stages submitted</div>
     <div class="sub">of {{ progress.total }}</div>
   </div>
-  <div class="stat">
+  <div class="stat frame frame-orange">
     <div class="n">{{ board|selectattr('can_open')|list|length }}</div><div class="l">Open now</div>
     <div class="sub">ready to fill</div>
   </div>
-  <div class="stat">
+  <div class="stat frame frame-navy">
     <div class="n">{{ programmes|length }}</div><div class="l">Programmes</div>
     <div class="sub">{{ 'entered' if programmes else 'not yet entered' }}</div>
   </div>
-  <div class="stat">
+  <div class="stat frame frame-orange">
     <div class="n">{{ board|sum(attribute='errors') }}</div><div class="l">Open errors</div>
     <div class="sub">across all stages</div>
   </div>
 </div>
 
-{% set ns = namespace(group=None) %}
-<div class="stage-list">
+{# One framed panel per group, navy and orange in turn, the group's name on
+   the tab across its top edge. #}
+{% set ns = namespace(group=None, n=0) %}
+<div class="stage-list stage-frames">
   {% for s in board %}
     {% if s.group != ns.group %}
+      {% if ns.group is not none %}</div></section>{% endif %}
       {% set ns.group = s.group %}
-      <div class="group-label">{{ s.group }}</div>
+      {% set ns.n = ns.n + 1 %}
+      {% set in_group = board|selectattr('group', 'equalto', s.group)|list %}
+      <section class="frame frame-{{ 'navy' if ns.n % 2 else 'orange' }} stage-frame">
+        <h3 class="frame-tab">{{ s.group }}
+          <span class="frame-tab-n">{{ in_group|selectattr('status', 'equalto', 'submitted')|list|length }}/{{ in_group|length }}</span>
+        </h3>
+        <div class="stage-frame-rows">
     {% endif %}
     <div class="stage-row {{ s.status }}">
-      <span class="stage-num">{{ loop.index }}</span>
+      <span class="stage-num frame-num">{{ '%02d' % loop.index }}</span>
       <div class="stage-info">
         <strong>{{ s.title }}</strong>
         <span>{{ s.blurb }}</span>
@@ -135,5 +144,6 @@
       </div>
     </div>
   {% endfor %}
+  {% if ns.group is not none %}</div></section>{% endif %}
 </div>
 {% endblock %}
