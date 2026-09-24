@@ -235,8 +235,9 @@ PROGRAMME_INFORMATION = {
         {
             "key": "programmes",
             "title": "Programmes offered",
-            "help": "Section A — programme profile. Every programme entered here gets its own "
-                    "credit structure in the next stage.",
+            "help": "Section A — programme profile, with each programme's vision, mission "
+                    "and outcomes. Every programme here gets its own credit structure in the "
+                    "next stage.",
             "type": "table",
             "min_rows": 1,
             "programme_source": True,
@@ -265,28 +266,22 @@ PROGRAMME_INFORMATION = {
                 {"name": "regulation", "label": "Regulation / Framework", "type": "select", "required": True,
                  "options": ["NEP 2020", "CBCS", "Outcome Based Education", "Other"]},
                 {"name": "exit_options", "label": "Multiple exit options offered", "type": "checkbox"},
-            ],
-            "rules": ["programme_duration_semesters", "programme_unique_codes"],
-        },
-        {
-            "key": "vision",
-            "title": "Vision, Mission and Outcomes",
-            "help": "Follow the existing university vision/mission template. Do not paraphrase.",
-            "type": "fields",
-            "fields": [
-                {"name": "vision", "label": "Department vision", "type": "textarea", "required": True,
-                 "rows": 3, "min_words": 15},
-                {"name": "mission", "label": "Department mission", "type": "textarea", "required": True,
-                 "rows": 4, "min_words": 25},
-                {"name": "peos", "label": "Programme Educational Objectives (PEOs)", "type": "textarea",
-                 "required": True, "rows": 5, "min_items": 3,
+                # the second tab of each programme card
+                {"name": "vision", "label": "Vision", "type": "textarea", "required": True,
+                 "rows": 3, "min_words": 15, "tab": "outcomes"},
+                {"name": "mission", "label": "Mission", "type": "textarea", "required": True,
+                 "rows": 4, "min_words": 25, "tab": "outcomes"},
+                {"name": "peos", "label": "Programme Educational Objectives (PEOs)",
+                 "type": "textarea", "required": True, "rows": 5, "min_items": 3, "tab": "outcomes",
                  "help": "One objective per line. At least three."},
-                {"name": "pos", "label": "Programme Outcomes (POs)", "type": "textarea", "required": True,
-                 "rows": 6, "min_items": 5, "help": "One outcome per line. At least five."},
+                {"name": "pos", "label": "Programme Outcomes (POs)", "type": "textarea",
+                 "required": True, "rows": 6, "min_items": 5, "tab": "outcomes",
+                 "help": "One outcome per line. At least five."},
                 {"name": "psos", "label": "Programme Specific Outcomes (PSOs)", "type": "textarea",
-                 "required": True, "rows": 4, "min_items": 2,
+                 "required": True, "rows": 4, "min_items": 2, "tab": "outcomes",
                  "help": "One outcome per line. At least two."},
             ],
+            "rules": ["programme_duration_semesters", "programme_unique_codes"],
         },
     ],
 }

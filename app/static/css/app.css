@@ -2362,3 +2362,67 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .rc-add { margin-top: 0; }
 @media (max-width: 900px) { .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .rc-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Programme Information: the strip, one card, two tabs ---------- */
+.rc-strip {
+  padding: 12px 14px; margin-bottom: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.rc-strip-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rc-strip-count { font-size: .78rem; color: var(--ink-soft); font-weight: 600; }
+.rc-fill {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--gold-500); color: var(--ink-900); font: 700 .78rem var(--font);
+}
+.rc-fill:hover { background: var(--gold-400); }
+.rc-fill:disabled { background: var(--ok-bg); color: var(--ok); cursor: default; }
+.rc-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 172px; overflow-y: auto; }
+.rc-chip {
+  --cc: var(--ink-800);
+  display: inline-flex; align-items: center; gap: 7px; max-width: 330px;
+  padding: 5px 11px 5px 9px; cursor: pointer;
+  background: #fff; border: 1.5px solid var(--line); border-radius: 999px;
+  font: 500 .78rem var(--font); color: var(--ink);
+}
+.rc-chip.is-pg { --cc: #e8620f; }
+.rc-chip:hover { border-color: var(--cc); }
+.rc-chip[aria-selected=true] { background: var(--cc); border-color: var(--cc); color: #fff; }
+.rc-chip-code { font: 700 .72rem ui-monospace, SFMono-Regular, Menlo, monospace; flex: none; }
+.rc-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .85; }
+.rc-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; border: 1.5px solid currentColor; opacity: .7; }
+.rc-chip.is-part .rc-chip-dot { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.rc-chip.is-full .rc-chip-dot { background: var(--ok); border-color: var(--ok); opacity: 1; }
+.rc-chip[aria-selected=true].is-full .rc-chip-dot { background: #9be3b4; border-color: #9be3b4; }
+.rc-chip-add { border-style: dashed; color: var(--ink-700); font-weight: 700; }
+.rc-chip:focus-visible { outline: 2px solid var(--ink-600); outline-offset: 2px; }
+.rc-note { margin: 0 0 4px; min-height: 0; font-size: .82rem; color: var(--ok); font-weight: 600; }
+.rc-note:empty { display: none; }
+
+.rc-card { margin-top: 26px; padding: 34px 20px 16px; }
+.rc-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.rc-head .rc-title { flex: 1; margin: 0; font-size: .98rem; }
+.rc-delete {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px 5px 9px; border: 1.5px solid #e7b9b2; border-radius: 999px;
+  background: #fff; color: var(--err); cursor: pointer; font: 700 .76rem var(--font);
+}
+.rc-delete:hover { background: var(--err); border-color: var(--err); color: #fff; }
+.rc-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.rc-tab {
+  padding: 8px 12px; margin-bottom: -1px; border: 0; border-bottom: 2.5px solid transparent;
+  background: none; cursor: pointer; font: 600 .82rem var(--font); color: var(--ink-soft);
+}
+.rc-tab[aria-selected=true] { color: var(--fc); border-bottom-color: var(--fc); }
+.rc-tab:focus-visible { outline: 2px solid var(--ink-600); outline-offset: -2px; }
+.rc-copy {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 10px; margin-bottom: 12px; background: var(--fc-wash); border-radius: var(--radius-sm);
+}
+.rc-copy-label { font-size: .78rem; font-weight: 600; color: var(--ink-700); }
+.rc-copy-pick { width: auto; flex: 1 1 200px; max-width: 340px; padding: 6px 30px 6px 10px; font-size: .8rem; }
+.rc-card .field { margin-bottom: 12px; }
+.rc-card .field label { font-size: .78rem; margin-bottom: 4px; }
+.rc-card input[type=text], .rc-card select, .rc-card textarea { padding: 8px 11px; font-size: .86rem; }
+.rc-card .field .help { font-size: .72rem; margin-top: 4px; }
+.rc-nav { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }

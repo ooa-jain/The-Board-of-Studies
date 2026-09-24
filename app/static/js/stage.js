@@ -765,10 +765,12 @@
   }
 
   // ------------------------------------------------------------ row cards
-  /* A repeating section shown as one framed card per row — navy for UG,
-     orange for PG — with the fields laid out as a form rather than a table
-     that scrolls sideways. Programme Information uses it, with a button
-     that brings in every programme the department offers in one go. */
+  /* Programme Information, one programme at a time. Every programme sits
+     in a strip of chips at the top — code, name and how complete it is —
+     and the one clicked opens below in a framed card (navy for UG, orange
+     for PG) with two tabs: its details, and its vision, mission and
+     outcomes. Outcomes can be copied from another programme or handed to
+     all of them at once. */
 
   function renderRowCards(section, host) {
     const synced = !!(section.synced_from && CTX.synced);
@@ -777,8 +779,28 @@
     const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
     const data = rows(section.key);
     const cols = section.columns.filter(c => !c.auto_index);
-    const isBlank = r => cols.every(c => num(r[c.name]) === null &&
-                                         String(r[c.name] ?? "").trim() === "");
+    const TABS = [
+      { key: "details", label: "Programme details" },
+      { key: "outcomes", label: "Vision, mission & outcomes" },
+    ];
+    const tabOf = c => c.tab || "details";
+    const OUT = cols.filter(c => tabOf(c) === "outcomes");
+    const blank = v => v === undefined || v === null || String(v).trim() === "";
+    const isBlankRow = r => cols.every(c => blank(r[c.name]) || c.type === "checkbox");
+    const hasOutcomes = r => OUT.some(c => !blank(r[c.name]));
+    let sel = 0;
+    let tab = "details";
+
+    // Vision and mission used to be one block for the whole department. A
+    // draft that still has it hands it to every programme that has none.
+    if (state.vision && typeof state.vision === "object" && !CTX.readonly) {
+      data.forEach(r => OUT.forEach(c => {
+        if (blank(r[c.name]) && !blank(state.vision[c.name])) r[c.name] = state.vision[c.name];
+      }));
+    }
+
+    const wrap = el("div", "rc-wrap");
+    host.appendChild(wrap);
 
     if (synced) {
       const note = el("div", "sync-note");
@@ -788,47 +810,46 @@
       a.href = CTX.urls.dept_info;
       note.appendChild(a);
       note.appendChild(el("span", null, "."));
-      host.appendChild(note);
+      wrap.appendChild(note);
     }
 
-    const bar = el("div", "rc-bar");
-    const fillNote = el("span", "rc-note");
-    fillNote.setAttribute("role", "status");
+    // --- the strip of every programme
+    const strip = el("div", "rc-strip");
+    const stripHead = el("div", "rc-strip-head");
+    const stripCount = el("span", "rc-strip-count");
+    stripHead.appendChild(stripCount);
     let fillBtn = null;
     if (!CTX.readonly && !synced && (CTX.fill || []).length) {
-      fillBtn = el("button", "btn btn-gold rc-fill");
+      fillBtn = el("button", "rc-fill");
       fillBtn.type = "button";
       fillBtn.addEventListener("click", fillAll);
-      bar.appendChild(fillBtn);
+      stripHead.appendChild(fillBtn);
     }
-    bar.appendChild(fillNote);
-    if (bar.childNodes.length > 1 || fillBtn) host.appendChild(bar);
+    strip.appendChild(stripHead);
+    const chips = el("div", "rc-chips");
+    chips.setAttribute("role", "tablist");
+    chips.setAttribute("aria-label", "Programmes");
+    strip.appendChild(chips);
+    wrap.appendChild(strip);
 
-    const list = el("div", "rc-list");
-    host.appendChild(list);
+    const note = el("p", "rc-note");
+    note.setAttribute("role", "status");
+    wrap.appendChild(note);
 
-    const foot = el("div", "rt-foot");
-    const count = el("span", "rt-count");
-    const rowNote = el("span", "rt-note");
-    rowNote.setAttribute("role", "status");
-    if (!synced && !CTX.readonly) {
-      const add = el("button", "pl-panel-add rc-add");
-      add.type = "button";
-      add.innerHTML = ICON.plus;
-      add.appendChild(el("span", null, "Add another programme"));
-      add.addEventListener("click", () => {
-        data.push({});
-        draw();
-        touch();
-        list.lastElementChild?.querySelector("input, select")?.focus();
-      });
-      foot.appendChild(add);
-    }
-    foot.appendChild(count);
-    foot.appendChild(rowNote);
-    host.appendChild(foot);
+    const stage = el("div", "rc-stage");
+    wrap.appendChild(stage);
 
     while (data.length < (section.min_rows || 0)) data.push({});
+
+    wrap.showRow = (i, field) => {
+      if (!data[i]) return;
+      sel = i;
+      const c = cols.find(x => x.name === field);
+      if (c) tab = tabOf(c);
+      draw();
+    };
+
+    function say(text) { note.textContent = text; }
 
     function missing() {
       const have = new Set(data.map(r => String(r.programme_code || "").trim().toUpperCase()));
@@ -838,111 +859,284 @@
     function fillAll() {
       const add = missing();
       if (!add.length) return;
-      // an untouched blank card is replaced rather than left at the top
-      for (let k = data.length - 1; k >= 0; k--) if (isBlank(data[k])) data.splice(k, 1);
+      for (let k = data.length - 1; k >= 0; k--) if (isBlankRow(data[k])) data.splice(k, 1);
+      const first = data.length;
       add.forEach(p => data.push(Object.assign({}, p)));
+      sel = first;
+      tab = "details";
       draw();
       touch();
-      fillNote.textContent = `Added ${add.length} programme${add.length === 1 ? "" : "s"}. ` +
-        "Fill in the rest of each card below.";
+      say(`Added ${add.length} programme${add.length === 1 ? "" : "s"}. Click each one to fill it in.`);
     }
 
-    function draw() {
-      list.textContent = "";
-      data.forEach((row, i) => {
-        const pg = /^PG/.test(row.degree_level || "");
-        const card = el("div", `frame frame-${pg ? "orange" : "navy"} rc-card`);
-        card.dataset.row = i;
-        const tab = el("span", "frame-tab");
-        const title = el("div", "rc-title");
-        const paint = () => {
-          const isPg = /^PG/.test(row.degree_level || "");
-          card.classList.toggle("frame-orange", isPg);
-          card.classList.toggle("frame-navy", !isPg);
-          tab.textContent = `${String(i + 1).padStart(2, "0")} · ` +
-                            (row.programme_code || "New programme");
-          title.textContent = row.programme_name || "Programme name not given yet";
-          title.classList.toggle("is-empty", !row.programme_name);
-        };
-        card.appendChild(tab);
-        card.appendChild(title);
+    // The part of a name that tells programmes apart: most share their first
+    // words ("Bachelor of Technology (Computer Science and Engineering) with
+    // specialisation in …"), so a chip shows what follows the last "in".
+    function shortName(n) {
+      let t = String(n || "").replace(/\s+/g, " ").trim();
+      const spec = t.match(/speciali[sz]ation in\s+(.+)$/i);
+      if (spec) return spec[1];
+      // drop the degree ("Bachelor of Technology", "Master of Commerce (Honours …)")
+      t = t.replace(/^(Bachelor|Master|Doctor|Post ?Graduate Diploma|PG Diploma|Diploma)\s+of\s+[A-Za-z ]+?(?=\s*\(|\s+in\s|$)/i, "")
+           .replace(/\(Honours[^)]*\)/i, "")
+           .replace(/^\s*in\s+/i, "")
+           .replace(/[()<>]/g, " ").replace(/\s+/g, " ").trim();
+      return t || String(n || "");
+    }
 
-        const grid = el("div", "fields-grid rc-grid");
-        const cells = {};
-        section.columns.forEach(c => {
-          if (c.auto_index) { row[c.name] = i + 1; return; }
-          const holder = el("div", "field" + (c.name === "programme_name" ? " wide" : ""));
-          holder.dataset.field = c.name;
-          const id = `rc-${section.key}-${i}-${c.name}`;
-          if (c.type === "checkbox") {
-            const lab = el("label", "check");
-            const input = makeInput(c, row[c.name], v => { row[c.name] = v; touch(); });
-            input.id = id;
-            lab.appendChild(input);
-            lab.appendChild(el("span", null, c.label));
-            holder.appendChild(lab);
-            grid.appendChild(holder);
-            return;
-          }
-          const lab = el("label", null, c.label);
-          lab.setAttribute("for", id);
-          if (c.required) {
-            const star = el("span", "req", "*");
-            star.setAttribute("aria-hidden", "true");
-            lab.appendChild(star);
-          }
-          holder.appendChild(lab);
-          const input = makeInput(c, row[c.name], v => {
-            row[c.name] = v;
-            if (DERIVED[c.name]) markManual(row, c.name, cells);
-            derive(RULES, row, cells);
-            if (["programme_code", "programme_name", "degree_level"].includes(c.name)) paint();
-            touch();
-          });
-          input.id = id;
-          if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) input.readOnly = true;
-          cells[c.name] = input;
-          holder.appendChild(input);
-          if (c.help) holder.appendChild(el("span", "help", c.help));
-          if (DERIVED[c.name]) {
-            if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
-            hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, paint));
-          }
-          attachLiveCheck(input, c, holder);
-          grid.appendChild(holder);
-        });
-        card.appendChild(grid);
+    function completeness(r) {
+      const req = cols.filter(c => c.required);
+      const done = req.filter(c => !blank(r[c.name])).length;
+      return done === req.length ? "full" : done ? "part" : "none";
+    }
 
-        if (!synced && !CTX.readonly) {
-          const del = iconButton("pl-icon pl-minus rc-del", "minus", `Remove programme ${i + 1}`);
-          del.addEventListener("click", () => {
-            if (data.length <= (section.min_rows || 0)) {
-              rowNote.textContent = `Keep at least ${section.min_rows} programme` +
-                                    `${section.min_rows === 1 ? "" : "s"}.`;
-              return;
-            }
-            data.splice(i, 1);
-            rowNote.textContent = "";
-            draw();
-            touch();
-          });
-          card.appendChild(del);
-        }
-        paint();
-        list.appendChild(card);
-        if (!CTX.readonly && derive(RULES, row, cells)) touch();
+    function drawStrip() {
+      chips.textContent = "";
+      data.forEach((r, i) => {
+        const b = el("button", `rc-chip is-${completeness(r)}` +
+                               (/^PG/.test(r.degree_level || "") ? " is-pg" : ""));
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-selected", i === sel ? "true" : "false");
+        b.appendChild(el("span", "rc-chip-dot"));
+        b.appendChild(el("span", "rc-chip-code", r.programme_code || `#${i + 1}`));
+        b.appendChild(el("span", "rc-chip-name", shortName(r.programme_name) || "New programme"));
+        b.title = `${r.programme_code || "No code yet"} — ${r.programme_name || "no name yet"}`;
+        b.addEventListener("click", () => { sel = i; draw(); });
+        chips.appendChild(b);
       });
-
-      const min = section.min_rows || 0;
-      count.textContent = `${data.length} programme${data.length === 1 ? "" : "s"}` +
-                          (min ? ` · minimum ${min}` : "");
+      if (!synced && !CTX.readonly) {
+        const add = el("button", "rc-chip rc-chip-add");
+        add.type = "button";
+        add.innerHTML = ICON.plus;
+        add.appendChild(el("span", null, "Add programme"));
+        add.addEventListener("click", () => {
+          data.push({});
+          sel = data.length - 1;
+          tab = "details";
+          draw();
+          touch();
+          stage.querySelector("input:not([readonly]), select")?.focus();
+        });
+        chips.appendChild(add);
+      }
+      const full = data.filter(r => completeness(r) === "full").length;
+      stripCount.textContent = `${data.length} programme${data.length === 1 ? "" : "s"} · ` +
+                               `${full} complete`;
       if (fillBtn) {
         const left = missing().length;
         fillBtn.disabled = !left;
-        fillBtn.textContent = left
-          ? `Fill in all programmes (${left} to add)`
-          : `All ${(CTX.fill || []).length} programmes are in`;
+        fillBtn.innerHTML = left ? ICON.plus : "";
+        fillBtn.appendChild(el("span", null,
+          left ? `Fill in all programmes (${left})` : `All ${(CTX.fill || []).length} programmes are in`));
       }
+    }
+
+    function field(row, c, cells, repaint) {
+      const holder = el("div", "field" +
+        (c.name === "programme_name" || c.type === "textarea" ? " wide" : ""));
+      holder.dataset.field = c.name;
+      const id = `rc-${section.key}-${c.name}`;
+      if (c.type === "checkbox") {
+        const lab = el("label", "check");
+        const input = makeInput(c, row[c.name], v => { row[c.name] = v; touch(); });
+        input.id = id;
+        lab.appendChild(input);
+        lab.appendChild(el("span", null, c.label));
+        holder.appendChild(lab);
+        return holder;
+      }
+      const lab = el("label", null, c.label);
+      lab.setAttribute("for", id);
+      if (c.required) {
+        const star = el("span", "req", "*");
+        star.setAttribute("aria-hidden", "true");
+        lab.appendChild(star);
+      }
+      holder.appendChild(lab);
+      const input = makeInput(c, row[c.name], v => {
+        row[c.name] = v;
+        if (DERIVED[c.name]) markManual(row, c.name, cells);
+        derive(RULES, row, cells);
+        repaint(c.name);
+        touch();
+      });
+      input.id = id;
+      if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) input.readOnly = true;
+      cells[c.name] = input;
+      holder.appendChild(input);
+      if (c.help) holder.appendChild(el("span", "help", c.help));
+      if (DERIVED[c.name]) {
+        if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
+        hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES,
+                                          () => repaint(c.name)));
+      }
+      attachLiveCheck(input, c, holder);
+      return holder;
+    }
+
+    // outcomes: take them from another programme, or give these to all
+    function outcomeTools(row, i) {
+      if (data.length < 2) return null;
+      const box = el("div", "rc-copy");
+      box.appendChild(el("span", "rc-copy-label", "Same as another programme?"));
+      const pick = el("select", "rc-copy-pick");
+      pick.setAttribute("aria-label", "Programme to copy from");
+      // listed fresh each time, since any programme may have gained some
+      const refill = () => {
+        const keep = pick.value;
+        pick.textContent = "";
+        const others = data.map((r, k) => [r, k]).filter(([r, k]) => k !== i && hasOutcomes(r));
+        if (!others.length) pick.appendChild(new Option("No other programme has any yet", ""));
+        others.forEach(([r, k]) => pick.appendChild(
+          new Option(`${r.programme_code || "#" + (k + 1)} — ${r.programme_name || ""}`, k)));
+        if ([...pick.options].some(o => o.value === keep)) pick.value = keep;
+      };
+      refill();
+      pick.addEventListener("focus", refill);
+      pick.addEventListener("mousedown", refill);
+      const go = el("button", "btn btn-ghost btn-sm", "Copy");
+      go.type = "button";
+      go.addEventListener("click", () => {
+        refill();
+        if (pick.value === "") { say("No other programme has a vision or mission to copy yet."); return; }
+        const src = data[+pick.value];
+        if (hasOutcomes(row) &&
+            !window.confirm("Replace this programme's vision, mission and outcomes?")) return;
+        OUT.forEach(c => { row[c.name] = src[c.name] ?? ""; });
+        draw();
+        touch();
+        say(`Copied from ${src.programme_code || "the other programme"}. Change anything that differs.`);
+      });
+      const all = el("button", "btn btn-ghost btn-sm", "Use for all programmes");
+      all.type = "button";
+      all.title = "Copy these to every programme that has none of its own yet";
+      all.addEventListener("click", () => {
+        if (!hasOutcomes(row)) { say("Fill in this programme's vision and mission first."); return; }
+        let given = 0, kept = 0;
+        data.forEach((r, k) => {
+          if (k === i) return;
+          if (hasOutcomes(r)) { kept++; return; }
+          OUT.forEach(c => { r[c.name] = row[c.name] ?? ""; });
+          given++;
+        });
+        drawStrip();
+        touch();
+        say(`Copied to ${given} programme${given === 1 ? "" : "s"}` +
+            (kept ? `; ${kept} already had their own and were left as they were.` : "."));
+      });
+      box.appendChild(pick);
+      box.appendChild(go);
+      box.appendChild(all);
+      return box;
+    }
+
+    function drawCard() {
+      stage.textContent = "";
+      if (!data.length) {
+        stage.appendChild(el("p", "pl-empty",
+          "No programmes yet. Use “Fill in all programmes” or “Add programme” above."));
+        return;
+      }
+      sel = Math.min(sel, data.length - 1);
+      const i = sel;
+      const row = data[i];
+      const pg = /^PG/.test(row.degree_level || "");
+      const card = el("div", `frame frame-${pg ? "orange" : "navy"} rc-card`);
+      card.dataset.row = i;
+      const tabLabel = el("span", "frame-tab");
+      const title = el("div", "rc-title");
+      const repaint = name => {
+        const isPg = /^PG/.test(row.degree_level || "");
+        card.classList.toggle("frame-orange", isPg);
+        card.classList.toggle("frame-navy", !isPg);
+        tabLabel.textContent = `${String(i + 1).padStart(2, "0")} · ` +
+                               (row.programme_code || "New programme");
+        title.textContent = row.programme_name || "Programme name not given yet";
+        title.classList.toggle("is-empty", !row.programme_name);
+        if (!name || ["programme_code", "programme_name", "degree_level"].includes(name) ||
+            cols.some(c => c.name === name && c.required)) drawStrip();
+      };
+      card.appendChild(tabLabel);
+
+      const head = el("div", "rc-head");
+      head.appendChild(title);
+      if (!synced && !CTX.readonly) {
+        const del = el("button", "rc-delete");
+        del.type = "button";
+        del.innerHTML = ICON.minus;
+        del.appendChild(el("span", null, "Delete"));
+        del.setAttribute("aria-label", `Delete programme ${row.programme_code || i + 1}`);
+        del.addEventListener("click", () => {
+          if (data.length <= (section.min_rows || 0)) {
+            say(`Keep at least ${section.min_rows} programme${section.min_rows === 1 ? "" : "s"}.`);
+            return;
+          }
+          if (!isBlankRow(row) &&
+              !window.confirm(`Delete ${row.programme_code || "this programme"} and everything ` +
+                              "filled in for it?")) return;
+          data.splice(i, 1);
+          sel = Math.max(0, i - 1);
+          draw();
+          touch();
+          say("Programme deleted.");
+        });
+        head.appendChild(del);
+      }
+      card.appendChild(head);
+
+      const tabs = el("div", "rc-tabs");
+      tabs.setAttribute("role", "tablist");
+      TABS.forEach(t => {
+        const b = el("button", "rc-tab", t.label);
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-selected", t.key === tab ? "true" : "false");
+        b.addEventListener("click", () => { tab = t.key; drawCard(); });
+        tabs.appendChild(b);
+      });
+      card.appendChild(tabs);
+
+      if (tab === "outcomes" && !CTX.readonly) {
+        const tools = outcomeTools(row, i);
+        if (tools) card.appendChild(tools);
+      }
+
+      const grid = el("div", "fields-grid rc-grid" + (tab === "outcomes" ? " is-outcomes" : ""));
+      const cells = {};
+      cols.filter(c => tabOf(c) === tab).forEach(c => grid.appendChild(field(row, c, cells, repaint)));
+      section.columns.forEach(c => { if (c.auto_index) row[c.name] = i + 1; });
+      card.appendChild(grid);
+
+      // prev / next, so a long list can be walked without scrolling up
+      const nav = el("div", "rc-nav");
+      if (i > 0) {
+        const prev = el("button", "btn btn-ghost btn-sm", "← Previous");
+        prev.type = "button";
+        prev.addEventListener("click", () => { sel = i - 1; draw(); });
+        nav.appendChild(prev);
+      }
+      if (tab === "details") {
+        const on = el("button", "btn btn-sm", "Vision, mission & outcomes →");
+        on.type = "button";
+        on.addEventListener("click", () => { tab = "outcomes"; drawCard(); });
+        nav.appendChild(on);
+      } else if (i < data.length - 1) {
+        const next = el("button", "btn btn-sm", "Next programme →");
+        next.type = "button";
+        next.addEventListener("click", () => { sel = i + 1; tab = "details"; draw(); });
+        nav.appendChild(next);
+      }
+      card.appendChild(nav);
+
+      stage.appendChild(card);
+      repaint();
+      if (!CTX.readonly && derive(RULES, row, cells)) touch();
+    }
+
+    function draw() {
+      drawStrip();
+      drawCard();
     }
     draw();
   }
@@ -1680,12 +1874,15 @@
     // a field behind the cards has to be brought out before it can be fixed
     const behind = target.closest ? target.closest(".bento-form") : null;
     if (behind && behind.hidden && behind.openForm) behind.openForm(iss.field);
-    // a programme in the tab that is not showing
-    const plWrap = document.querySelector(`#sec-${iss.section} .pl-wrap`);
-    if (plWrap && iss.row !== null && iss.row !== undefined &&
-        !plWrap.querySelector(`[data-row="${iss.row}"]`)) {
-      plWrap.showRow(iss.row);
-      if (plWrap.querySelector(`[data-row="${iss.row}"]`)) return focusIssue(iss);
+    // a programme that is not the one on screen (or a row in the other panel)
+    const plWrap = document.querySelector(`#sec-${iss.section} .pl-wrap, ` +
+                                          `#sec-${iss.section} .rc-wrap`);
+    if (plWrap && !iss._shown && iss.row !== null && iss.row !== undefined) {
+      const want = `[data-row="${iss.row}"]` + (iss.field ? ` [data-field="${iss.field}"]` : "");
+      if (!plWrap.querySelector(want)) {
+        plWrap.showRow(iss.row, iss.field);
+        return focusIssue(Object.assign({}, iss, { _shown: true }));
+      }
     }
     target.scrollIntoView({ behavior: "smooth", block: "center" });
     const input = target.querySelector("input, select, textarea");
