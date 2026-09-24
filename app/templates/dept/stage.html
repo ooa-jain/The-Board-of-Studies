@@ -18,6 +18,13 @@
         Replaces: {{ stage.source_templates|join(' · ') }}
       </p>
       {% endif %}
+      {% if stage.samples %}
+      <p class="small sample-links">
+        {% for d in stage.samples %}
+        <a href="{{ url_for('static', filename=d.file) }}" download>{{ d.label }}</a>
+        {% endfor %}
+      </p>
+      {% endif %}
     </div>
     <div class="spacer head-aside">
       {% if status == 'submitted' %}<span class="pill pill-ok">Submitted — read only</span>
@@ -185,7 +192,8 @@
       submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
       upload:   {{ url_for('dept.api_upload')|tojson }},
       dashboard:{{ url_for('dept.dashboard')|tojson }},
-      dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }}
+      dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }},
+      stage:    {{ url_for('dept.stage', stage_key='__stage__')|tojson }}
     }
   };
 </script>

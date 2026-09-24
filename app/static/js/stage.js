@@ -486,23 +486,22 @@
         empty: "Fill L, T, P and E and the credits fill themselves.",
       });
     }
-    if (has("total_marks") && has("credits")) {
+    if (has("total_marks") && has("cia") && has("ese")) {
       out.push({
-        field: "total_marks", title: "Total marks from credits",
-        calc: r => num(r.credits) === null ? null : num(r.credits) * C.marks_per_credit,
-        explain: r => [`${r.credits ?? "–"} credits × ${C.marks_per_credit} marks per credit`],
-        empty: "Enter the credits and the total fills itself.",
+        field: "total_marks", title: "Total marks",
+        calc: r => num(r.cia) === null || num(r.ese) === null ? null : num(r.cia) + num(r.ese),
+        explain: r => [`Continuous Assessment ${r.cia ?? "–"} + Term End ${r.ese ?? "–"}`],
+        empty: "Enter both marks and the total fills itself.",
       });
     }
-    if (has("ese") && has("cia") && has("total_marks")) {
+    if (has("total_credits") && has("degree_level")) {
+      const totals = C.degree_totals || {};
       out.push({
-        field: "ese", title: "End-semester marks",
-        calc: r => {
-          const t = num(r.total_marks), c = num(r.cia);
-          return t === null || c === null || c > t ? null : t - c;
-        },
-        explain: r => [`Total ${r.total_marks ?? "–"} − CIA ${r.cia ?? "–"}`],
-        empty: "Enter the CIA marks and the rest of the total fills in here.",
+        field: "total_credits", title: "Credits from UGC Table 2",
+        calc: r => totals[r.degree_level] ?? null,
+        explain: r => [`UGC Table 2 asks for at least ${totals[r.degree_level]} credits ` +
+                       `for “${r.degree_level}”.`],
+        empty: "Choose a UG degree and the UGC minimum fills in; enter a PG programme's own total.",
       });
     }
     return out;
@@ -564,6 +563,7 @@
     const sum = name => data.reduce((a, r) => a + (num(r[name]) || 0), 0);
 
     if (section.key === "semester_structure") {
+      data = data.filter(rowCounts);
       const bySem = {};
       data.forEach(r => {
         const sem = num(r.semester);
@@ -779,17 +779,19 @@
     const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
     const data = rows(section.key);
     const cols = section.columns.filter(c => !c.auto_index);
-    const TABS = [
-      { key: "details", label: "Programme details" },
-      { key: "outcomes", label: "Vision, mission & outcomes" },
-    ];
-    const tabOf = c => c.tab || "details";
+    // what a card is: a programme by default, or whatever the section says
+    const CARD = Object.assign({ code: "programme_code", name: "programme_name",
+                                 noun: "programme" }, section.card || {});
+    const K = CARD.code, N = CARD.name, NOUN = CARD.noun;
+    const TABS = section.tabs || [{ key: "details", label: "Details" }];
+    const tabOf = c => c.tab || TABS[0].key;
     const OUT = cols.filter(c => tabOf(c) === "outcomes");
+    const colourOf = r => /^PG/.test(r.degree_level || "") ? "orange" : "navy";
     const blank = v => v === undefined || v === null || String(v).trim() === "";
     const isBlankRow = r => cols.every(c => blank(r[c.name]) || c.type === "checkbox");
     const hasOutcomes = r => OUT.some(c => !blank(r[c.name]));
     let sel = 0;
-    let tab = "details";
+    let tab = (section.tabs || [{ key: "details" }])[0].key;
 
     // Vision and mission used to be one block for the whole department. A
     // draft that still has it hands it to every programme that has none.
@@ -852,8 +854,8 @@
     function say(text) { note.textContent = text; }
 
     function missing() {
-      const have = new Set(data.map(r => String(r.programme_code || "").trim().toUpperCase()));
-      return (CTX.fill || []).filter(p => !have.has(p.programme_code.toUpperCase()));
+      const have = new Set(data.map(r => String(r[K] || "").trim().toUpperCase()));
+      return (CTX.fill || []).filter(p => !have.has(String(p[K]).toUpperCase()));
     }
 
     function fillAll() {
@@ -863,10 +865,10 @@
       const first = data.length;
       add.forEach(p => data.push(Object.assign({}, p)));
       sel = first;
-      tab = "details";
+      tab = TABS[0].key;
       draw();
       touch();
-      say(`Added ${add.length} programme${add.length === 1 ? "" : "s"}. Click each one to fill it in.`);
+      say(`Added ${add.length} ${NOUN}${add.length === 1 ? "" : "s"}. Click each one to fill it in.`);
     }
 
     // The part of a name that tells programmes apart: most share their first
@@ -887,17 +889,17 @@
     function removeAt(i) {
       const r = data[i];
       if (data.length <= (section.min_rows || 0)) {
-        say(`Keep at least ${section.min_rows} programme${section.min_rows === 1 ? "" : "s"}.`);
+        say(`Keep at least ${section.min_rows} ${NOUN}${section.min_rows === 1 ? "" : "s"}.`);
         return;
       }
       if (!isBlankRow(r) &&
-          !window.confirm(`Remove ${r.programme_code || "this programme"} and everything ` +
+          !window.confirm(`Remove ${r[K] || "this " + NOUN} and everything ` +
                           "filled in for it?")) return;
       data.splice(i, 1);
       if (sel > i || sel >= data.length) sel = Math.max(0, sel - 1);
       draw();
       touch();
-      say(`${r.programme_code || "Programme"} removed.`);
+      say(`${r[K] || "The " + NOUN} removed.`);
       chips.querySelector(".rc-chip.is-sel .rc-chip-open")?.focus();
     }
 
@@ -911,23 +913,24 @@
       chips.textContent = "";
       data.forEach((r, i) => {
         const chip = el("span", `rc-chip is-${completeness(r)}` +
-                                (/^PG/.test(r.degree_level || "") ? " is-pg" : "") +
+                                (colourOf(r) === "orange" ? " is-pg" : "") +
                                 (i === sel ? " is-sel" : ""));
         const b = el("button", "rc-chip-open");
         b.type = "button";
         b.setAttribute("role", "tab");
         b.setAttribute("aria-selected", i === sel ? "true" : "false");
         b.appendChild(el("span", "rc-chip-dot"));
-        b.appendChild(el("span", "rc-chip-code", r.programme_code || `#${i + 1}`));
-        b.appendChild(el("span", "rc-chip-name", shortName(r.programme_name) || "New programme"));
-        b.title = `${r.programme_code || "No code yet"} — ${r.programme_name || "no name yet"}`;
+        b.appendChild(el("span", "rc-chip-code", r[K] || `#${i + 1}`));
+        b.appendChild(el("span", "rc-chip-name",
+          (NOUN === "programme" ? shortName(r[N]) : r[N]) || `New ${NOUN}`));
+        b.title = `${r[K] || "No code yet"} — ${r[N] || "no name yet"}`;
         b.addEventListener("click", () => { sel = i; draw(); });
         chip.appendChild(b);
         if (!synced && !CTX.readonly) {
           const x = el("button", "rc-chip-x", "×");
           x.type = "button";
-          x.title = `Remove ${r.programme_code || "this programme"}`;
-          x.setAttribute("aria-label", `Remove ${r.programme_code || "programme " + (i + 1)}`);
+          x.title = `Remove ${r[K] || "this " + NOUN}`;
+          x.setAttribute("aria-label", `Remove ${r[K] || NOUN + " " + (i + 1)}`);
           x.addEventListener("click", () => removeAt(i));
           chip.appendChild(x);
         }
@@ -937,11 +940,11 @@
         const add = el("button", "rc-chip rc-chip-add");
         add.type = "button";
         add.innerHTML = ICON.plus;
-        add.appendChild(el("span", null, "Add programme"));
+        add.appendChild(el("span", null, `Add ${NOUN}`));
         add.addEventListener("click", () => {
           data.push({});
           sel = data.length - 1;
-          tab = "details";
+          tab = TABS[0].key;
           draw();
           touch();
           stage.querySelector("input:not([readonly]), select")?.focus();
@@ -949,20 +952,20 @@
         chips.appendChild(add);
       }
       const full = data.filter(r => completeness(r) === "full").length;
-      stripCount.textContent = `${data.length} programme${data.length === 1 ? "" : "s"} · ` +
+      stripCount.textContent = `${data.length} ${NOUN}${data.length === 1 ? "" : "s"} · ` +
                                `${full} complete`;
       if (fillBtn) {
         const left = missing().length;
         fillBtn.disabled = !left;
         fillBtn.innerHTML = left ? ICON.plus : "";
         fillBtn.appendChild(el("span", null,
-          left ? `Fill in all programmes (${left})` : `All ${(CTX.fill || []).length} programmes are in`));
+          left ? `Fill in all ${NOUN}s (${left})` : `All ${(CTX.fill || []).length} ${NOUN}s are in`));
       }
     }
 
     function field(row, c, cells, repaint) {
       const holder = el("div", "field" +
-        (c.name === "programme_name" || c.type === "textarea" ? " wide" : ""));
+        (c.name === N || c.type === "textarea" ? " wide" : ""));
       holder.dataset.field = c.name;
       const id = `rc-${section.key}-${c.name}`;
       if (c.type === "checkbox") {
@@ -1063,26 +1066,24 @@
       stage.textContent = "";
       if (!data.length) {
         stage.appendChild(el("p", "pl-empty",
-          "No programmes yet. Use “Fill in all programmes” or “Add programme” above."));
+          `No ${NOUN}s yet. Use “Fill in all ${NOUN}s” or “Add ${NOUN}” above.`));
         return;
       }
       sel = Math.min(sel, data.length - 1);
       const i = sel;
       const row = data[i];
-      const pg = /^PG/.test(row.degree_level || "");
-      const card = el("div", `frame frame-${pg ? "orange" : "navy"} rc-card`);
+      const card = el("div", `frame frame-${colourOf(row)} rc-card`);
       card.dataset.row = i;
       const tabLabel = el("span", "frame-tab");
       const title = el("div", "rc-title");
       const repaint = name => {
-        const isPg = /^PG/.test(row.degree_level || "");
-        card.classList.toggle("frame-orange", isPg);
-        card.classList.toggle("frame-navy", !isPg);
-        tabLabel.textContent = `${String(i + 1).padStart(2, "0")} · ` +
-                               (row.programme_code || "New programme");
-        title.textContent = row.programme_name || "Programme name not given yet";
-        title.classList.toggle("is-empty", !row.programme_name);
-        if (!name || ["programme_code", "programme_name", "degree_level"].includes(name) ||
+        const orange = colourOf(row) === "orange";
+        card.classList.toggle("frame-orange", orange);
+        card.classList.toggle("frame-navy", !orange);
+        tabLabel.textContent = `${String(i + 1).padStart(2, "0")} · ` + (row[K] || `New ${NOUN}`);
+        title.textContent = row[N] || `${NOUN[0].toUpperCase() + NOUN.slice(1)} name not given yet`;
+        title.classList.toggle("is-empty", !row[N]);
+        if (!name || [K, N, "degree_level"].includes(name) ||
             cols.some(c => c.name === name && c.required)) drawStrip();
       };
       card.appendChild(tabLabel);
@@ -1103,7 +1104,7 @@
       });
       card.appendChild(tabs);
 
-      if (tab === "outcomes" && !CTX.readonly) {
+      if (tab === "outcomes" && OUT.length && !CTX.readonly) {
         const tools = outcomeTools(row, i);
         if (tools) card.appendChild(tools);
       }
@@ -1122,15 +1123,16 @@
         prev.addEventListener("click", () => { sel = i - 1; draw(); });
         nav.appendChild(prev);
       }
-      if (tab === "details") {
-        const on = el("button", "btn btn-sm", "Vision, mission & outcomes →");
+      const t = TABS.findIndex(x => x.key === tab);
+      if (t < TABS.length - 1) {
+        const on = el("button", "btn btn-sm", `${TABS[t + 1].label} →`);
         on.type = "button";
-        on.addEventListener("click", () => { tab = "outcomes"; drawCard(); });
+        on.addEventListener("click", () => { tab = TABS[t + 1].key; drawCard(); });
         nav.appendChild(on);
       } else if (i < data.length - 1) {
-        const next = el("button", "btn btn-sm", "Next programme →");
+        const next = el("button", "btn btn-sm", `Next ${NOUN} →`);
         next.type = "button";
-        next.addEventListener("click", () => { sel = i + 1; tab = "details"; draw(); });
+        next.addEventListener("click", () => { sel = i + 1; tab = TABS[0].key; draw(); });
         nav.appendChild(next);
       }
       card.appendChild(nav);
@@ -1145,6 +1147,149 @@
       drawCard();
     }
     draw();
+  }
+
+  // --------------------------------------------------- credit distribution
+  /* The template's two generated tables, worked out from the programme
+     structure as it is typed: "Classification of Credits" (credits per
+     semester in each group) and "Summary" (100% continuous-assessment
+     credits against term-end credits, and marks). Semesters 7 and 8 of a
+     4-year programme get an Honours block and an Honours with Research
+     block, as in the template. */
+
+  // Does a programme-structure row count for this programme's track?
+  function rowCounts(r) {
+    const t = r.track || "All semesters";
+    const mine = (CTX.calc || {}).track;
+    if (t === "Honours") return mine === "honours";
+    if (t === "Honours with Research") return mine === "research";
+    return true;
+  }
+
+  const DIST_GROUPS = [
+    ["Major (Core)", "Major"],
+    ["Minor Stream", "Minor"],
+    ["Multidisciplinary", "Multi-Disciplinary / OE"],
+    ["Ability Enhancement Courses (AEC)", "AEC"],
+    ["Skill Enhancement Courses (SEC)", "SEC"],
+    ["Value Added Courses (VAC)", "VAC"],
+    ["Summer Internship", "Internship"],
+    ["Research Project / Dissertation", "Project"],
+  ];
+
+  function renderCreditDistribution(section, host) {
+    const box = el("div", "cd-box");
+    host.appendChild(box);
+
+    function paint() {
+      box.textContent = "";
+      const all = (Array.isArray(state.semester_structure) ? state.semester_structure : [])
+        .filter(r => num(r.semester) !== null);
+      if (!all.length) {
+        box.appendChild(el("p", "pl-empty",
+          "Add courses to the programme structure above and the credit tables build themselves."));
+        return;
+      }
+      const track = r => r.track || "All semesters";
+      const special = new Set(all.filter(r => track(r) !== "All semesters").map(r => num(r.semester)));
+      const sems = rows => Array.from(new Set(rows.map(r => num(r.semester)))).sort((a, b) => a - b);
+      const base = all.filter(r => !special.has(num(r.semester)));
+      const blocks = [{ title: null, rows: base }];
+      [["Honours", "Honours"], ["Honours with Research", "Honours with Research"]].forEach(([t, label]) => {
+        const rows = all.filter(r => special.has(num(r.semester)) &&
+                                     (track(r) === t || track(r) === "All semesters"));
+        if (rows.some(r => track(r) === t)) blocks.push({ title: label, rows: rows });
+      });
+
+      // --- classification of credits
+      const t1 = el("table", "cd-table");
+      const h = el("tr");
+      ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total credits", "Non-credit courses"]
+        .forEach(x => h.appendChild(el("th", x === "Semester" ? null : "num", x)));
+      const thead = el("thead");
+      thead.appendChild(h);
+      t1.appendChild(thead);
+      const b1 = el("tbody");
+      const sumBy = (rows, fn) => rows.reduce((a, r) => a + (fn(r) || 0), 0);
+      let running = null;
+      blocks.forEach((blk, n) => {
+        if (blk.title) {
+          const tr = el("tr", "cd-band");
+          const td = el("td", null, blk.title);
+          td.colSpan = DIST_GROUPS.length + 3;
+          tr.appendChild(td);
+          b1.appendChild(tr);
+        }
+        sems(blk.rows).forEach(sem => {
+          const rows = blk.rows.filter(r => num(r.semester) === sem);
+          const tr = el("tr");
+          tr.appendChild(el("td", null, String(sem)));
+          DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
+            fmt(sumBy(rows.filter(r => r.nep_category === cat), r => num(r.credits))))));
+          tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
+          tr.appendChild(el("td", "num",
+            String(rows.filter(r => num(r.credits) === 0).length || "")));
+          b1.appendChild(tr);
+        });
+        // a track's total runs on from the common semesters, as in the template
+        const counted = n === 0 ? blk.rows : base.concat(blk.rows);
+        const tot = el("tr", "total");
+        tot.appendChild(el("td", null, "Total"));
+        DIST_GROUPS.forEach(([cat]) => tot.appendChild(el("td", "num",
+          fmt(sumBy(counted.filter(r => r.nep_category === cat), r => num(r.credits))))));
+        tot.appendChild(el("td", "num", fmt(sumBy(counted, r => num(r.credits)))));
+        tot.appendChild(el("td", "num",
+          String(counted.filter(r => num(r.credits) === 0).length || "")));
+        b1.appendChild(tot);
+        if (n === 0) running = counted;
+      });
+      t1.appendChild(b1);
+      const w1 = el("div", "rt-wrap");
+      w1.appendChild(t1);
+      box.appendChild(el("h4", "cd-head", "Classification of credits and number of non-credit courses"));
+      box.appendChild(w1);
+
+      // --- summary
+      const t2 = el("table", "cd-table");
+      const h2 = el("tr");
+      ["Semester", "100% Continuous Assessment credits", "Term End (University) Examination credits",
+       "Total credits", "Total marks"].forEach(x => h2.appendChild(el("th", x === "Semester" ? null : "num", x)));
+      const th2 = el("thead");
+      th2.appendChild(h2);
+      t2.appendChild(th2);
+      const b2 = el("tbody");
+      const caOnly = r => num(r.ese) === 0 && num(r.cia) !== null;
+      const line = (label, rows, cls) => {
+        const tr = el("tr", cls || "");
+        tr.appendChild(el("td", null, label));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows.filter(caOnly), r => num(r.credits)))));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows.filter(r => !caOnly(r)), r => num(r.credits)))));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows, r => num(r.credits)))));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows, r => num(r.total_marks)))));
+        b2.appendChild(tr);
+      };
+      blocks.forEach((blk, n) => {
+        if (blk.title) {
+          const tr = el("tr", "cd-band");
+          const td = el("td", null, blk.title);
+          td.colSpan = 5;
+          tr.appendChild(td);
+          b2.appendChild(tr);
+        }
+        sems(blk.rows).forEach(sem => line(String(sem), blk.rows.filter(r => num(r.semester) === sem)));
+        line("Total credits", n === 0 ? blk.rows : running.concat(blk.rows), "total");
+      });
+      t2.appendChild(b2);
+      const w2 = el("div", "rt-wrap");
+      w2.appendChild(t2);
+      box.appendChild(el("h4", "cd-head", "Summary"));
+      box.appendChild(w2);
+    }
+
+    window.addEventListener("stage:rows", e => {
+      if (e.detail === "semester_structure") paint();
+    });
+    paint();
   }
 
   // ------------------------------------------------------------ credit matrix
@@ -1204,6 +1349,7 @@
       const map = (CTX.calc || {}).nep_to_key || {};
       const out = {};
       (Array.isArray(state.semester_structure) ? state.semester_structure : []).forEach(r => {
+        if (!rowCounts(r)) return;
         const key = map[r.nep_category];
         const c = num(r.credits);
         if (key && c !== null) out[key] = (out[key] || 0) + c;
@@ -1750,6 +1896,11 @@
       const h = el("h3", null, section.title);
       block.appendChild(h);
       if (section.help) block.appendChild(el("div", "section-help", section.help));
+      (section.links || []).forEach(l => {
+        const a = el("a", "section-link", `${l.label} →`);
+        a.href = CTX.urls.stage.replace("__stage__", l.stage);
+        block.appendChild(a);
+      });
 
       if (section.type === "table" && section.display === "cards") {
         renderRowCards(section, block);
@@ -1757,6 +1908,8 @@
         renderTable(section, block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
+      } else if (section.type === "credit_distribution") {
+        renderCreditDistribution(section, block);
       } else if (section.type === "programme_list") {
         renderProgrammeList(section, block);
       } else if (section.display === "cards") {

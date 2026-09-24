@@ -2436,3 +2436,24 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .rc-chip-x:hover { opacity: 1; background: var(--err); color: #fff; }
 .rc-chip-open:focus-visible, .rc-chip-x:focus-visible { outline: 2px solid var(--ink-600); outline-offset: 1px; }
 .rc-chip-add { padding: 5px 12px 5px 9px; gap: 6px; }
+
+/* ---------- Curriculum & Regulations: generated credit tables ---------- */
+.cd-head { margin: 14px 0 8px; font-size: .86rem; color: var(--ink-800); }
+.cd-head:first-child { margin-top: 0; }
+.cd-table { width: 100%; border-collapse: collapse; font-size: .8rem; background: var(--surface); }
+.cd-table th {
+  padding: 8px 8px; background: var(--ink-800); color: #fff; font-size: .7rem;
+  font-weight: 700; letter-spacing: .02em; text-align: left; vertical-align: bottom;
+}
+.cd-table th.num, .cd-table td.num { text-align: center; font-variant-numeric: tabular-nums; }
+.cd-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+.cd-table tr.total td { font-weight: 700; background: var(--gold-100); border-top: 1.5px solid var(--gold-500); }
+.cd-table tr.cd-band td {
+  font-weight: 700; color: #fff; background: #e8620f; text-align: center; letter-spacing: .04em;
+}
+.cd-strong { font-weight: 700; }
+
+/* links: the sample documents, and a section pointing at another stage */
+.sample-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; }
+.sample-links a { color: var(--ink-600); font-weight: 600; text-decoration: underline; }
+.section-link { display: inline-block; margin: -4px 0 14px; font-size: .84rem; font-weight: 700; color: var(--ink-600); }

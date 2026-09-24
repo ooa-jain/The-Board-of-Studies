@@ -398,17 +398,19 @@ def r_ltpe_credit_arithmetic(data, ctx, sk):
 
 
 def r_credit_marks_ratio(data, ctx, sk):
+    """1 credit = 25 marks is the guideline, not a hard rule: the university's
+    own curriculum sample gives 3-credit courses 100 marks. So it warns."""
     per = U.DEFAULT_OTHER_RULES["marks_per_credit"]
     out = []
     for i, r in enumerate(_rows(data, sk)):
         cr, tot = _num(r.get("credits")), _num(r.get("total_marks"))
-        if cr is None or tot is None:
+        if not cr or tot is None:
             continue
         expected = cr * per
         if abs(expected - tot) > 0.01:
-            out.append(err(
-                f"Course {r.get('course_code') or f'in row {i + 1}'}: {cr:g} credits carries "
-                f"{expected:g} marks at 1 credit = {per} marks, but total marks is {tot:g}.",
+            out.append(warn(
+                f"Course {r.get('course_code') or f'in row {i + 1}'}: {cr:g} credits would "
+                f"usually carry {expected:g} marks (1 credit = {per} marks); this has {tot:g}.",
                 section=sk, row=i, field="total_marks"))
     return out
 
@@ -441,16 +443,19 @@ def r_semester_within_duration(data, ctx, sk):
 
 
 def r_unique_course_codes(data, ctx, sk):
+    """A code may appear once per track: semester 7 of Honours and of
+    Honours with Research often share courses."""
     seen, out = {}, []
     for i, r in enumerate(_rows(data, sk)):
         c = str(r.get("course_code", "")).strip().upper()
         if not c:
             continue
-        if c in seen:
-            out.append(err(f"Course code “{c}” is used twice, in rows {seen[c] + 1} and {i + 1}.",
+        key = (c, str(r.get("track") or "All semesters"))
+        if key in seen:
+            out.append(err(f"Course code “{c}” is used twice, in rows {seen[key] + 1} and {i + 1}.",
                            section=sk, row=i, field="course_code"))
         else:
-            seen[c] = i
+            seen[key] = i
     return out
 
 
@@ -460,7 +465,10 @@ def r_category_totals_match_summary(data, ctx, sk):
     if not matrix:
         return []
     tally = {}
+    track = U.honours_track(ctx.get("degree_level"))
     for r in _rows(data, sk):
+        if not U.row_counts_for(r, track):
+            continue
         key = U.NEP_CATEGORY_TO_KEY.get(r.get("nep_category"))
         cr = _num(r.get("credits"))
         if key and cr is not None:

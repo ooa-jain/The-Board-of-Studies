@@ -222,6 +222,48 @@ BOS_COMMITTEE = {
 
 
 # --------------------------------------------------------------------------
+# UGC Mandatory Disclosure — laid out as the Office of Academics' three
+# columns: Programme Information | Curriculum & Regulations | Course
+# Information. The fields follow the Curriculum Matrix template, and the
+# default wording is the university-wide text of the BCom (Corporate
+# Finance) sample built on it.
+# --------------------------------------------------------------------------
+
+NEP_FRAMEWORKS = ["NEP 2020", "CBCS", "Outcome Based Education", "Other"]
+
+TRACKS = ["All semesters", "Honours", "Honours with Research"]
+
+# the university-wide wording from the sample curriculum
+DEFAULT_REGULATIONS = {
+    "reservation_policy": "Reservation Policy as prescribed by Central Government and UGC "
+                          "Guidelines",
+    "selection_procedure": "Jain Entrance Test (JET) / Personal Interview. The selection "
+                           "procedure for the Multiple Entry would be as per the University's "
+                           "Lateral Entry Rules.",
+    "medium": "English",
+    "pattern": "Semester Model",
+    "assessment": "The courses will have 50% Continuous Assessment and 50% Term End "
+                  "(University) examination. However, some courses (not more than 10% of the "
+                  "total programme credits) may have 100% Continuous Assessment.",
+    "passing": "The assessment of the student for each examination is done based on relevant "
+               "performance. Maximum Grade Point (GP) is 10 corresponding to O (Outstanding). "
+               "For all courses, a student is required to secure a minimum of 35% marks "
+               "separately in ESE and 40% in aggregate in a course to secure a pass grade. "
+               "(The Percentage Weightage of CA to ESE is 50:50 for theory courses.) A “R” "
+               "(Reappear) Grade will be awarded for unsatisfactory performance, i.e. if the "
+               "score is less than 40% aggregate.",
+    "award": "Under Graduate Certificate will be awarded at the end of semester 2, subject to "
+             "a minimum 4.00 CGPA and the successful completion of the 04-credit Vocational "
+             "Course in the summer (NCrF Level 4.5).\n"
+             "Under Graduate Diploma will be awarded at the end of semester 4, subject to a "
+             "minimum 4.00 CGPA and the successful completion of the 04-credit Vocational "
+             "Course in the summer (NCrF Level 5).\n"
+             "The Bachelor's degree will be awarded at the end of semester 6, and the "
+             "Honours / Honours with Research degree at the end of semester 8.",
+}
+
+
+# --------------------------------------------------------------------------
 # Stage 4 — UGC Mandatory Disclosure : Programme Information
 # --------------------------------------------------------------------------
 
@@ -229,15 +271,15 @@ PROGRAMME_INFORMATION = {
     "key": "ugc_programme",
     "group": "UGC Mandatory Disclosure",
     "title": "Programme Information",
-    "blurb": "One record per programme. Section A of the Curriculum Matrix template.",
-    "source_templates": ["Curriculum Matrix Template.docx (Section A)"],
+    "blurb": "One record per programme: name, code, degree, specialisation, intake, duration, "
+             "credits, batch and NEP category.",
+    "source_templates": ["Curriculum Matrix Template.docx"],
     "sections": [
         {
             "key": "programmes",
             "title": "Programmes offered",
-            "help": "Section A — programme profile, with each programme's vision, mission "
-                    "and outcomes. Every programme here gets its own credit structure in the "
-                    "next stage.",
+            "help": "Every programme here gets its own curriculum and course information in "
+                    "the next two stages.",
             "type": "table",
             "min_rows": 1,
             "programme_source": True,
@@ -246,26 +288,31 @@ PROGRAMME_INFORMATION = {
             "synced_from": "dept_info",
             # one framed card per programme rather than a wide table row
             "display": "cards",
+            "tabs": [{"key": "details", "label": "Programme details"},
+                     {"key": "outcomes", "label": "Vision, mission & outcomes"}],
             "columns": [
                 {"name": "sl", "label": "S. No.", "type": "integer", "width": "70px", "auto_index": True},
                 {"name": "programme_name", "label": "Programme name", "type": "text", "required": True,
                  "help": "For example: Bachelor of Commerce (Corporate Finance)"},
                 {"name": "programme_code", "label": "Programme code", "type": "text", "required": True,
                  "pattern": "^[A-Za-z0-9\\-]{2,20}$"},
-                {"name": "degree_level", "label": "Degree / Duration", "type": "select", "required": True,
+                {"name": "degree_level", "label": "Degree", "type": "select", "required": True,
                  "options": DEGREE_LEVELS},
                 {"name": "specialisation", "label": "Specialisation", "type": "text"},
-                {"name": "duration_years", "label": "Duration (years)", "type": "integer", "required": True,
-                 "min": 1, "max": 5},
-                {"name": "semesters", "label": "Number of semesters", "type": "integer", "required": True,
-                 "min": 2, "max": 10},
-                {"name": "intake", "label": "Approved intake", "type": "integer", "required": True,
+                {"name": "intake", "label": "Intake", "type": "integer", "required": True,
                  "min": 1, "max": 2000},
+                {"name": "duration_years", "label": "Duration (years)", "type": "integer",
+                 "required": True, "min": 1, "max": 5},
+                {"name": "semesters", "label": "Semesters", "type": "integer", "required": True,
+                 "min": 2, "max": 10},
+                {"name": "total_credits", "label": "Credits", "type": "integer", "required": True,
+                 "min": 1, "max": 400,
+                 "help": "Total credits to award the degree. At least 120 for a 3-year UG and "
+                         "160 for a 4-year UG under UGC Table 2."},
                 {"name": "batch", "label": "Batch", "type": "text", "required": True,
-                 "pattern": "^[0-9]{4}\\s*-\\s*[0-9]{2,4}$", "help": "For example 2027-31 or 2027-2031."},
-                {"name": "regulation", "label": "Regulation / Framework", "type": "select", "required": True,
-                 "options": ["NEP 2020", "CBCS", "Outcome Based Education", "Other"]},
-                {"name": "exit_options", "label": "Multiple exit options offered", "type": "checkbox"},
+                 "pattern": "^[0-9]{4}\\s*-\\s*[0-9]{2,4}$", "help": "For example 2026-30."},
+                {"name": "regulation", "label": "NEP category", "type": "select", "required": True,
+                 "options": NEP_FRAMEWORKS},
                 # the second tab of each programme card
                 {"name": "vision", "label": "Vision", "type": "textarea", "required": True,
                  "rows": 3, "min_words": 15, "tab": "outcomes"},
@@ -296,46 +343,56 @@ CURRICULUM_REGULATIONS = {
     "key": "ugc_curriculum",
     "group": "UGC Mandatory Disclosure",
     "title": "Curriculum & Regulations",
-    "blurb": "Credit distribution per programme, checked live against UGC Table 2 "
-             "(Minimum Credit Requirements to Award Degree under Each Category).",
+    "blurb": "The programme structure semester by semester, its credit distribution checked "
+             "against UGC Table 2, and the regulations that govern it.",
     "source_templates": [
-        "Curriculum Matrix Template.docx (Sections B, C, D)",
+        "Curriculum Matrix Template.docx",
         "BCom (Corporate Finance) Honours / Honours with Research V1 25 Jun.docx",
+    ],
+    "samples": [
+        {"label": "Curriculum Matrix template (blank)", "file": "docs/Curriculum_Matrix_Template.docx"},
+        {"label": "Curriculum sample — BCom (Corporate Finance)",
+         "file": "docs/Curriculum_Sample_BCom_Corporate_Finance.docx"},
     ],
     "per_programme": True,
     "sections": [
         {
             "key": "semester_structure",
-            "title": "Section C — Semester-wise programme structure",
-            "help": "One row per course, for every semester of the programme.",
+            "title": "Programme structure — semester scheme",
+            "help": "One row per course, semester by semester, grouped the way the template "
+                    "groups them (Major, Minor, AEC, VAC, SEC …). For a 4-year programme, mark "
+                    "semester 7 and 8 courses as Honours or Honours with Research. A Minor or "
+                    "Multi-disciplinary slot may be left without a code.",
             "type": "table",
             "min_rows": 1,
             "columns": [
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
-                 "min": 1, "max": 10, "width": "90px"},
-                {"name": "course_code", "label": "Course code", "type": "text", "required": True,
-                 "pattern": "^[A-Z]{2,4}[0-9]{0,2}\\.[0-9]{1,2}\\.[0-9]{1,2}$",
-                 "help": "Format: letters, then section numbers. Example COM.5.1"},
-                {"name": "course_title", "label": "Course title", "type": "text", "required": True,
-                 "pattern": "^[A-Za-z0-9 ,.:()&'\\-/]{3,120}$"},
-                {"name": "nep_category", "label": "NEP category", "type": "select", "required": True,
+                 "min": 1, "max": 10, "width": "84px"},
+                {"name": "track", "label": "Applies to", "type": "select", "options": TRACKS,
+                 "width": "150px", "help": "Leave as All semesters except for semester 7 and 8 "
+                                           "courses that differ between the two tracks."},
+                {"name": "nep_category", "label": "Course group", "type": "select", "required": True,
                  "options": NEP_CATEGORIES},
+                {"name": "course_code", "label": "Course code", "type": "text",
+                 "pattern": "^[A-Za-z0-9][A-Za-z0-9 /\\-.]{1,60}$", "width": "130px",
+                 "help": "For example 26BCC1C01."},
+                {"name": "course_title", "label": "Course title", "type": "text", "required": True},
                 {"name": "l", "label": "L", "type": "integer", "required": True, "min": 0, "max": 10,
-                 "width": "60px", "help": "Lecture hours"},
+                 "width": "56px", "help": "Lecture hours"},
                 {"name": "t", "label": "T", "type": "integer", "required": True, "min": 0, "max": 10,
-                 "width": "60px", "help": "Tutorial hours"},
+                 "width": "56px", "help": "Tutorial hours"},
                 {"name": "p", "label": "P", "type": "integer", "required": True, "min": 0, "max": 20,
-                 "width": "60px", "help": "Practical hours"},
+                 "width": "56px", "help": "Practical hours"},
                 {"name": "e", "label": "E", "type": "integer", "required": True, "min": 0, "max": 20,
-                 "width": "60px", "help": "Experiential hours"},
+                 "width": "56px", "help": "Experiential hours"},
                 {"name": "credits", "label": "Credits", "type": "integer", "required": True,
-                 "min": 1, "max": 20, "width": "80px"},
-                {"name": "cia", "label": "CIA marks", "type": "integer", "required": True,
-                 "min": 0, "max": 500, "width": "90px"},
-                {"name": "ese", "label": "ESE marks", "type": "integer", "required": True,
-                 "min": 0, "max": 500, "width": "90px"},
+                 "min": 0, "max": 20, "width": "76px"},
+                {"name": "cia", "label": "Continuous Assessment marks", "type": "integer",
+                 "required": True, "min": 0, "max": 500, "width": "96px"},
+                {"name": "ese", "label": "Term End Examination marks", "type": "integer",
+                 "required": True, "min": 0, "max": 500, "width": "96px"},
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
-                 "min": 0, "max": 1000, "width": "100px"},
+                 "min": 0, "max": 1000, "width": "86px"},
             ],
             "rules": [
                 "ltpe_credit_arithmetic",
@@ -347,45 +404,110 @@ CURRICULUM_REGULATIONS = {
             ],
         },
         {
+            "key": "credit_distribution",
+            "title": "Credit distribution — classification of credits",
+            "help": "Worked out from the programme structure above, in the layout of the "
+                    "template: credits per semester in each group, then the summary of "
+                    "continuous-assessment and term-end credits. Nothing to type here.",
+            "type": "credit_distribution",
+        },
+        {
             "key": "credit_summary",
-            "title": "Section B — Credit classification",
-            "help": "Filled in from the courses above, category by category. Change a "
+            "title": "UGC Table 2 — minimum credits by category",
+            "help": "Filled in from the programme structure, category by category. Change a "
                     "figure only if it should differ; the minimum column is fixed by UGC "
                     "Table 2.",
             "type": "credit_matrix",
             "rules": ["ugc_table2_minimums", "ugc_total_credits", "ugc_research_or_lieu"],
         },
         {
-            "key": "regulations",
-            "title": "Section D — Regulations and exit options",
+            "key": "profile",
+            "title": "Regulations — programme profile",
+            "help": "Items 1 to 12 of the Curriculum Matrix template. The university-wide "
+                    "wording is filled in from the sample; change only what differs for this "
+                    "programme.",
             "type": "fields",
             "fields": [
-                {"name": "framework", "label": "Curriculum framework", "type": "select", "required": True,
-                 "options": ["NEP 2020", "CBCS", "Other"]},
-                {"name": "min_pass_percent", "label": "Minimum pass percentage", "type": "integer",
-                 "required": True, "min": 30, "max": 60},
-                {"name": "attendance_percent", "label": "Minimum attendance percentage", "type": "integer",
-                 "required": True, "min": 50, "max": 100},
-                {"name": "exit_cert", "label": "Certificate exit after year 1 (credits)", "type": "integer",
-                 "min": 0, "max": 60},
-                {"name": "exit_diploma", "label": "Diploma exit after year 2 (credits)", "type": "integer",
-                 "min": 0, "max": 100},
-                {"name": "minor_offered", "label": "Minor stream offered", "type": "checkbox"},
-                {"name": "honours_research", "label": "Honours with Research track offered", "type": "checkbox"},
-                {"name": "elective_basket", "label": "Elective basket description", "type": "textarea", "rows": 3},
+                {"name": "objective", "label": "1. Objective", "type": "textarea", "required": True,
+                 "rows": 5, "min_items": 2, "wide": True,
+                 "help": "Two to six objectives, one per line, each beginning with a Bloom's "
+                         "taxonomy action verb."},
+                {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
+                 "required": True, "min": 6, "max": 72},
+                {"name": "intake", "label": "3. Intake", "type": "integer", "required": True,
+                 "min": 1, "max": 2000},
+                {"name": "reservation_policy", "label": "4. Reservation", "type": "textarea",
+                 "required": True, "rows": 2, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["reservation_policy"],
+                 "help": "Within the sanctioned intake: SC, ST, differently abled and defence "
+                         "(in percentage). Over and above: Kashmiri migrants (in seats) and "
+                         "international students (in percentage)."},
+                {"name": "eligibility", "label": "5. Eligibility", "type": "textarea",
+                 "required": True, "rows": 3, "wide": True,
+                 "placeholder": "For example: A student who has passed Level 4 / Class 12 "
+                                "schooling or its equivalent shall be eligible …"},
+                {"name": "selection_procedure", "label": "6. Selection procedure", "type": "textarea",
+                 "required": True, "rows": 2, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["selection_procedure"]},
+                {"name": "medium", "label": "7. Medium of instruction", "type": "text",
+                 "required": True, "prefill_text": DEFAULT_REGULATIONS["medium"]},
+                {"name": "pattern", "label": "8. Programme pattern", "type": "text",
+                 "required": True, "prefill_text": DEFAULT_REGULATIONS["pattern"]},
+                {"name": "course_specialisation", "label": "9. Course & specialisation",
+                 "type": "text", "required": True, "wide": True,
+                 "placeholder": "For example: BCom (Corporate Finance) Honours / Honours with "
+                                "Research — minors as per Annexure I"},
+                {"name": "assessment", "label": "10. Assessment", "type": "textarea",
+                 "required": True, "rows": 3, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["assessment"]},
+                {"name": "passing", "label": "11. Standard of passing", "type": "textarea",
+                 "required": True, "rows": 4, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["passing"]},
+                {"name": "award", "label": "12. Award of degree / diploma / certificate",
+                 "type": "textarea", "required": True, "rows": 4, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["award"]},
             ],
         },
         {
+            "key": "regulations",
+            "title": "CBCS / NEP framework, exit options and electives",
+            "type": "fields",
+            "fields": [
+                {"name": "framework", "label": "CBCS / NEP framework", "type": "select",
+                 "required": True, "options": ["NEP 2020", "CBCS", "Other"]},
+                {"name": "min_pass_percent", "label": "Minimum pass percentage", "type": "integer",
+                 "required": True, "min": 30, "max": 60, "prefill_text": 40},
+                {"name": "attendance_percent", "label": "Minimum attendance percentage",
+                 "type": "integer", "required": True, "min": 50, "max": 100, "prefill_text": 75},
+                {"name": "exit_cert", "label": "Exit with UG Certificate after year 1 (credits)",
+                 "type": "integer", "min": 0, "max": 60},
+                {"name": "exit_diploma", "label": "Exit with UG Diploma after year 2 (credits)",
+                 "type": "integer", "min": 0, "max": 100},
+                {"name": "minor_offered", "label": "Minor stream offered", "type": "checkbox"},
+                {"name": "honours_research", "label": "Honours with Research track offered",
+                 "type": "checkbox"},
+                {"name": "elective_basket", "label": "Elective basket", "type": "textarea",
+                 "rows": 3, "wide": True,
+                 "help": "The electives students choose from, and how many they take."},
+            ],
+            "links": [{"label": "Design and Development plan", "stage": "dd_plan"}],
+        },
+        {
             "key": "minors",
-            "title": "Annexure I — Minor subjects offered",
+            "title": "Minor / Honours — Annexure I",
+            "help": "One row per minor course: the minor stream, the semester it is taught in, "
+                    "and its code and title. Annexure I differs by department.",
             "type": "table",
             "min_rows": 0,
             "columns": [
-                {"name": "sl", "label": "S. No.", "type": "integer", "width": "70px", "auto_index": True},
-                {"name": "minor_title", "label": "Minor subject", "type": "text", "required": True},
-                {"name": "offered_by", "label": "Offered by department", "type": "text", "required": True},
-                {"name": "credits", "label": "Total credits", "type": "integer", "required": True,
-                 "min": 1, "max": 60},
+                {"name": "minor_title", "label": "Minor stream", "type": "text", "required": True,
+                 "help": "For example: Analytics"},
+                {"name": "semester", "label": "Semester", "type": "integer", "required": True,
+                 "min": 1, "max": 10, "width": "84px"},
+                {"name": "course_code", "label": "Course code", "type": "text", "width": "130px"},
+                {"name": "course_title", "label": "Course title", "type": "text", "required": True},
+                {"name": "credits", "label": "Credits", "type": "integer", "required": True,
+                 "min": 0, "max": 20, "width": "76px"},
             ],
         },
     ],
@@ -400,45 +522,55 @@ COURSE_INFORMATION = {
     "key": "ugc_course",
     "group": "UGC Mandatory Disclosure",
     "title": "Course Information",
-    "blurb": "The syllabus record for each course, with course outcomes and CO-PO mapping.",
+    "blurb": "The syllabus record for each course: objectives, outcomes, CO-PO mapping, "
+             "assessment, units and books.",
     "source_templates": ["[Template] Syllabus.pdf (with skill mapping requirement)"],
     "per_programme": True,
     "sections": [
         {
             "key": "courses",
-            "title": "Syllabus",
-            "help": "Course codes are drawn from the programme structure you submitted in the "
-                    "previous stage. Add the syllabus detail for each.",
+            "title": "Courses",
+            "help": "Every course in the programme structure gets a card. Code, title, credits "
+                    "and L-T-P-E come from the Curriculum & Regulations stage.",
             "type": "table",
             "min_rows": 1,
+            "display": "cards",
+            "card": {"code": "course_code", "name": "course_title", "noun": "course"},
+            "tabs": [{"key": "details", "label": "Course details"},
+                     {"key": "syllabus", "label": "Syllabus & books"}],
             "columns": [
                 {"name": "course_code", "label": "Course code", "type": "text", "required": True,
                  "from_previous": "ugc_curriculum.semester_structure.course_code"},
                 {"name": "course_title", "label": "Course title", "type": "text", "required": True},
-                {"name": "course_type", "label": "Course type", "type": "select", "required": True,
-                 "options": COURSE_TYPES},
+                {"name": "credits", "label": "Credits", "type": "integer", "required": True,
+                 "min": 0, "max": 20},
+                {"name": "ltpe", "label": "L-T-P-E structure", "type": "text", "required": True,
+                 "pattern": "^[0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}-[0-9]{1,2}$",
+                 "help": "For example 3-1-0-0."},
                 {"name": "objectives", "label": "Course objectives", "type": "textarea", "required": True,
                  "rows": 3, "min_items": 2, "help": "One objective per line, at least two."},
                 {"name": "outcomes", "label": "Course outcomes (COs)", "type": "textarea", "required": True,
                  "rows": 4, "min_items": 4,
                  "help": "One outcome per line, at least four. Begin each with a Bloom's taxonomy action verb."},
-                {"name": "units", "label": "Units / Modules", "type": "textarea", "required": True,
-                 "rows": 5, "min_items": 4, "help": "One unit per line, at least four."},
-                {"name": "skill_mapping", "label": "Skill mapping", "type": "textarea", "required": True,
-                 "rows": 3, "min_items": 1,
-                 "help": "Mandatory. Map each unit to the skill it builds."},
                 {"name": "co_po_map", "label": "CO-PO mapping", "type": "textarea", "required": True,
                  "rows": 3, "help": "For example: CO1-PO1(3), CO1-PO3(2), CO2-PO2(3)",
                  "pattern": "^(CO[0-9]+\\s*-\\s*(PO|PSO)[0-9]+\\s*\\([123]\\)\\s*,?\\s*)+$"},
-                {"name": "textbooks", "label": "Text books", "type": "textarea", "required": True,
-                 "rows": 3, "min_items": 2},
-                {"name": "references", "label": "Reference books", "type": "textarea", "required": True,
-                 "rows": 3, "min_items": 2},
-                {"name": "resources", "label": "Learning resources", "type": "textarea", "rows": 2},
                 {"name": "assessment", "label": "Assessment pattern", "type": "textarea", "required": True,
-                 "rows": 2},
+                 "rows": 2, "help": "For example: CA 50 (two tests, assignment, quiz) and ESE 50."},
+                {"name": "units", "label": "Syllabus — units / modules", "type": "textarea",
+                 "required": True, "rows": 6, "min_items": 4, "tab": "syllabus",
+                 "help": "One unit per line, at least four."},
+                {"name": "skill_mapping", "label": "Skill mapping", "type": "textarea", "required": True,
+                 "rows": 3, "min_items": 1, "tab": "syllabus",
+                 "help": "Map each unit to the skill it builds."},
+                {"name": "textbooks", "label": "Text books", "type": "textarea", "required": True,
+                 "rows": 3, "min_items": 2, "tab": "syllabus"},
+                {"name": "references", "label": "Reference books", "type": "textarea", "required": True,
+                 "rows": 3, "min_items": 2, "tab": "syllabus"},
+                {"name": "resources", "label": "Learning resources", "type": "textarea", "rows": 2,
+                 "tab": "syllabus"},
                 {"name": "question_paper", "label": "Sample question paper", "type": "file",
-                 "accept": ".pdf,.docx"},
+                 "accept": ".pdf,.docx", "tab": "syllabus"},
             ],
             "rules": ["course_codes_known", "bloom_verbs_present", "co_po_wellformed"],
         },

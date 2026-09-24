@@ -376,11 +376,18 @@ def unlock_stage(dept_code, academic_year, stage_key, actor=""):
                   "updated_at": now()}}, upsert=True)
 
 
-def prefill_for(stage_key, department, academic_year):
-    """Values pulled from the department master into a stage's first render."""
+def prefill_for(stage_key, department, academic_year, programme=None):
+    """Values a stage opens with: from the department master ("prefill"),
+    from the programme it is filed for ("prefill_programme"), or standing
+    university wording ("prefill_text")."""
     stage = STAGE_BY_KEY.get(stage_key) or {}
     source = dict(department or {})
     source["academic_year"] = academic_year
+    prog = dict(programme or {})
+    try:
+        prog["duration_months"] = int(float(prog.get("duration_years"))) * 12
+    except (TypeError, ValueError):
+        pass
     out = {}
     for section in stage.get("sections", []):
         if section.get("type") == "programme_list":
@@ -391,8 +398,13 @@ def prefill_for(stage_key, department, academic_year):
         vals = {}
         for f in section.get("fields", []):
             key = f.get("prefill")
+            pkey = f.get("prefill_programme", f["name"] if programme else None)
             if key and source.get(key) not in (None, ""):
                 vals[f["name"]] = source[key]
+            elif pkey and prog.get(pkey) not in (None, ""):
+                vals[f["name"]] = prog[pkey]
+            elif f.get("prefill_text") not in (None, ""):
+                vals[f["name"]] = f["prefill_text"]
         if vals:
             out[section["key"]] = vals
     return out
@@ -439,6 +451,27 @@ def sync_programme_rows(existing, offered):
             row["degree_level"] = _DEGREE_LEVEL[p["degree"]]
         row["programme_code"] = code
         row["programme_name"] = p.get("programme_name") or row.get("programme_name", "")
+        out.append(row)
+    return out
+
+
+def course_fill_source(submission, programme_code):
+    """Courses for the "fill in all" button in Course Information: every
+    coded course in the programme structure, with its credits and L-T-P-E."""
+    data = ((submission.get("programmes") or {}).get(programme_code, {})
+            .get("ugc_curriculum", {}).get("data") or {})
+    out, seen = [], set()
+    for r in data.get("semester_structure") or []:
+        code = str(r.get("course_code") or "").strip()
+        if not code or code.upper() in seen:
+            continue
+        seen.add(code.upper())
+        row = {"course_code": code, "course_title": r.get("course_title", "")}
+        if r.get("credits") not in (None, ""):
+            row["credits"] = r["credits"]
+        parts = [r.get(k) for k in ("l", "t", "p", "e")]
+        if all(v not in (None, "") for v in parts):
+            row["ltpe"] = "-".join(str(int(float(v))) for v in parts)
         out.append(row)
     return out
 

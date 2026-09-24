@@ -16,7 +16,7 @@ from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
-                       form_data, prefill_for, programme_fill_source,
+                       course_fill_source, form_data, prefill_for, programme_fill_source,
                        programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only)
@@ -89,7 +89,11 @@ def stage(stage_key, programme_code=None):
 
     synced = False
     if programme:
-        data = state.get("data") or prefill_for(stage_key, dept, _year())
+        data = dict(state.get("data") or {})
+        if status in OPENABLE:
+            # a section the draft has never held opens with its prefill
+            for key, value in prefill_for(stage_key, dept, _year(), programme).items():
+                data.setdefault(key, value)
     else:
         data, synced = form_data(stage_key, sub, dept, _year(), status in OPENABLE)
 
@@ -117,10 +121,19 @@ def stage(stage_key, programme_code=None):
         "max_per_course": other["max_credits_per_course"],
         "nep_to_key": U.NEP_CATEGORY_TO_KEY,
         "required_total": (credit_matrix or {}).get("total"),
+        # which semester 7-8 courses count: "honours", "research" or None
+        "track": U.honours_track((programme or {}).get("degree_level")),
+        # the UGC total for each degree, for Programme Information's credits
+        "degree_totals": {d: (rules_doc().get("totals") or U.DEFAULT_TOTALS).get(t)
+                          for d, t in U.DEGREE_TO_TRACK.items() if t},
     }
 
-    fill = (programme_fill_source(sub, dept)
-            if stage_key == "ugc_programme" and status in OPENABLE else [])
+    fill = []
+    if status in OPENABLE:
+        if stage_key == "ugc_programme":
+            fill = programme_fill_source(sub, dept)
+        elif stage_key == "ugc_course" and programme:
+            fill = course_fill_source(sub, programme["programme_code"])
 
     board = stage_board(sub)
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,

@@ -173,3 +173,25 @@ def blank_credit_matrix(table, track, degree_level=None):
             "credits": None,
         })
     return rows
+
+
+def honours_track(degree_level):
+    """Which of a 4-year programme's semester 7-8 tracks it follows."""
+    d = str(degree_level or "")
+    if "Research" in d:
+        return "research"
+    if "Honours" in d:
+        return "honours"
+    return None
+
+
+def row_counts_for(row, track):
+    """Does a programme-structure row count towards a programme on `track`?
+    Rows for all semesters always do; a row marked for one 4-year track only
+    counts for that track."""
+    t = str(row.get("track") or "All semesters")
+    if t == "Honours":
+        return track == "honours"
+    if t == "Honours with Research":
+        return track == "research"
+    return True

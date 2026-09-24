@@ -170,11 +170,15 @@ def test_practical_hours_count_half():
     assert not any("works out to" in m for m in errors(issues))
 
 
-def test_one_credit_is_twenty_five_marks():
+def test_one_credit_is_twenty_five_marks_is_advice_not_a_refusal():
+    """The university's own sample gives 3-credit courses 100 marks, so the
+    1 credit = 25 marks guideline warns rather than blocks."""
     data = {"credit_summary": {}, "semester_structure": [_course(credits=4, total_marks=150,
                                                                  cia=75, ese=75)]}
     issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 3 Year", 6))
-    assert any("carries 100 marks" in m for m in errors(issues))
+    assert any("usually carry 100 marks" in i["message"] for i in issues
+               if i["level"] == "warning")
+    assert not any("marks" in m and "credit" in m for m in errors(issues))
 
 
 def test_cia_plus_ese_must_equal_the_total():
@@ -196,7 +200,8 @@ def test_duplicate_course_codes_are_caught():
 
 
 def test_malformed_course_code_is_caught():
-    data = {"credit_summary": {}, "semester_structure": [_course(course_code="financial-1")]}
+    # codes look like 26BCC1C01; punctuation at the start is not a code
+    data = {"credit_summary": {}, "semester_structure": [_course(course_code="#bad code!")]}
     issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 3 Year", 6))
     assert any("Course code" in m and "expected format" in m for m in errors(issues))
 
@@ -207,3 +212,26 @@ def test_section_b_must_equal_the_sum_of_section_c():
     issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 3 Year", 6))
     assert any("Section B declares 60 credits" in m and "add up to 4" in m
                for m in errors(issues))
+
+
+def test_university_style_course_codes_are_accepted():
+    data = {"credit_summary": {}, "semester_structure": [_course(course_code="26BCC1C01")]}
+    issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 3 Year", 6))
+    assert not any("Course code" in m and "expected format" in m for m in errors(issues))
+
+
+def test_a_course_may_repeat_across_the_two_honours_tracks():
+    rows = [_course(course_code="26BCC7C01", semester=7, track="Honours"),
+            _course(course_code="26BCC7C01", semester=7, track="Honours with Research")]
+    issues, _ = validate_stage("ugc_curriculum", {"credit_summary": {}, "semester_structure": rows},
+                               ctx("UG - 4 Year (Honours)", 8))
+    assert not any("used twice" in m for m in errors(issues))
+
+
+def test_section_b_counts_only_this_programmes_track():
+    rows = [_course(credits=4, l=4, total_marks=100, cia=50, ese=50),
+            _course(course_code="R7", semester=7, credits=4, l=4, total_marks=100, cia=50, ese=50,
+                    track="Honours with Research")]
+    data = {"credit_summary": {"major_core": 4}, "semester_structure": rows}
+    issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 4 Year (Honours)", 8))
+    assert not any("Section B declares" in m for m in errors(issues))
