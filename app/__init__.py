@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from flask import Flask, g, render_template, session
 
@@ -33,6 +34,21 @@ def create_app(config_object=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(dept_bp, url_prefix="/department")
+
+    # Static files are cached for 30 days (deploy/nginx.conf). Stamp every
+    # static URL with the file's mtime so a deploy changes the URL and
+    # browsers fetch the new CSS/JS instead of pairing new HTML with old CSS.
+    @app.url_defaults
+    def _bust_static_cache(endpoint, values):
+        if endpoint != "static" or "v" in values:
+            return
+        filename = values.get("filename")
+        if not filename:
+            return
+        try:
+            values["v"] = int((Path(app.static_folder) / filename).stat().st_mtime)
+        except OSError:
+            pass
 
     @app.before_request
     def _load_user():
