@@ -83,20 +83,61 @@ def slugify_username(dept_code: str, dept_name: str = "") -> str:
     return base.strip(".")[:40]
 
 
+_GRAMMAR = {"of", "and", "the", "for", "in"}
+
+
+def _initials(text: str, keep: int = 4, drop=frozenset()) -> str:
+    """Initials of a name, ignoring the grammar between the words.
+
+    A single-word name has no initials worth the name, so the first few
+    letters stand in: "Commerce" gives "comm", not "c".
+    """
+    words = [w for w in "".join(ch if ch.isalpha() else " " for ch in text).split()
+             if w.lower() not in _GRAMMAR and w.lower() not in drop]
+    if not words:
+        return "dept"
+    if len(words) == 1:
+        return words[0][:keep].lower()
+    return "".join(w[0] for w in words)[:keep].lower()
+
+
+def department_username(db, dept) -> str:
+    """department + school + a number, e.g. ``cse.scse.4713``.
+
+    The department and the school say whose login it is at a glance; the
+    number keeps the same department at a second campus from colliding with
+    the first. Nothing about a person appears in it. The number is drawn
+    again if it is already taken.
+    """
+    # "Department" is dropped from the first half because every department
+    # carries it; "School" is kept in the second, where it tells the two
+    # halves apart — cse.scse, not cse.cse.
+    stem = (f"{_initials(dept.get('dept_name', ''), drop={'department'})}"
+            f".{_initials(dept.get('school', ''))}")
+    for _ in range(40):
+        candidate = f"{stem}.{secrets.randbelow(9000) + 1000}"
+        clash = db.users.find_one({"username": candidate})
+        if not clash or clash.get("dept_code") == dept.get("dept_code"):
+            return candidate
+    # 40 collisions on a 4-digit number means something is very wrong; fall
+    # back to the code, which is unique by construction.
+    return slugify_username(dept["dept_code"])
+
+
 def issue_department_login(db, dept, actor="system", reset=False):
     """Create or reset one department's login and return (username, password).
 
-    Both halves come from the department itself: the username from its code,
-    the password freshly generated. Single, bulk and import all call this, so
-    a login issued one way is identical to one issued another.
+    Both halves are generated: the username from the department and its
+    school plus a number, the password freshly drawn. Single, bulk, seed and
+    import all call this, so a login issued one way is identical to one
+    issued another, and nobody has to key one in by hand.
+
+    A department that already has a username keeps it — reissuing is about
+    the password, and changing someone's username along with it would lock
+    them out of a name they have already been told.
     """
     dept_code = dept["dept_code"]
-    username = dept.get("username") or slugify_username(dept_code, dept.get("dept_name", ""))
-
-    # Only a *different* department holding this name forces a suffix.
-    clash = db.users.find_one({"username": username})
-    if clash and clash.get("dept_code") != dept_code:
-        username = f"{username}.{dept_code.lower()}"
+    username = dept.get("username") or department_username(db, dept)
 
     password = generate_password()
     db.users.update_one(

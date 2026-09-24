@@ -7,3 +7,7 @@ bcrypt==5.0.0
 gunicorn==23.0.0
 gevent==25.9.1
 Werkzeug==3.1.3
+# First-page previews of uploaded PDFs. Both are wheels — no
+# system packages to install alongside them.
+pypdfium2==5.13.0
+Pillow==12.3.0

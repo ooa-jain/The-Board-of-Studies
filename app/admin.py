@@ -14,7 +14,8 @@ from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
 from .schema import STAGE_BY_KEY, STAGES
-from .workflow import (compute_status, get_or_create_submission, progress,
+from .workflow import (compute_status, department_analysis, get_or_create_submission,
+                       institution_analysis, progress, stage_analysis, stage_board,
                        return_stage, stage_board, unlock_stage)
 
 bp = Blueprint("admin", __name__)
@@ -77,6 +78,58 @@ def dashboard():
 
 
 # ---------------------------------------------------------------------------
+# analysis
+# ---------------------------------------------------------------------------
+
+@bp.route("/analysis")
+@admin_required
+def analysis():
+    """Every department in one reading: done, part-done, untouched, failing.
+
+    The Office's standing question is "who still owes me what", and it used to
+    be answered by opening departments one at a time. This answers it once.
+    """
+    db = get_db()
+    year = _year()
+
+    # Demonstration mode. Everything it needs lives in app/demo.py; delete that
+    # module and this branch and the page is live-only.
+    if request.args.get("demo") == "1":
+        from .demo import demo_analysis
+        rows, totals, stages = demo_analysis()
+        return render_template("admin/analysis.html", rows=rows, totals=totals,
+                               stages=stages, year=year, demo=True,
+                               filters={"state": None, "q": ""})
+
+    departments = list(db.departments.find({"active": True})
+                       .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department"})}
+
+    rows = [department_analysis(d, subs.get(d["dept_code"]), users.get(d["dept_code"]))
+            for d in departments]
+    totals = institution_analysis(rows)
+    stages = stage_analysis([stage_board(subs.get(d["dept_code"]) or {})
+                             for d in departments])
+
+    # filtering happens after the totals, so the summary always describes the
+    # whole institution and not whatever slice is on screen
+    state = request.args.get("state")
+    search = (request.args.get("q") or "").strip().lower()
+    if state:
+        rows = [r for r in rows if r["state"] == state]
+    if search:
+        rows = [r for r in rows
+                if search in (r["dept"].get("dept_name", "") + " "
+                              + r["dept"].get("school", "") + " "
+                              + r["dept"].get("dept_code", "")).lower()]
+
+    return render_template("admin/analysis.html", rows=rows, totals=totals,
+                           stages=stages, year=year, demo=False,
+                           filters={"state": state, "q": search})
+
+
+# ---------------------------------------------------------------------------
 # department master
 # ---------------------------------------------------------------------------
 
@@ -85,9 +138,12 @@ def dashboard():
 def departments():
     db = get_db()
     q = {}
+    place = request.args.get("place")
     campus = request.args.get("campus")
     school = request.args.get("school")
     search = (request.args.get("q") or "").strip()
+    if place:
+        q["place"] = place
     if campus:
         q["campus"] = campus
     if school:
@@ -95,12 +151,23 @@ def departments():
     if search:
         q["$or"] = [{"dept_name": {"$regex": search, "$options": "i"}},
                     {"dept_code": {"$regex": search, "$options": "i"}},
-                    {"school": {"$regex": search, "$options": "i"}}]
-    depts = list(db.departments.find(q).sort([("campus", 1), ("school", 1), ("dept_name", 1)]))
+                    {"school": {"$regex": search, "$options": "i"}},
+                    {"faculty": {"$regex": search, "$options": "i"}}]
+    depts = list(db.departments.find(q)
+                 .sort([("place", 1), ("campus", 1), ("school", 1), ("dept_name", 1)]))
+
+    # only the campuses in the city being looked at: offering Kochi Campus
+    # while Bangalore is selected would be a filter that can only return none
+    campuses = [c for c in current_app.config["CAMPUSES"]
+                if not place or db.departments.count_documents(
+                    {"place": place, "campus": c})]
     return render_template("admin/departments.html", departments=depts,
                            schools=sorted(x for x in db.departments.distinct("school") if x),
-                           campuses=current_app.config["CAMPUSES"],
-                           filters={"campus": campus, "school": school, "q": search})
+                           campuses=campuses,
+                           places=current_app.config["PLACES"],
+                           total=db.departments.count_documents({}),
+                           filters={"place": place, "campus": campus,
+                                    "school": school, "q": search})
 
 
 @bp.route("/departments/new", methods=["GET", "POST"])
@@ -112,24 +179,34 @@ def department_form(dept_code=None):
     if dept_code and not dept:
         abort(404)
 
+    # existing values offered as suggestions, so a new department lands in an
+    # existing faculty and school rather than a near-miss spelling of one
+    def _form(d):
+        return render_template(
+            "admin/department_form.html", dept=d,
+            campuses=current_app.config["CAMPUSES"],
+            places=current_app.config["PLACES"],
+            faculties=sorted(x for x in db.departments.distinct("faculty") if x),
+            schools=sorted(x for x in db.departments.distinct("school") if x))
+
     if request.method == "POST":
         f = request.form
         code = (f.get("dept_code") or "").strip().upper()
         if not code:
             flash("Department code is required.", "error")
-            return render_template("admin/department_form.html", dept=dept or f,
-                                   campuses=current_app.config["CAMPUSES"])
+            return _form(dept or f)
         clash = db.departments.find_one({"dept_code": code})
         if clash and (not dept or clash["_id"] != dept["_id"]):
             flash(f"Department code “{code}” is already in use.", "error")
-            return render_template("admin/department_form.html", dept=f,
-                                   campuses=current_app.config["CAMPUSES"])
+            return _form(f)
 
         payload = {
             "dept_code": code,
             "dept_name": (f.get("dept_name") or "").strip(),
+            "faculty": (f.get("faculty") or "").strip(),
             "school": (f.get("school") or "").strip(),
             "campus": f.get("campus") or current_app.config["CAMPUSES"][0],
+            "place": f.get("place") or current_app.config["PLACES"][0],
             "active": f.get("active") == "on",
             "updated_at": now(),
         }
@@ -142,11 +219,11 @@ def department_form(dept_code=None):
             db.departments.insert_one(payload)
             audit(_actor(), "department.created", code)
             flash(f"{payload['dept_name']} has been added. "
-                  f"Generate its login from the department list.", "success")
+                  f"Use “Issue every missing login” on the department list "
+                  f"to give it one.", "success")
         return redirect(url_for("admin.departments"))
 
-    return render_template("admin/department_form.html", dept=dept,
-                           campuses=current_app.config["CAMPUSES"])
+    return _form(dept)
 
 
 @bp.route("/departments/<dept_code>/toggle", methods=["POST"])
@@ -197,6 +274,35 @@ def credential_slip(dept_code):
                            login_url=url_for("auth.login", _external=True), year=_year())
 
 
+@bp.route("/departments/clear", methods=["POST"])
+@admin_required
+def departments_clear():
+    """Remove every department in one go, with its login and its submissions.
+
+    This empties the master, so it asks for the word to be typed rather than
+    for a button to be clicked. It is not as final as it sounds: seed.py puts
+    the whole list back from the Office of Academics workbook.
+    """
+    db = get_db()
+    if (request.form.get("confirm") or "").strip().upper() != "REMOVE ALL":
+        flash("Nothing was removed — type REMOVE ALL to confirm.", "warning")
+        return redirect(url_for("admin.departments"))
+
+    counts = {
+        "departments": db.departments.count_documents({}),
+        "logins": db.users.count_documents({"role": "department"}),
+        "submissions": db.submissions.count_documents({}),
+    }
+    db.departments.delete_many({})
+    db.users.delete_many({"role": "department"})
+    db.submissions.delete_many({})
+    audit(_actor(), "departments.cleared", detail=counts)
+    flash(f"Removed {counts['departments']} department(s), "
+          f"{counts['logins']} login(s) and {counts['submissions']} submission(s). "
+          f"Run seed.py to put the master back from the workbook.", "success")
+    return redirect(url_for("admin.departments"))
+
+
 @bp.route("/credentials/bulk", methods=["POST"])
 @admin_required
 def bulk_credentials():
@@ -207,7 +313,11 @@ def bulk_credentials():
         issue_department_login(db, dept, actor=_actor())
         made += 1
     audit(_actor(), "credentials.bulk", detail={"count": made})
-    flash(f"Generated logins for {made} department(s).", "success")
+    if made:
+        flash(f"Issued a login for {made} department(s). The passwords are on "
+              f"the credential sheet until each department signs in.", "success")
+    else:
+        flash("Every active department already has a login.", "info")
     return redirect(url_for("admin.departments"))
 
 
@@ -239,9 +349,13 @@ def import_departments():
 
     data = upload.read()
     sheet = request.form.get("sheet") or None
-    default_campus = request.form.get("default_campus") or "Bengaluru"
+    default_campus = (request.form.get("default_campus")
+                      or current_app.config["CAMPUSES"][0])
+    default_place = (request.form.get("default_place")
+                     or current_app.config["PLACES"][0])
     try:
-        rows, meta = parse_workbook(data, sheet, default_campus=default_campus)
+        rows, meta = parse_workbook(data, sheet, default_campus=default_campus,
+                                    default_place=default_place)
     except Exception as exc:
         flash(f"That file could not be read: {exc}", "error")
         return redirect(url_for("admin.import_departments"))
@@ -254,7 +368,9 @@ def import_departments():
     session["import_rows"] = rows[:500]
     return render_template("admin/import.html", preview=rows, meta=meta,
                            default_campus=default_campus,
-                           campuses=current_app.config["CAMPUSES"])
+                           default_place=default_place,
+                           campuses=current_app.config["CAMPUSES"],
+                           places=current_app.config["PLACES"])
 
 
 @bp.route("/import/commit", methods=["POST"])
@@ -277,6 +393,10 @@ def import_commit():
         existing = db.departments.find_one({"dept_code": r["dept_code"]})
         payload = {k: r[k] for k in
                    ("dept_name", "school", "dept_code", "campus")}
+        if r.get("place"):
+            payload["place"] = r["place"]
+        if r.get("faculty"):
+            payload["faculty"] = r["faculty"]
         payload["active"] = True
         payload["updated_at"] = now()
         if existing and not overwrite:
@@ -430,17 +550,31 @@ def rules_reset():
 def app_settings():
     db = get_db()
     if request.method == "POST":
+        from .db import settings as _s
+        was_dev = bool(_s().get("dev_mode"))
+        dev = request.form.get("dev_mode") == "on"
         db.settings.update_one(
             {"_id": "app"},
             {"$set": {"academic_year": (request.form.get("academic_year") or "").strip(),
                       "submissions_open": request.form.get("submissions_open") == "on",
+                      "dev_mode": dev,
                       "banner": (request.form.get("banner") or "").strip(),
                       "updated_at": now()}})
         audit(_actor(), "settings.updated")
-        flash("Settings saved.", "success")
+        # Unlocking every stage for every department is worth its own line in
+        # the log, separate from whatever else was saved in the same form.
+        if dev != was_dev:
+            audit(_actor(), "settings.dev_mode." + ("on" if dev else "off"))
+            flash("Developer mode is ON — every stage is unlocked for every "
+                  "department." if dev else
+                  "Developer mode is off. Stages lock in sequence again.",
+                  "warning" if dev else "success")
+        else:
+            flash("Settings saved.", "success")
         return redirect(url_for("admin.app_settings"))
     from .db import settings as s
-    return render_template("admin/settings.html", settings=s())
+    return render_template("admin/settings.html", settings=s(),
+                           stage_count=len(STAGES))
 
 
 @bp.route("/audit")

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_art.html" as art %}
 {% block title %}{{ stage.title }}{% endblock %}
 
 {% block header %}
@@ -85,20 +86,62 @@
     </div>
     {% endif %}
 
-    <div class="card">
-      <div class="card-head"><h3 class="card-title-sm">Stages</h3></div>
+    {# The whole sequence as branches. The group you are working in is open;
+       the others are folded, and each says how far through it you are. A
+       submitted stage stays reachable — read-only — so the branch is a link;
+       a locked one is plain text, because there is nowhere to go yet. #}
+    {% set done_count = board|selectattr('status','equalto','submitted')|list|length %}
+    <nav class="card branch-card" aria-label="All stages" data-branch>
+      <div class="card-head">
+        <h3 class="card-title-sm">Stages</h3>
+        <span class="spacer branch-tally">{{ done_count }}/{{ board|length }} done</span>
+      </div>
       <div class="card-body tight scroll-300">
-        <ol class="mini-board">
-          {% for s in board %}
-          <li class="flex small{{ ' is-locked' if s.status == 'locked' }}{{ ' is-here' if s.key == stage.key }}">
-            <span class="mini-dot mini-{{ s.status }}" aria-hidden="true"></span>
-            <span>{{ s.title }}</span>
-            <span class="sr-only">— {{ s.status }}{{ ', this stage' if s.key == stage.key }}</span>
+        <ul class="branch">
+          {% for g in groups %}
+          {% set here = g.stages|selectattr('key','equalto',stage.key)|list|length > 0 %}
+          <li class="branch-group{{ ' is-done' if g.complete }}">
+            <button class="branch-parent" type="button"
+                    aria-expanded="{{ 'true' if here else 'false' }}"
+                    aria-controls="branch-g{{ loop.index }}">
+              <span class="branch-caret" aria-hidden="true"></span>
+              <span class="branch-label">{{ g.name }}</span>
+              <span class="branch-tally">
+                {{ g.done }}/{{ g.total }}
+                <span class="sr-only">stages submitted</span>
+              </span>
+            </button>
+            <ul class="branch-children" id="branch-g{{ loop.index }}"
+                data-open="{{ 'true' if here else 'false' }}">
+              {% for s in g.stages %}
+              <li class="branch-row is-{{ s.status }}{{ ' is-here' if s.key == stage.key }}"
+                  style="--i: {{ loop.index0 }}">
+                {% if s.status == 'locked' %}
+                <span class="branch-dead">
+                  <span class="branch-icon">{{ art.stage_icon(s.status) }}</span>
+                  <span class="branch-text">{{ s.title }}</span>
+                  <span class="sr-only">— locked, opens once the stage before it is submitted</span>
+                </span>
+                {% else %}
+                <a class="branch-link" href="{{ url_for('dept.stage', stage_key=s.key) }}"
+                   {% if s.key == stage.key %}aria-current="page"{% endif %}>
+                  <span class="branch-icon">{{ art.stage_icon(s.status) }}</span>
+                  <span class="branch-text">{{ s.title }}</span>
+                  <span class="sr-only">
+                    — {{ {'submitted': 'submitted', 'draft': 'in progress',
+                          'returned': 'returned for correction'}.get(s.status, 'open') }}
+                    {{- ', this stage' if s.key == stage.key }}
+                  </span>
+                </a>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
           </li>
           {% endfor %}
-        </ol>
+        </ul>
       </div>
-    </div>
+    </nav>
   </aside>
 </div>
 
@@ -143,4 +186,5 @@
   };
 </script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/branch.js') }}"></script>
 {% endblock %}
