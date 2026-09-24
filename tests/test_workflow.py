@@ -35,7 +35,8 @@ PROGRAMMES_OK = [
     {"programme_code": "BCMREG", "programme_name": "Bachelor of Commerce", "degree": "UG",
      "source": "catalogue", "decision": "keep"},
     {"programme_code": "BCHCOF", "programme_name": "B.Com in Corporate Finance",
-     "degree": "UG", "source": "catalogue", "decision": "remove"},
+     "degree": "UG", "source": "catalogue", "decision": "remove",
+     "removal_reason": "Programme discontinued"},
     {"programme_code": "MCMNEW", "programme_name": "Master of Commerce", "degree": "PG",
      "source": "new", "decision": "keep"},
 ]
@@ -257,12 +258,12 @@ def test_an_invalid_submission_is_refused_with_reasons(app, client):
     u, p = make_department(app)
     login(client, u, p)
     r = client.post("/department/api/dept_info/submit",
-                    json={"contact": {"faculty_count": "twelve"}})
+                    json={"identity": {"dept_name": ""}, "programmes_offered": []})
     body = r.get_json()
     assert body["ok"] is False
     msgs = [i["message"] for i in body["issues"]]
-    assert any("must be a number" in m for m in msgs)
     assert any("is required" in m for m in msgs)
+    assert any("at least one programme" in m for m in msgs)
 
 
 DEPT_INFO_OK = {
@@ -925,3 +926,23 @@ def test_programme_information_follows_the_programmes_kept(app, client):
     assert [r["programme_code"] for r in rows] == ["BCMREG", "MCMNEW"]
     assert rows[1]["degree_level"] == "PG - 2 Year"
     assert "synced: true" in body
+
+
+def test_a_removed_programme_needs_a_reason(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    rows = [dict(r) for r in PROGRAMMES_OK]
+    rows[1].pop("removal_reason")
+    body = client.post("/department/api/dept_info/submit",
+                       json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()
+    assert body["ok"] is False
+    assert any("being removed" in i["message"] for i in body["issues"])
+
+    rows[1]["removal_reason"] = "Other"
+    body = client.post("/department/api/dept_info/submit",
+                       json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()
+    assert any("add a line" in i["message"] for i in body["issues"])
+
+    rows[1]["removal_note"] = "Folded into BCMREG"
+    assert client.post("/department/api/dept_info/submit",
+                       json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()["ok"]

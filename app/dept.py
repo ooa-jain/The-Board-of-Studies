@@ -107,8 +107,19 @@ def stage(stage_key, programme_code=None):
             "needs_in_lieu": (programme or {}).get("degree_level") == U.HONOURS_NO_RESEARCH,
         }
 
+    # the arithmetic the form fills in by itself — the same figures the
+    # server checks against
+    other = U.DEFAULT_OTHER_RULES
+    calc = {
+        "weights": other["credit_from_hours"],
+        "marks_per_credit": other["marks_per_credit"],
+        "max_per_course": other["max_credits_per_course"],
+        "nep_to_key": U.NEP_CATEGORY_TO_KEY,
+        "required_total": (credit_matrix or {}).get("total"),
+    }
+
     board = stage_board(sub)
-    return render_template("dept/stage.html", stage=stage_def, dept=dept, submission=sub,
+    return render_template("dept/stage.html", calc=calc, stage=stage_def, dept=dept, submission=sub,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,

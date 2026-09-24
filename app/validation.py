@@ -270,6 +270,15 @@ def r_programmes_offered_valid(data, ctx, sk):
             if _is_blank(r.get("degree")):
                 out.append(err(f"Programme {i + 1}: choose UG, PG or another degree level.",
                                section=sk, row=i, field="degree"))
+        if r.get("decision") == "remove" and r.get("source") != "new":
+            why = r.get("removal_reason")
+            if _is_blank(why):
+                out.append(err(f"Say why “{r.get('programme_code')}” is being removed.",
+                               section=sk, row=i, field="removal_reason"))
+            elif why == "Other" and _is_blank(r.get("removal_note")):
+                out.append(err(f"“{r.get('programme_code')}” is removed for “Other” — "
+                               f"add a line saying what the reason is.",
+                               section=sk, row=i, field="removal_note"))
         c = str(r.get("programme_code") or "").strip().upper()
         if c:
             if c in seen:

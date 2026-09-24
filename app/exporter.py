@@ -127,7 +127,7 @@ def department_excel(dept_code: str, year: str) -> io.BytesIO:
                 continue
             sheet.cell(row=row, column=1, value=section["title"]).font = Font(bold=True, size=11)
             row += 1
-            if section.get("type") == "table" and isinstance(payload, list):
+            if section.get("type") in ("table", "programme_list") and isinstance(payload, list):
                 cols = section.get("columns", [])
                 _head(sheet, row, [c["label"] for c in cols], fill=GOLD, color="1A1A1A")
                 row += 1
@@ -165,7 +165,7 @@ def department_excel(dept_code: str, year: str) -> io.BytesIO:
                     continue
                 sheet.cell(row=row, column=1, value=section["title"]).font = Font(bold=True, size=11)
                 row += 1
-                if section.get("type") == "table" and isinstance(payload, list):
+                if section.get("type") in ("table", "programme_list") and isinstance(payload, list):
                     cols = section.get("columns", [])
                     _head(sheet, row, [c["label"] for c in cols], fill=GOLD, color="1A1A1A")
                     row += 1
@@ -326,7 +326,7 @@ def submission_word(dept_code: str, year: str) -> io.BytesIO:
             if not payload:
                 continue
             doc.add_heading(section["title"], level=2)
-            if section.get("type") == "table" and isinstance(payload, list):
+            if section.get("type") in ("table", "programme_list") and isinstance(payload, list):
                 cols = section.get("columns", [])
                 keep = [c for c in cols if c.get("type") != "file"][:8]
                 tbl = doc.add_table(rows=1, cols=len(keep))
