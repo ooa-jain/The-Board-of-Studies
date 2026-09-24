@@ -884,6 +884,23 @@
       return t || String(n || "");
     }
 
+    function removeAt(i) {
+      const r = data[i];
+      if (data.length <= (section.min_rows || 0)) {
+        say(`Keep at least ${section.min_rows} programme${section.min_rows === 1 ? "" : "s"}.`);
+        return;
+      }
+      if (!isBlankRow(r) &&
+          !window.confirm(`Remove ${r.programme_code || "this programme"} and everything ` +
+                          "filled in for it?")) return;
+      data.splice(i, 1);
+      if (sel > i || sel >= data.length) sel = Math.max(0, sel - 1);
+      draw();
+      touch();
+      say(`${r.programme_code || "Programme"} removed.`);
+      chips.querySelector(".rc-chip.is-sel .rc-chip-open")?.focus();
+    }
+
     function completeness(r) {
       const req = cols.filter(c => c.required);
       const done = req.filter(c => !blank(r[c.name])).length;
@@ -893,8 +910,10 @@
     function drawStrip() {
       chips.textContent = "";
       data.forEach((r, i) => {
-        const b = el("button", `rc-chip is-${completeness(r)}` +
-                               (/^PG/.test(r.degree_level || "") ? " is-pg" : ""));
+        const chip = el("span", `rc-chip is-${completeness(r)}` +
+                                (/^PG/.test(r.degree_level || "") ? " is-pg" : "") +
+                                (i === sel ? " is-sel" : ""));
+        const b = el("button", "rc-chip-open");
         b.type = "button";
         b.setAttribute("role", "tab");
         b.setAttribute("aria-selected", i === sel ? "true" : "false");
@@ -903,7 +922,16 @@
         b.appendChild(el("span", "rc-chip-name", shortName(r.programme_name) || "New programme"));
         b.title = `${r.programme_code || "No code yet"} — ${r.programme_name || "no name yet"}`;
         b.addEventListener("click", () => { sel = i; draw(); });
-        chips.appendChild(b);
+        chip.appendChild(b);
+        if (!synced && !CTX.readonly) {
+          const x = el("button", "rc-chip-x", "×");
+          x.type = "button";
+          x.title = `Remove ${r.programme_code || "this programme"}`;
+          x.setAttribute("aria-label", `Remove ${r.programme_code || "programme " + (i + 1)}`);
+          x.addEventListener("click", () => removeAt(i));
+          chip.appendChild(x);
+        }
+        chips.appendChild(chip);
       });
       if (!synced && !CTX.readonly) {
         const add = el("button", "rc-chip rc-chip-add");
@@ -1061,28 +1089,6 @@
 
       const head = el("div", "rc-head");
       head.appendChild(title);
-      if (!synced && !CTX.readonly) {
-        const del = el("button", "rc-delete");
-        del.type = "button";
-        del.innerHTML = ICON.minus;
-        del.appendChild(el("span", null, "Delete"));
-        del.setAttribute("aria-label", `Delete programme ${row.programme_code || i + 1}`);
-        del.addEventListener("click", () => {
-          if (data.length <= (section.min_rows || 0)) {
-            say(`Keep at least ${section.min_rows} programme${section.min_rows === 1 ? "" : "s"}.`);
-            return;
-          }
-          if (!isBlankRow(row) &&
-              !window.confirm(`Delete ${row.programme_code || "this programme"} and everything ` +
-                              "filled in for it?")) return;
-          data.splice(i, 1);
-          sel = Math.max(0, i - 1);
-          draw();
-          touch();
-          say("Programme deleted.");
-        });
-        head.appendChild(del);
-      }
       card.appendChild(head);
 
       const tabs = el("div", "rc-tabs");

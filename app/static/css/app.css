@@ -2387,13 +2387,12 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 }
 .rc-chip.is-pg { --cc: #e8620f; }
 .rc-chip:hover { border-color: var(--cc); }
-.rc-chip[aria-selected=true] { background: var(--cc); border-color: var(--cc); color: #fff; }
 .rc-chip-code { font: 700 .72rem ui-monospace, SFMono-Regular, Menlo, monospace; flex: none; }
 .rc-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .85; }
 .rc-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; border: 1.5px solid currentColor; opacity: .7; }
 .rc-chip.is-part .rc-chip-dot { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
 .rc-chip.is-full .rc-chip-dot { background: var(--ok); border-color: var(--ok); opacity: 1; }
-.rc-chip[aria-selected=true].is-full .rc-chip-dot { background: #9be3b4; border-color: #9be3b4; }
+.rc-chip.is-sel.is-full .rc-chip-dot { background: #9be3b4; border-color: #9be3b4; }
 .rc-chip-add { border-style: dashed; color: var(--ink-700); font-weight: 700; }
 .rc-chip:focus-visible { outline: 2px solid var(--ink-600); outline-offset: 2px; }
 .rc-note { margin: 0 0 4px; min-height: 0; font-size: .82rem; color: var(--ok); font-weight: 600; }
@@ -2402,12 +2401,6 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .rc-card { margin-top: 26px; padding: 34px 20px 16px; }
 .rc-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .rc-head .rc-title { flex: 1; margin: 0; font-size: .98rem; }
-.rc-delete {
-  flex: none; display: inline-flex; align-items: center; gap: 5px;
-  padding: 5px 12px 5px 9px; border: 1.5px solid #e7b9b2; border-radius: 999px;
-  background: #fff; color: var(--err); cursor: pointer; font: 700 .76rem var(--font);
-}
-.rc-delete:hover { background: var(--err); border-color: var(--err); color: #fff; }
 .rc-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .rc-tab {
   padding: 8px 12px; margin-bottom: -1px; border: 0; border-bottom: 2.5px solid transparent;
@@ -2426,3 +2419,20 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .rc-card input[type=text], .rc-card select, .rc-card textarea { padding: 8px 11px; font-size: .86rem; }
 .rc-card .field .help { font-size: .72rem; margin-top: 4px; }
 .rc-nav { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }
+
+/* each chip: open it, or × to remove it — the only place a programme is removed */
+.rc-chip { padding: 0; gap: 0; }
+.rc-chip.is-sel { background: var(--cc); border-color: var(--cc); color: #fff; }
+.rc-chip-open {
+  display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+  padding: 5px 8px 5px 9px; border: 0; background: none; color: inherit;
+  font: inherit; cursor: pointer; border-radius: 999px;
+}
+.rc-chip-x {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-right: 4px;
+  border: 0; border-radius: 50%; background: none; color: inherit; opacity: .55;
+  font: 700 1rem/1 var(--font); cursor: pointer;
+}
+.rc-chip-x:hover { opacity: 1; background: var(--err); color: #fff; }
+.rc-chip-open:focus-visible, .rc-chip-x:focus-visible { outline: 2px solid var(--ink-600); outline-offset: 1px; }
+.rc-chip-add { padding: 5px 12px 5px 9px; gap: 6px; }
