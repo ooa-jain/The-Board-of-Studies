@@ -449,6 +449,27 @@
     const C = CTX.calc || {};
     const w = C.weights || {};
     const out = [];
+    // "UG - 3 Year" → 3 years → 6 semesters
+    const yearsOf = r => {
+      const m = /(\d+)\s*Year/i.exec(String(r.degree_level || ""));
+      return m ? Number(m[1]) : null;
+    };
+    if (has("degree_level") && has("duration_years")) {
+      out.push({
+        field: "duration_years", title: "Duration from the degree",
+        calc: yearsOf,
+        explain: r => [`“${r.degree_level}” runs for ${yearsOf(r)} year${yearsOf(r) === 1 ? "" : "s"}.`],
+        empty: "Choose the degree / duration and this fills itself.",
+      });
+    }
+    if (has("duration_years") && has("semesters")) {
+      out.push({
+        field: "semesters", title: "Semesters from the duration",
+        calc: r => num(r.duration_years) === null ? null : num(r.duration_years) * 2,
+        explain: r => [`${r.duration_years} year${num(r.duration_years) === 1 ? "" : "s"} × 2 semesters a year`],
+        empty: "Enter the duration and the semesters fill themselves.",
+      });
+    }
     if (has("credits") && ["l", "t", "p", "e"].every(has)) {
       out.push({
         field: "credits", title: "Credits from contact hours",
