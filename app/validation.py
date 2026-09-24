@@ -245,6 +245,43 @@ def r_programme_unique_codes(data, ctx, sk):
     return out
 
 
+def r_programmes_offered_valid(data, ctx, sk):
+    """Department Information → Programmes offered.
+
+    Every row is kept or removed; a row the department added needs a code, a
+    name and a degree, and no code may appear twice. At least one programme
+    has to stay, because every later stage is filed per programme.
+    """
+    rows = _rows(data, sk)
+    out, seen = [], {}
+    for i, r in enumerate(rows):
+        if r.get("source") == "new":
+            if _is_blank(r.get("programme_name")):
+                out.append(err(f"Programme {i + 1}: the new programme needs a name.",
+                               section=sk, row=i, field="programme_name"))
+            code = str(r.get("programme_code") or "").strip()
+            if not code:
+                out.append(err(f"Programme {i + 1}: the new programme needs a code.",
+                               section=sk, row=i, field="programme_code"))
+            elif not re.fullmatch(r"[A-Za-z0-9\-]{2,20}", code):
+                out.append(err(f"Programme code “{code}” may use only letters, numbers and "
+                               f"hyphens (2–20 characters).",
+                               section=sk, row=i, field="programme_code"))
+            if _is_blank(r.get("degree")):
+                out.append(err(f"Programme {i + 1}: choose UG, PG or another degree level.",
+                               section=sk, row=i, field="degree"))
+        c = str(r.get("programme_code") or "").strip().upper()
+        if c:
+            if c in seen:
+                out.append(err(f"Programme code “{c}” is listed twice.",
+                               section=sk, row=i, field="programme_code"))
+            seen.setdefault(c, i)
+    if not any(r.get("decision") != "remove" for r in rows):
+        out.append(err("Keep or add at least one programme — every later stage is filed "
+                       "per programme.", section=sk))
+    return out
+
+
 # ---- credit engine --------------------------------------------------------
 
 def r_ugc_table2_minimums(data, ctx, sk):
@@ -620,6 +657,9 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
 
         elif stype == "credit_matrix":
             pass  # handled entirely by the named UGC rules below
+
+        elif stype == "programme_list":
+            pass  # rows are checked by the section's rule
 
         else:
             vals = _vals(data, sk)

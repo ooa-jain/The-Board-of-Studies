@@ -16,7 +16,7 @@ from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
-                       prefill_for, programme_stage_state, programmes_of,
+                       form_data, prefill_for, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only)
 
@@ -86,9 +86,11 @@ def stage(stage_key, programme_code=None):
     else:
         state = stage_state(sub, stage_key)
 
-    data = state.get("data") or {}
-    if not data:
-        data = prefill_for(stage_key, dept, _year())
+    synced = False
+    if programme:
+        data = state.get("data") or prefill_for(stage_key, dept, _year())
+    else:
+        data, synced = form_data(stage_key, sub, dept, _year(), status in OPENABLE)
 
     credit_matrix = None
     if any(s.get("type") == "credit_matrix" for s in stage_def["sections"]):
@@ -109,7 +111,7 @@ def stage(stage_key, programme_code=None):
     return render_template("dept/stage.html", stage=stage_def, dept=dept, submission=sub,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
-                           readonly=(status == "submitted"),
+                           readonly=(status == "submitted"), synced=synced,
                            board=board, groups=grouped_board(board))
 
 

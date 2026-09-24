@@ -389,6 +389,21 @@
   // ---------------------------------------------------------- repeating table
 
   function renderTable(section, host) {
+    // Programme Information takes its rows from Department Information:
+    // no adding or removing here, and code and name are not retyped.
+    const synced = !!(section.synced_from && CTX.synced);
+    const fixed = !!section.fixed_rows || synced;
+    const LOCKED_COLS = ["programme_code", "programme_name"];
+    if (synced) {
+      const note = el("div", "sync-note");
+      note.appendChild(el("span", null,
+        "These programmes come from Department Information. To add or remove one, "));
+      const a = el("a", null, "change the list there");
+      a.href = CTX.urls.dept_info;
+      note.appendChild(a);
+      note.appendChild(el("span", null, "."));
+      host.appendChild(note);
+    }
     const wrap = el("div", "rt-wrap");
     const table = el("table", "rt");
     const thead = el("thead");
@@ -400,7 +415,7 @@
       if (c.help) th.title = c.help;
       htr.appendChild(th);
     });
-    if (!section.fixed_rows && !CTX.readonly) {
+    if (!fixed && !CTX.readonly) {
       const actions = el("th");
       actions.appendChild(el("span", "sr-only", "Remove row"));
       htr.appendChild(actions);
@@ -418,7 +433,7 @@
     // Row-count problems belong next to the table, not in a modal dialog.
     const rowNote = el("span", "rt-note");
     rowNote.setAttribute("role", "status");
-    if (!section.fixed_rows && !CTX.readonly) {
+    if (!fixed && !CTX.readonly) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add row");
       add.type = "button";
       add.addEventListener("click", () => { rows(section.key).push({}); draw(); touch(); });
@@ -463,14 +478,16 @@
           holder.dataset.field = c.name;
           const input = makeInput(c, row[c.name], (v) => { row[c.name] = v; touch(); });
           if (c.width) input.style.minWidth = c.width;
-          if (c.type === "readonly") input.readOnly = true;
+          if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) {
+            input.readOnly = true;
+          }
           holder.appendChild(input);
           attachLiveCheck(input, c, holder);
           td.appendChild(holder);
           tr.appendChild(td);
         });
 
-        if (!section.fixed_rows && !CTX.readonly) {
+        if (!fixed && !CTX.readonly) {
           const td = el("td", "rt-del");
           const b = el("button", null, "×");
           b.type = "button";
@@ -683,6 +700,218 @@
     tally();
   }
 
+  // --------------------------------------------------------------- cards
+  /* A section the department mostly confirms rather than types: each value
+     is a card, and a pencil opens the ordinary fields to change them. */
+
+  const PENCIL = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
+    '<path d="M4 20h4L19 9l-4-4L4 16v4z" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" ' +
+    'stroke="currentColor" stroke-width="1.8"/></svg>';
+
+  function renderCards(section, block) {
+    state[section.key] = state[section.key] || {};
+    const vals = () => state[section.key];
+
+    const grid = el("div", "bento");
+    const form = el("div", "bento-form");
+    form.hidden = true;
+    const fieldsGrid = el("div", "fields-grid");
+    section.fields.forEach(f => {
+      fieldsGrid.appendChild(fieldBlock(f, vals()[f.name], v => setVal(section.key, f.name, v)));
+    });
+    form.appendChild(fieldsGrid);
+    const done = el("button", "btn btn-ghost btn-sm", "Done");
+    done.type = "button";
+    form.appendChild(done);
+
+    function paint() {
+      grid.textContent = "";
+      section.fields.forEach((f, i) => {
+        const v = vals()[f.name];
+        const empty = v === undefined || v === null || String(v).trim() === "";
+        const card = el("div", "bento-card" + (i === 0 ? " is-wide" : "") +
+                               (empty && f.required ? " is-missing" : ""));
+        card.appendChild(el("span", "bento-label", f.label));
+        card.appendChild(el("span", "bento-value" + (empty ? " is-empty" : ""),
+                            empty ? (f.required ? "Not given yet" : "—") : String(v)));
+        if (!CTX.readonly && f.type !== "readonly") {
+          const pen = el("button", "bento-edit");
+          pen.type = "button";
+          pen.innerHTML = PENCIL;
+          pen.title = `Edit ${f.label.toLowerCase()}`;
+          pen.setAttribute("aria-label", `Edit ${f.label}`);
+          pen.addEventListener("click", () => openForm(f.name));
+          card.appendChild(pen);
+        }
+        grid.appendChild(card);
+      });
+      if (window.MagicBento) window.MagicBento.attach(grid);
+    }
+
+    function openForm(fieldName) {
+      grid.hidden = true;
+      form.hidden = false;
+      const target = fieldName && form.querySelector(`[data-field="${fieldName}"] input, ` +
+        `[data-field="${fieldName}"] select, [data-field="${fieldName}"] textarea`);
+      (target || form.querySelector("input:not([readonly]), select"))?.focus();
+    }
+    form.openForm = openForm;
+
+    done.addEventListener("click", () => {
+      form.hidden = true;
+      grid.hidden = false;
+      paint();
+      grid.querySelector(".bento-edit")?.focus();
+    });
+
+    block.appendChild(grid);
+    block.appendChild(form);
+    paint();
+  }
+
+  // ------------------------------------------------------- programme list
+  /* The department's programmes from the Office of Academics workbook. Each
+     one is kept or removed; programmes the workbook does not have are added
+     at the foot. Removed rows stay visible, struck through, so a mistake is
+     one click to undo and the Office can see what was dropped. */
+
+  function renderProgrammeList(section, host) {
+    const data = rows(section.key);
+
+    const bar = el("div", "pl-bar");
+    const tally = el("span", "pl-tally");
+    tally.setAttribute("role", "status");
+    const search = el("input", "pl-search");
+    search.type = "search";
+    search.placeholder = "Find a programme";
+    search.setAttribute("aria-label", "Find a programme by name or code");
+    bar.appendChild(tally);
+    if (data.length > 6) bar.appendChild(search);
+    host.appendChild(bar);
+
+    const list = el("ul", "pl");
+    host.appendChild(list);
+
+    const foot = el("div", "rt-foot");
+    if (!CTX.readonly) {
+      const add = el("button", "btn btn-ghost btn-sm", "+ Add a new programme");
+      add.type = "button";
+      add.addEventListener("click", () => {
+        data.push({ source: "new", decision: "keep", programme_code: "",
+                    programme_name: "", degree: "", category: "" });
+        draw();
+        touch();
+        list.lastElementChild?.querySelector("input")?.focus();
+      });
+      foot.appendChild(add);
+    }
+    host.appendChild(foot);
+
+    function input(row, name, def) {
+      const holder = el("div", "pl-in pl-in-" + name);
+      holder.dataset.field = name;
+      const i = makeInput(def, row[name], v => { row[name] = v; touch(); count(); });
+      i.setAttribute("aria-label", def.label);
+      holder.appendChild(i);
+      attachLiveCheck(i, def, holder);
+      return holder;
+    }
+
+    function count() {
+      const kept = data.filter(r => r.decision !== "remove" && r.source !== "new").length;
+      const gone = data.filter(r => r.decision === "remove").length;
+      const added = data.filter(r => r.source === "new").length;
+      tally.textContent = `${kept} kept · ${gone} removed · ${added} new`;
+    }
+
+    function draw() {
+      list.textContent = "";
+      if (!data.length) {
+        list.appendChild(el("li", "pl-empty",
+          "The Office of Academics has no programmes on record for this department. " +
+          "Add each programme you run this year."));
+      }
+      data.forEach((row, i) => {
+        const removed = row.decision === "remove";
+        const li = el("li", "pl-row" + (removed ? " is-removed" : "") +
+                            (row.source === "new" ? " is-new" : ""));
+        li.dataset.row = i;
+
+        if (row.source === "new") {
+          const grid = el("div", "pl-new");
+          grid.appendChild(input(row, "programme_code",
+            { name: "programme_code", label: "Programme code", type: "text", required: true,
+              placeholder: "Code" }));
+          grid.appendChild(input(row, "programme_name",
+            { name: "programme_name", label: "Programme name", type: "text", required: true,
+              placeholder: "Full programme name" }));
+          grid.appendChild(input(row, "degree",
+            { name: "degree", label: "Degree", type: "select", required: true,
+              options: section.degrees || [] }));
+          grid.appendChild(input(row, "category",
+            { name: "category", label: "Type", type: "select",
+              options: section.categories || [] }));
+          li.appendChild(grid);
+          if (!CTX.readonly) {
+            const del = el("button", "pl-del", "×");
+            del.type = "button";
+            del.title = "Remove this new programme";
+            del.setAttribute("aria-label", `Remove new programme ${i + 1}`);
+            del.addEventListener("click", () => { data.splice(i, 1); draw(); touch(); });
+            li.appendChild(del);
+          }
+          li.appendChild(el("span", "pl-tag", "New"));
+        } else {
+          const body = el("div", "pl-body");
+          const top = el("div", "pl-top");
+          top.appendChild(el("span", "pl-code", row.programme_code || ""));
+          top.appendChild(el("span", "pl-name", row.programme_name || ""));
+          body.appendChild(top);
+          const meta = [row.degree, row.year_introduced && `since ${row.year_introduced}`,
+                        row.category, row.minors].filter(Boolean).join(" · ");
+          if (meta) body.appendChild(el("span", "pl-meta", meta));
+          li.appendChild(body);
+
+          const seg = el("div", "pl-seg");
+          seg.setAttribute("role", "group");
+          seg.setAttribute("aria-label", `Keep or remove ${row.programme_code}`);
+          [["keep", "Keep"], ["remove", "Remove"]].forEach(([val, label]) => {
+            const b = el("button", "pl-opt pl-" + val, label);
+            b.type = "button";
+            const on = (row.decision || "keep") === val;
+            b.setAttribute("aria-pressed", on ? "true" : "false");
+            b.disabled = CTX.readonly;
+            b.addEventListener("click", () => {
+              if ((row.decision || "keep") === val) return;
+              row.decision = val;
+              draw();
+              touch();
+              list.querySelector(`[data-row="${i}"] .pl-${val}`)?.focus();
+            });
+            seg.appendChild(b);
+          });
+          li.appendChild(seg);
+        }
+        list.appendChild(li);
+      });
+      count();
+      filter();
+    }
+
+    function filter() {
+      const q = search.value.trim().toLowerCase();
+      list.querySelectorAll(".pl-row").forEach(li => {
+        const row = data[+li.dataset.row] || {};
+        const hay = `${row.programme_code} ${row.programme_name}`.toLowerCase();
+        li.hidden = !!q && row.source !== "new" && !hay.includes(q);
+      });
+    }
+    search.addEventListener("input", filter);
+
+    draw();
+  }
+
   // ------------------------------------------------------------------ render
 
   function render() {
@@ -705,6 +934,10 @@
         renderTable(section, block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
+      } else if (section.type === "programme_list") {
+        renderProgrammeList(section, block);
+      } else if (section.display === "cards") {
+        renderCards(section, block);
       } else {
         const grid = el("div", "fields-grid");
         state[section.key] = state[section.key] || {};
@@ -808,7 +1041,7 @@
     const block = document.getElementById(`sec-${iss.section}`);
     if (!block) return null;
     if (iss.row !== null && iss.row !== undefined) {
-      const tr = block.querySelector(`tr[data-row="${iss.row}"]`);
+      const tr = block.querySelector(`[data-row="${iss.row}"]`);
       if (!tr) return block;
       return iss.field ? (tr.querySelector(`[data-field="${iss.field}"]`) || tr) : tr;
     }
@@ -821,6 +1054,9 @@
   function focusIssue(iss) {
     const target = locate(iss);
     if (!target) return;
+    // a field behind the cards has to be brought out before it can be fixed
+    const behind = target.closest ? target.closest(".bento-form") : null;
+    if (behind && behind.hidden && behind.openForm) behind.openForm(iss.field);
     target.scrollIntoView({ behavior: "smooth", block: "center" });
     const input = target.querySelector("input, select, textarea");
     if (input) { input.focus(); input.classList.add("is-bad"); }

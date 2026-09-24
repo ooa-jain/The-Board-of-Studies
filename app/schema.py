@@ -73,6 +73,8 @@ DEPARTMENT_INFORMATION = {
             "key": "identity",
             "title": "Department identity",
             "type": "fields",
+            # shown as cards; the pencil opens the fields for editing
+            "display": "cards",
             "fields": [
                 {"name": "dept_name", "label": "Department name", "type": "text", "required": True,
                  "prefill": "dept_name", "help": "Exactly as it appears on official university records."},
@@ -96,10 +98,18 @@ DEPARTMENT_INFORMATION = {
                 {"name": "office_phone", "label": "Department landline / extension", "type": "phone"},
                 {"name": "faculty_count", "label": "Number of full-time faculty", "type": "integer",
                  "required": True, "min": 0, "max": 1000},
-                {"name": "programme_count", "label": "Number of programmes offered", "type": "integer",
-                 "required": True, "min": 1, "max": 100,
-                 "help": "You will enter each of these programmes in the Programme Information stage."},
             ],
+        },
+        {
+            "key": "programmes_offered",
+            "title": "Programmes offered",
+            "help": "The programmes the Office of Academics has on record for your department. "
+                    "Keep the ones you run this year, remove the ones you do not, and add any "
+                    "new programme. This list carries into the UGC Mandatory Disclosure stages.",
+            "type": "programme_list",
+            "degrees": ["UG", "PG", "PG-1Yr", "PGD"],
+            "categories": ["Independent", "Specialised", "Grouped"],
+            "rules": ["programmes_offered_valid"],
         },
     ],
 }
@@ -222,6 +232,9 @@ PROGRAMME_INFORMATION = {
             "type": "table",
             "min_rows": 1,
             "programme_source": True,
+            # rows come from Department Information → Programmes offered;
+            # code and name are fixed here, the rest is filled per programme
+            "synced_from": "dept_info",
             "columns": [
                 {"name": "sl", "label": "S. No.", "type": "integer", "width": "70px", "auto_index": True},
                 {"name": "programme_name", "label": "Programme name", "type": "text", "required": True,

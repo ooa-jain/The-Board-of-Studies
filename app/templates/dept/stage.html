@@ -176,15 +176,18 @@
     key: {{ stage.key|tojson }},
     programme: {{ (programme.programme_code if programme else None)|tojson }},
     readonly: {{ readonly|tojson }},
+    synced: {{ synced|tojson }},
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
       validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},
       submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
       upload:   {{ url_for('dept.api_upload')|tojson }},
-      dashboard:{{ url_for('dept.dashboard')|tojson }}
+      dashboard:{{ url_for('dept.dashboard')|tojson }},
+      dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }}
     }
   };
 </script>
+<script src="{{ url_for('static', filename='js/magic-bento.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
 <script src="{{ url_for('static', filename='js/branch.js') }}"></script>
 {% endblock %}

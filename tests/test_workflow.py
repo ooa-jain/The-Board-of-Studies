@@ -29,6 +29,18 @@ def make_department(app, code="COM", name="Department of Commerce",
         return code.lower(), pw
 
 
+# Department Information → Programmes offered: one kept from the workbook,
+# one dropped, one the department added.
+PROGRAMMES_OK = [
+    {"programme_code": "BCMREG", "programme_name": "Bachelor of Commerce", "degree": "UG",
+     "source": "catalogue", "decision": "keep"},
+    {"programme_code": "BCHCOF", "programme_name": "B.Com in Corporate Finance",
+     "degree": "UG", "source": "catalogue", "decision": "remove"},
+    {"programme_code": "MCMNEW", "programme_name": "Master of Commerce", "degree": "PG",
+     "source": "new", "decision": "keep"},
+]
+
+
 # --------------------------------------------------------------------------
 
 def test_landing_page_does_not_name_the_campuses(client):
@@ -230,8 +242,8 @@ def test_submitting_department_information_unlocks_pre_bos(app, client):
                      "dept_code": "COM", "campus": "Jain Global Campus"},
         "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
                 "hod_email": "head@example.edu", "hod_phone": "9999999999"},
-        "contact": {"office_email": "office@example.edu", "faculty_count": 24,
-                    "programme_count": 3},
+        "contact": {"office_email": "office@example.edu", "faculty_count": 24},
+        "programmes_offered": PROGRAMMES_OK,
     }
     r = client.post("/department/api/dept_info/submit", json=payload)
     body = r.get_json()
@@ -256,8 +268,8 @@ def test_an_invalid_submission_is_refused_with_reasons(app, client):
 DEPT_INFO_OK = {
     "identity": {"dept_name": "Department of Commerce", "school": "School of Commerce",
                  "dept_code": "COM", "campus": "Jain Global Campus"},
-    "contact": {"office_email": "office@example.edu", "faculty_count": 24,
-                "programme_count": 3},
+    "contact": {"office_email": "office@example.edu", "faculty_count": 24},
+    "programmes_offered": PROGRAMMES_OK,
 }
 
 
@@ -412,8 +424,8 @@ def test_admin_can_return_a_stage_for_correction(app, client):
                      "campus": "Jain Global Campus"},
         "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
                 "hod_email": "head@example.edu", "hod_phone": "9999999999"},
-        "contact": {"office_email": "office@example.edu", "faculty_count": 1,
-                    "programme_count": 1}})
+        "contact": {"office_email": "office@example.edu", "faculty_count": 1},
+        "programmes_offered": PROGRAMMES_OK})
     client.get("/logout")
 
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
@@ -863,3 +875,53 @@ def test_a_department_still_cannot_reach_the_switch(app, client):
     set_dev_mode(app, True)
     assert client.get("/admin/settings").status_code == 403
     assert client.post("/admin/settings", data={"dev_mode": "on"}).status_code == 403
+
+
+# --------------------------------------------------------------------------
+# Department Information: identity cards and the programme list
+
+def test_department_information_lists_the_workbook_programmes(app, client):
+    u, p = make_department(app, code="COMM-JYN")
+    with app.app_context():
+        from app.db import get_db
+        get_db().departments.update_one({"dept_code": "COMM-JYN"},
+                                        {"$set": {"campus": "Jayanagar Campus"}})
+    login(client, u, p)
+    body = client.get("/department/stage/dept_info").get_data(as_text=True)
+    data = json.loads(body.split('id="stage-data" type="application/json">')[1]
+                      .split("</script>")[0])
+    codes = [r["programme_code"] for r in data["programmes_offered"]]
+    assert "BCMREG" in codes and "BCHCOF" in codes
+    assert all(r["decision"] == "keep" for r in data["programmes_offered"])
+    assert "magic-bento.js" in body
+
+
+def test_programme_list_must_keep_one_and_new_rows_need_details(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    bad = dict(DEPT_INFO_OK, programmes_offered=[
+        {"programme_code": "BCMREG", "programme_name": "B.Com", "source": "catalogue",
+         "decision": "remove"},
+        {"programme_code": "", "programme_name": "", "source": "new", "decision": "keep"},
+    ])
+    body = client.post("/department/api/dept_info/submit", json=bad).get_json()
+    assert body["ok"] is False
+    msgs = " ".join(i["message"] for i in body["issues"])
+    assert "needs a name" in msgs and "needs a code" in msgs and "UG, PG" in msgs
+
+
+def test_programme_information_follows_the_programmes_kept(app, client):
+    from app.db import get_db
+    u, p = make_department(app)
+    login(client, u, p)
+    assert client.post("/department/api/dept_info/submit",
+                       json=DEPT_INFO_OK).get_json()["ok"]
+    with app.app_context():   # developer mode: open the stage without the four before it
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
+    body = client.get("/department/stage/ugc_programme").get_data(as_text=True)
+    data = json.loads(body.split('id="stage-data" type="application/json">')[1]
+                      .split("</script>")[0])
+    rows = data["programmes"]
+    assert [r["programme_code"] for r in rows] == ["BCMREG", "MCMNEW"]
+    assert rows[1]["degree_level"] == "PG - 2 Year"
+    assert "synced: true" in body

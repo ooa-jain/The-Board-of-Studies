@@ -20,6 +20,7 @@ Stage status values
 
 from __future__ import annotations
 
+from . import catalogue
 from .db import get_db, now, rules_doc, settings
 from .schema import STAGE_BY_KEY, STAGE_KEYS, STAGES, stage_index
 from .validation import build_context, validate_stage
@@ -382,6 +383,9 @@ def prefill_for(stage_key, department, academic_year):
     source["academic_year"] = academic_year
     out = {}
     for section in stage.get("sections", []):
+        if section.get("type") == "programme_list":
+            out[section["key"]] = catalogue_rows(department)
+            continue
         if section.get("type") != "fields":
             continue
         vals = {}
@@ -392,3 +396,71 @@ def prefill_for(stage_key, department, academic_year):
         if vals:
             out[section["key"]] = vals
     return out
+
+
+def catalogue_rows(department):
+    """The department's programmes from the Office of Academics workbook, as
+    rows of the Programmes offered list — every one kept until the
+    department says otherwise."""
+    everyone = list(get_db().departments.find({}, {"dept_name": 1, "campus": 1}))
+    fields = ("programme_code", "programme_name", "degree", "year_introduced",
+              "category", "minors")
+    return [{**{k: r.get(k, "") for k in fields}, "source": "catalogue", "decision": "keep"}
+            for r in catalogue.programmes_for(department or {}, everyone)]
+
+
+def offered_programmes(submission):
+    """Programmes offered, as confirmed in Department Information — None if
+    that list has never been saved (older records file programmes by hand)."""
+    data = stage_state(submission, "dept_info").get("data") or {}
+    rows = data.get("programmes_offered")
+    if not isinstance(rows, list):
+        return None
+    return [r for r in rows
+            if r.get("decision") != "remove" and str(r.get("programme_code") or "").strip()]
+
+
+# Only the unambiguous ones: a UG row in the workbook could be three years or
+# four, so the department chooses that itself.
+_DEGREE_LEVEL = {"PG": "PG - 2 Year", "PG-1Yr": "PG - 1 Year"}
+
+
+def sync_programme_rows(existing, offered):
+    """Rows for Programme Information, one per programme offered, in that
+    order. What was already filled against a code is kept; code and name
+    follow Department Information."""
+    by_code = {str(r.get("programme_code") or "").strip().upper(): r
+               for r in existing or [] if isinstance(r, dict)}
+    out = []
+    for p in offered:
+        code = str(p["programme_code"]).strip()
+        row = dict(by_code.get(code.upper()) or {})
+        if not row and _DEGREE_LEVEL.get(p.get("degree")):
+            row["degree_level"] = _DEGREE_LEVEL[p["degree"]]
+        row["programme_code"] = code
+        row["programme_name"] = p.get("programme_name") or row.get("programme_name", "")
+        out.append(row)
+    return out
+
+
+def form_data(stage_key, submission, department, academic_year, editable):
+    """What a stage's form opens with: the saved draft, with the prefill for
+    any section it has never held, and — for Programme Information — the
+    programme rows lined up with Department Information. Returns (data,
+    synced) where `synced` says the programme rows are fixed by that list."""
+    data = dict(stage_state(submission, stage_key).get("data") or {})
+    if not editable:
+        return data, False
+    for key, value in prefill_for(stage_key, department, academic_year).items():
+        data.setdefault(key, value)
+
+    synced = False
+    stage = STAGE_BY_KEY.get(stage_key) or {}
+    for section in stage.get("sections", []):
+        if section.get("synced_from") != "dept_info":
+            continue
+        offered = offered_programmes(submission)
+        if offered:
+            data[section["key"]] = sync_programme_rows(data.get(section["key"]), offered)
+            synced = True
+    return data, synced
