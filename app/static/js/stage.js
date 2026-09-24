@@ -1180,23 +1180,9 @@
     const tabs = section.tabs || [{ key: "all", label: "Programmes", degrees: null }];
     const tabOf = row => (tabs.find(t => t.degrees && t.degrees.includes(row.degree)) ||
                           tabs[0]).key;
-    let active = tabs[0].key;
 
     const wrap = el("div", "pl-wrap");
     host.appendChild(wrap);
-
-    const tablist = el("div", "pl-tabs");
-    tablist.setAttribute("role", "tablist");
-    const tabButtons = {};
-    tabs.forEach(t => {
-      const b = el("button", "pl-tab");
-      b.type = "button";
-      b.setAttribute("role", "tab");
-      b.addEventListener("click", () => { active = t.key; draw(); });
-      tabButtons[t.key] = b;
-      tablist.appendChild(b);
-    });
-    wrap.appendChild(tablist);
 
     const bar = el("div", "pl-bar");
     const tally = el("span", "pl-tally");
@@ -1207,28 +1193,41 @@
     search.setAttribute("aria-label", "Find a programme by name or code");
     bar.appendChild(tally);
     bar.appendChild(search);
-    let add = null;
-    if (!CTX.readonly) {
-      add = el("button", "btn btn-gold btn-sm pl-add");
-      add.type = "button";
-      add.addEventListener("click", () => {
-        const tab = tabs.find(t => t.key === active);
-        data.push({ source: "new", decision: "keep", programme_code: "",
-                    programme_name: "", degree: (tab.degrees || [""])[0], category: "" });
-        draw();
-        touch();
-        list.lastElementChild?.querySelector("input")?.focus();
-      });
-      bar.appendChild(add);
-    }
     wrap.appendChild(bar);
 
-    const list = el("ul", "pl");
-    list.setAttribute("role", "tabpanel");
-    wrap.appendChild(list);
+    // one panel per degree group, side by side
+    const cols = el("div", "pl-cols");
+    wrap.appendChild(cols);
+    const panels = {};
+    tabs.forEach((t, n) => {
+      const panel = el("section", `pl-panel pl-panel-${n % 2 ? "b" : "a"}`);
+      panel.setAttribute("aria-label", t.label);
+      const head = el("div", "pl-panel-head");
+      const title = el("h4", "pl-panel-title");
+      head.appendChild(title);
+      panel.appendChild(head);
+      const list = el("ol", "pl");
+      panel.appendChild(list);
+      if (!CTX.readonly) {
+        const add = el("button", "pl-panel-add");
+        add.type = "button";
+        add.innerHTML = ICON.plus;
+        add.appendChild(el("span", null, `Add ${t.key === "all" ? "a" : t.key} programme`));
+        add.addEventListener("click", () => {
+          data.push({ source: "new", decision: "keep", programme_code: "",
+                      programme_name: "", degree: (t.degrees || [""])[0] });
+          draw();
+          touch();
+          list.lastElementChild?.querySelector("input")?.focus();
+        });
+        panel.appendChild(add);
+      }
+      cols.appendChild(panel);
+      panels[t.key] = { tab: t, title: title, list: list };
+    });
 
-    // an issue on a row in the other tab brings that tab forward
-    wrap.showRow = i => { if (data[i]) { active = tabOf(data[i]); draw(); } };
+    // every row is on screen now; kept for focusIssue
+    wrap.showRow = () => draw();
 
     function input(row, name, def) {
       const holder = el("div", "pl-in pl-in-" + name);
@@ -1240,112 +1239,107 @@
       return holder;
     }
 
-    function draw() {
-      const tab = tabs.find(t => t.key === active);
-      tabs.forEach(t => {
-        const n = data.filter(r => tabOf(r) === t.key && r.decision !== "remove").length;
-        const b = tabButtons[t.key];
-        b.textContent = "";
-        b.appendChild(el("span", null, t.label));
-        b.appendChild(el("span", "pl-tab-n", String(n)));
-        b.setAttribute("aria-selected", t.key === active ? "true" : "false");
-      });
-      if (add) {
-        add.innerHTML = ICON.plus;
-        add.appendChild(el("span", null, `Add ${tab.key === "all" ? "a" : tab.key} programme`));
-      }
+    function rowItem(row, i, n) {
+      const removed = row.decision === "remove";
+      const li = el("li", "pl-row" + (removed ? " is-removed" : "") +
+                          (row.source === "new" ? " is-new" : ""));
+      li.dataset.row = i;
+      li.appendChild(el("span", "pl-num", String(n).padStart(2, "0")));
 
-      list.textContent = "";
-      const mine = data.map((r, i) => [r, i]).filter(([r]) => tabOf(r) === active);
-      if (!mine.length) {
-        list.appendChild(el("li", "pl-empty",
-          `No ${tab.key === "all" ? "" : tab.key + " "}programmes on record. ` +
-          "Use the plus button to add each one you run this year."));
-      }
-      mine.forEach(([row, i]) => {
-        const removed = row.decision === "remove";
-        const li = el("li", "pl-row" + (removed ? " is-removed" : "") +
-                            (row.source === "new" ? " is-new" : ""));
-        li.dataset.row = i;
-
-        if (row.source === "new") {
-          const grid = el("div", "pl-new");
-          grid.appendChild(input(row, "programme_code",
-            { name: "programme_code", label: "Programme code", type: "text", required: true,
-              placeholder: "Code" }));
-          grid.appendChild(input(row, "programme_name",
-            { name: "programme_name", label: "Programme name", type: "text", required: true,
-              placeholder: "Full programme name" }));
-          grid.appendChild(input(row, "degree",
-            { name: "degree", label: "Degree", type: "select", required: true,
-              options: section.degrees || [] }));
-          grid.appendChild(input(row, "category",
-            { name: "category", label: "Type", type: "select",
-              options: section.categories || [] }));
-          li.appendChild(grid);
-          li.appendChild(el("span", "pl-tag", "New"));
-          if (!CTX.readonly) {
-            const del = iconButton("pl-icon pl-minus", "minus", "Take this new programme off");
-            del.addEventListener("click", () => { data.splice(i, 1); draw(); touch(); });
-            li.appendChild(del);
-          }
-        } else {
-          const body = el("div", "pl-body");
-          const top = el("div", "pl-top");
-          top.appendChild(el("span", "pl-code", row.programme_code || ""));
-          top.appendChild(el("span", "pl-name", row.programme_name || ""));
-          body.appendChild(top);
-          const meta = [row.degree, row.year_introduced && `since ${row.year_introduced}`,
-                        row.category, row.minors].filter(Boolean).join(" · ");
-          if (meta) body.appendChild(el("span", "pl-meta", meta));
-          if (removed) {
-            const why = el("span", "pl-why");
-            why.dataset.field = "removal_reason";
-            why.textContent = "Removed — " + (row.removal_reason || "no reason given") +
-                              (row.removal_note ? `: ${row.removal_note}` : "");
-            body.appendChild(why);
-          }
-          li.appendChild(body);
-
-          if (!CTX.readonly) {
-            if (removed) {
-              const back = iconButton("pl-icon pl-plus", "plus", `Keep ${row.programme_code} after all`);
-              back.addEventListener("click", () => {
-                row.decision = "keep";
-                delete row.removal_reason;
-                delete row.removal_note;
-                draw();
-                touch();
-              });
-              li.appendChild(back);
-            } else {
-              const rm = iconButton("pl-icon pl-minus", "minus", `Remove ${row.programme_code}`);
-              rm.addEventListener("click", async () => {
-                const answer = await askRemovalReason(row, section.removal_reasons || ["Other"]);
-                if (!answer) { rm.focus(); return; }
-                row.decision = "remove";
-                row.removal_reason = answer.reason;
-                row.removal_note = answer.note;
-                draw();
-                touch();
-              });
-              li.appendChild(rm);
-            }
-          }
+      if (row.source === "new") {
+        const grid = el("div", "pl-new");
+        grid.appendChild(input(row, "programme_code",
+          { name: "programme_code", label: "Programme code", type: "text", required: true,
+            placeholder: "Code" }));
+        grid.appendChild(input(row, "degree",
+          { name: "degree", label: "Degree", type: "select", required: true,
+            options: section.degrees || [] }));
+        grid.appendChild(input(row, "programme_name",
+          { name: "programme_name", label: "Programme name", type: "text", required: true,
+            placeholder: "Full programme name" }));
+        const body = el("div", "pl-body");
+        body.appendChild(el("span", "pl-tag", "New"));
+        body.appendChild(grid);
+        li.appendChild(body);
+        if (!CTX.readonly) {
+          const del = iconButton("pl-icon pl-minus", "minus", "Take this new programme off");
+          del.addEventListener("click", () => { data.splice(i, 1); draw(); touch(); });
+          li.appendChild(del);
         }
-        list.appendChild(li);
+        return li;
+      }
+
+      const body = el("div", "pl-body");
+      body.appendChild(el("span", "pl-name", row.programme_name || ""));
+      const meta = el("span", "pl-meta");
+      meta.appendChild(el("span", "pl-code", row.programme_code || ""));
+      const rest = [row.degree, row.year_introduced && `since ${row.year_introduced}`,
+                    row.minors].filter(Boolean).join(" · ");
+      if (rest) meta.appendChild(document.createTextNode(" " + rest));
+      body.appendChild(meta);
+      if (removed) {
+        const why = el("span", "pl-why");
+        why.dataset.field = "removal_reason";
+        why.textContent = "Removed — " + (row.removal_reason || "no reason given") +
+                          (row.removal_note ? `: ${row.removal_note}` : "");
+        body.appendChild(why);
+      }
+      li.appendChild(body);
+
+      if (!CTX.readonly) {
+        if (removed) {
+          const back = iconButton("pl-icon pl-plus", "plus", `Keep ${row.programme_code} after all`);
+          back.addEventListener("click", () => {
+            row.decision = "keep";
+            delete row.removal_reason;
+            delete row.removal_note;
+            draw();
+            touch();
+          });
+          li.appendChild(back);
+        } else {
+          const rm = iconButton("pl-icon pl-minus", "minus", `Remove ${row.programme_code}`);
+          rm.addEventListener("click", async () => {
+            const answer = await askRemovalReason(row, section.removal_reasons || ["Other"]);
+            if (!answer) { rm.focus(); return; }
+            row.decision = "remove";
+            row.removal_reason = answer.reason;
+            row.removal_note = answer.note;
+            draw();
+            touch();
+          });
+          li.appendChild(rm);
+        }
+      }
+      return li;
+    }
+
+    function draw() {
+      Object.values(panels).forEach(({ tab, title, list }) => {
+        const mine = data.map((r, i) => [r, i]).filter(([r]) => tabOf(r) === tab.key);
+        const live = mine.filter(([r]) => r.decision !== "remove").length;
+        title.textContent = "";
+        title.appendChild(el("span", null, tab.label));
+        title.appendChild(el("span", "pl-panel-n", String(live)));
+        list.textContent = "";
+        if (!mine.length) {
+          list.appendChild(el("li", "pl-empty",
+            `No ${tab.key === "all" ? "" : tab.key + " "}programmes on record. ` +
+            "Use the plus button below to add each one you run this year."));
+        }
+        mine.forEach(([row, i], n) => list.appendChild(rowItem(row, i, n + 1)));
       });
 
-      const kept = data.filter(r => tabOf(r) === active && r.decision !== "remove" && r.source !== "new").length;
-      const gone = data.filter(r => tabOf(r) === active && r.decision === "remove").length;
-      const added = data.filter(r => tabOf(r) === active && r.source === "new").length;
+      const kept = data.filter(r => r.decision !== "remove" && r.source !== "new").length;
+      const gone = data.filter(r => r.decision === "remove").length;
+      const added = data.filter(r => r.source === "new").length;
       tally.textContent = `${kept} kept · ${gone} removed · ${added} new`;
       filter();
     }
 
     function filter() {
       const q = search.value.trim().toLowerCase();
-      list.querySelectorAll(".pl-row").forEach(li => {
+      wrap.querySelectorAll(".pl-row").forEach(li => {
         const row = data[+li.dataset.row] || {};
         const hay = `${row.programme_code} ${row.programme_name}`.toLowerCase();
         li.hidden = !!q && row.source !== "new" && !hay.includes(q);

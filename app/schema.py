@@ -94,7 +94,6 @@ DEPARTMENT_INFORMATION = {
                     "new programme. This list carries into the UGC Mandatory Disclosure stages.",
             "type": "programme_list",
             "degrees": ["UG", "PG", "PG-1Yr", "PGD"],
-            "categories": ["Independent", "Specialised", "Grouped"],
             # the tabs the list is split into, by the workbook's Degree column
             "tabs": [{"key": "UG", "label": "UG programmes", "degrees": ["UG"]},
                      {"key": "PG", "label": "PG programmes",
@@ -114,7 +113,6 @@ DEPARTMENT_INFORMATION = {
                 {"name": "programme_code", "label": "Code"},
                 {"name": "programme_name", "label": "Programme"},
                 {"name": "degree", "label": "Degree"},
-                {"name": "category", "label": "Type"},
                 {"name": "source", "label": "From"},
                 {"name": "decision", "label": "Kept / removed"},
                 {"name": "removal_reason", "label": "Reason for removal"},

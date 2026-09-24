@@ -2198,3 +2198,62 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 
 /* "Open <programme name>": a name, so it keeps its own capitals */
 .btn-prog { text-transform: none; letter-spacing: 0; font-size: .92rem; line-height: 1.35; text-align: center; }
+
+/* ---------- programmes offered: UG and PG side by side ----------
+   Two framed panels, each with a label tab breaking its top edge, a solid
+   offset shadow in its colour, and large faint numerals down the side. */
+.pl-cols {
+  display: grid; gap: 28px; align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 6px;
+}
+.pl-panel {
+  --pc: var(--ink-800); --pc-soft: #aab4d6; --pc-wash: #eef1f9;
+  position: relative; margin: 22px 8px 8px 0; padding: 38px 18px 16px;
+  background: var(--surface); border: 2px solid var(--pc); border-radius: 18px;
+  box-shadow: 8px 8px 0 var(--pc);
+}
+.pl-panel-b { --pc: #e8620f; --pc-soft: #f4b98c; --pc-wash: #fdf0e6; }
+.pl-panel-head { position: absolute; top: -20px; left: -8px; }
+.pl-panel-title {
+  margin: 0; display: inline-flex; align-items: center; gap: 12px;
+  padding: 10px 20px; background: var(--pc); color: #fff;
+  border-radius: 4px; font-size: 1.02rem; font-weight: 700;
+}
+.pl-panel-n {
+  min-width: 26px; padding: 2px 8px; border-radius: 999px; text-align: center;
+  background: rgba(255, 255, 255, .22); font-size: .78rem;
+}
+.pl-panel .pl { gap: 0; counter-reset: none; }
+.pl-panel .pl-row {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: start;
+  gap: 12px; padding: 14px 4px; background: none; border: 0; border-radius: 0;
+  border-bottom: 1px dashed var(--line);
+}
+.pl-panel .pl-row:last-child { border-bottom: 0; }
+.pl-num {
+  font: 700 1.7rem/1 Georgia, "Times New Roman", serif; color: var(--pc-soft);
+  font-variant-numeric: tabular-nums; padding-top: 2px;
+}
+.pl-panel .pl-body { display: grid; gap: 4px; min-width: 0; }
+.pl-panel .pl-name { font-size: .92rem; line-height: 1.4; }
+.pl-panel .pl-meta { font-size: .76rem; line-height: 1.5; }
+.pl-panel .pl-code { margin-right: 4px; font-size: .7rem; padding: 2px 6px; background: var(--pc-wash); color: var(--pc); }
+.pl-panel .pl-row.is-removed { background: none; opacity: .75; }
+.pl-panel .pl-row.is-new { background: none; border: 0; border-bottom: 1px dashed var(--line); padding-right: 4px; }
+.pl-panel .pl-row.is-new .pl-tag { position: static; justify-self: start; }
+.pl-panel .pl-new { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pl-panel .pl-new .pl-in-programme_name { grid-column: 1 / -1; }
+.pl-panel .pl-icon { width: 30px; height: 30px; margin-top: 2px; }
+.pl-panel-add {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+  padding: 8px 14px; border: 1.5px dashed var(--pc); border-radius: 999px;
+  background: var(--pc-wash); color: var(--pc); cursor: pointer;
+  font: 700 .8rem var(--font);
+}
+.pl-panel-add:hover { background: var(--pc); color: #fff; border-style: solid; }
+.pl-panel-add:focus-visible { outline: 2px solid var(--pc); outline-offset: 2px; }
+.pl-panel .pl-empty { background: var(--pc-wash); }
+@media (max-width: 900px) {
+  .pl-cols { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+}
