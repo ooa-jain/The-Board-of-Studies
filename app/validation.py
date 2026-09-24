@@ -217,6 +217,7 @@ def r_experts_unique_emails(data, ctx, sk):
 def r_programme_duration_semesters(data, ctx, sk):
     out = []
     for i, r in enumerate(_rows(data, sk)):
+        # semesters are no longer asked for; an older row may still carry them
         yrs, sems = _int(r.get("duration_years")), _int(r.get("semesters"))
         if yrs and sems and sems != yrs * 2:
             out.append(err(f"A {yrs}-year programme has {yrs * 2} semesters, not {sems}.",
@@ -293,9 +294,28 @@ def r_programmes_offered_valid(data, ctx, sk):
 
 # ---- credit engine --------------------------------------------------------
 
+def _category_credits(data, ctx):
+    """Credits per UGC Table 2 category, added up from the programme
+    structure — only the courses on this programme's track count. An older
+    draft that still holds a typed-in matrix is read as it was."""
+    typed = _vals(data, "credit_summary")
+    if typed and not _rows(data, "semester_structure"):
+        return typed
+    track = U.honours_track(ctx.get("degree_level"))
+    out = {}
+    for r in _rows(data, "semester_structure"):
+        if not U.row_counts_for(r, track):
+            continue
+        key = U.NEP_CATEGORY_TO_KEY.get(r.get("nep_category"))
+        cr = _num(r.get("credits"))
+        if key and cr is not None:
+            out[key] = out.get(key, 0) + cr
+    return out
+
+
 def r_ugc_table2_minimums(data, ctx, sk):
-    """Check the entered credit matrix against UGC Table 2."""
-    matrix = _vals(data, sk)
+    """Check the credits in each category against UGC Table 2."""
+    matrix = _category_credits(data, ctx)
     track = ctx.get("track")
     degree = ctx.get("degree_level")
     table = ctx.get("table2") or U.DEFAULT_TABLE_2
@@ -319,9 +339,7 @@ def r_ugc_table2_minimums(data, ctx, sk):
             continue
 
         if entered is None:
-            out.append(err(f"{label}: enter the credits your programme awards. "
-                           f"The UGC minimum is {spec['min']}.", section=sk, field=key))
-            continue
+            entered = 0
 
         lo, hi = spec.get("min"), spec.get("max")
         if lo is not None and entered < lo:
@@ -334,7 +352,7 @@ def r_ugc_table2_minimums(data, ctx, sk):
 
 
 def r_ugc_total_credits(data, ctx, sk):
-    matrix = _vals(data, sk)
+    matrix = _category_credits(data, ctx)
     track = ctx.get("track")
     if not track:
         return []
@@ -710,7 +728,8 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
         deg = programme.get("degree_level")
         ctx["degree_level"] = deg
         ctx["track"] = U.get_track(deg)
-        ctx["semesters"] = _int(programme.get("semesters"))
+        yrs = _int(programme.get("duration_years"))
+        ctx["semesters"] = _int(programme.get("semesters")) or (yrs * 2 if yrs else None)
         ctx["programme_code"] = programme.get("programme_code")
 
         curric = ((submission.get("programmes") or {})

@@ -1102,7 +1102,8 @@
         b.addEventListener("click", () => { tab = t.key; drawCard(); });
         tabs.appendChild(b);
       });
-      card.appendChild(tabs);
+      // one tab is no choice at all, so it is not shown
+      if (TABS.length > 1) card.appendChild(tabs);
 
       if (tab === "outcomes" && OUT.length && !CTX.readonly) {
         const tools = outcomeTools(row, i);
@@ -1284,6 +1285,66 @@
       w2.appendChild(t2);
       box.appendChild(el("h4", "cd-head", "Summary"));
       box.appendChild(w2);
+      ugcCheck(all);
+    }
+
+    // --- UGC Table 2, from the same courses (only this programme's track)
+    function ugcCheck(all) {
+      const side = document.getElementById("credit-tally");
+      if (!CREDIT || !CREDIT.rows || !CREDIT.rows.length) {
+        box.appendChild(el("p", "small muted",
+          "UGC Table 2 applies to 3-year and 4-year UG programmes only."));
+        return;
+      }
+      const map = (CTX.calc || {}).nep_to_key || {};
+      const by = {};
+      all.filter(rowCounts).forEach(r => {
+        const k = map[r.nep_category];
+        if (k) by[k] = (by[k] || 0) + (num(r.credits) || 0);
+      });
+      const t3 = el("table", "cd-table");
+      const h3 = el("tr");
+      ["Category", `UGC minimum (${CREDIT.track_label})`, "Your credits", ""].forEach(
+        (x, n) => h3.appendChild(el("th", n ? "num" : null, x)));
+      const th3 = el("thead");
+      th3.appendChild(h3);
+      t3.appendChild(th3);
+      const b3 = el("tbody");
+      let total = 0;
+      CREDIT.rows.forEach(r => {
+        if (!r.applicable) return;
+        const got = by[r.key] || 0;
+        total += got;
+        const ok = got >= r.min && (r.max === null || r.max === undefined || got <= r.max);
+        const tr = el("tr");
+        tr.appendChild(el("td", null, r.label));
+        tr.appendChild(el("td", "num", r.max ? `${r.min} – ${r.max}` : String(r.min)));
+        tr.appendChild(el("td", "num cd-strong", fmt(got)));
+        tr.appendChild(el("td", "num " + (ok ? "ok-tick" : "bad-tick"), ok ? "✓" : "✗"));
+        b3.appendChild(tr);
+      });
+      const need = CREDIT.total;
+      const tr = el("tr", "total");
+      tr.appendChild(el("td", null, "Total"));
+      tr.appendChild(el("td", "num", String(need ?? "—")));
+      tr.appendChild(el("td", "num", fmt(total)));
+      tr.appendChild(el("td", "num " + (need && total < need ? "bad-tick" : "ok-tick"),
+                        need && total < need ? "✗" : "✓"));
+      b3.appendChild(tr);
+      t3.appendChild(b3);
+      const w3 = el("div", "rt-wrap");
+      w3.appendChild(t3);
+      box.appendChild(el("h4", "cd-head", "Check against UGC Table 2"));
+      box.appendChild(w3);
+
+      if (side && need) {
+        const short = need - total;
+        side.textContent = "";
+        side.appendChild(el("span", short > 0 ? "tally-short" : "tally-met",
+          short > 0 ? `${fmt(short)} credit${short === 1 ? "" : "s"} short` : "Total requirement met"));
+        side.appendChild(el("div", "muted",
+          short > 0 ? `${fmt(total)} entered of ${need} required` : `${fmt(total)} credits entered`));
+      }
     }
 
     window.addEventListener("stage:rows", e => {

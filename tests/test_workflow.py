@@ -966,16 +966,18 @@ def test_programme_information_offers_every_programme_in_one_click(app, client):
     assert "synced: false" in body
 
 
-def test_each_programme_carries_its_own_vision_and_mission(app, client):
+def test_programme_information_asks_only_what_the_template_names(app, client):
+    """No vision / mission / outcomes and no semesters: the Office's list is
+    name, code, degree, specialisation, intake, duration, credits, batch
+    and NEP category."""
     from app.db import get_db
     u, p = make_department(app)
     with app.app_context():
         get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
     login(client, u, p)
     row = {"programme_name": "Bachelor of Commerce", "programme_code": "BCOM",
-           "degree_level": "UG - 3 Year", "duration_years": 3, "semesters": 6, "intake": 60,
-           "batch": "2027-30", "regulation": "NEP 2020"}
+           "degree_level": "UG - 3 Year", "duration_years": 3, "intake": 60,
+           "total_credits": 120, "batch": "2027-30", "regulation": "NEP 2020"}
     body = client.post("/department/api/ugc_programme/validate",
                        json={"programmes": [row]}).get_json()
-    fields = {i["field"] for i in body["issues"] if i["level"] == "error"}
-    assert {"vision", "mission", "peos", "pos", "psos"} <= fields
+    assert not [i for i in body["issues"] if i["level"] == "error"], body["issues"]

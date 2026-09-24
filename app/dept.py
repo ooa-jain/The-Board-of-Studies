@@ -98,7 +98,8 @@ def stage(stage_key, programme_code=None):
         data, synced = form_data(stage_key, sub, dept, _year(), status in OPENABLE)
 
     credit_matrix = None
-    if any(s.get("type") == "credit_matrix" for s in stage_def["sections"]):
+    if any(s.get("type") in ("credit_matrix", "credit_distribution")
+           for s in stage_def["sections"]):
         doc = rules_doc()
         track = U.get_track((programme or {}).get("degree_level"))
         credit_matrix = {

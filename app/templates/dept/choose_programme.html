@@ -36,7 +36,7 @@
         {%- if p.specialisation %} · {{ p.specialisation }}{% endif %}
       </p>
       {% set facts = [] %}
-      {% if p.semesters %}{% set _ = facts.append(p.semesters ~ ' semesters') %}{% endif %}
+      {% if p.duration_years %}{% set _ = facts.append(p.duration_years ~ ' years') %}{% endif %}
       {% if p.batch %}{% set _ = facts.append('batch ' ~ p.batch) %}{% endif %}
       {% if p.intake %}{% set _ = facts.append('intake ' ~ p.intake) %}{% endif %}
       {% if facts %}<p class="small muted">{{ facts|join(' · ') }}</p>{% endif %}

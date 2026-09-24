@@ -128,14 +128,6 @@ def test_four_year_needs_one_hundred_and_sixty():
     assert any("at least 160 credits" in m for m in msgs), msgs
 
 
-def test_honours_without_research_must_declare_three_courses_for_twelve_credits():
-    data = _matrix(major_core=80, minor_stream=32)
-    issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 4 Year (Honours)"))
-    msgs = errors(issues)
-    assert any("in lieu" in m and "12 credits" in m for m in msgs)
-    assert any("in lieu" in m and "3 courses" in m for m in msgs)
-
-
 def test_honours_without_research_passes_when_in_lieu_is_declared():
     data = _matrix(major_core=113, minor_stream=32)
     data["credit_summary"]["in_lieu_courses"] = 3
@@ -206,14 +198,6 @@ def test_malformed_course_code_is_caught():
     assert any("Course code" in m and "expected format" in m for m in errors(issues))
 
 
-def test_section_b_must_equal_the_sum_of_section_c():
-    data = {"credit_summary": {"major_core": 60},
-            "semester_structure": [_course(credits=4, l=4, total_marks=100, cia=50, ese=50)]}
-    issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 3 Year", 6))
-    assert any("Section B declares 60 credits" in m and "add up to 4" in m
-               for m in errors(issues))
-
-
 def test_university_style_course_codes_are_accepted():
     data = {"credit_summary": {}, "semester_structure": [_course(course_code="26BCC1C01")]}
     issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 3 Year", 6))
@@ -228,10 +212,16 @@ def test_a_course_may_repeat_across_the_two_honours_tracks():
     assert not any("used twice" in m for m in errors(issues))
 
 
-def test_section_b_counts_only_this_programmes_track():
+def test_ugc_table2_is_worked_out_from_the_programme_structure():
+    """Nothing is typed into a credit grid: the categories are added up from
+    the courses, and only this programme's semester 7-8 track counts."""
     rows = [_course(credits=4, l=4, total_marks=100, cia=50, ese=50),
-            _course(course_code="R7", semester=7, credits=4, l=4, total_marks=100, cia=50, ese=50,
+            _course(course_code="R7", semester=7, credits=4, l=4, total_marks=100, cia=50,
+                    ese=50, nep_category="Research Project / Dissertation",
                     track="Honours with Research")]
-    data = {"credit_summary": {"major_core": 4}, "semester_structure": rows}
-    issues, _ = validate_stage("ugc_curriculum", data, ctx("UG - 4 Year (Honours)", 8))
-    assert not any("Section B declares" in m for m in errors(issues))
+    issues, _ = validate_stage("ugc_curriculum", {"semester_structure": rows},
+                               ctx("UG - 4 Year (Honours)", 8))
+    msgs = errors(issues)
+    assert any("Major (Core): 4 credits is below the UGC minimum" in m for m in msgs)
+    assert any("Total credits come to 4." in m for m in msgs)
+
