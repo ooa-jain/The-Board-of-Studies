@@ -2092,3 +2092,25 @@ html.is-preloading .preload.is-done { opacity: 0; pointer-events: none; }
   background: var(--gold-100); color: var(--gold-700); border-radius: var(--radius-sm);
 }
 .sync-note a { color: var(--ink-700); font-weight: 600; }
+
+/* Department identity as one box: every value in it, one pencil */
+.bento:has(.bento-single) { display: block; }
+.bento-single { padding: 26px 64px 26px 28px; min-height: 0; justify-content: flex-start; }
+.bento-single:hover { transform: none; }
+.bento-items {
+  margin: 0; display: grid; gap: 22px 28px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.bento-item { display: grid; gap: 6px; align-content: start; margin: 0; }
+.bento-item dd { margin: 0; }
+.bento-item.is-wide { grid-column: 1 / -1; }
+.bento-item.is-wide .bento-value { font-size: 1.4rem; }
+.bento-item.is-missing .bento-value { color: #ffb4a8; }
+.bento-single .bento-edit { top: 18px; right: 18px; width: 38px; height: 38px; }
+@media (max-width: 720px) {
+  .bento-items { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .bento-single { padding: 22px 58px 22px 20px; }
+}
+@media (max-width: 460px) {
+  .bento-items { grid-template-columns: minmax(0, 1fr); }
+}

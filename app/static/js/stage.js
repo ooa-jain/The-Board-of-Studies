@@ -725,27 +725,32 @@
     done.type = "button";
     form.appendChild(done);
 
+    // one box holding every value, with a single pencil for the lot
     function paint() {
       grid.textContent = "";
+      const card = el("div", "bento-card bento-single");
+      const list = el("dl", "bento-items");
       section.fields.forEach((f, i) => {
         const v = vals()[f.name];
         const empty = v === undefined || v === null || String(v).trim() === "";
-        const card = el("div", "bento-card" + (i === 0 ? " is-wide" : "") +
+        const item = el("div", "bento-item" + (i === 0 ? " is-wide" : "") +
                                (empty && f.required ? " is-missing" : ""));
-        card.appendChild(el("span", "bento-label", f.label));
-        card.appendChild(el("span", "bento-value" + (empty ? " is-empty" : ""),
+        item.appendChild(el("dt", "bento-label", f.label));
+        item.appendChild(el("dd", "bento-value" + (empty ? " is-empty" : ""),
                             empty ? (f.required ? "Not given yet" : "—") : String(v)));
-        if (!CTX.readonly && f.type !== "readonly") {
-          const pen = el("button", "bento-edit");
-          pen.type = "button";
-          pen.innerHTML = PENCIL;
-          pen.title = `Edit ${f.label.toLowerCase()}`;
-          pen.setAttribute("aria-label", `Edit ${f.label}`);
-          pen.addEventListener("click", () => openForm(f.name));
-          card.appendChild(pen);
-        }
-        grid.appendChild(card);
+        list.appendChild(item);
       });
+      card.appendChild(list);
+      if (!CTX.readonly) {
+        const pen = el("button", "bento-edit");
+        pen.type = "button";
+        pen.innerHTML = PENCIL;
+        pen.title = `Edit ${section.title.toLowerCase()}`;
+        pen.setAttribute("aria-label", `Edit ${section.title}`);
+        pen.addEventListener("click", () => openForm());
+        card.appendChild(pen);
+      }
+      grid.appendChild(card);
       if (window.MagicBento) window.MagicBento.attach(grid);
     }
 
