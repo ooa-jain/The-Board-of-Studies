@@ -1007,3 +1007,33 @@ footer.site a { color: rgba(255,255,255,.72); }
   .slip { border-color: #333; box-shadow: none; }
   .card { box-shadow: none; border-color: #ccc; break-inside: avoid; }
 }
+
+/* ---------------------------------------------------- curriculum programmes */
+.part-list { display: flex; flex-direction: column; gap: 8px; }
+.part-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.part-info { flex: 1; min-width: 120px; display: flex; flex-direction: column; }
+.note-err { color: var(--err); }
+.part-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.part-tab {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink-700); text-decoration: none; font-size: .9rem;
+}
+.part-tab:hover { background: var(--ink-050); }
+.part-tab.is-here { background: var(--ink-800); border-color: var(--ink-800); color: #fff; font-weight: 600; }
+
+/* a repeating section shown as cards (syllabus, revision log) */
+.rc-list { display: flex; flex-direction: column; gap: 14px; }
+.rc-card { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.rc-head {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  border-bottom: 1px solid var(--line); font-weight: 600;
+}
+.rc-head .spacer { flex: 1; }
+.rc-body { padding: 14px; }
+input.is-auto, textarea.is-auto { background: var(--ink-050); }
+.upload-list { display: block; }

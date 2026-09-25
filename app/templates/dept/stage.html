@@ -7,10 +7,12 @@
     <div>
       <div class="crumbs">
         <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a>
-        <span>›</span> {{ stage.group }}
+        <span>›</span>
+        {% if stage.parent %}<a href="{{ url_for('dept.stage', stage_key=stage.parent) }}">{{ stage.group }}</a>
+        {% else %}{{ stage.group }}{% endif %}
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
-      <h1>{{ stage.title }}</h1>
+      <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{{ stage.title }}</h1>
       <p>{{ stage.blurb }}</p>
       {% if stage.source_templates %}
       <p class="small note-gold">
@@ -32,6 +34,16 @@
 {% endblock %}
 
 {% block content %}
+{% if parts %}
+<nav class="part-tabs" aria-label="Parts of this programme">
+  {% for part in parts %}
+  <a href="{{ url_for('dept.stage', stage_key=part.key, programme_code=programme.programme_code) }}"
+     class="part-tab{{ ' is-here' if part.here }}"{% if part.here %} aria-current="page"{% endif %}>
+    <span class="mini-dot mini-{{ part.status }}" aria-hidden="true"></span>{{ part.title }}
+  </a>
+  {% endfor %}
+</nav>
+{% endif %}
 {% if state.returned_note %}
 <div class="alert alert-warning">
   <div><strong>Sent back by the Office of Academics:</strong> {{ state.returned_note }}</div>
@@ -107,7 +119,7 @@
   <div class="wrap">
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
-    <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back</a>
+    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
     <button class="btn btn-ghost" type="button" id="btn-check">Check now</button>
     <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage</button>
   </div>
@@ -118,7 +130,7 @@
     <span class="save-note">Submitted on
       {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
     <span class="spacer"></span>
-    <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back to my submission</a>
+    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
   </div>
 </div>
 {% endif %}
@@ -128,6 +140,7 @@
 <script id="stage-def" type="application/json">{{ stage|tojson }}</script>
 <script id="stage-data" type="application/json">{{ data|tojson }}</script>
 <script id="credit-def" type="application/json">{{ (credit_matrix or {})|tojson }}</script>
+<script id="lookups" type="application/json">{{ (lookups or {})|tojson }}</script>
 <script>
   window.STAGE_CTX = {
     key: {{ stage.key|tojson }},
