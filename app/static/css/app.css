@@ -2476,3 +2476,12 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .part-tab:hover { background: var(--ink-050); }
 .part-tab.is-here { background: var(--ink-800); border-color: var(--ink-800); color: #fff; font-weight: 600; }
 .file-previews { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-top: 8px; }
+
+/* the Curriculum branch: UG / PG → programme → its three parts */
+.scroll-tall { max-height: 70vh; }
+.branch-nested { margin-left: 4px; max-height: none; }
+.branch-children.branch-nested[data-open="false"] { max-height: 0; }
+.branch-parent-sm { font-size: .92em; padding-top: 3px; padding-bottom: 3px; }
+.branch-parent-sm .branch-label { letter-spacing: 0; }
+.is-here-prog > .branch-parent .branch-label { font-weight: 700; color: var(--ink-800); }
+.branch-children[data-open="true"]:has(.branch-nested) { max-height: none; }

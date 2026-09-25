@@ -147,7 +147,33 @@ def stage(stage_key, programme_code=None):
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,
                            parts=_parts_nav(sub, stage_def, programme),
+                           prog_tree=_programme_tree(sub, dept, programme),
                            board=board, groups=grouped_board(board))
+
+
+def _programme_tree(sub, dept, current=None):
+    """The side menu's Curriculum branch: UG / PG, each programme, its parts."""
+    stage_def = next((s for s in STAGE_BY_KEY.values() if s.get("parts")), None)
+    if not stage_def:
+        return []
+    here = (current or {}).get("programme_code")
+    levels = {"UG": [], "PG": []}
+    for p in programmes_of(sub, dept):
+        levels["PG" if p["level"] in ("PG", "PGD") else "UG"].append({
+            "code": p["programme_code"], "name": p["programme_name"],
+            "here": p["programme_code"] == here,
+            "parts": [{"key": k, "title": STAGE_BY_KEY[k]["title"],
+                       "status": part_status(sub, p["programme_code"], k)}
+                      for k in stage_def["parts"]],
+        })
+    tree = []
+    for name, progs in levels.items():
+        if progs:
+            tree.append({"name": name, "programmes": progs,
+                         "here": any(x["here"] for x in progs),
+                         "done": sum(1 for x in progs
+                                     if all(pt["status"] == "submitted" for pt in x["parts"]))})
+    return tree
 
 
 def _parts_nav(sub, stage_def, programme):
