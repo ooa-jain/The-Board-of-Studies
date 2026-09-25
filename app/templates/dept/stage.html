@@ -8,10 +8,12 @@
     <div>
       <div class="crumbs">
         <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a>
-        <span>›</span> {{ stage.group }}
+        <span>›</span>
+        {% if stage.parent %}<a href="{{ url_for('dept.stage', stage_key=stage.parent) }}">{{ stage.group }}</a>
+        {% else %}{{ stage.group }}{% endif %}
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
-      <h1>{{ stage.title }}</h1>
+      <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{{ stage.title }}</h1>
       <p>{{ stage.blurb }}</p>
       {% if stage.source_templates %}
       <p class="small note-gold">
@@ -40,6 +42,16 @@
 {% endblock %}
 
 {% block content %}
+{% if parts %}
+<nav class="part-tabs" aria-label="Parts of this programme">
+  {% for part in parts %}
+  <a href="{{ url_for('dept.stage', stage_key=part.key, programme_code=programme.programme_code) }}"
+     class="part-tab{{ ' is-here' if part.here }}"{% if part.here %} aria-current="page"{% endif %}>
+    <span class="mini-dot mini-{{ part.status }}" aria-hidden="true"></span>{{ part.title }}
+  </a>
+  {% endfor %}
+</nav>
+{% endif %}
 {% if state.returned_note %}
 <div class="alert alert-warning">
   <div><strong>Sent back by the Office of Academics:</strong> {{ state.returned_note }}</div>
@@ -106,7 +118,7 @@
       <div class="card-body tight scroll-300">
         <ul class="branch">
           {% for g in groups %}
-          {% set here = g.stages|selectattr('key','equalto',stage.key)|list|length > 0 %}
+          {% set here = g.stages|selectattr('key','equalto',stage.parent or stage.key)|list|length > 0 %}
           <li class="branch-group{{ ' is-done' if g.complete }}">
             <button class="branch-parent" type="button"
                     aria-expanded="{{ 'true' if here else 'false' }}"
@@ -121,7 +133,7 @@
             <ul class="branch-children" id="branch-g{{ loop.index }}"
                 data-open="{{ 'true' if here else 'false' }}">
               {% for s in g.stages %}
-              <li class="branch-row is-{{ s.status }}{{ ' is-here' if s.key == stage.key }}"
+              <li class="branch-row is-{{ s.status }}{{ ' is-here' if s.key == (stage.parent or stage.key) }}"
                   style="--i: {{ loop.index0 }}">
                 {% if s.status == 'locked' %}
                 <span class="branch-dead">
@@ -131,13 +143,13 @@
                 </span>
                 {% else %}
                 <a class="branch-link" href="{{ url_for('dept.stage', stage_key=s.key) }}"
-                   {% if s.key == stage.key %}aria-current="page"{% endif %}>
+                   {% if s.key == (stage.parent or stage.key) %}aria-current="page"{% endif %}>
                   <span class="branch-icon">{{ art.stage_icon(s.status) }}</span>
                   <span class="branch-text">{{ s.title }}</span>
                   <span class="sr-only">
                     — {{ {'submitted': 'submitted', 'draft': 'in progress',
                           'returned': 'returned for correction'}.get(s.status, 'open') }}
-                    {{- ', this stage' if s.key == stage.key }}
+                    {{- ', this stage' if s.key == (stage.parent or stage.key) }}
                   </span>
                 </a>
                 {% endif %}
@@ -157,7 +169,7 @@
   <div class="wrap">
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
-    <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back</a>
+    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
     <button class="btn btn-ghost" type="button" id="btn-check">Check now</button>
     <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage</button>
   </div>
@@ -168,7 +180,7 @@
     <span class="save-note">Submitted on
       {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
     <span class="spacer"></span>
-    <a class="btn btn-ghost" href="{{ url_for('dept.dashboard') }}">Back to my submission</a>
+    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
   </div>
 </div>
 {% endif %}

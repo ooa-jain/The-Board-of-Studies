@@ -74,11 +74,11 @@ def _resume_for(user):
 # Drawn from the schema's file fields, in the order they are asked for.
 FILINGS = [
     {"name": "DIAC composition, signed", "stage": "Pre-BoS"},
-    {"name": "Board of Studies composition, signed", "stage": "Pre-BoS"},
-    {"name": "PAC composition, signed", "stage": "Pre-BoS"},
-    {"name": "Meeting agenda and minutes", "stage": "Meeting Documents"},
-    {"name": "Approved BoS file", "stage": "Final BoS Repository"},
-    {"name": "Consolidated PDF of everything", "stage": "Final BoS Repository"},
+    {"name": "DPAC composition, signed", "stage": "Pre-BoS"},
+    {"name": "BoS composition, vision and mission, minutes", "stage": "BoS Documents"},
+    {"name": "Geotagged photos, attendance, external profiles", "stage": "BoS Documents"},
+    {"name": "Stakeholder feedback", "stage": "BoS Documents"},
+    {"name": "Curriculum, syllabus and revision log per programme", "stage": "Curriculum"},
 ]
 
 

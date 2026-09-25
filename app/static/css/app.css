@@ -2457,3 +2457,22 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .sample-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; }
 .sample-links a { color: var(--ink-600); font-weight: 600; text-decoration: underline; }
 .section-link { display: inline-block; margin: -4px 0 14px; font-size: .84rem; font-weight: 700; color: var(--ink-600); }
+
+/* ---------------------------------------------------- curriculum programmes */
+.part-list { display: flex; flex-direction: column; gap: 8px; }
+.part-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.part-info { flex: 1; min-width: 120px; display: flex; flex-direction: column; }
+.note-err { color: var(--err); }
+.part-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.part-tab {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--ink-700); text-decoration: none; font-size: .9rem;
+}
+.part-tab:hover { background: var(--ink-050); }
+.part-tab.is-here { background: var(--ink-800); border-color: var(--ink-800); color: #fff; font-weight: 600; }
+.file-previews { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-top: 8px; }

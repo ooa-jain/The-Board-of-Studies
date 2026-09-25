@@ -14,6 +14,8 @@
   const STAGE = JSON.parse(document.getElementById("stage-def").textContent);
   const CREDIT = JSON.parse(document.getElementById("credit-def").textContent || "{}");
   const CTX = window.STAGE_CTX;
+  // run after every change: counts that follow a table, and the like
+  const refreshers = [];
   let state = JSON.parse(document.getElementById("stage-data").textContent || "{}");
 
   const root = document.getElementById("sections");
@@ -301,36 +303,60 @@
     host.appendChild(card);
   }
 
-  function uploadFile(input, def, onChange) {
-    const file = input.files[0];
-    if (!file) return;
+  /** One preview, or a row of them for a box that takes several files. */
+  function showFiles(host, val) {
+    const oldList = host.querySelector(".file-previews");
+    if (oldList) oldList.remove();
+    if (!Array.isArray(val)) { filePreview(host, val); return; }
+    const old = host.querySelector(".file-preview");
+    if (old) old.remove();
+    const list = el("div", "file-previews");
+    val.forEach(v => { const slot = el("div"); filePreview(slot, v); list.appendChild(slot); });
+    host.appendChild(list);
+  }
+
+  function fileNames(val) {
+    return (Array.isArray(val) ? val : [val]).filter(v => v && v.name).map(v => v.name);
+  }
+
+  function uploadOne(file, def) {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("stage", CTX.key);
     fd.append("field", def.name);
+    return fetch(CTX.urls.upload, { method: "POST", body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (!j.ok) throw new Error(j.error || `Upload of ${file.name} failed.`);
+        // thumb comes along too, or the preview has no picture to show
+        return { name: j.name, stored: j.stored, size: j.size,
+                 url: j.url, thumb: j.thumb || null };
+      });
+  }
+
+  function uploadFile(input, def, onChange) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
     const note = input.parentElement.querySelector(".upload-note") ||
                  input.parentElement.appendChild(el("span", "help upload-note"));
     note.className = "help upload-note";
     note.setAttribute("role", "status");
-    note.textContent = "Uploading…";
-    fetch(CTX.urls.upload, { method: "POST", body: fd })
-      .then(r => r.json())
-      .then(j => {
-        if (j.ok) {
-          // thumb comes along too, or the preview has no picture to show
-          const val = { name: j.name, stored: j.stored, size: j.size,
-                        url: j.url, thumb: j.thumb || null };
-          note.textContent = `Uploaded: ${j.name} (${sizeLabel(j.size)})`;
-          note.className = "help upload-note is-ok";
-          filePreview(input.parentElement, val);
-          onChange(val);
-        } else {
-          note.textContent = j.error || "Upload failed.";
-          note.className = "help upload-note is-bad-text";
-        }
+    note.textContent = files.length > 1 ? `Uploading ${files.length} files…` : "Uploading…";
+    // one after another, so a slow connection is not flooded
+    files.reduce((chain, f) => chain.then(done => uploadOne(f, def).then(v => done.concat([v]))),
+                 Promise.resolve([]))
+      .then(done => {
+        const val = def.multiple ? done : done[0];
+        note.textContent = done.length > 1
+          ? `Uploaded ${done.length} files`
+          : `Uploaded: ${done[0].name} (${sizeLabel(done[0].size)})`;
+        note.className = "help upload-note is-ok";
+        showFiles(input.parentElement, val);
+        onChange(val);
       })
-      .catch(() => {
-        note.textContent = "Upload failed — check your connection and choose the file again.";
+      .catch(e => {
+        note.textContent = (e && e.message) ||
+          "Upload failed — check your connection and choose the file again.";
         note.className = "help upload-note is-bad-text";
       });
   }
@@ -370,12 +396,13 @@
     input.id = `f-${def.name}`;
     wrap.appendChild(input);
 
-    if (value && def.type === "file" && typeof value === "object") {
-      const n = el("span", "help upload-note", `Uploaded: ${value.name}`);
+    if (value && def.type === "file" && typeof value === "object" && fileNames(value).length) {
+      const n = el("span", "help upload-note", `Uploaded: ${fileNames(value).join(", ")}`);
       n.classList.add("is-ok");
       wrap.appendChild(n);
-      filePreview(wrap, value);
+      showFiles(wrap, value);
     }
+    wrap._input = input;
     if (def.help) {
       const help = el("span", "help", def.help);
       help.id = `f-${def.name}-help`;
@@ -1066,7 +1093,7 @@
       stage.textContent = "";
       if (!data.length) {
         stage.appendChild(el("p", "pl-empty",
-          `No ${NOUN}s yet. Use “Fill in all ${NOUN}s” or “Add ${NOUN}” above.`));
+          fillBtn ? `No ${NOUN}s yet. Use “Fill in all ${NOUN}s” or “Add ${NOUN}” above.` : `No ${NOUN}s yet. Use “Add ${NOUN}” above.`));
         return;
       }
       sel = Math.min(sel, data.length - 1);
@@ -1979,8 +2006,20 @@
         const grid = el("div", "fields-grid");
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
-          const b = fieldBlock(f, state[section.key][f.name],
-                               v => setVal(section.key, f.name, v));
+          const b = fieldBlock(f, state[section.key][f.name], v => {
+            setVal(section.key, f.name, v);
+            // the credit check follows the degree: save, then reopen with it
+            if (f.reload_on_change) { reloadAfterSave = true; clearTimeout(saveTimer); save(); }
+          });
+          if (f.count && b._input) {
+            // "No. of courses with major revisions" and the like count themselves
+            const c = f.count;
+            refreshers.push(() => {
+              const n = rows(c.section).filter(r => r && r[c.field] === c.value).length;
+              state[section.key][f.name] = n;
+              b._input.value = String(n);
+            });
+          }
           grid.appendChild(b);
         });
         block.appendChild(grid);
@@ -1993,8 +2032,14 @@
 
   let saveTimer = null;
   let dirty = false;
+  let reloadAfterSave = false;
+
+  function refresh() {
+    refreshers.forEach(fn => { try { fn(); } catch (_) { /* never block typing */ } });
+  }
 
   function touch() {
+    refresh();
     dirty = true;
     saveNote.textContent = "Unsaved changes";
     saveNote.className = "save-note";
@@ -2015,6 +2060,7 @@
         dirty = false;
         saveNote.textContent = "Saved " + new Date().toLocaleTimeString();
         saveNote.className = "save-note saved";
+        if (reloadAfterSave) { reloadAfterSave = false; window.location.reload(); }
       } else {
         saveNote.textContent = j.error || "Could not save";
         saveNote.className = "save-note";
@@ -2176,6 +2222,7 @@
   // ------------------------------------------------------------------- boot
 
   render();
+  refresh();
 
   if (!CTX.readonly) {
     document.getElementById("btn-check").addEventListener("click", () => check());

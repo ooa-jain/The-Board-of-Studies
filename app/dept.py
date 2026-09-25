@@ -16,8 +16,8 @@ from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
-                       course_fill_source, form_data, prefill_for, programme_fill_source,
-                       programme_stage_state, programmes_of,
+                       course_fill_source, form_data, part_status, prefill_for,
+                       programme_fill_source, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only)
 
@@ -50,7 +50,7 @@ def dashboard():
     sub = get_or_create_submission(dept["dept_code"], _year())
     return render_template("dept/dashboard.html", dept=dept, submission=sub,
                            board=stage_board(sub), progress=progress(sub),
-                           programmes=programmes_of(sub), year=_year(),
+                           programmes=programmes_of(sub, dept), year=_year(),
                            next_step=next_action(sub))
 
 
@@ -66,24 +66,26 @@ def stage(stage_key, programme_code=None):
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
 
+    top_key = stage_def.get("parent") or stage_key
     status = compute_status(sub, stage_key)
     if status == "locked":
-        prev = STAGE_BY_KEY[STAGE_KEYS[STAGE_KEYS.index(stage_key) - 1]]["title"]
-        flash(f"“{stage_def['title']}” opens once you have submitted “{prev}”.", "info")
+        prev = STAGE_BY_KEY[STAGE_KEYS[STAGE_KEYS.index(top_key) - 1]]["title"]
+        flash(f"“{STAGE_BY_KEY[top_key]['title']}” opens once you have submitted “{prev}”.",
+              "info")
         return redirect(url_for("dept.dashboard"))
 
     programme = None
     if stage_def.get("per_programme"):
-        programmes = programmes_of(sub)
+        programmes = programmes_of(sub, dept)
         if not programmes:
-            flash("Add your programmes in the Programme Information stage first.", "info")
+            flash("Keep at least one programme in Department Information first.", "info")
             return redirect(url_for("dept.dashboard"))
-        if not programme_code:
-            return render_template("dept/choose_programme.html", stage=stage_def,
-                                   programmes=programmes, submission=sub, dept=dept)
+        if stage_def.get("parts") or not programme_code:
+            return _programme_hub(STAGE_BY_KEY[top_key], programmes, sub, dept)
         programme = next((p for p in programmes
                           if p.get("programme_code") == programme_code), None) or abort(404)
         state = programme_stage_state(sub, programme_code, stage_key)
+        status = part_status(sub, programme_code, stage_key)
     else:
         state = stage_state(sub, stage_key)
 
@@ -92,8 +94,13 @@ def stage(stage_key, programme_code=None):
         data = dict(state.get("data") or {})
         if status in OPENABLE:
             # a section the draft has never held opens with its prefill
-            for key, value in prefill_for(stage_key, dept, _year(), programme).items():
+            for key, value in prefill_for(stage_key, dept, _year(), programme, sub).items():
                 data.setdefault(key, value)
+        # read-only values follow the record they are copied from
+        for key, vals in prefill_for(stage_key, dept, _year(), programme, sub,
+                                     readonly_only=True).items():
+            if isinstance(data.get(key), dict):
+                data[key] = {**data[key], **vals}
     else:
         data, synced = form_data(stage_key, sub, dept, _year(), status in OPENABLE)
 
@@ -131,9 +138,7 @@ def stage(stage_key, programme_code=None):
 
     fill = []
     if status in OPENABLE:
-        if stage_key == "ugc_programme":
-            fill = programme_fill_source(sub, dept)
-        elif stage_key == "ugc_course" and programme:
+        if stage_key == "prog_syllabus" and programme:
             fill = course_fill_source(sub, programme["programme_code"])
 
     board = stage_board(sub)
@@ -141,7 +146,38 @@ def stage(stage_key, programme_code=None):
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,
+                           parts=_parts_nav(sub, stage_def, programme),
                            board=board, groups=grouped_board(board))
+
+
+def _parts_nav(sub, stage_def, programme):
+    """Curriculum · Syllabus · Course Revision, as tabs across one programme."""
+    if not programme or not stage_def.get("parent"):
+        return []
+    parent = STAGE_BY_KEY[stage_def["parent"]]
+    return [{"key": k, "title": STAGE_BY_KEY[k]["title"],
+             "status": part_status(sub, programme["programme_code"], k),
+             "here": k == stage_def["key"]} for k in parent["parts"]]
+
+
+def _programme_hub(stage_def, programmes, sub, dept):
+    """The Curriculum stage: the mapped programmes, UG and PG, three parts each."""
+    groups = {}
+    for p in programmes:
+        p = dict(p)
+        p["parts"] = []
+        for k in stage_def["parts"]:
+            st = programme_stage_state(sub, p["programme_code"], k)
+            p["parts"].append({"key": k, "title": STAGE_BY_KEY[k]["title"],
+                               "status": part_status(sub, p["programme_code"], k),
+                               "errors": (st.get("summary") or {}).get("errors", 0),
+                               "note": st.get("returned_note")})
+        groups.setdefault("PG" if p["level"] in ("PG", "PGD") else "UG", []).append(p)
+    board = stage_board(sub)
+    return render_template("dept/choose_programme.html", stage=stage_def, groups=groups,
+                           submission=sub, dept=dept, board=board,
+                           groups_board=grouped_board(board),
+                           status=compute_status(sub, stage_def["key"]))
 
 
 # ---------------------------------------------------------------------------
@@ -151,12 +187,19 @@ def stage(stage_key, programme_code=None):
 def _guard(stage_key, programme_code=None):
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
-    if compute_status(sub, stage_key) not in OPENABLE:
-        return None, None, None, (jsonify({"ok": False,
-                                           "error": "This stage is not open for editing."}), 409)
+    stage_def = STAGE_BY_KEY.get(stage_key)
+    closed = (jsonify({"ok": False, "error": "This stage is not open for editing."}), 409)
+    if not stage_def or stage_def.get("parts"):
+        return None, None, None, closed
+    if stage_def.get("parent"):
+        if (not programme_code or compute_status(sub, stage_key) == "locked"
+                or part_status(sub, programme_code, stage_key) == "submitted"):
+            return None, None, None, closed
+    elif compute_status(sub, stage_key) not in OPENABLE:
+        return None, None, None, closed
     programme = None
     if programme_code:
-        programme = next((p for p in programmes_of(sub)
+        programme = next((p for p in programmes_of(sub, dept)
                           if p.get("programme_code") == programme_code), None)
         if not programme:
             return None, None, None, (jsonify({"ok": False,
@@ -198,6 +241,15 @@ def api_submit(stage_key, programme_code=None):
     data = request.get_json(silent=True) or {}
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])
+    if status == "submitted" and programme:
+        audit(_me()["username"], "stage.submitted",
+              f"{dept['dept_code']}/{programme['programme_code']}/{stage_key}")
+        flash(f"{programme['programme_name']}: “{STAGE_BY_KEY[stage_key]['title']}” is submitted.",
+              "success")
+        return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
+                        "next": None,
+                        "redirect": url_for("dept.stage",
+                                            stage_key=STAGE_BY_KEY[stage_key]["parent"])})
     if status == "submitted":
         audit(_me()["username"], "stage.submitted", f"{dept['dept_code']}/{stage_key}")
         nxt_key = None

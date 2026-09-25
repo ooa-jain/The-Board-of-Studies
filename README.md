@@ -41,23 +41,17 @@ Table 2 credit table.
 
 ## The stages
 
-| # | Stage | Replaces |
-|---|-------|----------|
-| 1 | Department Information | — |
-| 2 | **Pre-BoS** | Composition of DIAC · Board of Studies · Programme Assessment Committee |
-| 3 | BoS Committee Information | Expert Profile_Form.docx |
-| 4 | Programme Information | Curriculum Matrix Template, Section A |
-| 5 | **Curriculum & Regulations** | Curriculum Matrix Template, Sections B–D (credit engine runs here) |
-| 6 | Course Information | [Template] Syllabus.pdf + skill mapping |
-| 7 | Course Revision & Mapping | Course Revisions Log_Template_2026.xlsx |
-| 8 | Stakeholder Feedback | Stakeholder Input Log |
-| 9 | Meeting Documents | Minutes of the Meeting_Template.docx |
-| 10 | Approval & Compliance | — |
-| 11 | Supporting Documents | — |
-| 12 | Design and Development Plan | Design & Development Plan template |
-| 13 | Final BoS Repository | — |
+| Level | Stage | What the department does |
+|-------|-------|--------------------------|
+| 0 | Department Information | Confirms the department record and the programmes mapped to it (UG and PG) |
+| 1 | **Pre-BoS** | Uploads the signed DIAC and DPAC compositions |
+| 2 | **BoS Documents** | Enters the BoS date and uploads: BoS composition · Vision, Mission and Program Overview · Minutes · Geotagged photos · External member profiles · Attendance sheet · Stakeholder feedback (curriculum, and new program if any) |
+| 3 | **Curriculum** | Opens each mapped programme (UG / PG) and fills its **Curriculum** (Curriculum Matrix template), **Syllabus** (syllabus template) and **Course Revision** (Course Revisions Log 2026) |
 
-Stages 5, 6 and 7 are filled once per programme.
+Auto-filled: programme code and name, degree, batch, department and BoS date are carried into
+every form; credits and total marks work themselves out; the credit classification follows the
+programme structure; "Fill in all courses" lists every course in the Syllabus with its title,
+credits and hours; the revision log counts its major and minor revisions.
 
 ---
 

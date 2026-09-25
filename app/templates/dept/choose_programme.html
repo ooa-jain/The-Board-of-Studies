@@ -9,54 +9,65 @@
         <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> {{ stage.group }}
       </div>
       <h1>{{ stage.title }}</h1>
-      <p>{{ stage.blurb }} This stage is filled once per programme.</p>
+      <p>{{ stage.blurb }}</p>
+    </div>
+    <div class="spacer head-aside">
+      {% if status == 'submitted' %}<span class="pill pill-ok">All programmes submitted</span>
+      {% elif status == 'returned' %}<span class="pill pill-err">Returned for correction</span>
+      {% elif status == 'draft' %}<span class="pill pill-warn">In progress</span>
+      {% else %}<span class="pill pill-gold">Open</span>{% endif %}
     </div>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-2">
-  {% for p in programmes %}
-  {% set st = (submission.programmes.get(p.programme_code, {}).get(stage.key, {})) %}
-  <div class="card frame frame-{{ 'navy' if loop.index is odd else 'orange' }} prog-frame">
+{% for level in ('UG', 'PG') if groups.get(level) %}
+<div class="group-label">{{ level }} programmes</div>
+<div class="grid grid-2 mb-2">
+  {% for p in groups[level] %}
+  <div class="card frame frame-{{ 'orange' if level == 'PG' else 'navy' }} prog-frame">
     <span class="frame-tab">{{ p.programme_code }}</span>
     <div class="card-head">
       <h3>{{ p.programme_name }}</h3>
-      <span class="spacer">
-        {% if st.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
-        {% elif st.status == 'draft' %}<span class="pill pill-warn">In progress</span>
-        {% else %}<span class="pill">Not started</span>{% endif %}
-      </span>
     </div>
     <div class="card-body">
-      <p class="small muted mb-1">
-        <span class="mono">{{ p.programme_code }}</span>
-        {%- if p.degree_level %} · {{ p.degree_level }}{% endif %}
-        {%- if p.specialisation %} · {{ p.specialisation }}{% endif %}
-      </p>
       {% set facts = [] %}
-      {% if p.duration_years %}{% set _ = facts.append(p.duration_years ~ ' years') %}{% endif %}
+      {% if p.degree_level %}{% set _ = facts.append(p.degree_level) %}{% endif %}
+      {% if p.specialisation %}{% set _ = facts.append(p.specialisation) %}{% endif %}
       {% if p.batch %}{% set _ = facts.append('batch ' ~ p.batch) %}{% endif %}
-      {% if p.intake %}{% set _ = facts.append('intake ' ~ p.intake) %}{% endif %}
-      {% if facts %}<p class="small muted">{{ facts|join(' · ') }}</p>{% endif %}
-      {% if programmes|selectattr('programme_code', 'equalto', p.programme_code)|list|length > 1 %}
-        <div class="alert alert-warning small mt-1 mb-0">
-          Another programme also uses the code {{ p.programme_code }}. Give each programme its
-          own code in Programme Information, or both will open the same record.
+      <p class="small muted mb-1">
+        <span class="mono">{{ p.programme_code }}</span>{% if facts %} · {{ facts|join(' · ') }}{% endif %}
+      </p>
+      <div class="part-list">
+        {% for part in p.parts %}
+        <div class="part-row">
+          <div class="part-info">
+            <strong>{{ part.title }}</strong>
+            {% if part.note %}<span class="small note-err">Returned: {{ part.note }}</span>{% endif %}
+          </div>
+          {% if part.errors and part.status != 'submitted' %}<span class="pill pill-err">{{ part.errors }} to fix</span>{% endif %}
+          {% if part.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
+          {% elif part.status == 'returned' %}<span class="pill pill-err">Returned</span>
+          {% elif part.status == 'draft' %}<span class="pill pill-warn">In progress</span>
+          {% else %}<span class="pill">Not started</span>{% endif %}
+          <a class="btn btn-sm {{ 'btn-ghost' if part.status == 'submitted' else 'btn-gold' if part.status == 'open' else '' }}"
+             href="{{ url_for('dept.stage', stage_key=part.key, programme_code=p.programme_code) }}">
+            {{ 'View' if part.status == 'submitted' else 'Correct' if part.status == 'returned'
+               else 'Continue' if part.status == 'draft' else 'Start' }}
+          </a>
         </div>
-      {% endif %}
-      {% if st.summary and st.summary.errors %}
-        <div class="alert alert-error small mt-1 mb-0">
-          {{ st.summary.errors }} item(s) still to fix.
-        </div>
-      {% endif %}
-      <a class="btn btn-block mt-2 btn-prog"
-         href="{{ url_for('dept.stage', stage_key=stage.key, programme_code=p.programme_code) }}">
-        {{ 'Review' if st.status == 'submitted' else 'Open' }} {{ p.programme_name or p.programme_code }}
-      </a>
+        {% endfor %}
+      </div>
     </div>
   </div>
   {% endfor %}
 </div>
+{% endfor %}
+
+<p class="small muted">
+  A programme missing here? It comes from the Programmes offered list in
+  <a href="{{ url_for('dept.stage', stage_key='dept_info') }}">Department Information</a> — ask the
+  Office of Academics to reopen that stage if it is already submitted.
+</p>
 {% endblock %}

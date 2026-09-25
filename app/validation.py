@@ -516,7 +516,7 @@ def r_course_codes_known(data, ctx, sk):
         c = str(r.get("course_code", "")).strip().upper()
         if c and c not in known:
             out.append(err(f"Course code “{c}” does not appear in the programme structure you "
-                           f"submitted in the Curriculum & Regulations stage.",
+                           f"saved in this programme's Curriculum.",
                            section=sk, row=i, field="course_code"))
     return out
 
@@ -734,7 +734,7 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
 
         curric = ((submission.get("programmes") or {})
                   .get(programme.get("programme_code"), {})
-                  .get("ugc_curriculum", {}).get("data", {}))
+                  .get("prog_curriculum", {}).get("data", {}))
         ctx["known_course_codes"] = {
             str(r.get("course_code", "")).strip().upper()
             for r in (curric.get("semester_structure") or [])

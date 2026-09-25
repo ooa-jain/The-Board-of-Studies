@@ -22,7 +22,8 @@ from __future__ import annotations
 
 from . import catalogue
 from .db import get_db, now, rules_doc, settings
-from .schema import STAGE_BY_KEY, STAGE_KEYS, STAGES, stage_index
+from .schema import (STAGE_BY_KEY, STAGE_KEYS, STAGES, degree_years, programme_level,
+                     stage_index)
 from .validation import build_context, validate_stage
 
 OPENABLE = {"open", "draft", "returned"}
@@ -86,10 +87,27 @@ def compute_status(submission: dict, stage_key: str, dev: bool | None = None) ->
     pass it when resolving a whole board, so thirteen stages cost one
     lookup rather than thirteen.
     """
+    stage = STAGE_BY_KEY.get(stage_key) or {}
+    if stage.get("parent"):
+        return compute_status(submission, stage["parent"], dev)
+
     stored = stage_state(submission, stage_key).get("status")
+    if stage.get("parts"):
+        # A container: open once the stage before is done, then as far on
+        # as its programme parts are.
+        if _gate(submission, stage_key, dev) == "locked":
+            return "locked"
+        return parts_status(submission, stage)
+
     if stored in ("submitted", "returned", "draft"):
         return stored
+    return _gate(submission, stage_key, dev)
 
+
+def _gate(submission, stage_key, dev=None):
+    """open when the stage before is submitted, or the Office forced it open."""
+    if stage_state(submission, stage_key).get("status") == "open":
+        return "open"
     idx = stage_index(stage_key)
     if idx <= 0:
         return "open"
@@ -102,6 +120,25 @@ def compute_status(submission: dict, stage_key: str, dev: bool | None = None) ->
     prev_key = STAGE_KEYS[idx - 1]
     prev = compute_status(submission, prev_key, dev)
     return "open" if prev in DONE else "locked"
+
+
+def parts_status(submission: dict, stage: dict) -> str:
+    """submitted once every part of every programme is submitted."""
+    states = [programme_stage_state(submission, p["programme_code"], part).get("status")
+              for p in programmes_of(submission) for part in stage["parts"]]
+    if not states:
+        return "open"
+    if "returned" in states:
+        return "returned"
+    if all(s == "submitted" for s in states):
+        return "submitted"
+    if any(states):
+        return "draft"
+    return "open"
+
+
+def part_status(submission: dict, programme_code: str, part_key: str) -> str:
+    return programme_stage_state(submission, programme_code, part_key).get("status") or "open"
 
 
 def stage_board(submission: dict, dev: bool | None = None):
@@ -288,10 +325,34 @@ def progress(submission: dict):
             "percent": round(done * 100 / len(STAGES)) if STAGES else 0}
 
 
-def programmes_of(submission: dict):
-    """Programme rows captured in the Programme Information stage."""
-    data = stage_state(submission, "ugc_programme").get("data") or {}
-    return [p for p in (data.get("programmes") or []) if p.get("programme_code")]
+def programmes_of(submission: dict, department: dict | None = None):
+    """The programmes mapped to the department — kept in Department
+    Information — with the details each one's Curriculum holds."""
+    offered = offered_programmes(submission)
+    if offered is None:
+        offered = catalogue_rows(department) if department else []
+    out, seen = [], set()
+    for p in offered:
+        code = str(p.get("programme_code") or "").strip()
+        if not code or code.upper() in seen:
+            continue
+        seen.add(code.upper())
+        details = (programme_stage_state(submission, code, "prog_curriculum")
+                   .get("data") or {}).get("details") or {}
+        row = {"programme_code": code, "programme_name": p.get("programme_name") or code,
+               "degree": p.get("degree", ""), "category": p.get("category", "")}
+        row["degree_level"] = details.get("degree_level") or _DEGREE_LEVEL.get(p.get("degree"), "")
+        row["specialisation"] = details.get("specialisation", "")
+        row["batch"] = details.get("batch", "")
+        years = degree_years(row["degree_level"])
+        row["duration_years"] = years
+        row["semesters"] = years * 2 if years else None
+        if row["degree_level"]:
+            row["level"] = programme_level(row["degree_level"])
+        else:
+            row["level"] = "UG" if (p.get("degree") or "UG") == "UG" else "PG"
+        out.append(row)
+    return out
 
 
 def _ctx_for(submission, stage_key, programme=None):
@@ -348,14 +409,34 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
                               {"$set": update, "$unset": {f"{path}.returned_note": ""}})
 
     fresh = db.submissions.find_one({"dept_code": dept_code, "academic_year": academic_year})
-    if stage_key == STAGE_KEYS[-1] and status == "submitted":
+    top = (STAGE_BY_KEY.get(stage_key) or {}).get("parent") or stage_key
+    if (top == STAGE_KEYS[-1] and status == "submitted"
+            and compute_status(fresh, top) == "submitted"):
         db.submissions.update_one({"_id": fresh["_id"]},
                                   {"$set": {"status": "sealed", "sealed_at": now()}})
     return issues, summary, status
 
 
-def return_stage(dept_code, academic_year, stage_key, note, actor=""):
+def return_stage(dept_code, academic_year, stage_key, note, actor="", programme_code=None):
     """Office of Academics sends a submitted stage back for correction."""
+    stage = STAGE_BY_KEY.get(stage_key) or {}
+    if stage.get("parts"):
+        # every submitted part goes back — or just one programme's
+        sub = get_or_create_submission(dept_code, academic_year)
+        update = {"status": "in_progress", "updated_at": now()}
+        for p in programmes_of(sub):
+            code = p["programme_code"]
+            if programme_code and code != programme_code:
+                continue
+            for part in stage["parts"]:
+                if programme_stage_state(sub, code, part).get("status") == "submitted":
+                    path = f"programmes.{code}.{part}"
+                    update[f"{path}.status"] = "returned"
+                    update[f"{path}.returned_note"] = note
+                    update[f"{path}.returned_by"] = actor
+                    update[f"{path}.returned_at"] = now()
+        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": update})
+        return
     get_db().submissions.update_one(
         {"dept_code": dept_code, "academic_year": academic_year},
         {"$set": {f"stages.{stage_key}.status": "returned",
@@ -376,13 +457,25 @@ def unlock_stage(dept_code, academic_year, stage_key, actor=""):
                   "updated_at": now()}}, upsert=True)
 
 
-def prefill_for(stage_key, department, academic_year, programme=None):
-    """Values a stage opens with: from the department master ("prefill"),
-    from the programme it is filed for ("prefill_programme"), or standing
-    university wording ("prefill_text")."""
+def prefill_for(stage_key, department, academic_year, programme=None, submission=None,
+                readonly_only=False):
+    """Values a stage opens with: from the department master or the programme
+    ("prefill"), from the programme it is filed for ("prefill_programme"), or
+    standing university wording ("prefill_text").
+
+    With readonly_only, just the read-only fields — refreshed on every open
+    so a changed BoS date or degree shows up everywhere it is copied."""
     stage = STAGE_BY_KEY.get(stage_key) or {}
     source = dict(department or {})
     source["academic_year"] = academic_year
+    info = (stage_state(submission or {}, "dept_info").get("data") or {}).get("identity") or {}
+    if info.get("dept_name"):
+        source["dept_name"] = info["dept_name"]
+    meeting = (stage_state(submission or {}, "bos_documents").get("data") or {}).get("meeting") or {}
+    source["bos_date"] = meeting.get("bos_date")
+    if programme:
+        source.update({k: v for k, v in programme.items() if v not in (None, "")})
+        source["specialisation"] = programme.get("specialisation") or "—"
     prog = dict(programme or {})
     try:
         prog["duration_months"] = int(float(prog.get("duration_years"))) * 12
@@ -397,6 +490,8 @@ def prefill_for(stage_key, department, academic_year, programme=None):
             continue
         vals = {}
         for f in section.get("fields", []):
+            if readonly_only and f.get("type") != "readonly":
+                continue
             key = f.get("prefill")
             pkey = f.get("prefill_programme", f["name"] if programme else None)
             if key and source.get(key) not in (None, ""):
@@ -434,7 +529,7 @@ def offered_programmes(submission):
 
 # Only the unambiguous ones: a UG row in the workbook could be three years or
 # four, so the department chooses that itself.
-_DEGREE_LEVEL = {"PG": "PG - 2 Year", "PG-1Yr": "PG - 1 Year"}
+_DEGREE_LEVEL = {"PG": "PG - 2 Year", "PG-1Yr": "PG - 1 Year", "PGD": "PG Diploma - 1 Year"}
 
 
 def sync_programme_rows(existing, offered):
@@ -456,10 +551,10 @@ def sync_programme_rows(existing, offered):
 
 
 def course_fill_source(submission, programme_code):
-    """Courses for the "fill in all" button in Course Information: every
-    coded course in the programme structure, with its credits and L-T-P-E."""
+    """Courses for the "fill in all" button in Syllabus: every coded course in
+    the programme structure, with its credits and hours (15 teaching weeks)."""
     data = ((submission.get("programmes") or {}).get(programme_code, {})
-            .get("ugc_curriculum", {}).get("data") or {})
+            .get("prog_curriculum", {}).get("data") or {})
     out, seen = [], set()
     for r in data.get("semester_structure") or []:
         code = str(r.get("course_code") or "").strip()
@@ -469,9 +564,15 @@ def course_fill_source(submission, programme_code):
         row = {"course_code": code, "course_title": r.get("course_title", "")}
         if r.get("credits") not in (None, ""):
             row["credits"] = r["credits"]
-        parts = [r.get(k) for k in ("l", "t", "p", "e")]
-        if all(v not in (None, "") for v in parts):
-            row["ltpe"] = "-".join(str(int(float(v))) for v in parts)
+        hours = 0
+        for k in ("l", "t", "p", "e"):
+            try:
+                hours += int(float(r.get(k) or 0))
+            except (TypeError, ValueError):
+                pass
+        if hours:
+            row["hours_per_week"] = hours
+            row["teaching_hours"] = hours * 15
         out.append(row)
     return out
 

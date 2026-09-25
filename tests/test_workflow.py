@@ -274,45 +274,157 @@ DEPT_INFO_OK = {
 }
 
 
+def _file(name):
+    return {"name": name, "stored": "x-" + name, "size": 1024}
+
+
 PRE_BOS_FILES_OK = {
-    "pre_bos_files": {
-        "diac_signed": {"name": "diac.pdf", "stored": "a.pdf", "size": 1024},
-        "bos_signed": {"name": "bos.pdf", "stored": "b.pdf", "size": 1024},
-        "pac_signed": {"name": "pac.pdf", "stored": "c.pdf", "size": 1024},
+    "pre_bos_files": {"diac_signed": _file("diac.pdf"), "dpac_signed": _file("dpac.pdf")},
+}
+
+BOS_DOCS_OK = {
+    "meeting": {"bos_date": "2026-03-12"},
+    "bos_files": {
+        "bos_composition": _file("bos.pdf"), "vision_mission": _file("vm.pdf"),
+        "minutes": _file("minutes.pdf"), "geotagged_photos": [_file("a.jpg"), _file("b.jpg")],
+        "external_profiles": [_file("p1.pdf")], "attendance": _file("att.pdf"),
+        "feedback_curriculum": _file("fb.pdf"),
     },
 }
 
 
-def test_pre_bos_requires_all_three_signed_documents(app, client):
+def test_pre_bos_requires_diac_and_dpac(app, client):
     u, p = make_department(app)
     login(client, u, p)
     assert client.post("/department/api/dept_info/submit",
                        json=DEPT_INFO_OK).get_json()["ok"]
 
-    # nothing uploaded — all three are named as missing
     r = client.post("/department/api/pre_bos/validate", json={})
     msgs = [i["message"] for i in r.get_json()["issues"]]
     assert any("Department Industry-Academia Cell" in m for m in msgs)
-    assert any("Board of Studies" in m for m in msgs)
-    assert any("Programme Assessment Committee" in m for m in msgs)
+    assert any("Programme Assessment Committee (DPAC)" in m for m in msgs)
 
-    # one still missing — the submit is refused
-    partial = {"pre_bos_files": dict(PRE_BOS_FILES_OK["pre_bos_files"])}
-    partial["pre_bos_files"].pop("pac_signed")
+    partial = {"pre_bos_files": {"diac_signed": _file("diac.pdf")}}
     assert not client.post("/department/api/pre_bos/submit", json=partial).get_json()["ok"]
 
-    # all three present — it goes through
-    assert client.post("/department/api/pre_bos/submit",
-                       json=PRE_BOS_FILES_OK).get_json()["ok"]
+    body = client.post("/department/api/pre_bos/submit", json=PRE_BOS_FILES_OK).get_json()
+    assert body["ok"] and body["next"]["key"] == "bos_documents"
 
 
-def test_pre_bos_no_longer_collects_composition_tables(app, client):
-    """The three tables were replaced by uploads; their rules are gone with them."""
-    from app.schema import STAGE_BY_KEY
-    keys = {s["key"] for s in STAGE_BY_KEY["pre_bos"]["sections"]}
-    assert keys == {"pre_bos_files", "pre_bos_extra"}
-    assert not any(s.get("type") == "table"
-                   for s in STAGE_BY_KEY["pre_bos"]["sections"])
+def test_the_four_stages_in_order(app):
+    from app.schema import STAGE_BY_KEY, STAGE_KEYS
+    assert STAGE_KEYS == ["dept_info", "pre_bos", "bos_documents", "curriculum"]
+    files = [f["name"] for s in STAGE_BY_KEY["pre_bos"]["sections"]
+             for f in s["fields"] if f["type"] == "file"]
+    assert files == ["diac_signed", "dpac_signed"]
+    assert STAGE_BY_KEY["curriculum"]["parts"] == ["prog_curriculum", "prog_syllabus",
+                                                   "prog_revision"]
+
+
+def _through_bos_documents(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    assert client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK).get_json()["ok"]
+    assert client.post("/department/api/pre_bos/submit", json=PRE_BOS_FILES_OK).get_json()["ok"]
+    body = client.post("/department/api/bos_documents/submit", json=BOS_DOCS_OK).get_json()
+    assert body["ok"], body["issues"]
+    assert body["next"]["key"] == "curriculum"
+    return u, p
+
+
+def test_bos_documents_needs_every_upload_but_the_new_programme_feedback(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    client.post("/department/api/pre_bos/submit", json=PRE_BOS_FILES_OK)
+    msgs = [i["message"] for i in
+            client.post("/department/api/bos_documents/validate", json={}).get_json()["issues"]]
+    for label in ("Composition of BoS Members", "Minutes of Meeting",
+                  "Geotagged photos", "Profiles of External Members", "Scanned Attendance Sheet",
+                  "Stakeholder Feedback (For Curriculum Design and Development)"):
+        assert any(label in m for m in msgs), label
+    assert not any("New Program" in m for m in msgs)
+
+
+def test_curriculum_lists_the_programmes_kept_under_ug_and_pg(app, client):
+    _through_bos_documents(app, client)
+    page = client.get("/department/stage/curriculum").get_data(as_text=True)
+    assert "UG programmes" in page and "PG programmes" in page
+    assert "Bachelor of Commerce" in page and "Master of Commerce" in page
+    # the programme removed in Department Information is not offered
+    assert "BCHCOF" not in page
+    for part in ("prog_curriculum", "prog_syllabus", "prog_revision"):
+        assert f"/department/stage/{part}/BCMREG" in page
+
+
+def _stage_data(body):
+    return json.loads(body.split('id="stage-data" type="application/json">')[1]
+                      .split("</script>")[0])
+
+
+def test_programme_parts_are_prefilled(app, client):
+    _through_bos_documents(app, client)
+    data = _stage_data(client.get("/department/stage/prog_curriculum/MCMNEW")
+                       .get_data(as_text=True))
+    assert data["details"]["programme_name"] == "Master of Commerce"
+    assert data["details"]["degree_level"] == "PG - 2 Year"
+    assert data["profile"]["medium"] == "English"
+
+    client.post("/department/api/prog_curriculum/BCMREG/save", json={
+        "details": {"degree_level": "UG - 3 Year", "batch": "2026-29"},
+        "semester_structure": [{"semester": 1, "nep_category": "Major (Core)",
+                                "course_code": "26BCC1C01",
+                                "course_title": "Basics of Financial Accounting",
+                                "l": 4, "t": 0, "p": 0, "e": 0, "credits": 4,
+                                "cia": 50, "ese": 50, "total_marks": 100}]})
+
+    syl = client.get("/department/stage/prog_syllabus/BCMREG").get_data(as_text=True)
+    fill = json.loads(syl.split("fill: ")[1].split(",\n")[0])
+    assert fill == [{"course_code": "26BCC1C01", "course_title": "Basics of Financial Accounting",
+                     "credits": 4, "hours_per_week": 4, "teaching_hours": 60}]
+    assert _stage_data(syl)["header"]["batch"] == "2026-29"
+
+    rev = _stage_data(client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True))
+    assert rev["header"]["bos_date"] == "2026-03-12"
+    assert rev["header"]["degree_level"] == "UG"
+
+
+def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
+    from app import workflow
+    _through_bos_documents(app, client)
+
+    # every part validates clean — the parts' own checks are covered elsewhere
+    monkeypatch.setattr(workflow, "validate_stage",
+                        lambda *a, **k: ([], {"errors": 0, "warnings": 0}))
+    for code in ("BCMREG", "MCMNEW"):
+        for part in ("prog_curriculum", "prog_syllabus", "prog_revision"):
+            body = client.post(f"/department/api/{part}/{code}/submit", json={}).get_json()
+            assert body["ok"]
+            assert body["redirect"].endswith("/department/stage/curriculum")
+
+    # a submitted part is read only
+    assert client.post("/department/api/prog_syllabus/MCMNEW/save", json={}).status_code == 409
+
+    from app.db import get_db
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "COM"})
+        assert sub["status"] == "sealed"
+        assert workflow.compute_status(sub, "curriculum") == "submitted"
+
+
+def test_returning_the_curriculum_sends_every_part_back(app, client, monkeypatch):
+    from app import workflow
+    u, p = _through_bos_documents(app, client)
+    monkeypatch.setattr(workflow, "validate_stage",
+                        lambda *a, **k: ([], {"errors": 0, "warnings": 0}))
+    client.post("/department/api/prog_syllabus/BCMREG/submit", json={})
+    client.get("/logout")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    client.post("/admin/submissions/COM/curriculum/return", data={"note": "Fix the books."})
+    client.get("/logout")
+    login(client, u, p)
+    page = client.get("/department/stage/curriculum").get_data(as_text=True)
+    assert "Returned: Fix the books." in page
 
 
 def test_submitting_a_stage_carries_you_into_the_next_one(app, client):
@@ -352,11 +464,11 @@ def test_next_action_prefers_a_returned_stage(app):
         get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
             "stages.dept_info.status": "submitted",
             "stages.pre_bos.status": "draft",
-            "stages.bos_committee.status": "returned",
+            "stages.bos_documents.status": "returned",
         }})
         sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
         nxt = next_action(sub)
-        assert nxt["key"] == "bos_committee"
+        assert nxt["key"] == "bos_documents"
         assert nxt["status"] == "returned"
 
 
@@ -367,8 +479,13 @@ def test_next_action_is_none_once_everything_is_submitted(app):
     make_department(app)
     with app.app_context():
         sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
-        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
-            f"stages.{k}.status": "submitted" for k in STAGE_KEYS}})
+        # the Curriculum is done when every part of every programme is
+        update = {f"stages.{k}.status": "submitted" for k in STAGE_KEYS[:-1]}
+        update["stages.dept_info.data"] = {"programmes_offered": PROGRAMMES_OK}
+        for code in ("BCMREG", "MCMNEW"):
+            for part in ("prog_curriculum", "prog_syllabus", "prog_revision"):
+                update[f"programmes.{code}.{part}.status"] = "submitted"
+        get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": update})
         sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
         assert next_action(sub) is None
 
@@ -496,7 +613,7 @@ def test_grouped_board_counts_each_group(app):
         sub = get_or_create_submission("COM", app.config["ACADEMIC_YEAR"])
 
         groups = grouped_board(stage_board(sub))
-        assert [g["name"] for g in groups][0] == "Department"
+        assert [g["name"] for g in groups][0] == "Level 0 · Department"
         assert groups[0]["done"] == groups[0]["total"] and groups[0]["complete"]
         assert groups[1]["done"] == 0 and not groups[1]["complete"]
         assert sum(g["total"] for g in groups) == len(stage_board(sub))
@@ -649,12 +766,12 @@ def test_a_signed_in_department_is_not_asked_to_sign_in_again(app, client):
     assert "Sign out" in body
     assert ">Home</a>" in body, "no way back to the home page from the bar"
     # and it shows where they had got to
-    assert "0 of 13 stages submitted" in body
+    assert "0 of 4 stages submitted" in body
     assert "Your next step" in body and "Department Information" in body
 
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
     body = client.get("/").get_data(as_text=True)
-    assert "1 of 13 stages submitted" in body
+    assert "1 of 4 stages submitted" in body
     assert "Pre-BoS" in body
 
 
@@ -911,23 +1028,6 @@ def test_programme_list_must_keep_one_and_new_rows_need_details(app, client):
     assert "needs a name" in msgs and "needs a code" in msgs and "UG, PG" in msgs
 
 
-def test_programme_information_follows_the_programmes_kept(app, client):
-    from app.db import get_db
-    u, p = make_department(app)
-    login(client, u, p)
-    assert client.post("/department/api/dept_info/submit",
-                       json=DEPT_INFO_OK).get_json()["ok"]
-    with app.app_context():   # developer mode: open the stage without the four before it
-        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
-    body = client.get("/department/stage/ugc_programme").get_data(as_text=True)
-    data = json.loads(body.split('id="stage-data" type="application/json">')[1]
-                      .split("</script>")[0])
-    rows = data["programmes"]
-    assert [r["programme_code"] for r in rows] == ["BCMREG", "MCMNEW"]
-    assert rows[1]["degree_level"] == "PG - 2 Year"
-    assert "synced: true" in body
-
-
 def test_a_removed_programme_needs_a_reason(app, client):
     u, p = make_department(app)
     login(client, u, p)
@@ -948,36 +1048,3 @@ def test_a_removed_programme_needs_a_reason(app, client):
                        json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()["ok"]
 
 
-def test_programme_information_offers_every_programme_in_one_click(app, client):
-    """Without a saved Programmes offered list, the one-click fill falls back
-    to the department's programmes in the Office of Academics workbook."""
-    from app.db import get_db
-    u, p = make_department(app, code="COMM-JYN")
-    with app.app_context():
-        get_db().departments.update_one({"dept_code": "COMM-JYN"},
-                                        {"$set": {"campus": "Jayanagar Campus"}})
-        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
-    login(client, u, p)
-    body = client.get("/department/stage/ugc_programme").get_data(as_text=True)
-    fill = json.loads(body.split("fill: ")[1].split(",\n")[0])
-    codes = [r["programme_code"] for r in fill]
-    assert "BCMREG" in codes and "MCMREG" in codes
-    assert next(r for r in fill if r["programme_code"] == "MCMREG")["degree_level"] == "PG - 2 Year"
-    assert "synced: false" in body
-
-
-def test_programme_information_asks_only_what_the_template_names(app, client):
-    """No vision / mission / outcomes and no semesters: the Office's list is
-    name, code, degree, specialisation, intake, duration, credits, batch
-    and NEP category."""
-    from app.db import get_db
-    u, p = make_department(app)
-    with app.app_context():
-        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
-    login(client, u, p)
-    row = {"programme_name": "Bachelor of Commerce", "programme_code": "BCOM",
-           "degree_level": "UG - 3 Year", "duration_years": 3, "intake": 60,
-           "total_credits": 120, "batch": "2027-30", "regulation": "NEP 2020"}
-    body = client.post("/department/api/ugc_programme/validate",
-                       json={"programmes": [row]}).get_json()
-    assert not [i for i in body["issues"] if i["level"] == "error"], body["issues"]
