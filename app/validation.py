@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime
 
 from . import ugc_rules as U
-from .schema import STAGE_BY_KEY
+from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
@@ -398,6 +398,13 @@ def r_ltpe_credit_arithmetic(data, ctx, sk):
     tol = cfg["credit_arithmetic_tolerance"]
     out = []
     for i, r in enumerate(_rows(data, sk)):
+        if r.get("nep_category") in NON_CREDIT_GROUPS:
+            # a non-credit course has contact hours but carries no credits
+            if (_num(r.get("credits")) or 0) != 0:
+                out.append(err(f"Course {r.get('course_code') or f'in row {i + 1}'} is a "
+                               f"non-credit course, so its credits must be 0.",
+                               section=sk, row=i, field="credits"))
+            continue
         l, t, p, e = (_num(r.get(k)) for k in ("l", "t", "p", "e"))
         cr = _num(r.get("credits"))
         if None in (l, t, p, e) or cr is None:

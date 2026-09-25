@@ -225,3 +225,23 @@ def test_ugc_table2_is_worked_out_from_the_programme_structure():
     assert any("Major (Core): 4 credits is below the UGC minimum" in m for m in msgs)
     assert any("Total credits come to 4." in m for m in msgs)
 
+
+
+def test_curriculum_follows_the_template_order():
+    from app.schema import STAGE_BY_KEY
+    keys = [s["key"] for s in STAGE_BY_KEY["prog_curriculum"]["sections"]]
+    assert keys.index("profile") < keys.index("credit_classification") \
+        < keys.index("semester_structure") < keys.index("credit_distribution") \
+        < keys.index("minors")
+
+
+def test_non_credit_courses_carry_no_credits():
+    ok = {"semester_structure": [_course(nep_category="Mandatory Non-Credit Course",
+                                         l=2, credits=0, cia=50, ese=0, total_marks=50)]}
+    issues, _ = validate_stage("prog_curriculum", ok, ctx("UG - 3 Year", 6))
+    assert not any("works out to" in m or "non-credit" in m for m in errors(issues))
+
+    bad = {"semester_structure": [_course(nep_category="Mandatory Non-Credit Audit Course",
+                                          l=2, credits=2)]}
+    issues, _ = validate_stage("prog_curriculum", bad, ctx("UG - 3 Year", 6))
+    assert any("non-credit course, so its credits must be 0" in m for m in errors(issues))

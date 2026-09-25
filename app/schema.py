@@ -44,7 +44,12 @@ NEP_CATEGORIES = [
     "Value Added Courses (VAC)",
     "Summer Internship",
     "Research Project / Dissertation",
+    "Mandatory Non-Credit Course",
+    "Mandatory Non-Credit Audit Course",
 ]
+
+# course groups that carry no credits; counted in their own columns
+NON_CREDIT_GROUPS = ["Mandatory Non-Credit Course", "Mandatory Non-Credit Audit Course"]
 
 COURSE_TYPES = ["Theory", "Practical", "Theory + Practical", "Project", "Internship", "Seminar"]
 
@@ -294,6 +299,63 @@ PROGRAMME_CURRICULUM = {
             ],
         },
         {
+            "key": "profile",
+            "title": "Regulations — programme profile",
+            "help": "Items 1 to 12 of the Curriculum Matrix template. The university-wide "
+                    "wording is filled in from the sample; change only what differs for this "
+                    "programme.",
+            "type": "fields",
+            "fields": [
+                {"name": "objective", "label": "1. Objective", "type": "textarea", "required": True,
+                 "rows": 5, "min_items": 2, "wide": True,
+                 "help": "Two to six objectives, one per line, each beginning with a Bloom's "
+                         "taxonomy action verb."},
+                {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
+                 "required": True, "min": 6, "max": 72},
+                {"name": "intake", "label": "3. Intake", "type": "integer", "required": True,
+                 "min": 1, "max": 2000},
+                {"name": "reservation_policy", "label": "4. Reservation", "type": "textarea",
+                 "required": True, "rows": 2, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["reservation_policy"],
+                 "help": "Within the sanctioned intake: SC, ST, differently abled and defence "
+                         "(in percentage). Over and above: Kashmiri migrants (in seats) and "
+                         "international students (in percentage)."},
+                {"name": "eligibility", "label": "5. Eligibility", "type": "textarea",
+                 "required": True, "rows": 3, "wide": True,
+                 "placeholder": "For example: A student who has passed Level 4 / Class 12 "
+                                "schooling or its equivalent shall be eligible …"},
+                {"name": "selection_procedure", "label": "6. Selection procedure", "type": "textarea",
+                 "required": True, "rows": 2, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["selection_procedure"]},
+                {"name": "medium", "label": "7. Medium of instruction", "type": "text",
+                 "required": True, "prefill_text": DEFAULT_REGULATIONS["medium"]},
+                {"name": "pattern", "label": "8. Programme pattern", "type": "text",
+                 "required": True, "prefill_text": DEFAULT_REGULATIONS["pattern"]},
+                {"name": "course_specialisation", "label": "9. Course & specialisation",
+                 "type": "text", "required": True, "wide": True,
+                 "placeholder": "For example: BCom (Corporate Finance) Honours / Honours with "
+                                "Research — minors as per Annexure I"},
+                {"name": "assessment", "label": "10. Assessment", "type": "textarea",
+                 "required": True, "rows": 3, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["assessment"]},
+                {"name": "passing", "label": "11. Standard of passing", "type": "textarea",
+                 "required": True, "rows": 4, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["passing"]},
+                {"name": "award", "label": "12. Award of degree / diploma / certificate",
+                 "type": "textarea", "required": True, "rows": 4, "wide": True,
+                 "prefill_text": DEFAULT_REGULATIONS["award"]},
+            ],
+        },
+        {
+            "key": "credit_classification",
+            "title": "Classification of Credits and Number of Non-Credit Courses",
+            "help": "Worked out from the programme structure below — credits per semester in "
+                    "each course group, and the mandatory non-credit and audit courses. Nothing "
+                    "to type here.",
+            "type": "credit_distribution",
+            "show": "classification",
+        },
+        {
             "key": "semester_structure",
             "title": "Programme structure — semester scheme",
             "help": "One row per course, semester by semester, grouped the way the template "
@@ -341,61 +403,12 @@ PROGRAMME_CURRICULUM = {
         },
         {
             "key": "credit_distribution",
-            "title": "Credit distribution — classification of credits",
-            "help": "Worked out from the programme structure above, in the layout of the "
-                    "template: credits per semester in each group, the summary of "
-                    "continuous-assessment and term-end credits, and the check against UGC "
-                    "Table 2. Nothing to type here.",
+            "title": "Summary",
+            "help": "Worked out from the programme structure above: continuous-assessment and "
+                    "term-end credits and marks per semester, and the check against UGC Table 2.",
             "type": "credit_distribution",
+            "show": "summary",
             "rules": ["ugc_table2_minimums", "ugc_total_credits"],
-        },
-        {
-            "key": "profile",
-            "title": "Regulations — programme profile",
-            "help": "Items 1 to 12 of the Curriculum Matrix template. The university-wide "
-                    "wording is filled in from the sample; change only what differs for this "
-                    "programme.",
-            "type": "fields",
-            "fields": [
-                {"name": "objective", "label": "1. Objective", "type": "textarea", "required": True,
-                 "rows": 5, "min_items": 2, "wide": True,
-                 "help": "Two to six objectives, one per line, each beginning with a Bloom's "
-                         "taxonomy action verb."},
-                {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
-                 "required": True, "min": 6, "max": 72},
-                {"name": "intake", "label": "3. Intake", "type": "integer", "required": True,
-                 "min": 1, "max": 2000},
-                {"name": "reservation_policy", "label": "4. Reservation", "type": "textarea",
-                 "required": True, "rows": 2, "wide": True,
-                 "prefill_text": DEFAULT_REGULATIONS["reservation_policy"],
-                 "help": "Within the sanctioned intake: SC, ST, differently abled and defence "
-                         "(in percentage). Over and above: Kashmiri migrants (in seats) and "
-                         "international students (in percentage)."},
-                {"name": "eligibility", "label": "5. Eligibility", "type": "textarea",
-                 "required": True, "rows": 3, "wide": True,
-                 "placeholder": "For example: A student who has passed Level 4 / Class 12 "
-                                "schooling or its equivalent shall be eligible …"},
-                {"name": "selection_procedure", "label": "6. Selection procedure", "type": "textarea",
-                 "required": True, "rows": 2, "wide": True,
-                 "prefill_text": DEFAULT_REGULATIONS["selection_procedure"]},
-                {"name": "medium", "label": "7. Medium of instruction", "type": "text",
-                 "required": True, "prefill_text": DEFAULT_REGULATIONS["medium"]},
-                {"name": "pattern", "label": "8. Programme pattern", "type": "text",
-                 "required": True, "prefill_text": DEFAULT_REGULATIONS["pattern"]},
-                {"name": "course_specialisation", "label": "9. Course & specialisation",
-                 "type": "text", "required": True, "wide": True,
-                 "placeholder": "For example: BCom (Corporate Finance) Honours / Honours with "
-                                "Research — minors as per Annexure I"},
-                {"name": "assessment", "label": "10. Assessment", "type": "textarea",
-                 "required": True, "rows": 3, "wide": True,
-                 "prefill_text": DEFAULT_REGULATIONS["assessment"]},
-                {"name": "passing", "label": "11. Standard of passing", "type": "textarea",
-                 "required": True, "rows": 4, "wide": True,
-                 "prefill_text": DEFAULT_REGULATIONS["passing"]},
-                {"name": "award", "label": "12. Award of degree / diploma / certificate",
-                 "type": "textarea", "required": True, "rows": 4, "wide": True,
-                 "prefill_text": DEFAULT_REGULATIONS["award"]},
-            ],
         },
         {
             "key": "minors",

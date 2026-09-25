@@ -16,6 +16,8 @@
   const CTX = window.STAGE_CTX;
   // run after every change: counts that follow a table, and the like
   const refreshers = [];
+  // course groups that carry no credits
+  const NON_CREDIT = ["Mandatory Non-Credit Course", "Mandatory Non-Credit Audit Course"];
   let state = JSON.parse(document.getElementById("stage-data").textContent || "{}");
 
   const root = document.getElementById("sections");
@@ -501,6 +503,7 @@
       out.push({
         field: "credits", title: "Credits from contact hours",
         calc: r => {
+          if (NON_CREDIT.includes(r.nep_category)) return 0;
           const [l, t, p, e] = ["l", "t", "p", "e"].map(k => num(r[k]));
           if ([l, t, p, e].some(x => x === null)) return null;
           return l * w.lecture + t * w.tutorial + p * w.practical + e * w.experiential;
@@ -1194,28 +1197,36 @@
     return true;
   }
 
+  // the columns of the template's "Classification of Credits" table
   const DIST_GROUPS = [
     ["Major (Core)", "Major"],
     ["Minor Stream", "Minor"],
     ["Multidisciplinary", "Multi-Disciplinary / OE"],
-    ["Ability Enhancement Courses (AEC)", "AEC"],
-    ["Skill Enhancement Courses (SEC)", "SEC"],
-    ["Value Added Courses (VAC)", "VAC"],
-    ["Summer Internship", "Internship"],
-    ["Research Project / Dissertation", "Project"],
+    ["Ability Enhancement Courses (AEC)", "Ability Enhancement / AEC"],
+    ["Skill Enhancement Courses (SEC)", "Skill Enhancement / SEC"],
+    ["Value Added Courses (VAC)", "Common Value Added / VAC"],
+    ["Summer Internship", "Summer Internship / INTERNSHIP"],
+    ["Research Project / Dissertation", "Research Project / Dissertation / PROJECT"],
   ];
+  const NC_COURSE = "Mandatory Non-Credit Course";
+  const NC_AUDIT = "Mandatory Non-Credit Audit Course";
 
   function renderCreditDistribution(section, host) {
     const box = el("div", "cd-box");
     host.appendChild(box);
+    // the template puts the classification before the programme structure and
+    // the summary after it; one section can show either, or both
+    const SHOW = section.show || "all";
+    const wants = k => SHOW === "all" || SHOW === k;
 
     function paint() {
       box.textContent = "";
       const all = (Array.isArray(state.semester_structure) ? state.semester_structure : [])
         .filter(r => num(r.semester) !== null);
       if (!all.length) {
-        box.appendChild(el("p", "pl-empty",
-          "Add courses to the programme structure above and the credit tables build themselves."));
+        box.appendChild(el("p", "pl-empty", SHOW === "classification"
+          ? "Add courses to the programme structure below and this table fills itself."
+          : "Add courses to the programme structure above and this table fills itself."));
         return;
       }
       const track = r => r.track || "All semesters";
@@ -1229,22 +1240,27 @@
         if (rows.some(r => track(r) === t)) blocks.push({ title: label, rows: rows });
       });
 
+      const sumBy = (rows, fn) => rows.reduce((a, r) => a + (fn(r) || 0), 0);
+      const nc = rows => rows.filter(r => r.nep_category === NC_COURSE ||
+        (num(r.credits) === 0 && r.nep_category !== NC_AUDIT)).length || "";
+      const audit = rows => rows.filter(r => r.nep_category === NC_AUDIT).length || "";
+
       // --- classification of credits
+      if (wants("classification")) {
       const t1 = el("table", "cd-table");
       const h = el("tr");
-      ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total credits", "Non-credit courses"]
+      ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total Credits",
+       "No. of Mandatory Non-Credit Course/s", "No. of Mandatory Non-Credit Audit Course"]
         .forEach(x => h.appendChild(el("th", x === "Semester" ? null : "num", x)));
       const thead = el("thead");
       thead.appendChild(h);
       t1.appendChild(thead);
       const b1 = el("tbody");
-      const sumBy = (rows, fn) => rows.reduce((a, r) => a + (fn(r) || 0), 0);
-      let running = null;
       blocks.forEach((blk, n) => {
         if (blk.title) {
           const tr = el("tr", "cd-band");
           const td = el("td", null, blk.title);
-          td.colSpan = DIST_GROUPS.length + 3;
+          td.colSpan = DIST_GROUPS.length + 4;
           tr.appendChild(td);
           b1.appendChild(tr);
         }
@@ -1255,8 +1271,8 @@
           DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
             fmt(sumBy(rows.filter(r => r.nep_category === cat), r => num(r.credits))))));
           tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
-          tr.appendChild(el("td", "num",
-            String(rows.filter(r => num(r.credits) === 0).length || "")));
+          tr.appendChild(el("td", "num", String(nc(rows))));
+          tr.appendChild(el("td", "num", String(audit(rows))));
           b1.appendChild(tr);
         });
         // a track's total runs on from the common semesters, as in the template
@@ -1266,16 +1282,17 @@
         DIST_GROUPS.forEach(([cat]) => tot.appendChild(el("td", "num",
           fmt(sumBy(counted.filter(r => r.nep_category === cat), r => num(r.credits))))));
         tot.appendChild(el("td", "num", fmt(sumBy(counted, r => num(r.credits)))));
-        tot.appendChild(el("td", "num",
-          String(counted.filter(r => num(r.credits) === 0).length || "")));
+        tot.appendChild(el("td", "num", String(nc(counted))));
+        tot.appendChild(el("td", "num", String(audit(counted))));
         b1.appendChild(tot);
-        if (n === 0) running = counted;
       });
       t1.appendChild(b1);
       const w1 = el("div", "rt-wrap");
       w1.appendChild(t1);
-      box.appendChild(el("h4", "cd-head", "Classification of credits and number of non-credit courses"));
       box.appendChild(w1);
+      }
+      if (!wants("summary")) return;
+      const running = base;
 
       // --- summary
       const t2 = el("table", "cd-table");
@@ -1310,7 +1327,7 @@
       t2.appendChild(b2);
       const w2 = el("div", "rt-wrap");
       w2.appendChild(t2);
-      box.appendChild(el("h4", "cd-head", "Summary"));
+      if (SHOW === "all") box.appendChild(el("h4", "cd-head", "Summary"));
       box.appendChild(w2);
       ugcCheck(all);
     }
