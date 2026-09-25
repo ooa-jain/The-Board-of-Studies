@@ -15,7 +15,7 @@ from openpyxl.utils import get_column_letter
 from . import ugc_rules as U
 from .db import get_db
 from .schema import STAGE_BY_KEY, STAGES
-from .workflow import compute_status, progress
+from .workflow import compute_status, programmes_of, progress
 
 NAVY = "0F2A4A"
 GOLD = "C8A44B"
@@ -50,6 +50,8 @@ def _flat(value):
     if isinstance(value, (list, tuple)):
         return "; ".join(_flat(v) for v in value)
     if isinstance(value, dict):
+        if "stored" in value and "name" in value:  # an uploaded file
+            return str(value["name"])
         return "; ".join(f"{k}: {_flat(v)}" for k, v in value.items())
     if isinstance(value, datetime):
         return value.strftime("%d %b %Y %H:%M")
@@ -238,12 +240,11 @@ def institution_excel(year: str) -> io.BytesIO:
         sub = subs.get(d["dept_code"])
         if not sub:
             continue
-        progs = ((sub.get("stages") or {}).get("ugc_programme", {})
-                 .get("data", {}).get("programmes") or [])
+        progs = programmes_of(sub)
         for p in progs:
             pcode = p.get("programme_code")
             state = ((sub.get("programmes") or {}).get(pcode, {})
-                     .get("ugc_curriculum", {}))
+                     .get("prog_curriculum", {}))
             matrix = (state.get("data") or {}).get("credit_summary") or {}
             track = U.get_track(p.get("degree_level"))
             declared = sum(float(v) for k, v in matrix.items()

@@ -14,6 +14,28 @@
   const STAGE = JSON.parse(document.getElementById("stage-def").textContent);
   const CREDIT = JSON.parse(document.getElementById("credit-def").textContent || "{}");
   const CTX = window.STAGE_CTX;
+  const lookupsNode = document.getElementById("lookups");
+  const LOOKUPS = lookupsNode ? JSON.parse(lookupsNode.textContent || "{}") : {};
+  // Run after every change: counts, the credit classification and so on.
+  const refreshers = [];
+
+  // Computed row values. Blank inputs count as nothing entered.
+  const W = { l: 1, t: 1, p: 0.5, e: 0.5 };
+  const CALCS = {
+    credits_from_ltpe(row) {
+      const keys = ["l", "t", "p", "e"];
+      if (keys.every(k => row[k] === undefined || row[k] === null || row[k] === "")) return "";
+      return keys.reduce((sum, k) => sum + (Number(row[k]) || 0) * W[k], 0);
+    },
+    cia_plus_ese(row) {
+      if ([row.cia, row.ese].every(v => v === undefined || v === null || v === "")) return "";
+      return (Number(row.cia) || 0) + (Number(row.ese) || 0);
+    }
+  };
+
+  function lookupRows(def) {
+    return (def.lookup && LOOKUPS[def.lookup]) || [];
+  }
   let state = JSON.parse(document.getElementById("stage-data").textContent || "{}");
 
   const root = document.getElementById("sections");
@@ -169,9 +191,21 @@
       input = el("textarea");
       input.rows = def.rows || 3;
       input.value = value ?? "";
+    } else if (def.type === "select" && def.lookup && !lookupRows(def).length) {
+      // nothing to pick from yet — let them type it
+      input = el("input");
+      input.type = "text";
+      input.value = value ?? "";
     } else if (def.type === "select") {
       input = el("select");
       input.appendChild(new Option(def.required ? "Choose…" : "—", ""));
+      if (def.lookup) {
+        const known = lookupRows(def);
+        known.forEach(r => input.appendChild(
+          new Option(`${r.course_code} — ${r.course_title}`, r.course_code)));
+        if (value && !known.some(r => r.course_code === value))
+          input.appendChild(new Option(value, value));
+      }
       (def.options || []).forEach(o => input.appendChild(new Option(o, o)));
       input.value = value ?? "";
     } else if (def.type === "checkbox") {
@@ -194,6 +228,21 @@
                      date: "date", phone: "tel" }[def.type] || "text";
       if (def.type === "integer" || def.type === "number") input.inputMode = "numeric";
       input.value = value ?? "";
+      if (def.lookup && lookupRows(def).length) {
+        const listId = `dl-${def.lookup}`;
+        if (!document.getElementById(listId)) {
+          const dl = el("datalist");
+          dl.id = listId;
+          lookupRows(def).forEach(r => {
+            const o = el("option");
+            o.value = r.course_code;
+            o.label = r.course_title;
+            dl.appendChild(o);
+          });
+          document.body.appendChild(dl);
+        }
+        input.setAttribute("list", listId);
+      }
     }
 
     if (def.placeholder) input.placeholder = def.placeholder;
@@ -210,50 +259,63 @@
     return input;
   }
 
-  function uploadFile(input, def, onChange) {
-    const file = input.files[0];
-    if (!file) return;
+  function uploadOne(file, def) {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("stage", CTX.key);
     fd.append("field", def.name);
+    return fetch(CTX.urls.upload, { method: "POST", body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (!j.ok) throw new Error(j.error || `Upload of ${file.name} failed.`);
+        return { name: j.name, stored: j.stored, size: j.size, url: j.url };
+      });
+  }
+
+  function fileNames(value) {
+    const list = Array.isArray(value) ? value : (value && typeof value === "object" ? [value] : []);
+    return list.map(v => v.name).filter(Boolean);
+  }
+
+  function uploadFile(input, def, onChange) {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
     const note = input.parentElement.querySelector(".upload-note") ||
                  input.parentElement.appendChild(el("span", "help upload-note"));
     note.className = "help upload-note";
     note.setAttribute("role", "status");
-    note.textContent = "Uploading…";
-    fetch(CTX.urls.upload, { method: "POST", body: fd })
-      .then(r => r.json())
-      .then(j => {
-        if (j.ok) {
-          note.textContent = `Uploaded: ${j.name} (${Math.round(j.size / 1024)} KB)`;
-          note.className = "help upload-note is-ok";
-          onChange({ name: j.name, stored: j.stored, size: j.size, url: j.url });
-        } else {
-          note.textContent = j.error || "Upload failed.";
-          note.className = "help upload-note is-bad-text";
-        }
+    note.textContent = files.length > 1 ? `Uploading ${files.length} files…` : "Uploading…";
+    // one after another, so a slow connection is not flooded
+    files.reduce((chain, f) => chain.then(done => uploadOne(f, def).then(r => done.concat([r]))),
+                 Promise.resolve([]))
+      .then(done => {
+        const value = def.multiple ? done : done[0];
+        note.textContent = "Uploaded: " + fileNames(value).join(", ");
+        note.className = "help upload-note is-ok";
+        onChange(value);
       })
-      .catch(() => {
-        note.textContent = "Upload failed — check your connection and choose the file again.";
+      .catch(e => {
+        note.textContent = (e && e.message) ||
+          "Upload failed — check your connection and choose the file again.";
         note.className = "help upload-note is-bad-text";
       });
   }
 
-  function fieldBlock(def, value, onChange) {
+  function fieldBlock(def, value, onChange, idp) {
+    idp = idp || "";
     const wrap = el("div", "field" + (def.type === "textarea" || def.wide ? " wide" : ""));
     wrap.dataset.field = def.name;
 
     if (def.type === "checkbox") {
       const lab = el("label", "check");
       const input = makeInput(def, value, onChange);
-      input.id = `f-${def.name}`;
+      input.id = `f-${idp}${def.name}`;
       lab.appendChild(input);
       lab.appendChild(el("span", null, def.label + (def.required ? " *" : "")));
       wrap.appendChild(lab);
       if (def.help) {
         const help = el("span", "help", def.help);
-        help.id = `f-${def.name}-help`;
+        help.id = `f-${idp}${def.name}-help`;
         wrap.appendChild(help);
         describe(input, help.id);
       }
@@ -261,7 +323,7 @@
     }
 
     const lab = el("label", null, def.label);
-    lab.setAttribute("for", `f-${def.name}`);
+    lab.setAttribute("for", `f-${idp}${def.name}`);
     if (def.required) {
       const star = el("span", "req");
       star.setAttribute("aria-hidden", "true");
@@ -272,17 +334,18 @@
     wrap.appendChild(lab);
 
     const input = makeInput(def, value, onChange);
-    input.id = `f-${def.name}`;
+    input.id = `f-${idp}${def.name}`;
     wrap.appendChild(input);
+    wrap._input = input;
 
-    if (value && def.type === "file" && typeof value === "object") {
-      const n = el("span", "help upload-note", `Uploaded: ${value.name}`);
+    if (def.type === "file" && fileNames(value).length) {
+      const n = el("span", "help upload-note", "Uploaded: " + fileNames(value).join(", "));
       n.classList.add("is-ok");
       wrap.appendChild(n);
     }
     if (def.help) {
       const help = el("span", "help", def.help);
-      help.id = `f-${def.name}-help`;
+      help.id = `f-${idp}${def.name}-help`;
       wrap.appendChild(help);
       describe(input, help.id);
     }
@@ -292,7 +355,117 @@
 
   // ---------------------------------------------------------- repeating table
 
+  /** A row value changed: re-run its calculations and lookup fills. */
+  function rowChanged(section, row, inputs, col) {
+    if (col && col.fills) {
+      const rec = lookupRows(col).find(r => r.course_code === row[col.name]);
+      if (rec) {
+        Object.entries(col.fills).forEach(([target, src]) => {
+          row[target] = rec[src] ?? "";
+          if (inputs[target]) inputs[target].value = row[target];
+        });
+      }
+    }
+    section.columns.forEach(c => {
+      if (!c.calc || !CALCS[c.calc]) return;
+      const v = CALCS[c.calc](row);
+      row[c.name] = v;
+      if (inputs[c.name]) inputs[c.name].value = v;
+    });
+  }
+
+  function markAuto(input) {
+    input.readOnly = true;
+    input.tabIndex = -1;
+    input.classList.add("is-auto");
+    input.title = "Worked out for you";
+  }
+
+  function renderCards(section, host) {
+    const list = el("div", "rc-list");
+    host.appendChild(list);
+    const foot = el("div", "rt-foot");
+    const count = el("span", "rt-count");
+    const rowNote = el("span", "rt-note");
+    rowNote.setAttribute("role", "status");
+    const noun = section.key === "courses" ? "course" : "entry";
+    if (!CTX.readonly) {
+      const add = el("button", "btn btn-ghost btn-sm", `+ Add ${noun}`);
+      add.type = "button";
+      add.addEventListener("click", () => { rows(section.key).push({}); draw(); touch(); });
+      foot.appendChild(add);
+    }
+    foot.appendChild(count);
+    foot.appendChild(rowNote);
+    host.appendChild(foot);
+
+    const data = rows(section.key);
+    while (data.length < (section.min_rows || 0)) data.push({});
+
+    function title(row, i) {
+      const code = row.course_code || row.revised_code || row.code_before || "";
+      const name = row.course_title || row.revised_title || row.title_before || "";
+      return `${noun[0].toUpperCase() + noun.slice(1)} ${i + 1}` +
+             (code || name ? ` · ${[code, name].filter(Boolean).join(" — ")}` : "");
+    }
+
+    function draw() {
+      list.textContent = "";
+      data.forEach((row, i) => {
+        const card = el("div", "rc-card");
+        card.dataset.row = i;
+        const head = el("div", "rc-head");
+        const h = el("span", null, title(row, i));
+        head.appendChild(h);
+        head.appendChild(el("span", "spacer"));
+        if (!CTX.readonly) {
+          const b = el("button", "btn btn-ghost btn-sm", "Remove");
+          b.type = "button";
+          b.setAttribute("aria-label", `Remove ${noun} ${i + 1}`);
+          b.addEventListener("click", () => {
+            if (data.length <= (section.min_rows || 0)) {
+              rowNote.textContent = `Keep at least ${section.min_rows} ${noun}.`;
+              return;
+            }
+            data.splice(i, 1);
+            rowNote.textContent = "";
+            draw();
+            touch();
+          });
+          head.appendChild(b);
+        }
+        card.appendChild(head);
+
+        const body = el("div", "rc-body fields-grid");
+        const inputs = {};
+        section.columns.forEach(c => {
+          if (c.auto_index) { row[c.name] = i + 1; return; }
+          const block = fieldBlock(c, row[c.name], (v) => {
+            row[c.name] = v;
+            rowChanged(section, row, inputs, c);
+            h.textContent = title(row, i);
+            touch();
+          }, `${section.key}-${i}-`);
+          if (block._input) {
+            inputs[c.name] = block._input;
+            if (c.calc) markAuto(block._input);
+          }
+          body.appendChild(block);
+        });
+        rowChanged(section, row, inputs, null);
+        card.appendChild(body);
+        list.appendChild(card);
+      });
+      const min = section.min_rows || 0;
+      const plural = noun === "entry" ? "entries" : noun + "s";
+      count.textContent = `${data.length} ${data.length === 1 ? noun : plural}` +
+                          (min ? ` · minimum ${min}` : "");
+    }
+    draw();
+  }
+
   function renderTable(section, host) {
+    if (section.layout === "cards") return renderCards(section, host);
     const wrap = el("div", "rt-wrap");
     const table = el("table", "rt");
     const thead = el("thead");
@@ -351,6 +524,7 @@
       const data = rows(section.key);
       data.forEach((row, i) => {
         const tr = el("tr");
+        const inputs = {};
         tr.dataset.row = i;
         tr.appendChild(el("td", "rt-idx", String(i + 1)));
 
@@ -365,7 +539,13 @@
           }
           const holder = el("div");
           holder.dataset.field = c.name;
-          const input = makeInput(c, row[c.name], (v) => { row[c.name] = v; touch(); });
+          const input = makeInput(c, row[c.name], (v) => {
+            row[c.name] = v;
+            rowChanged(section, row, inputs, c);
+            touch();
+          });
+          inputs[c.name] = input;
+          if (c.calc) markAuto(input);
           if (c.width) input.style.minWidth = c.width;
           if (c.type === "readonly") input.readOnly = true;
           holder.appendChild(input);
@@ -374,6 +554,7 @@
           tr.appendChild(td);
         });
 
+        rowChanged(section, row, inputs, null);
         if (!section.fixed_rows && !CTX.readonly) {
           const td = el("td", "rt-del");
           const b = el("button", null, "×");
@@ -448,6 +629,9 @@
 
     const totalRow = el("tr", "total");
     const inputs = {};
+    // Filled from the programme structure when this stage has one.
+    const feeder = (STAGE.sections || []).find(s => s.feeds_credit_matrix);
+    const catKeys = CREDIT.category_keys || {};
 
     (CREDIT.rows || []).forEach(r => {
       const tr = el("tr", r.applicable ? "" : "na");
@@ -474,6 +658,7 @@
           touch();
         });
         if (CTX.readonly) input.disabled = true;
+        if (feeder) markAuto(input);
         inputs[r.key] = input;
         td.appendChild(input);
       } else {
@@ -577,6 +762,22 @@
                     : `${sum} credits entered`));
       }
     }
+    if (feeder) {
+      refreshers.push(() => {
+        const sums = {};
+        rows(feeder.key).forEach(r => {
+          const k = catKeys[r.nep_category];
+          const c = Number(r.credits);
+          if (k && !Number.isNaN(c)) sums[k] = (sums[k] || 0) + c;
+        });
+        (CREDIT.rows || []).forEach(r => {
+          if (!r.applicable) return;
+          data[r.key] = sums[r.key] ?? 0;
+          if (inputs[r.key]) inputs[r.key].value = String(data[r.key]);
+        });
+        tally();
+      });
+    }
     tally();
   }
 
@@ -608,6 +809,14 @@
         section.fields.forEach(f => {
           const b = fieldBlock(f, state[section.key][f.name],
                                v => setVal(section.key, f.name, v));
+          if (f.count && b._input) {
+            const c = f.count;
+            refreshers.push(() => {
+              const n = rows(c.section).filter(r => r[c.field] === c.value).length;
+              state[section.key][f.name] = n;
+              b._input.value = String(n);
+            });
+          }
           grid.appendChild(b);
         });
         block.appendChild(grid);
@@ -621,7 +830,12 @@
   let saveTimer = null;
   let dirty = false;
 
+  function refresh() {
+    refreshers.forEach(fn => { try { fn(); } catch (_) { /* never block typing */ } });
+  }
+
   function touch() {
+    refresh();
     dirty = true;
     saveNote.textContent = "Unsaved changes";
     saveNote.className = "save-note";
@@ -705,7 +919,7 @@
     const block = document.getElementById(`sec-${iss.section}`);
     if (!block) return null;
     if (iss.row !== null && iss.row !== undefined) {
-      const tr = block.querySelector(`tr[data-row="${iss.row}"]`);
+      const tr = block.querySelector(`[data-row="${iss.row}"]`);
       if (!tr) return block;
       return iss.field ? (tr.querySelector(`[data-field="${iss.field}"]`) || tr) : tr;
     }
@@ -790,6 +1004,7 @@
   // ------------------------------------------------------------------- boot
 
   render();
+  refresh();
 
   if (!CTX.readonly) {
     document.getElementById("btn-check").addEventListener("click", () => check());

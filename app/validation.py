@@ -430,8 +430,8 @@ def r_category_totals_match_summary(data, ctx, sk):
         if abs(got - d) > 0.01:
             label = next((r["label"] for r in U.DEFAULT_TABLE_2 if r["key"] == key), key)
             out.append(err(
-                f"{label}: Section B declares {d:g} credits but the courses you listed in "
-                f"Section C add up to {got:g}.", section=sk, field=key))
+                f"{label}: the classification of credits shows {d:g} credits but the courses "
+                f"in the programme structure add up to {got:g}.", section=sk, field=key))
     return out
 
 
@@ -443,8 +443,8 @@ def r_course_codes_known(data, ctx, sk):
     for i, r in enumerate(_rows(data, sk)):
         c = str(r.get("course_code", "")).strip().upper()
         if c and c not in known:
-            out.append(err(f"Course code “{c}” does not appear in the programme structure you "
-                           f"submitted in the Curriculum & Regulations stage.",
+            out.append(err(f"Course code “{c}” is not in this programme's structure. "
+                           f"Add it under Curriculum first.",
                            section=sk, row=i, field="course_code"))
     return out
 
@@ -658,10 +658,10 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
 
         curric = ((submission.get("programmes") or {})
                   .get(programme.get("programme_code"), {})
-                  .get("ugc_curriculum", {}).get("data", {}))
+                  .get("prog_curriculum", {}).get("data", {}))
         ctx["known_course_codes"] = {
             str(r.get("course_code", "")).strip().upper()
-            for r in (curric.get("semester_structure") or [])
+            for r in (curric.get("structure") or [])
             if r.get("course_code")
         }
     return ctx

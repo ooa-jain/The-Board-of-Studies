@@ -88,7 +88,7 @@
               <table class="data">
                 {% for k, v in payload.items() %}
                 <tr><td class="small" style="width:240px;color:var(--ink-soft)">{{ k }}</td>
-                    <td class="small">{{ v if v is not mapping else v.get('name', v) }}</td></tr>
+                    <td class="small">{% if v is mapping %}{{ v.get('name', v) }}{% elif v is iterable and v is not string %}{{ v|map(attribute='name')|join(', ') }}{% else %}{{ v }}{% endif %}</td></tr>
                 {% endfor %}
               </table>
             {% elif payload is iterable %}
