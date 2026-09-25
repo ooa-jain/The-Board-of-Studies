@@ -2070,7 +2070,13 @@
     });
   }
 
+  const checksCard = document.getElementById("checks-card");
+  const checksClose = document.getElementById("checks-close");
+  function showChecks() { if (checksCard) checksCard.hidden = false; }
+  if (checksClose) checksClose.addEventListener("click", () => { checksCard.hidden = true; });
+
   function paintIssues(issues, summary) {
+    showChecks();
     issuesBox.textContent = "";
     document.querySelectorAll(".is-bad").forEach(n => {
       n.classList.remove("is-bad");
@@ -2180,6 +2186,7 @@
 
   /** A message in the Checks panel, for when we have no issue list to show. */
   function showPanelMessage(text) {
+    showChecks();
     issuesBox.textContent = "";
     issuesBox.appendChild(el("p", "small issue-note", text));
     countsBox.textContent = "";

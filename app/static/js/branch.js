@@ -57,8 +57,10 @@
   );
 
   var here = nav.querySelector(".branch-row.is-here");
-  var box = nav.querySelector(".scroll-300");
+  // the side column is what scrolls now; fall back to the menu's own box
+  var box = nav.closest(".stage-side") || nav.querySelector(".scroll-300");
   if (here && box && box.scrollHeight > box.clientHeight) {
-    box.scrollTop = Math.max(0, here.offsetTop - box.clientHeight / 2);
+    var top = here.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTop = Math.max(0, top - box.clientHeight / 2);
   }
 })();

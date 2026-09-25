@@ -80,10 +80,13 @@
   </div>
 
   <aside class="stage-side">
-    <div class="card">
+    {# shown only once "Check now" (or Submit) has run the checks #}
+    <div class="card" id="checks-card" hidden>
       <div class="card-head">
         <h3 class="card-title-sm">Checks</h3>
         <span class="spacer issue-counts" id="issue-counts"></span>
+        <button type="button" class="checks-close" id="checks-close"
+                aria-label="Hide the checks">×</button>
       </div>
       <div class="card-body tight">
         <div id="issues" class="issues" role="status" aria-live="polite" aria-atomic="true">
