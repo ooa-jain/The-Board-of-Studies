@@ -53,8 +53,9 @@ def test_landing_page_does_not_name_the_campuses(client):
     assert "Bengaluru" not in body
     assert "Bangalore" not in body
     # but it still explains what the portal is for
-    assert "UGC Table 2" in body
     assert "Board of Studies" in body
+    # the credit-rules showcase was taken off the home page
+    assert "The checking" not in body and "UGC Table 2" not in body
 
 
 def test_seed_list_is_usable_as_a_department_master(app):
