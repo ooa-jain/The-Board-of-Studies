@@ -2596,3 +2596,219 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
   .prog-frame .card-body { padding-left: 14px; padding-right: 14px; }
   .prog-frame .card-head { padding-left: 14px; padding-right: 14px; }
 }
+
+/* ---------- Flow 3D (admin) ---------- */
+.flow-layout { display: grid; grid-template-columns: 1fr 300px; gap: 20px; align-items: start; }
+@media (max-width: 1080px) { .flow-layout { grid-template-columns: 1fr; } }
+.flow-stage { position: relative; overflow: hidden; padding: 0; }
+.flow-canvas { height: min(72vh, 680px); min-height: 420px; position: relative; }
+.flow-canvas canvas { display: block; width: 100% !important; height: 100% !important; cursor: grab; }
+.flow-canvas canvas:active { cursor: grabbing; }
+.flow-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-soft); }
+.flow-toolbar { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; }
+.flow-toolbar .btn { background: rgba(255,255,255,.9); }
+.flow-tip {
+  position: absolute; z-index: 5; pointer-events: none; max-width: 280px;
+  background: var(--ink-800); color: #fff; border-radius: 10px; padding: 8px 12px;
+  box-shadow: 0 10px 30px rgba(9,19,36,.25); font-size: .85rem;
+}
+.flow-tip strong { display: block; }
+.flow-tip span { display: block; opacity: .8; font-size: .8rem; }
+.flow-side { display: flex; flex-direction: column; gap: 16px; }
+.flow-side select { width: 100%; }
+.flow-info strong { display: block; color: var(--ink-800); font-size: .95rem; }
+.flow-picked { color: var(--ink-800); font-weight: 600; }
+.flow-key { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.flow-key i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
+.flow-count { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: .85rem; margin-bottom: 10px; }
+.flow-count .bar { grid-column: 1 / -1; height: 6px; }
+
+/* ==========================================================================
+   Lovable theme — the look of the "BoS Portal Design" prototype built in
+   Lovable, laid over the portal's own components. Flat ivory ground, soft
+   white cards with a hairline border and a gentle shadow, Manrope headings,
+   Inter text, IBM Plex Mono labels, gold primary and orange for PG.
+   Everything above stays; this layer only restyles it.
+   ========================================================================== */
+:root {
+  --font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-head: "Manrope", "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --lv-bg: #f6f1e7;
+  --lv-card: #fdfbf7;
+  --lv-border: #e6ddcc;
+  --lv-muted: #f1ebdf;
+  --lv-muted-fg: #5f6b7d;
+  --lv-gold: #c79c10;
+  --lv-orange: #e8620f;
+  --lv-navy: #0f2440;
+  --lv-soft-gold: #fbf1cf;
+  --lv-soft-orange: #fdebdf;
+  --lv-soft-green: #e2f1e6;
+  --lv-soft-red: #f9e5e1;
+  --lv-shadow: 0 12px 35px -24px rgba(15, 36, 64, .28), 0 2px 9px -5px rgba(15, 36, 64, .1);
+  --lv-shadow-hover: 0 15px 38px -22px rgba(15, 36, 64, .3);
+}
+body { background: var(--lv-bg); background-image: none; color: var(--lv-navy); }
+h1, h2, h3, h4, .page-head h1 { font-family: var(--font-head); font-weight: 800; letter-spacing: -.01em; font-stretch: normal; }
+::selection { background: var(--lv-soft-gold); color: var(--lv-navy); }
+
+/* ---- top bar: flat, white, a gold-to-orange stripe along the top ---- */
+.topbar { background: var(--lv-card); border-bottom: 1px solid var(--lv-border); }
+.topbar::before {
+  content: ""; display: block; height: 4px;
+  background: linear-gradient(90deg, var(--lv-gold) 0 72%, var(--lv-orange) 72% 100%);
+}
+.topbar .wrap, .topbar-wide .wrap {
+  border: 0 !important; box-shadow: none !important; border-radius: 0;
+  background: transparent; height: 72px;
+}
+.nav-left a, .nav-right > a { font-weight: 600; font-size: .84rem; color: var(--lv-muted-fg); border-radius: 8px; }
+.nav-left a:hover, .nav-right > a:hover { color: var(--lv-navy); background: transparent; }
+.nav-left a[aria-current="page"], .nav-left a.is-on, .nav-left a.active {
+  color: var(--lv-navy); background: transparent; box-shadow: inset 0 -2px 0 var(--lv-gold); border-radius: 0;
+}
+.brand-text strong { font-family: var(--font-head); font-weight: 800; }
+.who-avatar { background: var(--lv-soft-gold); color: var(--lv-navy); }
+
+/* ---- page heading ---- */
+.page-head { background: transparent; border-bottom: 0; }
+.page-head h1 { font-size: clamp(1.8rem, 3vw, 2.6rem); }
+.crumbs, .eyebrow { font-family: var(--font-mono); letter-spacing: .08em; }
+.eyebrow { color: var(--lv-gold); }
+
+/* ---- cards, frames and panels: one soft card everywhere ---- */
+.card, .stat, .frame, .frame-panel, .next-step, .stage-row, .branch-card, .rc-card, .part-row,
+.fixed-block, .rv-wrap, .rt-wrap, .mc-item {
+  border-radius: 16px;
+}
+.card, .stat, .frame, .stage-row, .branch-card {
+  background: var(--lv-card); border: 1px solid var(--lv-border) !important;
+  box-shadow: var(--lv-shadow) !important;
+}
+.frame, .frame-orange, .frame-navy { --fc: var(--lv-border); }
+.frame { padding-top: 34px; }
+.card:hover, .stat:hover, .stage-row:not(.locked):hover { box-shadow: var(--lv-shadow-hover) !important; transform: translateY(-2px); }
+.card-head { border-bottom: 1px solid var(--lv-border); }
+.card-head h3, .card-title-sm { font-family: var(--font-head); font-weight: 800; }
+/* the label that broke the frame's top edge becomes a quiet tag */
+.frame-tab {
+  background: var(--lv-muted) !important; color: var(--lv-navy) !important;
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+  border-radius: 8px; box-shadow: none; border: 1px solid var(--lv-border);
+}
+.frame-orange .frame-tab, .frame.frame-orange > .frame-tab { background: var(--lv-soft-orange) !important; color: var(--lv-orange) !important; border-color: #f5cfb4; }
+.frame-num, .story-num { color: var(--lv-gold) !important; font-family: var(--font-mono); }
+
+/* ---- stats ---- */
+.stat .n { font-family: var(--font-head); font-weight: 800; color: var(--lv-navy); }
+.stat .l { font-family: var(--font-mono); font-size: .66rem; letter-spacing: .1em; color: var(--lv-muted-fg); }
+
+/* ---- next-step banner: deep navy card ---- */
+.next-step { background: var(--lv-navy) !important; border: 0 !important; box-shadow: var(--lv-shadow) !important; }
+
+/* ---- buttons: sentence case, rounded, calm ---- */
+.btn {
+  border-radius: 10px; text-transform: none; letter-spacing: 0;
+  font-weight: 700; font-size: .86rem; padding: 12px 20px;
+}
+.btn-sm { padding: 8px 14px; font-size: .8rem; letter-spacing: 0; }
+.btn-lg { padding: 15px 26px; font-size: .92rem; }
+.btn-gold { background: var(--lv-gold); color: var(--lv-navy); }
+.btn-gold:hover { background: #b08a0e; color: var(--lv-navy); }
+.btn-ghost { background: var(--lv-card); border-color: var(--lv-border); color: var(--lv-navy); }
+.btn-ghost:hover { background: var(--lv-muted); }
+
+/* ---- status pills ---- */
+.pill {
+  border-radius: 999px; font-size: .7rem; font-weight: 700; padding: 5px 10px;
+  text-transform: none; letter-spacing: 0; display: inline-flex; align-items: center; gap: 6px;
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill-ok { background: var(--lv-soft-green); color: #1d6b3e; }
+.pill-warn, .pill-gold { background: var(--lv-soft-gold); color: #7a5f06; }
+.pill-err { background: var(--lv-soft-red); color: #ad3325; }
+.pill-lock { background: var(--lv-muted); color: var(--lv-muted-fg); }
+
+/* ---- stage list on the dashboard: a quiet timeline ---- */
+.stage-num {
+  background: var(--lv-soft-gold) !important; color: var(--lv-gold) !important;
+  font-family: var(--font-mono); font-weight: 700; border-radius: 9px;
+}
+.stage-row.locked { opacity: .72; }
+.stage-row.open, .stage-row.draft, .stage-row.returned, .stage-row.submitted { border-left: 1px solid var(--lv-border) !important; }
+.group-label { font-family: var(--font-mono); color: var(--lv-muted-fg); letter-spacing: .1em; }
+
+/* ---- forms ---- */
+.field label, .lbl { font-weight: 700; font-size: .8rem; color: var(--lv-navy); }
+input[type=text], input[type=email], input[type=password], input[type=number],
+input[type=date], input[type=tel], input[type=search], select, textarea {
+  border-radius: 8px; border-color: var(--lv-border); background: var(--lv-card);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--lv-gold); outline: 2px solid var(--lv-soft-gold); }
+input[readonly], textarea[readonly], input.is-auto, textarea.is-auto { background: var(--lv-muted); }
+/* the file boxes read as drop zones */
+input[type=file] {
+  border: 1px dashed var(--lv-border); border-radius: 10px; background: var(--lv-bg); padding: 14px;
+}
+input[type=file]:hover { border-color: var(--lv-gold); background: var(--lv-soft-gold); }
+input[type=file]::file-selector-button { background: var(--lv-navy); border-radius: 8px; }
+.section-block > h3 { font-family: var(--font-head); font-weight: 800; border-bottom-color: var(--lv-border); }
+.section-help { background: var(--lv-card); border: 1px solid var(--lv-border); border-left: 3px solid var(--lv-gold); border-radius: 10px; }
+
+/* ---- tables ---- */
+table.data th, .cd-table th, .rt th {
+  font-family: var(--font-mono); font-size: .68rem; letter-spacing: .06em;
+  background: var(--lv-muted); color: var(--lv-muted-fg); text-transform: uppercase;
+}
+.cd-table thead th { background: var(--lv-navy); color: #fff; }
+.rv-table thead th { background: var(--lv-orange); font-family: var(--font-mono); }
+.rv-total td { background: var(--lv-soft-orange); }
+.rv-wrap, .rt-wrap { border-color: var(--lv-border); background: var(--lv-card); box-shadow: var(--lv-shadow); }
+
+/* ---- the stage page: part tabs, side menu, save bar ---- */
+.part-tab { border-color: var(--lv-border); background: var(--lv-card); font-weight: 600; }
+.part-tab.is-here { background: var(--lv-navy); border-color: var(--lv-navy); }
+.part-row { background: var(--lv-card); border-color: var(--lv-border); }
+.savebar { background: var(--lv-card); border-top: 1px solid var(--lv-border); box-shadow: 0 -8px 26px rgba(15,36,64,.05); }
+
+/* ---- footer ---- */
+footer.site { border-radius: 0; }
+
+/* ---- motion stays gentle ---- */
+@media (prefers-reduced-motion: reduce) {
+  .card:hover, .stat:hover, .stage-row:hover { transform: none; }
+}
+/* Lovable theme — second pass */
+.stat.frame .n, .stat .n { color: var(--lv-navy); }
+.stat.frame-orange .n { color: var(--lv-orange); }
+.stat.frame { padding-top: 22px; }
+/* a stage inside its group panel is one surface, not a card in a card */
+.frame .stage-row { border: 0 !important; box-shadow: none !important; background: transparent; margin: 0; }
+.frame .stage-row:hover { transform: none; background: var(--lv-bg); }
+.stage-num { width: 42px; height: 42px; min-width: 42px; display: grid; place-items: center; font-size: .9rem !important; }
+.next-step-go, .resume-go { border-radius: 10px; text-transform: none; letter-spacing: 0; font-size: .9rem; }
+.next-step-label, .resume-label { font-family: var(--font-mono); }
+/* Lovable theme — third pass */
+.stage-row .stage-num {
+  width: 42px !important; height: 42px !important; min-width: 42px; padding: 0 !important;
+  display: grid !important; place-items: center; line-height: 1; border-radius: 10px !important;
+}
+.hero { background: transparent !important; }
+.hero-display { font-family: var(--font-head); font-weight: 800 !important; letter-spacing: -.02em; }
+.hero-display em, .hero .hero-display em {
+  color: var(--lv-gold) !important; text-decoration: none; font-style: normal;
+}
+.hero-tagline { color: var(--lv-navy); font-family: var(--font-head); font-weight: 700; }
+.frame-panel, .hero-panel {
+  box-shadow: var(--lv-shadow) !important; border: 1px solid var(--lv-border) !important; border-radius: 16px;
+}
+.hero-resume .frame-tab { background: var(--lv-soft-gold) !important; color: var(--lv-navy) !important; }
+.signin-note a { color: var(--lv-gold); font-weight: 700; }
+.frame-stories .story-kicker { color: var(--lv-orange); font-family: var(--font-mono); }
+.stage-frame .stage-row .stage-num, .stage-row .stage-num {
+  place-items: center !important; font: 700 .9rem/1 var(--font-mono) !important;
+  background: var(--lv-soft-gold) !important; color: var(--lv-gold) !important;
+}
+.stage-frame .stage-row.submitted .stage-num { background: var(--lv-soft-green) !important; color: #1d6b3e !important; }
+.stage-frame .stage-row.locked .stage-num { background: var(--lv-muted) !important; color: var(--lv-muted-fg) !important; }

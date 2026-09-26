@@ -8,7 +8,7 @@
   <title>{% block title %}BoS Academic Portal{% endblock %} · JAIN Office of Academics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Fragment+Mono&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 
   {# the JGI roundel, the only square part of the lockup #}
@@ -65,6 +65,7 @@
           {{ nav_link(url_for('admin.dashboard'), 'Dashboard', request.endpoint == 'admin.dashboard') }}
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
           {{ nav_link(url_for('admin.analysis'), 'Analysis', request.endpoint == 'admin.analysis') }}
+          {{ nav_link(url_for('admin.flow'), 'Flow 3D', request.endpoint == 'admin.flow') }}
           {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
         {% elif current_user and current_user.role == 'department' %}
           {{ nav_link(url_for('dept.dashboard'), 'My Submission', request.endpoint == 'dept.dashboard') }}
