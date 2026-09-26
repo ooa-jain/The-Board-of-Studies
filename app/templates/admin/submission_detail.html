@@ -140,7 +140,7 @@
       <span>{{ STAGE_BY_KEY[skey].title if skey in STAGE_BY_KEY else skey }}</span>
       <span class="spacer"></span>
       {% if st.summary and st.summary.errors %}<span class="pill pill-err">{{ st.summary.errors }} errors</span>{% endif %}
-      <span class="pill {{ 'pill-ok' if st.status == 'submitted' else 'pill-warn' }}">{{ st.status }}</span>
+      <span class="pill {{ 'pill-ok' if st.status == 'submitted' else 'pill-err' if st.status == 'returned' else 'pill-warn' }}">{{ {'submitted': 'Submitted', 'returned': 'Returned', 'draft': 'In progress'}.get(st.status, (st.status or 'Not started')|capitalize) }}</span>
     </div>
     {% endfor %}
   </div>

@@ -36,7 +36,7 @@
 {# The masthead is the same bar on every page: the sections on the left, the
    wordmark in the middle, whoever is signed in — or the way to sign in — on
    the right. Below the breakpoint both groups fold into one panel under it. #}
-<header class="topbar">
+<header class="topbar{{ ' topbar-wide' if current_user and current_user.role == 'admin' }}">
   <div class="wrap">
     <button class="nav-toggle" type="button" id="nav-toggle"
             aria-expanded="false" aria-controls="topnav">

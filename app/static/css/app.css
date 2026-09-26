@@ -2569,3 +2569,30 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .rv-total td { background: #fdf0e6; font-weight: 700; }
 .rv-total .rv-avg { font-size: 1.05rem; color: var(--ink-800); }
 .rv-add td { background: var(--surface); }
+
+/* ---------- UI pass ---------- */
+/* The admin bar carries seven sections and an account: give it room so the
+   account and Sign out stay inside the frame. */
+.topbar-wide .wrap { width: min(1320px, calc(100% - 28px)); }
+.topbar-wide .nav-left a, .topbar-wide .nav-right > a { padding-left: 10px; padding-right: 10px; }
+@media (min-width: 901px) and (max-width: 1240px) {
+  .topbar-wide .brand-text { display: none; }
+}
+/* On a phone the wordmark alone says who we are; the portal name is left out
+   rather than cut in half. */
+@media (max-width: 460px) {
+  .brand-text { display: none; }
+}
+/* On a phone the four figures sit two by two instead of in one tall column. */
+@media (max-width: 680px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-4 > * { min-width: 0; }
+}
+/* A programme's three parts stay one line each on a phone: the button's own
+   word (Start / Continue / View) already says where the part stands. */
+@media (max-width: 560px) {
+  .part-row { flex-wrap: nowrap; padding: 8px 10px; }
+  .part-row .pill:not(.pill-err) { display: none; }
+  .prog-frame .card-body { padding-left: 14px; padding-right: 14px; }
+  .prog-frame .card-head { padding-left: 14px; padding-right: 14px; }
+}
