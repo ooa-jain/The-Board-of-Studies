@@ -68,8 +68,6 @@
           {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
         {% elif current_user and current_user.role == 'department' %}
           {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
-          <a href="{{ url_for('dept.export_excel') }}">Excel</a>
-          <a href="{{ url_for('dept.export_word') }}">Report</a>
         {% else %}
           {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
         {% endif %}

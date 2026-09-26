@@ -500,8 +500,19 @@ def test_autosave_keeps_a_draft(app, client):
 
 
 def test_exports_produce_real_files(app, client):
+    from app.db import get_db
     u, p = make_department(app)
     login(client, u, p)
+
+    # not before the record is finished — and not offered in the bar either
+    r = client.get("/department/export.xlsx")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/department/")
+    body = client.get("/department/").get_data(as_text=True)
+    assert "export.xlsx" not in body and "export.docx" not in body
+
+    with app.app_context():
+        get_db().submissions.update_one({"dept_code": "COM"}, {"$set": {"status": "sealed"}})
+    assert "export.xlsx" in client.get("/department/").get_data(as_text=True)
     x = client.get("/department/export.xlsx")
     assert x.status_code == 200 and x.data[:2] == b"PK"
     w = client.get("/department/export.docx")

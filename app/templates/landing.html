@@ -138,8 +138,10 @@
 
         <p class="signin-note">
           <a href="{{ url_for('dept.dashboard') }}">All {{ resume.progress.total }} stages</a>
+          {% if resume.sealed %}
           · <a href="{{ url_for('dept.export_excel') }}">Excel</a>
           · <a href="{{ url_for('dept.export_word') }}">Word report</a>
+          {% endif %}
         </p>
       </aside>
 

@@ -2501,3 +2501,11 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
   line-height: 1; color: var(--ink-700); padding: 2px 6px; border-radius: 6px;
 }
 .checks-close:hover { background: var(--ink-050); }
+
+/* The top bar in the portal's frame style: a navy outline with a solid
+   offset shadow, like the programme panels. It hangs from the top of the
+   window, so there is no top edge. */
+.topbar .wrap {
+  border: 2px solid var(--ink-800); border-top: 0;
+  box-shadow: 6px 6px 0 var(--ink-800);
+}

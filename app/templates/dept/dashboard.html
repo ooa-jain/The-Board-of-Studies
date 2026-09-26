@@ -17,8 +17,11 @@
         <span class="bar-label">{{ progress.done }} / {{ progress.total }} stages</span>
       </div>
       <div class="flex mt-1 head-aside-row">
+        {# the downloads are the finished record, so they appear once it is #}
+        {% if submission.status == 'sealed' %}
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
+        {% endif %}
         <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.change_password') }}">Password</a>
       </div>
     </div>

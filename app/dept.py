@@ -405,10 +405,22 @@ def download(stage_key, stored):
 # department's own exports
 # ---------------------------------------------------------------------------
 
+def _not_finished(dept):
+    """The downloads are the finished record: until every stage is
+    submitted, send the department back to its submission instead."""
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    if sub.get("status") == "sealed":
+        return None
+    flash("The Excel and Word downloads appear once every stage is submitted.", "info")
+    return redirect(url_for("dept.dashboard"))
+
+
 @bp.route("/export.xlsx")
 @department_required
 def export_excel():
     dept = _dept()
+    if (back := _not_finished(dept)):
+        return back
     buf = department_excel(dept["dept_code"], _year())
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-{dept['dept_code']}-{_year()}.xlsx",
@@ -419,6 +431,8 @@ def export_excel():
 @department_required
 def export_word():
     dept = _dept()
+    if (back := _not_finished(dept)):
+        return back
     buf = submission_word(dept["dept_code"], _year())
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Report-{dept['dept_code']}-{_year()}.docx",
