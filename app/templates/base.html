@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="OOA Data Portal — where JAIN departments file their Board of Studies record with the Office of Academics for the academic year.">
+  <meta name="description" content="BoS Academic Portal — where JAIN departments file their Board of Studies record with the Office of Academics for the academic year.">
   <meta name="theme-color" content="#091324">
-  <title>{% block title %}OOA Data Portal{% endblock %} · JAIN Office of Academics</title>
+  <title>{% block title %}BoS Academic Portal{% endblock %} · JAIN Office of Academics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Fragment+Mono&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -49,7 +49,7 @@
            src="{{ url_for('static', filename='img/jain-logo.png') }}"
            width="1103" height="319">
       <span class="brand-text">
-        <strong>OOA Data Portal</strong>
+        <strong>BoS Academic Portal</strong>
         <span>Office of Academics</span>
       </span>
     </a>
@@ -67,7 +67,7 @@
           {{ nav_link(url_for('admin.analysis'), 'Analysis', request.endpoint == 'admin.analysis') }}
           {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
         {% elif current_user and current_user.role == 'department' %}
-          {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
+          {{ nav_link(url_for('dept.dashboard'), 'My Submission', request.endpoint == 'dept.dashboard') }}
         {% else %}
           {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
         {% endif %}
@@ -118,9 +118,8 @@
 {% if app_settings and app_settings.dev_mode %}
 <div class="dev-banner" role="status">
   <div class="wrap">
-    <strong>Developer mode is on.</strong>
-    Every stage is unlocked and can be opened in any order. Nothing else
-    changes — what you file is saved and validated as usual.
+    <strong>Developer Preview</strong> · All workflow stages are currently accessible for
+    testing. Submission validation and data-saving processes remain unchanged.
     {% if current_user and current_user.role == 'admin' %}
       <a href="{{ url_for('admin.app_settings') }}">Turn it off</a>
     {% endif %}
@@ -164,7 +163,7 @@
          src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
          width="1103" height="319">
     <span>JAIN (Deemed-to-be University) · Office of Academics</span>
-    <span class="spacer">Office of Academics Data Portal</span>
+    <span class="spacer">BoS Academic Portal</span>
     <span>{{ app_settings.academic_year if app_settings else '' }}</span>
   </div>
 </footer>

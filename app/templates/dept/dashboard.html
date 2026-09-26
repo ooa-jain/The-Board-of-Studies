@@ -56,12 +56,12 @@
   <span class="next-step-label">
     {% if next_step.status == 'returned' %}Sent back — needs your correction
     {% elif next_step.status == 'draft' %}Pick up where you left off
-    {% else %}Your next step{% endif %}
+    {% else %}Next Stage{% endif %}
   </span>
   <span class="next-step-title">{{ next_step.title }}</span>
   <span class="next-step-blurb">{{ next_step.blurb }}</span>
   <span class="next-step-go">
-    {% if next_step.status == 'draft' %}Continue{% else %}Start{% endif %}
+    {% if next_step.status == 'draft' %}Continue{% else %}Proceed{% endif %}
     <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

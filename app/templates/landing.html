@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_art.html" as art %}
-{% block title %}Office of Academics Data Portal{% endblock %}
+{% block title %}BoS Academic Portal{% endblock %}
 
 {% block body_class %}has-hero{% endblock %}
 
@@ -19,7 +19,7 @@
 <div class="preload" id="preload">
   <canvas class="preload-canvas" id="preload-canvas" aria-hidden="true"></canvas>
   <p class="sr-only" role="status">
-    Loading the OOA Data Portal — JAIN (Deemed-to-be University), Office of Academics.
+    Loading the BoS Academic Portal — JAIN (Deemed-to-be University), Office of Academics.
   </p>
   <div class="preload-foot">
     {# A real control, not a hint: it takes the focus ring, it answers to
@@ -33,7 +33,7 @@
       </svg>
     </button>
     <span class="preload-bar" aria-hidden="true"><i></i></span>
-    <p class="preload-note">Office of Academics Data Portal</p>
+    <p class="preload-note">BoS Academic Portal</p>
   </div>
 </div>
 {% endblock %}
@@ -52,39 +52,49 @@
       <div>
         <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
         <h1 class="hero-display">
-          The Board of Studies record,<br><em>filled once</em>
+          Board of Studies<br><em>Academic Record</em>
+          <span class="hero-tagline">One Submission. One Record.</span>
         </h1>
-        <p class="hero-lede">Four stages. One form. Checked as you type.</p>
+        <p class="hero-lede">Four structured stages. One consolidated academic record.
+          Validated as you submit.</p>
 
         <div class="frame frame-navy frame-stories">
-          <h3 class="frame-tab">What the portal does</h3>
+          <h3 class="frame-tab">Portal Workflow</h3>
           <div class="story-list">
             <div class="story-item">
               <span class="story-num frame-num">01</span>
               <span>
-                <span class="story-kicker">In order</span>
-                <span class="story-line">Each stage opens when the last is submitted</span>
+                <span class="story-kicker">Structured Workflow</span>
+                <span class="story-line">Complete each stage sequentially</span>
+                <span class="story-detail">Each stage becomes available upon completion of the
+                  preceding stage.</span>
               </span>
             </div>
             <div class="story-item">
               <span class="story-num frame-num">02</span>
               <span>
-                <span class="story-kicker">Checked live</span>
-                <span class="story-line">Credit totals validated at the keystroke, not weeks later</span>
+                <span class="story-kicker">Real-Time Validation</span>
+                <span class="story-line">Information is validated during submission</span>
+                <span class="story-detail">Required fields and academic data are checked as you
+                  enter information.</span>
               </span>
             </div>
             <div class="story-item">
               <span class="story-num frame-num">03</span>
               <span>
-                <span class="story-kicker">Uploaded once</span>
-                <span class="story-line">The three signed composition documents, as files</span>
+                <span class="story-kicker">Document Submission</span>
+                <span class="story-line">Upload approved BoS documentation</span>
+                <span class="story-detail">Submit the required Board of Studies composition and
+                  supporting documents securely.</span>
               </span>
             </div>
             <div class="story-item">
               <span class="story-num frame-num">04</span>
               <span>
-                <span class="story-kicker">One login</span>
-                <span class="story-line">Issued to the department, not to a person</span>
+                <span class="story-kicker">Department-Based Access</span>
+                <span class="story-line">Access is assigned to the department</span>
+                <span class="story-detail">The portal account is linked to the department rather
+                  than an individual user.</span>
               </span>
             </div>
           </div>
@@ -94,9 +104,9 @@
       {% if resume %}
       {# Already signed in: the thread you dropped, not a second sign-in. #}
       <aside class="hero-panel hero-resume frame-panel" id="signin">
-        <span class="frame-tab">Signed in</span>
+        <span class="frame-tab">Active Session</span>
         <div class="resume-head">
-          <span class="resume-kicker">Signed in · {{ resume.year }}</span>
+          <span class="resume-kicker">Academic Session · {{ resume.year|replace('-', '–') }}</span>
           <h2 class="signin-title">{{ resume.dept.dept_name }}</h2>
           <p class="resume-where">{{ resume.dept.campus }}{% if resume.dept.place %} · {{ resume.dept.place }}{% endif %}</p>
         </div>
@@ -107,7 +117,7 @@
                aria-valuemax="{{ resume.progress.total }}"
                aria-label="Stages submitted"><i style="width:{{ resume.progress.percent }}%"></i></div>
           <span class="resume-count">
-            {{ resume.progress.done }} of {{ resume.progress.total }} stages submitted
+            {{ resume.progress.done }} of {{ resume.progress.total }} stages completed
           </span>
         </div>
 
@@ -116,11 +126,11 @@
           <span class="resume-label">
             {% if resume.next.status == 'returned' %}Sent back — needs your correction
             {% elif resume.next.status == 'draft' %}You left off here
-            {% else %}Your next step{% endif %}
+            {% else %}Next Stage{% endif %}
           </span>
           <span class="resume-title">{{ resume.next.title }}</span>
           <span class="resume-go">
-            {% if resume.next.status == 'draft' %}Continue{% else %}Start{% endif %}
+            {% if resume.next.status == 'draft' %}Continue{% else %}Proceed{% endif %}
             <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
                     stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -137,7 +147,7 @@
         {% endif %}
 
         <p class="signin-note">
-          <a href="{{ url_for('dept.dashboard') }}">All {{ resume.progress.total }} stages</a>
+          <a href="{{ url_for('dept.dashboard') }}">View All {{ resume.progress.total }} Stages</a>
           {% if resume.sealed %}
           · <a href="{{ url_for('dept.export_excel') }}">Excel</a>
           · <a href="{{ url_for('dept.export_word') }}">Word report</a>
@@ -150,9 +160,9 @@
          on the role, not merely on being signed in — a department must never
          be pointed at the admin console because a lookup came back empty. #}
       <aside class="hero-panel hero-resume frame-panel" id="signin">
-        <span class="frame-tab">Signed in</span>
+        <span class="frame-tab">Active Session</span>
         <div class="resume-head">
-          <span class="resume-kicker">Signed in</span>
+          <span class="resume-kicker">Active Session</span>
           <h2 class="signin-title">{{ current_user.name }}</h2>
           <p class="resume-where">{{ stats.departments }} active departments</p>
         </div>
@@ -178,9 +188,9 @@
          been removed, say. Say so plainly rather than offering a sign-in they
          do not need. #}
       <aside class="hero-panel hero-resume frame-panel" id="signin">
-        <span class="frame-tab">Signed in</span>
+        <span class="frame-tab">Active Session</span>
         <div class="resume-head">
-          <span class="resume-kicker">Signed in</span>
+          <span class="resume-kicker">Active Session</span>
           <h2 class="signin-title">{{ current_user.name }}</h2>
         </div>
         <p class="signin-note">
@@ -254,20 +264,20 @@
     </div>
     <div class="flow">
       <div>
-        <h4>The Office of Academics issues a login</h4>
-        <p>One account per department at each campus, issued in a batch.</p>
+        <h4>Level 0 · Department Information</h4>
+        <p>Confirm the department record and the programmes mapped to it.</p>
       </div>
       <div>
-        <h4>Pre-BoS is filled first</h4>
-        <p>DIAC, Board of Studies and PAC. Everything else stays locked.</p>
+        <h4>Stage 1 · Pre-BoS</h4>
+        <p>Upload the signed DIAC and DPAC compositions.</p>
       </div>
       <div>
-        <h4>UGC Mandatory Disclosure opens</h4>
-        <p>Programmes, credits and syllabus, checked against UGC Table 2.</p>
+        <h4>Stage 2 · BoS Documents</h4>
+        <p>BoS composition, minutes, photographs, attendance and stakeholder feedback.</p>
       </div>
       <div>
-        <h4>Evidence, approval, repository</h4>
-        <p>Feedback, meeting papers and approvals — then sealed.</p>
+        <h4>Stage 3 · Curriculum</h4>
+        <p>Curriculum, syllabus and course revision for every UG and PG programme.</p>
       </div>
     </div>
   </div>

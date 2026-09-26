@@ -205,7 +205,7 @@ def institution_excel(year: str) -> io.BytesIO:
     wb = Workbook()
     ws = wb.active
     ws.title = "Status"
-    ws["A1"] = f"OOA Data Portal — institution status, {year}"
+    ws["A1"] = f"BoS Academic Portal — institution status, {year}"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
 
     header = ["Place", "Campus", "School", "Department", "Code", "Progress"] + \

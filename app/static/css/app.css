@@ -2509,3 +2509,13 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
   border: 2px solid var(--ink-800); border-top: 0;
   box-shadow: 6px 6px 0 var(--ink-800);
 }
+
+/* the hero's third line and the workflow panel's detail line */
+.hero-tagline {
+  display: block; margin-top: 14px; font-size: .42em; letter-spacing: 0;
+  font-weight: 600; color: var(--gold-700);
+}
+.story-detail {
+  display: block; margin-top: 4px; font-size: .92rem; line-height: 1.45;
+  color: var(--ink-soft);
+}

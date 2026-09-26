@@ -446,7 +446,7 @@ def test_the_dashboard_names_the_next_step(app, client):
     u, p = make_department(app)
     login(client, u, p)
     body = client.get("/department/").get_data(as_text=True)
-    assert "Your next step" in body
+    assert "Next Stage" in body
     assert "Department Information" in body
 
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
@@ -642,7 +642,7 @@ def test_the_home_page_carries_the_loading_screen(client):
 
 def test_the_portal_is_named_ooa_data_portal(client):
     body = client.get("/").get_data(as_text=True)
-    assert "OOA Data Portal" in body or "Office of Academics Data Portal" in body
+    assert "BoS Academic Portal" in body
     assert "BoS Data Repository" not in body
 
 
@@ -777,12 +777,12 @@ def test_a_signed_in_department_is_not_asked_to_sign_in_again(app, client):
     assert "Sign out" in body
     assert ">Home</a>" in body, "no way back to the home page from the bar"
     # and it shows where they had got to
-    assert "0 of 4 stages submitted" in body
-    assert "Your next step" in body and "Department Information" in body
+    assert "0 of 4 stages completed" in body
+    assert "Next Stage" in body and "Department Information" in body
 
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
     body = client.get("/").get_data(as_text=True)
-    assert "1 of 4 stages submitted" in body
+    assert "1 of 4 stages completed" in body
     assert "Pre-BoS" in body
 
 
@@ -791,7 +791,7 @@ def test_the_admin_gets_the_console_not_a_department_panel(app, client):
     body = client.get("/").get_data(as_text=True)
     assert 'name="password"' not in body
     assert "The admin dashboard" in body
-    assert "stages submitted" not in body
+    assert "stages completed" not in body
 
 
 def test_the_analysis_tells_each_department_apart(app, client):
@@ -970,11 +970,11 @@ def test_developer_mode_says_so_on_every_page(app, client):
     """It is easy to switch on and easy to forget, so it announces itself."""
     u, p = make_department(app)
     login(client, u, p)
-    assert "Developer mode is on" not in client.get("/department/").get_data(as_text=True)
+    assert "Developer Preview" not in client.get("/department/").get_data(as_text=True)
 
     set_dev_mode(app, True)
     for path in ("/department/", "/department/stage/dept_info"):
-        assert "Developer mode is on" in client.get(path).get_data(as_text=True), path
+        assert "Developer Preview" in client.get(path).get_data(as_text=True), path
 
 
 def test_the_switch_is_on_the_settings_page_and_is_logged(app, client):
