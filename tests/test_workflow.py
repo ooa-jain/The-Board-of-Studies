@@ -1063,25 +1063,42 @@ def test_a_removed_programme_needs_a_reason(app, client):
 
 
 
-def test_flow_mapping_shows_each_department_at_its_stage(app, client):
+def test_flow_maps_one_departments_data_between_stages(app, client):
     _through_bos_documents(app, client)
+    client.post("/department/api/prog_curriculum/BCMREG/save", json={
+        "details": {"degree_level": "UG - 3 Year", "batch": "2026-29"},
+        "semester_structure": [{"semester": 1, "nep_category": "Major (Core)",
+                                "course_code": "26BCC1C01", "course_title": "Accounting",
+                                "l": 4, "t": 0, "p": 0, "e": 0, "credits": 4,
+                                "cia": 50, "ese": 50, "total_marks": 100}]})
+    client.post("/department/api/prog_syllabus/BCMREG/save", json={"courses": [{
+        "course_code": "26BCC1C01", "course_title": "Accounting", "semester": 1,
+        "prev_code": "16BBA1C03", "prev_title": "Business Management", "year_previous": "2020",
+        "avg_change": 57.15}]})
+    # the Course Revision offers the revised course with what the Syllabus holds
+    page = client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True)
+    fill = json.loads(page.split("fill: ")[1].split(",\n")[0])
+    assert fill == [{"revised_code": "26BCC1C01", "revised_title": "Accounting", "semester": 1,
+                     "code_before": "16BBA1C03", "title_before": "Business Management",
+                     "previous_revision": "2020", "percent_change": 57}]
     client.get("/logout")
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
 
     page = client.get("/admin/flow").get_data(as_text=True)
-    assert "Department to stage mapping" in page and "/admin/flow.xlsx" in page
+    assert "Choose a department" in page and 'value="COM"' in page
+    assert client.get("/admin/flow.json").status_code == 400      # one department at a time
 
-    data = client.get("/admin/flow.json").get_json()
-    com = next(d for d in data["departments"] if d["code"] == "COM")
-    assert com["reached"] == 3                       # at Curriculum
-    assert com["statuses"]["bos_documents"] == "submitted"
-    assert {p["level"] for p in com["programmes"]} == {"UG", "PG"}
+    data = client.get("/admin/flow.json?dept=COM&prog=BCMREG").get_json()
+    flows = {f["id"]: f for f in data["flows"]}
+    assert flows["bos_date"]["value"] == "2026-03-12"
+    assert flows["bos_date"]["to"] == ["prog_revision", "prog_syllabus"]
+    assert flows["batch"]["value"] == "2026-29"
+    assert flows["credits"]["value"] == "4 credits"
+    assert "57.15" in flows["syllabus_change"]["value"]
 
-    x = client.get("/admin/flow.xlsx")
+    x = client.get("/admin/flow.xlsx?dept=COM")
     assert x.status_code == 200 and x.data[:2] == b"PK"
     import io
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(x.data))
-    assert wb.sheetnames == ["Department to stage", "Programmes"]
-    rows = list(wb["Department to stage"].iter_rows(min_row=4, values_only=True))
-    assert any(r[1] == "COM" and r[4] == "Curriculum" for r in rows)
+    assert wb.sheetnames == ["Data mapping", "By programme"]

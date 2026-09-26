@@ -2410,6 +2410,22 @@
             // the credit check follows the degree: save, then reopen with it
             if (f.reload_on_change) { reloadAfterSave = true; clearTimeout(saveTimer); save(); }
           });
+          if (f.derive_from && b._input) {
+            // filled from other fields on the page (item 9 from the programme
+            // name and specialisation) until the department types its own
+            const read = ref => { const [sec, name] = ref.split("."); return String(((state[sec] || {})[name]) || "").trim(); };
+            const make = () => f.derive_from.map(read).filter(Boolean).join(" — ");
+            let last = make();
+            refreshers.push(() => {
+              const v = make();
+              const cur = String(state[section.key][f.name] || "").trim();
+              if (!CTX.readonly && (cur === "" || cur === last) && v !== cur) {
+                state[section.key][f.name] = v;
+                b._input.value = v;
+              }
+              last = v;
+            });
+          }
           if (f.count && b._input) {
             // "No. of courses with major revisions" and the like count themselves
             const c = f.count;

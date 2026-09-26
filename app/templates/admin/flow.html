@@ -6,10 +6,9 @@
   <div class="wrap">
     <div>
       <div class="crumbs">Office of Academics <span>›</span> Flow 3D</div>
-      <h1>How a submission flows — {{ year }}</h1>
-      <p>The four stages as platforms, every department standing at the stage it has reached,
-        and the programmes a department is filing under Curriculum. Drag to turn, scroll to zoom,
-        click a department to open its programmes.</p>
+      <h1>How a department's data flows — {{ year }}</h1>
+      <p>Choose a department — and one of its programmes — to see what it enters once and every
+        stage the portal carries it to. Drag to turn, scroll to zoom, hover a line for its value.</p>
     </div>
   </div>
 </div>
@@ -19,14 +18,18 @@
 <div class="flow-layout">
   <div class="flow-stage card">
     <div id="flow-canvas" class="flow-canvas" role="img"
-         aria-label="Three-dimensional view of the four stages and where every department stands">
+         aria-label="Three-dimensional map of where a department's data is entered and used again">
       <p class="flow-loading" id="flow-loading">Building the view…</p>
+    </div>
+    <div class="flow-empty" id="flow-empty">
+      <strong>Choose a department</strong>
+      <span>Pick one in the panel on the right to draw its data map.</span>
     </div>
     <div class="flow-tip" id="flow-tip" hidden></div>
     <div class="flow-toolbar">
       <button class="btn btn-ghost btn-sm" type="button" id="flow-reset">Reset view</button>
-      <button class="btn btn-ghost btn-sm" type="button" id="flow-labels">Labels: codes</button>
-      <button class="btn btn-ghost btn-sm" type="button" id="flow-spin" aria-pressed="true">Pause rotation</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-all" aria-pressed="false">Show all flows</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-spin" aria-pressed="false">Rotate</button>
     </div>
   </div>
 
@@ -34,32 +37,38 @@
     <div class="card">
       <div class="card-head"><h3 class="card-title-sm">Department</h3></div>
       <div class="card-body tight">
-        <label class="sr-only" for="flow-dept">Choose a department</label>
-        <select id="flow-dept"><option value="">All departments</option></select>
-        <div id="flow-info" class="flow-info small muted mt-1">
-          Choose a department, or click one in the view, to see its UG and PG programmes and the
-          state of each programme's Curriculum, Syllabus and Course Revision.
-        </div>
+        <label class="lbl" for="flow-dept">Department</label>
+        <select id="flow-dept">
+          <option value="">Choose a department…</option>
+          {% for d in departments %}
+          <option value="{{ d.dept_code }}">{{ d.dept_name }} — {{ d.campus }}</option>
+          {% endfor %}
+        </select>
+        <label class="lbl mt-1" for="flow-prog">Programme</label>
+        <select id="flow-prog" disabled><option value="">All programmes</option></select>
+        <p class="small muted mt-1" id="flow-info">The map follows the programme you choose, with
+          its own batch, degree, courses and credits.</p>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-head"><h3 class="card-title-sm">Where departments stand</h3></div>
-      <div class="card-body tight" id="flow-counts"></div>
+      <div class="card-head">
+        <h3 class="card-title-sm">Choose what to follow</h3>
+        <span class="spacer small muted" id="flow-n"></span>
+      </div>
+      <div class="card-body tight">
+        <ol class="flow-list" id="flow-list"><li class="muted small">Choose a department.</li></ol>
+      </div>
     </div>
 
     <div class="card">
       <div class="card-head"><h3 class="card-title-sm">Key</h3></div>
       <div class="card-body tight small">
         <ul class="flow-key">
-          <li><i style="background:#1d6b3e"></i> Submitted</li>
-          <li><i style="background:#c79c10"></i> In progress</li>
-          <li><i style="background:#ad3325"></i> Returned for correction</li>
-          <li><i style="background:#8a94a6"></i> Not started / open</li>
-          <li><i style="background:#0f2440"></i> UG programme branch</li>
-          <li><i style="background:#e8620f"></i> PG programme branch</li>
+          <li><i style="background:#0f2440"></i> Copied — filled in as it is</li>
+          <li><i style="background:#c79c10"></i> Worked out — calculated from it</li>
+          <li><i style="background:#e8620f"></i> Offered — “Fill in all” in one click</li>
         </ul>
-        <p class="muted mt-1">The light running along the path shows the order the stages open in.</p>
       </div>
     </div>
   </aside>
@@ -67,25 +76,17 @@
 
 <section class="card flow-map" id="mapping">
   <div class="card-head">
-    <h3 class="card-title-sm">Department to stage mapping</h3>
+    <h3 class="card-title-sm">Data mapping <span class="muted" id="map-for"></span></h3>
     <span class="spacer"></span>
-    <a class="btn btn-gold btn-sm" href="{{ url_for('admin.flow_excel') }}">Download Excel</a>
+    <a class="btn btn-gold btn-sm" id="map-xlsx" href="#" aria-disabled="true" hidden>Download Excel</a>
   </div>
   <div class="card-body tight">
-    <div class="flow-map-tools">
-      <label class="sr-only" for="map-q">Find a department</label>
-      <input id="map-q" type="search" placeholder="Find a department, code or campus">
-      <label class="sr-only" for="map-stage">Show departments at</label>
-      <select id="map-stage"><option value="">Every stage</option></select>
-      <span class="small muted" id="map-count"></span>
-    </div>
     <div class="table-wrap">
       <table class="data flow-map-table">
-        <thead id="map-head"></thead>
-        <tbody id="map-body"><tr><td class="muted">Loading…</td></tr></tbody>
+        <thead><tr><th>Field</th><th>Entered in</th><th>Used again in</th><th>How</th><th>Value</th></tr></thead>
+        <tbody id="map-body"><tr><td colspan="5" class="muted">Choose a department above.</td></tr></tbody>
       </table>
     </div>
-    <p class="small muted mt-1">Click a department to open it in the 3D view above.</p>
   </div>
 </section>
 
@@ -95,6 +96,9 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/three.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/OrbitControls.js') }}"></script>
-<script>window.FLOW_URL = {{ url_for('admin.flow_data')|tojson }};</script>
+<script>
+  window.FLOW_URL = {{ url_for('admin.flow_data')|tojson }};
+  window.FLOW_XLSX = {{ url_for('admin.flow_excel')|tojson }};
+</script>
 <script src="{{ url_for('static', filename='js/flow3d.js') }}"></script>
 {% endblock %}

@@ -585,6 +585,34 @@ def course_fill_source(submission, programme_code):
     return out
 
 
+def revision_fill_source(submission, programme_code):
+    """Revised courses for the "fill in all" button in Course Revision: every
+    syllabus with a revision recorded against it, carrying its previous code,
+    title and year and its average % change — typed once, in the Syllabus."""
+    data = ((submission.get("programmes") or {}).get(programme_code, {})
+            .get("prog_syllabus", {}).get("data") or {})
+    out, seen = [], set()
+    for c in data.get("courses") or []:
+        if not isinstance(c, dict):
+            continue
+        code = str(c.get("course_code") or "").strip()
+        pct = c.get("avg_change")
+        if not code or code.upper() in seen or pct in (None, ""):
+            continue
+        seen.add(code.upper())
+        row = {"revised_code": code, "revised_title": c.get("course_title", "")}
+        for src, dst in (("semester", "semester"), ("prev_code", "code_before"),
+                         ("prev_title", "title_before"), ("year_previous", "previous_revision")):
+            if c.get(src) not in (None, ""):
+                row[dst] = c[src]
+        try:
+            row["percent_change"] = int(round(float(pct)))
+        except (TypeError, ValueError):
+            pass
+        out.append(row)
+    return out
+
+
 def programme_fill_source(submission, department):
     """Programmes for the "fill in all" button in Programme Information:
     the list confirmed in Department Information, or — if that was never

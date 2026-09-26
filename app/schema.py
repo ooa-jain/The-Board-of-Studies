@@ -341,6 +341,7 @@ PROGRAMME_CURRICULUM = {
                  "required": True, "prefill_text": DEFAULT_REGULATIONS["pattern"]},
                 {"name": "course_specialisation", "label": "9. Course & specialisation",
                  "type": "text", "required": True, "wide": True,
+                 "derive_from": ["details.programme_name", "details.specialisation"],
                  "placeholder": "For example: BCom (Corporate Finance) Honours / Honours with "
                                 "Research — minors as per Annexure I"},
                 {"name": "assessment", "label": "10. Assessment", "type": "textarea",
@@ -570,7 +571,9 @@ PROGRAMME_REVISION = {
         {
             "key": "revisions",
             "title": "Revised courses",
-            "help": "One card per revised or new course. Leave empty if nothing was revised.",
+            "help": "One card per revised or new course. “Fill in all revisions” brings every "
+                    "course revised in the Syllabus, with its previous code, title, year and "
+                    "% change. Leave empty if nothing was revised.",
             "type": "table",
             "min_rows": 0,
             "display": "cards",

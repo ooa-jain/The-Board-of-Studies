@@ -84,60 +84,40 @@ def dashboard():
 @bp.route("/flow")
 @admin_required
 def flow():
-    """The whole sequence in 3D: the four stages as platforms, every
-    department standing at the stage it has reached, and — for a chosen
-    department — its UG and PG programmes with their three parts."""
-    return render_template("admin/flow.html", year=_year())
+    """How one department's data moves from stage to stage, in 3D. The
+    department — and a programme of it — is chosen in the side panel."""
+    departments = list(get_db().departments.find({"active": True}).sort("dept_name", 1))
+    return render_template("admin/flow.html", year=_year(), departments=departments)
 
 
-def _flow_payload():
-    """Every department, the stage it has reached, each stage's status, and
-    its programmes with the state of their Curriculum, Syllabus and Revision."""
-    from .schema import STAGE_KEYS
-    from .workflow import part_status, programmes_of
+def _flow_for(dept_code, programme_code=None):
+    from .flows import flows_for
     db = get_db()
-    year = _year()
-    departments = list(db.departments.find({"active": True}).sort("dept_name", 1))
-    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
-    parts = next((s["parts"] for s in STAGES if s.get("parts")), [])
-    out = []
-    for d in departments:
-        sub = subs.get(d["dept_code"]) or {}
-        statuses = {k: compute_status(sub, k) for k in STAGE_KEYS}
-        reached = next((i for i, k in enumerate(STAGE_KEYS)
-                        if statuses[k] != "submitted"), len(STAGE_KEYS))
-        progs = []
-        for p in programmes_of(sub, d) if sub else []:
-            progs.append({"code": p["programme_code"], "name": p["programme_name"],
-                          "level": "PG" if p.get("level") in ("PG", "PGD") else "UG",
-                          "degree_level": p.get("degree_level") or "",
-                          "parts": {k: part_status(sub, p["programme_code"], k)
-                                    for k in parts}})
-        out.append({"code": d["dept_code"], "name": d.get("dept_name", d["dept_code"]),
-                    "campus": d.get("campus", ""), "school": d.get("school", ""),
-                    "statuses": statuses, "reached": reached, "programmes": progs})
-    return {
-        "year": year,
-        "stages": [{"key": s["key"], "title": s["title"], "group": s["group"]} for s in STAGES],
-        "parts": [{"key": k, "title": STAGE_BY_KEY[k]["title"]} for k in parts],
-        "departments": out,
-    }
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": _year()}) or {}
+    return dept, sub, flows_for(sub, dept, programme_code)
 
 
 @bp.route("/flow.json")
 @admin_required
 def flow_data():
-    return jsonify(_flow_payload())
+    code = request.args.get("dept") or abort(400)
+    _, _, data = _flow_for(code, request.args.get("prog") or None)
+    return jsonify(data)
 
 
 @bp.route("/flow.xlsx")
 @admin_required
 def flow_excel():
-    """The department-to-stage mapping, and every programme's parts, as Excel."""
-    from .exporter import mapping_excel
-    data = _flow_payload()
-    return send_file(mapping_excel(data), as_attachment=True,
-                     download_name=f"BoS-stage-mapping-{data['year']}.xlsx",
+    """One department's data mapping — every flow, for every programme."""
+    from .exporter import flow_mapping_excel
+    from .flows import flows_for
+    code = request.args.get("dept") or abort(400)
+    dept, sub, data = _flow_for(code)
+    per_prog = [(p, flows_for(sub, dept, p["code"])["flows"]) for p in data["programmes"]]
+    buf = flow_mapping_excel(data, per_prog, _year())
+    return send_file(buf, as_attachment=True,
+                     download_name=f"BoS-data-mapping-{code}-{_year()}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
