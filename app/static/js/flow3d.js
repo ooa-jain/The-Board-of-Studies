@@ -34,8 +34,8 @@
   scene.fog = new THREE.Fog(0xf7f3ec, 55, 110);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
-  const HOME = new THREE.Vector3(3.5, 17, 44);
-  const HOME_TARGET = new THREE.Vector3(3.5, 3, 0);
+  const HOME = new THREE.Vector3(3.5, 22, 34);
+  const HOME_TARGET = new THREE.Vector3(3.5, 1.2, 0);
   camera.position.copy(HOME);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -112,6 +112,13 @@
   let curve = null;
   let tree = null;          // the selected department's programme tree
   let deptSpheres = [];
+  let deptLabels = [];
+  // department name tags: short codes, full names, or none
+  const LABEL_MODES = ["codes", "names", "off"];
+  let labelMode = "codes";
+  const labelText = d => labelMode === "names"
+    ? (d.name.length > 34 ? d.name.slice(0, 33) + "…" : d.name).replace(/^Department of /, "")
+    : d.code;
 
   function buildStages(stages) {
     stages.forEach((s, i) => {
@@ -174,7 +181,9 @@
   // --------------------------------------------------------- departments
   function buildDepartments(depts) {
     deptSpheres.forEach(s => scene.remove(s));
+    deptLabels.forEach(t => scene.remove(t));
     deptSpheres = [];
+    deptLabels = [];
     const byStop = {};
     depts.forEach(d => { (byStop[d.reached] = byStop[d.reached] || []).push(d); });
     const geo = new THREE.SphereGeometry(0.34, 24, 24);
@@ -198,6 +207,15 @@
         scene.add(s);
         deptSpheres.push(s);
         hoverables.push(s);
+        // the department's name tag, floating over its ball
+        const tag = label(labelText(d), { size: 34, color: "#0f2440", bg: "rgba(255,255,255,0.94)",
+                                          pad: 12, weight: 800, scale: 0.019 });
+        // staggered heights, so neighbours' tags do not sit on top of each other
+        tag.position.copy(s.position).add(new THREE.Vector3(0, 1.0 + (k % 3) * 0.6, 0));
+        tag.userData.base = tag.position.clone();
+        tag.visible = labelMode !== "off";
+        scene.add(tag);
+        deptLabels.push(tag);
       });
     });
   }
@@ -322,12 +340,95 @@
     });
     buildTree(dept);
     describe(dept);
+    if (mapBody.children.length) paintMap();
     if (dept) {
       controls.autoRotate = false;
       spinBtn.setAttribute("aria-pressed", "false");
       spinBtn.textContent = "Resume rotation";
       flyTo(new THREE.Vector3(STAGE_X[3] - 1, 14, 31), new THREE.Vector3(STAGE_X[3] - 1, 6, -2));
     }
+  }
+
+  // ------------------------------------------------------- mapping table
+  const WORD = { submitted: "Submitted", draft: "In progress", returned: "Returned",
+                 open: "Not started", locked: "Locked" };
+  const PILL = { submitted: "pill-ok", draft: "pill-warn", returned: "pill-err",
+                 open: "pill-lock", locked: "pill-lock" };
+  const mapQ = document.getElementById("map-q");
+  const mapStage = document.getElementById("map-stage");
+  const mapBody = document.getElementById("map-body");
+  const mapHead = document.getElementById("map-head");
+  const mapCount = document.getElementById("map-count");
+
+  function currentStage(d) {
+    return d.reached >= data.stages.length ? "Sealed" : data.stages[d.reached].title;
+  }
+
+  function paintMap() {
+    const q = mapQ.value.trim().toLowerCase();
+    const at = mapStage.value;
+    const rows = data.departments.filter(d =>
+      (!q || [d.name, d.code, d.campus, d.school].join(" ").toLowerCase().includes(q)) &&
+      (at === "" || String(Math.min(d.reached, data.stages.length)) === at));
+    mapBody.textContent = "";
+    rows.forEach(d => {
+      const tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.className = "flow-map-row" + (picker.value === d.code ? " is-picked" : "");
+      const td = (text, cls) => { const c = document.createElement("td"); if (cls) c.className = cls;
+                                  c.textContent = text; tr.appendChild(c); return c; };
+      const name = td("");
+      const b = document.createElement("strong"); b.textContent = d.name; name.appendChild(b);
+      const sm = document.createElement("small"); sm.className = "muted";
+      sm.textContent = ` ${d.code} · ${d.campus}`; name.appendChild(sm);
+      const cur = td("");
+      const cp = document.createElement("span");
+      cp.className = "pill " + (d.reached >= data.stages.length ? "pill-ok" : "pill-gold");
+      cp.textContent = currentStage(d); cur.appendChild(cp);
+      data.stages.forEach(s => {
+        const c = td("");
+        const st = d.statuses[s.key];
+        const pl = document.createElement("span");
+        pl.className = "pill " + (PILL[st] || "pill-lock");
+        pl.textContent = WORD[st] || st; c.appendChild(pl);
+      });
+      const ug = d.programmes.filter(p => p.level === "UG").length;
+      const pg = d.programmes.filter(p => p.level === "PG").length;
+      td(String(ug), "num");
+      td(String(pg), "num");
+      const cells = d.programmes.flatMap(p => data.parts.map(k => p.parts[k.key]));
+      const done = cells.filter(c => c === "submitted").length;
+      td(cells.length ? `${done} / ${cells.length}` : "—", "num");
+      const open = () => {
+        select(d.code);
+        document.getElementById("flow-canvas").scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+      };
+      tr.addEventListener("click", open);
+      tr.addEventListener("keydown", e => { if (e.key === "Enter") open(); });
+      mapBody.appendChild(tr);
+    });
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      const c = document.createElement("td");
+      c.colSpan = 4 + data.stages.length + 1;
+      c.className = "muted";
+      c.textContent = "No department matches.";
+      tr.appendChild(c); mapBody.appendChild(tr);
+    }
+    mapCount.textContent = `${rows.length} of ${data.departments.length} departments`;
+  }
+
+  function buildMap() {
+    const h = document.createElement("tr");
+    ["Department", "Current stage", ...data.stages.map(s => s.title), "UG", "PG", "Curriculum parts"]
+      .forEach((x, i, all) => { const th = document.createElement("th"); th.textContent = x;
+        if (i >= all.length - 3) th.className = "num"; h.appendChild(th); });
+    mapHead.appendChild(h);
+    data.stages.forEach((s, i) => mapStage.appendChild(new Option(`At ${s.title}`, String(i))));
+    mapStage.appendChild(new Option("Sealed", String(data.stages.length)));
+    mapQ.addEventListener("input", paintMap);
+    mapStage.addEventListener("change", paintMap);
+    paintMap();
   }
 
   // ------------------------------------------------------------ camera
@@ -406,6 +507,13 @@
     select("");
     flyTo(HOME.clone(), HOME_TARGET.clone());
   });
+  const labelBtn = document.getElementById("flow-labels");
+  labelBtn.addEventListener("click", () => {
+    labelMode = LABEL_MODES[(LABEL_MODES.indexOf(labelMode) + 1) % LABEL_MODES.length];
+    labelBtn.textContent = "Labels: " + labelMode;
+    buildDepartments(data.departments);
+    select(picker.value);
+  });
   const spinBtn = document.getElementById("flow-spin");
   if (REDUCED) { spinBtn.setAttribute("aria-pressed", "false"); spinBtn.textContent = "Resume rotation"; }
   spinBtn.addEventListener("click", () => {
@@ -439,6 +547,8 @@
     if (!REDUCED) {
       deptSpheres.forEach((s, k) => {
         s.position.y = s.userData.home.y + Math.sin(time * 1.6 + k) * 0.06;
+        const t = deptLabels[k];
+        if (t) t.position.y = t.userData.base.y + Math.sin(time * 1.6 + k) * 0.06;
       });
     }
     if (tree && tree.userData.grow < 1) {
@@ -470,6 +580,7 @@
       buildDepartments(j.departments);
       paintCounts(j.departments);
       j.departments.forEach(d => picker.appendChild(new Option(`${d.name} — ${d.campus}`, d.code)));
+      buildMap();
       tick();
     })
     .catch(() => { loading.textContent = "The view could not load its data. Refresh to try again."; });

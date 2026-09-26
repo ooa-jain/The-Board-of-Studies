@@ -1061,3 +1061,27 @@ def test_a_removed_programme_needs_a_reason(app, client):
                        json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()["ok"]
 
 
+
+
+def test_flow_mapping_shows_each_department_at_its_stage(app, client):
+    _through_bos_documents(app, client)
+    client.get("/logout")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+
+    page = client.get("/admin/flow").get_data(as_text=True)
+    assert "Department to stage mapping" in page and "/admin/flow.xlsx" in page
+
+    data = client.get("/admin/flow.json").get_json()
+    com = next(d for d in data["departments"] if d["code"] == "COM")
+    assert com["reached"] == 3                       # at Curriculum
+    assert com["statuses"]["bos_documents"] == "submitted"
+    assert {p["level"] for p in com["programmes"]} == {"UG", "PG"}
+
+    x = client.get("/admin/flow.xlsx")
+    assert x.status_code == 200 and x.data[:2] == b"PK"
+    import io
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(x.data))
+    assert wb.sheetnames == ["Department to stage", "Programmes"]
+    rows = list(wb["Department to stage"].iter_rows(min_row=4, values_only=True))
+    assert any(r[1] == "COM" and r[4] == "Curriculum" for r in rows)

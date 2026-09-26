@@ -2812,3 +2812,17 @@ footer.site { border-radius: 0; }
 }
 .stage-frame .stage-row.submitted .stage-num { background: var(--lv-soft-green) !important; color: #1d6b3e !important; }
 .stage-frame .stage-row.locked .stage-num { background: var(--lv-muted) !important; color: var(--lv-muted-fg) !important; }
+
+/* Flow 3D — the department-to-stage mapping */
+.flow-map { margin-top: 20px; }
+.flow-map .card-head { display: flex; align-items: center; gap: 12px; }
+.flow-map-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.flow-map-tools input { flex: 1 1 260px; }
+.flow-map-tools select { flex: 0 0 220px; }
+.flow-map-table td { vertical-align: middle; }
+.flow-map-table td small { display: block; margin-top: 2px; }
+.flow-map-row { cursor: pointer; }
+.flow-map-row:hover td, .flow-map-row:focus td { background: var(--lv-soft-gold, #fbf1cf); }
+.flow-map-row.is-picked td { background: var(--lv-soft-gold, #fbf1cf); box-shadow: inset 0 0 0 0 transparent; }
+.flow-map-row.is-picked td:first-child { box-shadow: inset 3px 0 0 var(--lv-gold, #c79c10); }
+.flow-map-table .pill { white-space: nowrap; }

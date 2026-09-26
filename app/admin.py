@@ -90,9 +90,9 @@ def flow():
     return render_template("admin/flow.html", year=_year())
 
 
-@bp.route("/flow.json")
-@admin_required
-def flow_data():
+def _flow_payload():
+    """Every department, the stage it has reached, each stage's status, and
+    its programmes with the state of their Curriculum, Syllabus and Revision."""
     from .schema import STAGE_KEYS
     from .workflow import part_status, programmes_of
     db = get_db()
@@ -110,17 +110,35 @@ def flow_data():
         for p in programmes_of(sub, d) if sub else []:
             progs.append({"code": p["programme_code"], "name": p["programme_name"],
                           "level": "PG" if p.get("level") in ("PG", "PGD") else "UG",
+                          "degree_level": p.get("degree_level") or "",
                           "parts": {k: part_status(sub, p["programme_code"], k)
                                     for k in parts}})
         out.append({"code": d["dept_code"], "name": d.get("dept_name", d["dept_code"]),
                     "campus": d.get("campus", ""), "school": d.get("school", ""),
                     "statuses": statuses, "reached": reached, "programmes": progs})
-    return jsonify({
+    return {
         "year": year,
         "stages": [{"key": s["key"], "title": s["title"], "group": s["group"]} for s in STAGES],
         "parts": [{"key": k, "title": STAGE_BY_KEY[k]["title"]} for k in parts],
         "departments": out,
-    })
+    }
+
+
+@bp.route("/flow.json")
+@admin_required
+def flow_data():
+    return jsonify(_flow_payload())
+
+
+@bp.route("/flow.xlsx")
+@admin_required
+def flow_excel():
+    """The department-to-stage mapping, and every programme's parts, as Excel."""
+    from .exporter import mapping_excel
+    data = _flow_payload()
+    return send_file(mapping_excel(data), as_attachment=True,
+                     download_name=f"BoS-stage-mapping-{data['year']}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @bp.route("/analysis")

@@ -25,6 +25,7 @@
     <div class="flow-tip" id="flow-tip" hidden></div>
     <div class="flow-toolbar">
       <button class="btn btn-ghost btn-sm" type="button" id="flow-reset">Reset view</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-labels">Labels: codes</button>
       <button class="btn btn-ghost btn-sm" type="button" id="flow-spin" aria-pressed="true">Pause rotation</button>
     </div>
   </div>
@@ -63,6 +64,30 @@
     </div>
   </aside>
 </div>
+
+<section class="card flow-map" id="mapping">
+  <div class="card-head">
+    <h3 class="card-title-sm">Department to stage mapping</h3>
+    <span class="spacer"></span>
+    <a class="btn btn-gold btn-sm" href="{{ url_for('admin.flow_excel') }}">Download Excel</a>
+  </div>
+  <div class="card-body tight">
+    <div class="flow-map-tools">
+      <label class="sr-only" for="map-q">Find a department</label>
+      <input id="map-q" type="search" placeholder="Find a department, code or campus">
+      <label class="sr-only" for="map-stage">Show departments at</label>
+      <select id="map-stage"><option value="">Every stage</option></select>
+      <span class="small muted" id="map-count"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="data flow-map-table">
+        <thead id="map-head"></thead>
+        <tbody id="map-body"><tr><td class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="small muted mt-1">Click a department to open it in the 3D view above.</p>
+  </div>
+</section>
 
 <noscript><div class="alert alert-error">The 3D view needs JavaScript.</div></noscript>
 {% endblock %}

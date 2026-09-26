@@ -384,3 +384,69 @@ def submission_word(dept_code: str, year: str) -> io.BytesIO:
     doc.save(buf)
     buf.seek(0)
     return buf
+
+
+# ---------------------------------------------------------------------------
+# Excel — the department-to-stage mapping (Admin > Flow 3D)
+# ---------------------------------------------------------------------------
+
+_WORD = {"submitted": "Submitted", "draft": "In progress", "returned": "Returned",
+         "open": "Not started", "locked": "Locked"}
+_FILL = {"submitted": "DFF3E4", "draft": "FFF4D6", "returned": "FDE7E7", "locked": "EFEFEF"}
+
+
+def mapping_excel(data: dict) -> io.BytesIO:
+    stages, parts = data["stages"], data["parts"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Department to stage"
+    ws["A1"] = f"Department to stage mapping · {data['year']}"
+    ws["A1"].font = Font(bold=True, size=14, color=NAVY)
+    head = (["Department", "Code", "Campus", "School", "Current stage"]
+            + [s["title"] for s in stages]
+            + ["UG programmes", "PG programmes", "Curriculum parts submitted"])
+    _head(ws, 3, head)
+    r = 4
+    for d in data["departments"]:
+        at = "Sealed" if d["reached"] >= len(stages) else stages[d["reached"]]["title"]
+        cells = [p["parts"][k["key"]] for p in d["programmes"] for k in parts]
+        done = sum(1 for c in cells if c == "submitted")
+        row = ([d["name"], d["code"], d["campus"], d["school"], at]
+               + [_WORD.get(d["statuses"][s["key"]], d["statuses"][s["key"]]) for s in stages]
+               + [sum(1 for p in d["programmes"] if p["level"] == "UG"),
+                  sum(1 for p in d["programmes"] if p["level"] == "PG"),
+                  f"{done} / {len(cells)}" if cells else "—"])
+        for i, v in enumerate(row, start=1):
+            c = ws.cell(row=r, column=i, value=v)
+            c.border = BORDER
+            if 6 <= i < 6 + len(stages):
+                key = d["statuses"][stages[i - 6]["key"]]
+                if key in _FILL:
+                    c.fill = PatternFill("solid", fgColor=_FILL[key])
+        r += 1
+    ws.freeze_panes = "B4"
+    _autosize(ws, max_width=40)
+
+    ps = wb.create_sheet("Programmes")
+    _head(ps, 1, ["Department", "Campus", "Level", "Programme code", "Programme", "Degree"]
+          + [k["title"] for k in parts])
+    r = 2
+    for d in data["departments"]:
+        for p in d["programmes"]:
+            row = ([d["name"], d["campus"], p["level"], p["code"], p["name"], p.get("degree_level", "")]
+                   + [_WORD.get(p["parts"][k["key"]], p["parts"][k["key"]]) for k in parts])
+            for i, v in enumerate(row, start=1):
+                c = ps.cell(row=r, column=i, value=v)
+                c.border = BORDER
+                if i > 6:
+                    key = p["parts"][parts[i - 7]["key"]]
+                    if key in _FILL:
+                        c.fill = PatternFill("solid", fgColor=_FILL[key])
+            r += 1
+    ps.freeze_panes = "A2"
+    _autosize(ps, max_width=48)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
