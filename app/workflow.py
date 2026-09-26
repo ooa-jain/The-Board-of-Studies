@@ -555,6 +555,10 @@ def course_fill_source(submission, programme_code):
     the programme structure, with its credits and hours (15 teaching weeks)."""
     data = ((submission.get("programmes") or {}).get(programme_code, {})
             .get("prog_curriculum", {}).get("data") or {})
+    # the revision is the one this BoS approves: its year is the latest revision
+    bos = str(((stage_state(submission, "bos_documents").get("data") or {})
+               .get("meeting") or {}).get("bos_date") or "")
+    year = bos[:4] if bos[:4].isdigit() else ""
     out, seen = [], set()
     for r in data.get("semester_structure") or []:
         code = str(r.get("course_code") or "").strip()
@@ -562,8 +566,12 @@ def course_fill_source(submission, programme_code):
             continue
         seen.add(code.upper())
         row = {"course_code": code, "course_title": r.get("course_title", "")}
+        if r.get("semester") not in (None, ""):
+            row["semester"] = r["semester"]
         if r.get("credits") not in (None, ""):
             row["credits"] = r["credits"]
+        if year:
+            row["year_latest"] = year
         hours = 0
         for k in ("l", "t", "p", "e"):
             try:

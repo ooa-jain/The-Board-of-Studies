@@ -167,8 +167,231 @@
 
   // ------------------------------------------------------------- widgets
 
+  // ---------------------------------------------- fixed text and module revision
+
+  /** A block the university fixes, shown as the template shows it. */
+  function fixedBlock(def) {
+    const box = el("div", "fixed-block");
+    (def.fixed_table || []).forEach(part => {
+      const row = el("div", "fixed-part");
+      row.appendChild(el("div", "fixed-head", part.head));
+      const body = el("div", "fixed-body");
+      const items = el("div", "fixed-items");
+      (part.items || []).forEach(t => items.appendChild(el("span", "fixed-item", t)));
+      body.appendChild(items);
+      if (part.note) body.appendChild(el("div", "fixed-note", part.note));
+      row.appendChild(body);
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+                 "XI", "XII", "XIII", "XIV", "XV"];
+
+  function wordsOf(t) {
+    return String(t || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  }
+
+  /** How much of a module changed, from the words the two versions share in
+      order: 0 when identical, 100 when nothing carries over. */
+  function percentChange(prev, next) {
+    const a = wordsOf(prev), b = wordsOf(next);
+    if (!b.length) return null;
+    if (!a.length) return 100;
+    const n = a.length, m = b.length;
+    let row = new Array(m + 1).fill(0);
+    for (let i = 1; i <= n; i++) {
+      const cur = new Array(m + 1).fill(0);
+      for (let j = 1; j <= m; j++) {
+        cur[j] = a[i - 1] === b[j - 1] ? row[j - 1] + 1 : Math.max(row[j], cur[j - 1]);
+      }
+      row = cur;
+    }
+    const same = (2 * row[m]) / (n + m);
+    return Math.round((1 - same) * 1000) / 10;
+  }
+
+  function averageChange(mods) {
+    const v = (Array.isArray(mods) ? mods : [])
+      .filter(m => m && String(m.revised || "").trim())
+      .map(m => num(m.pct)).filter(x => x !== null);
+    if (!v.length) return null;
+    return Math.round(v.reduce((a, b) => a + b, 0) / v.length * 100) / 100;
+  }
+
+  /** Module by module: the previous syllabus beside the revised one, and the
+      % change between them — worked out, unless the department types its own. */
+  function moduleCompare(def, value, onChange) {
+    const mods = (Array.isArray(value) ? value : []).map(m => Object.assign({}, m));
+    if (!mods.length && !CTX.readonly) mods.push({});
+    const box = el("div", "mc-box");
+    const list = el("div", "mc-list");
+    const foot = el("div", "mc-foot");
+    const avg = el("span", "mc-avg");
+    box.appendChild(list);
+    box.appendChild(foot);
+
+    const emit = () => {
+      const a = averageChange(mods);
+      avg.textContent = a === null ? "" : `Average change across modules: ${fmt(a)}%`;
+      onChange(mods.map(m => Object.assign({}, m)));
+    };
+
+    function draw() {
+      list.textContent = "";
+      mods.forEach((m, i) => {
+        const card = el("div", "mc-item");
+        const head = el("div", "mc-head");
+        head.appendChild(el("strong", null, `Module ${ROMAN[i] || i + 1}`));
+        head.appendChild(el("span", "spacer"));
+        const pctWrap = el("label", "mc-pct");
+        pctWrap.appendChild(el("span", null, "% change"));
+        const pct = el("input");
+        pct.type = "text";
+        pct.inputMode = "decimal";
+        pct.value = m.pct ?? "";
+        if (!m.pct_manual) pct.classList.add("is-auto");
+        pct.title = "Worked out from the two versions — type to use your own figure";
+        pct.addEventListener("input", () => {
+          const v = pct.value.trim();
+          m.pct = v === "" ? null : Number(v);
+          m.pct_manual = v !== "";
+          pct.classList.toggle("is-auto", !m.pct_manual);
+          if (!m.pct_manual) recalc(m, pct);
+          emit();
+        });
+        pctWrap.appendChild(pct);
+        pctWrap.appendChild(el("span", null, "%"));
+        head.appendChild(pctWrap);
+        if (!CTX.readonly) {
+          const rm = el("button", "btn btn-ghost btn-sm", "Remove");
+          rm.type = "button";
+          rm.setAttribute("aria-label", `Remove module ${i + 1}`);
+          rm.addEventListener("click", () => { mods.splice(i, 1); draw(); emit(); });
+          head.appendChild(rm);
+        }
+        card.appendChild(head);
+
+        const cols = el("div", "mc-cols");
+        [["previous", "Previous syllabus", "Leave empty for a new module"],
+         ["revised", "Revised syllabus", "Module title (hours) — content"]].forEach(([k, label, ph]) => {
+          const f = el("label", "mc-col");
+          f.appendChild(el("span", "mc-col-label", label));
+          const t = el("textarea");
+          t.rows = 5;
+          t.placeholder = ph;
+          t.value = m[k] || "";
+          if (CTX.readonly) t.disabled = true;
+          t.addEventListener("input", () => {
+            m[k] = t.value;
+            if (!m.pct_manual) recalc(m, pct);
+            emit();
+          });
+          f.appendChild(t);
+          cols.appendChild(f);
+        });
+        card.appendChild(cols);
+        if (CTX.readonly) pct.disabled = true;
+        list.appendChild(card);
+      });
+    }
+
+    function recalc(m, pct) {
+      const v = percentChange(m.previous, m.revised);
+      m.pct = v;
+      pct.value = v === null ? "" : fmt(v);
+    }
+
+    if (!CTX.readonly) {
+      const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+      add.type = "button";
+      add.addEventListener("click", () => { mods.push({}); draw(); emit(); });
+      foot.appendChild(add);
+    }
+    foot.appendChild(avg);
+    draw();
+    const a = averageChange(mods);
+    avg.textContent = a === null ? "" : `Average change across modules: ${fmt(a)}%`;
+    return box;
+  }
+
+  /** Programme-wide: (A)-(D) and the course-wise change for every semester. */
+  function renderRevisionSummary(section, host) {
+    const box = el("div", "cd-box");
+    host.appendChild(box);
+    const T = section.threshold ?? 20;
+    function paint() {
+      box.textContent = "";
+      const courses = rows(section.source || "courses").filter(r => r && r.course_code);
+      if (!courses.length) {
+        box.appendChild(el("p", "pl-empty", "Add courses above and this summary fills itself."));
+        return;
+      }
+      const avgOf = r => num(r.avg_change) ?? averageChange(r.modules);
+      const A = courses.length;
+      const B = courses.filter(r => (avgOf(r) ?? 0) > T).length;
+      const C = A ? Math.round(B / A * 10000) / 100 : 0;
+      const known = courses.map(avgOf).filter(x => x !== null);
+      const D = known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length * 100) / 100 : null;
+      const t = el("table", "cd-table");
+      const tb = el("tbody");
+      [["(A)", "Total number of courses", String(A)],
+       ["(B)", `Number of courses with syllabus revision above ${T}%`, String(B)],
+       ["(C)", "Percentage of courses revised — (B / A) × 100", fmt(C)],
+       ["(D)", "Average percentage of syllabus revised, across all courses",
+        D === null ? "—" : fmt(D) + "%"]].forEach(([k, label, v]) => {
+        const tr = el("tr");
+        tr.appendChild(el("td", null, k));
+        tr.appendChild(el("td", null, label));
+        tr.appendChild(el("td", "num cd-strong", v));
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      const w = el("div", "rt-wrap");
+      w.appendChild(t);
+      box.appendChild(w);
+
+      box.appendChild(el("h4", "cd-head", "Percentage of change in syllabus — course-wise, by semester"));
+      const t2 = el("table", "cd-table");
+      const h = el("tr");
+      ["SL", "Course code", "Course title", "Percentage of change in syllabus"].forEach(
+        (x, n) => h.appendChild(el("th", n === 3 ? "num" : null, x)));
+      const th = el("thead");
+      th.appendChild(h);
+      t2.appendChild(th);
+      const b2 = el("tbody");
+      const sems = Array.from(new Set(courses.map(r => num(r.semester)))).sort((a, b) =>
+        (a ?? 99) - (b ?? 99));
+      sems.forEach(sem => {
+        const band = el("tr", "cd-band");
+        const td = el("td", null, sem === null ? "Semester not given" : `Semester ${ROMAN[sem - 1] || sem}`);
+        td.colSpan = 4;
+        band.appendChild(td);
+        b2.appendChild(band);
+        courses.filter(r => num(r.semester) === sem).forEach((r, i) => {
+          const tr = el("tr");
+          tr.appendChild(el("td", null, String(i + 1)));
+          tr.appendChild(el("td", null, r.course_code || ""));
+          tr.appendChild(el("td", null, r.course_title || ""));
+          const v = avgOf(r);
+          tr.appendChild(el("td", "num", v === null ? "—" : fmt(v) + "%"));
+          b2.appendChild(tr);
+        });
+      });
+      t2.appendChild(b2);
+      const w2 = el("div", "rt-wrap");
+      w2.appendChild(t2);
+      box.appendChild(w2);
+    }
+    refreshers.push(paint);
+    paint();
+  }
+
   function makeInput(def, value, onChange) {
     let input;
+    if (def.type === "fixed") return fixedBlock(def);
+    if (def.type === "module_compare") return moduleCompare(def, value, onChange);
     if (def.type === "textarea") {
       input = el("textarea");
       input.rows = def.rows || 3;
@@ -514,6 +737,14 @@
           `A course may carry at most ${C.max_per_course} credits.`,
         ],
         empty: "Fill L, T, P and E and the credits fill themselves.",
+      });
+    }
+    if (has("avg_change") && has("modules")) {
+      out.push({
+        field: "avg_change", title: "Average percentage on revision",
+        calc: r => averageChange(r.modules),
+        explain: r => ["The average of the modules' % change."],
+        empty: "Fill in the modules and the average works itself out.",
       });
     }
     if (has("total_marks") && has("cia") && has("ese")) {
@@ -995,7 +1226,7 @@
 
     function field(row, c, cells, repaint) {
       const holder = el("div", "field" +
-        (c.name === N || c.type === "textarea" ? " wide" : ""));
+        (c.name === N || c.type === "textarea" || c.wide ? " wide" : ""));
       holder.dataset.field = c.name;
       const id = `rc-${section.key}-${c.name}`;
       if (c.type === "checkbox") {
@@ -2013,6 +2244,8 @@
         renderTable(section, block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
+      } else if (section.type === "revision_summary") {
+        renderRevisionSummary(section, block);
       } else if (section.type === "credit_distribution") {
         renderCreditDistribution(section, block);
       } else if (section.type === "programme_list") {

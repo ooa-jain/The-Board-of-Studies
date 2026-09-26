@@ -245,3 +245,37 @@ def test_non_credit_courses_carry_no_credits():
                                           l=2, credits=2)]}
     issues, _ = validate_stage("prog_curriculum", bad, ctx("UG - 3 Year", 6))
     assert any("non-credit course, so its credits must be 0" in m for m in errors(issues))
+
+
+def _syllabus(modules):
+    return {"courses": [{"course_code": "22BBAC1C01", "course_title": "Business Accounting",
+                         "credits": 4, "hours_per_week": 4, "teaching_hours": 60,
+                         "pedagogy": "Lectures", "outcomes": "Explain\nApply\nAnalyse",
+                         "year_latest": "2026", "modules": modules,
+                         "skill_activities": "Visit a firm", "books": "A\nB"}]}
+
+
+def test_syllabus_needs_revised_modules():
+    issues, _ = validate_stage("prog_syllabus", _syllabus([]), {})
+    assert any("needs at least one module" in m for m in errors(issues))
+
+    issues, _ = validate_stage("prog_syllabus", _syllabus(
+        [{"previous": "Old text", "revised": "", "pct": None}]), {})
+    assert any("enter the revised content" in m for m in errors(issues))
+
+    issues, _ = validate_stage("prog_syllabus", _syllabus(
+        [{"previous": "Old", "revised": "New", "pct": 140}]), {})
+    assert any("between 0 and 100" in m for m in errors(issues))
+
+    issues, _ = validate_stage("prog_syllabus", _syllabus(
+        [{"previous": "", "revised": "Module 1: Accounting (12 Hrs)", "pct": 100}]), {})
+    assert not any("module" in m.lower() for m in errors(issues)), errors(issues)
+
+
+def test_reservation_is_fixed_text():
+    from app.schema import STAGE_BY_KEY
+    f = next(f for s in STAGE_BY_KEY["prog_curriculum"]["sections"] if s["key"] == "profile"
+             for f in s["fields"] if f["name"] == "reservation_policy")
+    assert f["type"] == "fixed"
+    items = [i for part in f["fixed_table"] for i in part["items"]]
+    assert "a) Kashmiri Migrants (In Seats)" in items and "d) Defence (In Percentage)" in items

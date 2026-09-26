@@ -381,7 +381,8 @@ def test_programme_parts_are_prefilled(app, client):
     syl = client.get("/department/stage/prog_syllabus/BCMREG").get_data(as_text=True)
     fill = json.loads(syl.split("fill: ")[1].split(",\n")[0])
     assert fill == [{"course_code": "26BCC1C01", "course_title": "Basics of Financial Accounting",
-                     "credits": 4, "hours_per_week": 4, "teaching_hours": 60}]
+                     "semester": 1, "credits": 4, "year_latest": "2026",
+                     "hours_per_week": 4, "teaching_hours": 60}]
     assert _stage_data(syl)["header"]["batch"] == "2026-29"
 
     rev = _stage_data(client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True))

@@ -106,7 +106,22 @@ def validate_field(fdef, value, section_key=None, row=None):
     ftype = fdef.get("type", "text")
     where = {"section": section_key, "row": row, "field": name}
 
-    if ftype in ("readonly",):
+    if ftype in ("readonly", "fixed"):
+        return out
+
+    if ftype == "module_compare":
+        # [{previous, revised, pct}, ...] — one entry per module
+        mods = [m for m in (value or []) if isinstance(m, dict)] if isinstance(value, list) else []
+        filled = [m for m in mods if str(m.get("revised") or "").strip()]
+        if fdef.get("required") and not filled:
+            out.append(err(f"{label} needs at least one module with its revised content.", **where))
+        for k, m in enumerate(mods, start=1):
+            if not str(m.get("revised") or "").strip() and str(m.get("previous") or "").strip():
+                out.append(err(f"Module {k}: enter the revised content (or remove the module).",
+                               **where))
+            pct = _num(m.get("pct"))
+            if m.get("pct") not in (None, "") and (pct is None or pct < 0 or pct > 100):
+                out.append(err(f"Module {k}: the % change must be between 0 and 100.", **where))
         return out
 
     if _is_blank(value):
