@@ -316,6 +316,148 @@
     return box;
   }
 
+  /** One course's revision, laid out as the syllabus revision document lays
+      it out: the previous and latest year, title and code side by side, then
+      each module previous-beside-revised with its % change, and the average. */
+  function revisionTable(def, row, commit) {
+    if (!Array.isArray(row[def.name])) row[def.name] = [];
+    const mods = row[def.name];
+    if (!mods.length && !CTX.readonly) mods.push({});
+
+    const wrap = el("div", "rt-wrap rv-wrap");
+    const table = el("table", "rv-table");
+    wrap.appendChild(table);
+
+    const avgCell = el("td", "rv-pct rv-avg");
+    function setAvg() {
+      const a = averageChange(mods);
+      row.avg_change = a === null ? "" : a;
+      avgCell.textContent = a === null ? "—" : `${fmt(a)}%`;
+    }
+    const changed = () => { setAvg(); commit(); };
+
+    function box(value, onInput, opts) {
+      const o = opts || {};
+      const t = el(o.multi ? "textarea" : "input");
+      if (o.multi) t.rows = 5; else t.type = "text";
+      t.value = value ?? "";
+      if (o.placeholder) t.placeholder = o.placeholder;
+      if (o.readonly) { t.readOnly = true; t.classList.add("is-auto"); t.tabIndex = -1; }
+      if (CTX.readonly) t.disabled = true;
+      if (!o.readonly) t.addEventListener("input", () => onInput(t.value));
+      return t;
+    }
+    function cell(node, field) {
+      const td = el("td");
+      if (field) td.dataset.field = field;
+      if (node) td.appendChild(node);
+      return td;
+    }
+
+    const head = el("thead");
+    const hr = el("tr");
+    ["", "Year of previous revision in a subject / course",
+     "Year of latest revision of a subject / course", "Percentage of change"]
+      .forEach(x => hr.appendChild(el("th", null, x)));
+    head.appendChild(hr);
+    table.appendChild(head);
+    const body = el("tbody");
+    table.appendChild(body);
+
+    function draw() {
+      body.textContent = "";
+      const line = (label, a, b) => {
+        const tr = el("tr", "rv-meta");
+        tr.appendChild(el("th", null, label));
+        tr.appendChild(a);
+        tr.appendChild(b);
+        tr.appendChild(el("td", "rv-pct"));
+        body.appendChild(tr);
+      };
+      line("Year",
+        cell(box(row.year_previous, v => { row.year_previous = v; commit(); },
+                 { placeholder: "e.g. 2020" }), "year_previous"),
+        cell(box(row.year_latest, v => { row.year_latest = v; commit(); },
+                 { placeholder: "e.g. 2026" }), "year_latest"));
+      line("Subject / course title",
+        cell(box(row.prev_title, v => { row.prev_title = v; commit(); },
+                 { placeholder: "Previous title" }), "prev_title"),
+        cell(box(row.course_title, null, { readonly: true })));
+      line("Subject code",
+        cell(box(row.prev_code, v => { row.prev_code = v; commit(); },
+                 { placeholder: "Previous code" }), "prev_code"),
+        cell(box(row.course_code, null, { readonly: true })));
+
+      mods.forEach((m, i) => {
+        const tr = el("tr", "rv-module");
+        const th = el("th");
+        th.appendChild(el("span", null, `Module ${ROMAN[i] || i + 1}`));
+        if (!CTX.readonly) {
+          const rm = el("button", "rv-remove", "Remove");
+          rm.type = "button";
+          rm.setAttribute("aria-label", `Remove module ${i + 1}`);
+          rm.addEventListener("click", () => { mods.splice(i, 1); draw(); changed(); });
+          th.appendChild(rm);
+        }
+        tr.appendChild(th);
+        const pct = el("input");
+        pct.type = "text";
+        pct.inputMode = "decimal";
+        pct.value = m.pct ?? "";
+        pct.title = "Worked out from the two versions — type to use your own figure";
+        if (!m.pct_manual) pct.classList.add("is-auto");
+        if (CTX.readonly) pct.disabled = true;
+        const recalc = () => {
+          if (m.pct_manual) return;
+          const v = percentChange(m.previous, m.revised);
+          m.pct = v;
+          pct.value = v === null ? "" : fmt(v);
+        };
+        tr.appendChild(cell(box(m.previous, v => { m.previous = v; recalc(); changed(); },
+                                { multi: true, placeholder: "Leave empty for a new module" })));
+        tr.appendChild(cell(box(m.revised, v => { m.revised = v; recalc(); changed(); },
+                                { multi: true, placeholder: "Module title (hours) — content" })));
+        pct.addEventListener("input", () => {
+          const v = pct.value.trim();
+          m.pct = v === "" ? null : Number(v);
+          m.pct_manual = v !== "";
+          pct.classList.toggle("is-auto", !m.pct_manual);
+          recalc();
+          changed();
+        });
+        const pc = el("td", "rv-pct");
+        const pw = el("span", "rv-pct-in");
+        pw.appendChild(pct);
+        pw.appendChild(el("span", null, "%"));
+        pc.appendChild(pw);
+        tr.appendChild(pc);
+        body.appendChild(tr);
+      });
+
+      if (!CTX.readonly) {
+        const tr = el("tr", "rv-add");
+        const td = el("td");
+        td.colSpan = 4;
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+        add.type = "button";
+        add.addEventListener("click", () => { mods.push({}); draw(); changed(); });
+        td.appendChild(add);
+        tr.appendChild(td);
+        body.appendChild(tr);
+      }
+      const tr = el("tr", "rv-total");
+      tr.appendChild(el("td"));
+      const lab = el("td", null, "Average percentage on revision considering all modules");
+      lab.colSpan = 2;
+      tr.appendChild(lab);
+      tr.appendChild(avgCell);
+      body.appendChild(tr);
+      setAvg();
+    }
+    draw();
+    return wrap;
+  }
+
   /** Programme-wide: (A)-(D) and the course-wise change for every semester. */
   function renderRevisionSummary(section, host) {
     const box = el("div", "cd-box");
@@ -1228,6 +1370,11 @@
       const holder = el("div", "field" +
         (c.name === N || c.type === "textarea" || c.wide ? " wide" : ""));
       holder.dataset.field = c.name;
+      if (c.type === "module_compare") {
+        holder.appendChild(revisionTable(c, row, () => { repaint(c.name); touch(); }));
+        if (c.help) holder.appendChild(el("span", "help", c.help));
+        return holder;
+      }
       const id = `rc-${section.key}-${c.name}`;
       if (c.type === "checkbox") {
         const lab = el("label", "check");
@@ -1373,7 +1520,9 @@
 
       const grid = el("div", "fields-grid rc-grid" + (tab === "outcomes" ? " is-outcomes" : ""));
       const cells = {};
-      cols.filter(c => tabOf(c) === tab).forEach(c => grid.appendChild(field(row, c, cells, repaint)));
+      // columns drawn inside the revision table are not drawn a second time
+      cols.filter(c => tabOf(c) === tab && !c.in_table)
+        .forEach(c => grid.appendChild(field(row, c, cells, repaint)));
       section.columns.forEach(c => { if (c.auto_index) row[c.name] = i + 1; });
       card.appendChild(grid);
 

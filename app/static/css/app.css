@@ -2545,3 +2545,27 @@ input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .mc-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .mc-avg { font-weight: 700; color: var(--ink-800); }
 @media (max-width: 760px) { .mc-cols { grid-template-columns: 1fr; } }
+
+/* Syllabus revision — the document's table, row for row */
+.rv-wrap { border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.rv-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+.rv-table thead th {
+  background: #e8620f; color: #fff; font-size: .78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; padding: 10px; text-align: center; border: 1px solid rgba(255,255,255,.35);
+}
+.rv-table th, .rv-table td { border: 1px solid var(--line); padding: 8px; vertical-align: top; }
+.rv-table tbody th {
+  width: 150px; text-align: left; font-size: .8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--ink-800); background: var(--ink-050);
+}
+.rv-table tbody th .rv-remove {
+  display: block; margin-top: 6px; border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--err); font-size: .75rem; text-transform: none; letter-spacing: 0; font-weight: 600;
+}
+.rv-table input, .rv-table textarea { width: 100%; }
+.rv-table .rv-pct { width: 120px; text-align: center; vertical-align: middle; }
+.rv-pct-in { display: inline-flex; align-items: center; gap: 4px; }
+.rv-pct-in input { width: 72px; text-align: right; }
+.rv-total td { background: #fdf0e6; font-weight: 700; }
+.rv-total .rv-avg { font-size: 1.05rem; color: var(--ink-800); }
+.rv-add td { background: var(--surface); }
