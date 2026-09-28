@@ -307,6 +307,13 @@
       return;
     }
     empty.hidden = true;
+    // the list and the table keep their shape while this department loads
+    list.innerHTML = Array.from({ length: 6 }, () =>
+      '<li class="sk-row" aria-hidden="true"><span class="sk" style="width:10px;height:10px;border-radius:50%"></span>' +
+      '<div class="sk-grow"><span class="sk sk-line w-70"></span><span class="sk sk-line w-50"></span></div></li>').join("");
+    mapBody.innerHTML = Array.from({ length: 6 }, () =>
+      "<tr aria-hidden='true'>" + ["w-90", "w-70", "w-70", "w-50", "w-70"].map(w =>
+        `<td><span class="sk sk-line ${w}"></span></td>`).join("") + "</tr>").join("");
     const url = `${window.FLOW_URL}?dept=${encodeURIComponent(dept)}` +
                 (progSel.value ? `&prog=${encodeURIComponent(progSel.value)}` : "");
     fetch(url, { credentials: "same-origin" }).then(r => r.json()).then(j => {

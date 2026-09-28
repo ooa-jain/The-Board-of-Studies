@@ -2576,9 +2576,29 @@
     if (input) { input.focus(); input.classList.add("is-bad"); }
   }
 
+  /** Placeholder issue lines while the checks run. */
+  function checksLoading() {
+    showChecks();
+    issuesBox.textContent = "";
+    const wrap = el("div");
+    wrap.setAttribute("aria-busy", "true");
+    ["w-90", "w-70", "w-90", "w-50"].forEach(w => {
+      const row = el("div", "sk-row");
+      row.style.margin = "10px 0";
+      row.appendChild(el("span", "sk sk-dot"));
+      row.lastChild.style.cssText = "width:10px;height:10px;border-radius:50%";
+      const g = el("div", "sk-grow");
+      g.appendChild(el("span", "sk sk-line " + w));
+      row.appendChild(g);
+      wrap.appendChild(row);
+    });
+    issuesBox.appendChild(wrap);
+  }
+
   function check(cb) {
     const btn = document.getElementById("btn-check");
     if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
+    checksLoading();
     const done = () => {
       if (btn) { btn.disabled = false; btn.textContent = "Check now"; }
     };

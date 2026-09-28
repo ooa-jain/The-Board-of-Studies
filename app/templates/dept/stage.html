@@ -74,7 +74,22 @@
 
     <form id="stage-form" autocomplete="off">
       <div id="sections">
-        <p class="muted small" id="sections-placeholder">Loading the form…</p>
+        {# the form's shape while the fields are built #}
+        <div id="sections-placeholder" aria-busy="true" aria-label="Loading the form">
+          {% for block in range(2) %}
+          <div class="section-block">
+            <span class="sk sk-title"></span>
+            <div class="sk-grid">
+              {% for f in range(4) %}
+              <div class="sk-field{{ ' wide' if f == 3 }}">
+                <span class="sk sk-label"></span>
+                <span class="sk {{ 'sk-area' if f == 3 else 'sk-input' }}"></span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </form>
   </div>

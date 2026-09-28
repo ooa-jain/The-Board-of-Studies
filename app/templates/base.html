@@ -171,7 +171,70 @@
 {% endif %}
 
 {% if not hide_chrome %}
+{# Shown while the next page loads — the shape of a page, not a spinner. #}
+<div class="page-skeleton" id="page-skeleton" hidden aria-hidden="true">
+  <div class="wrap">
+    <span class="sk sk-line w-30"></span>
+    <span class="sk sk-heading"></span>
+    <span class="sk sk-line w-70"></span>
+    <div class="sk-stats">
+      <span class="sk sk-stat"></span><span class="sk sk-stat"></span>
+      <span class="sk sk-stat"></span><span class="sk sk-stat"></span>
+    </div>
+    <div class="sk-list">
+      {% for i in range(4) %}
+      <div class="sk-card">
+        <span class="sk sk-dot"></span>
+        <div class="sk-grow"><span class="sk sk-line w-50"></span><span class="sk sk-line w-90"></span></div>
+        <span class="sk sk-pill"></span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
 <script>
+  // Page-to-page skeleton. Only for a click that leaves for another page of
+  // the portal; downloads, new tabs, in-page anchors and anything that takes
+  // under a moment are left alone.
+  (function () {
+    var sk = document.getElementById("page-skeleton");
+    if (!sk) return;
+    var timer = null;
+    var FILE = /(\.xlsx|\.docx|\.pdf|\.zip)(\?|$)|\/file\/|\/export|thumb=|inline=/i;
+    function show() {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        sk.hidden = false;
+        document.body.setAttribute("aria-busy", "true");
+        requestAnimationFrame(function () { sk.classList.add("is-on"); });
+      }, 160);
+    }
+    function hide() {
+      clearTimeout(timer);
+      sk.classList.remove("is-on");
+      sk.hidden = true;
+      document.body.removeAttribute("aria-busy");
+    }
+    document.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest("a[href]");
+      if (!a || a.target === "_blank" || a.hasAttribute("download") || a.dataset.noSkeleton !== undefined) return;
+      var url = new URL(a.href, location.href);
+      if (url.origin !== location.origin || FILE.test(url.pathname + url.search)) return;
+      if (url.pathname === location.pathname && url.search === location.search) return;
+      show();
+    });
+    document.addEventListener("submit", function (e) {
+      var f = e.target;
+      if (e.defaultPrevented || f.target === "_blank" || f.dataset.noSkeleton !== undefined) return;
+      if (FILE.test(f.getAttribute("action") || "")) return;
+      show();
+    });
+    // back / forward from the browser's cache, or a submit a script stopped
+    window.addEventListener("pageshow", hide);
+    window.addEventListener("pagehide", function () { clearTimeout(timer); });
+  })();
+
   (function () {
     var btn = document.getElementById("nav-toggle");
     var nav = document.getElementById("topnav");
