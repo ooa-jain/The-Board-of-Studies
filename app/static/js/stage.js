@@ -684,7 +684,7 @@
     if (val.url && info.kind === "pdf" && CTX.summaries) {
       sumBtn = el("button", "file-act is-ai", "✦ AI summary");
       sumBtn.type = "button";
-      sumBtn.title = "A short summary of this PDF, written by Grok";
+      sumBtn.title = "A short summary of this PDF, written by AI";
       acts.appendChild(sumBtn);
     }
     if (onRemove && !CTX.readonly) {
@@ -713,7 +713,7 @@
   }
 
   /* ------------------------------------------------------------- summaries
-     Grok reads the PDF (pictures of its pages, for a scan) and says in a few
+     The AI reads the PDF (pictures of its pages, for a scan) and says in a few
      lines what it is and whether it looks like the right document for the
      box. Made once per file on the server and kept. */
   const freshUploads = new Set();

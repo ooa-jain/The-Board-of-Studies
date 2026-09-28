@@ -27,12 +27,17 @@ class Config:
     UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", BASE_DIR / "uploads"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_MB", "32")) * 1024 * 1024
 
-    # Short PDF summaries by Grok (xAI). Leave the key unset to switch them off.
-    XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
-    XAI_MODEL = os.getenv("XAI_MODEL", "grok-4")
-    XAI_API_URL = os.getenv("XAI_API_URL", "https://api.x.ai/v1/chat/completions")
+    # Short AI summaries of uploaded PDFs. Any service with an OpenAI-style
+    # chat API works: Google Gemini (free tier), Groq, xAI Grok, OpenAI …
+    # AI_* names win; the older XAI_* names still work. No key = feature off.
+    AI_API_KEY = (os.getenv("AI_API_KEY") or os.getenv("XAI_API_KEY") or "").strip()
+    AI_API_URL = (os.getenv("AI_API_URL") or os.getenv("XAI_API_URL")
+                  or "https://api.x.ai/v1/chat/completions")
+    AI_MODEL = os.getenv("AI_MODEL") or os.getenv("XAI_MODEL") or "grok-4"
     # for scanned PDFs, read as pictures; must be a model that takes images
-    XAI_VISION_MODEL = os.getenv("XAI_VISION_MODEL", os.getenv("XAI_MODEL", "grok-4"))
+    AI_VISION_MODEL = os.getenv("AI_VISION_MODEL") or os.getenv("XAI_VISION_MODEL") or AI_MODEL
+    # shown under each summary: "by Gemini"
+    AI_NAME = os.getenv("AI_NAME") or ("Grok" if "x.ai" in AI_API_URL else "AI")
 
     PORT = int(os.getenv("PORT", "8102"))
     DEBUG = _bool("FLASK_DEBUG", False)

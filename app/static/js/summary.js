@@ -35,7 +35,7 @@
         box.className = "file-summary" + (j.ok ? "" : " is-bad");
         box.innerHTML = "";
         const h = head(j.ok ? "AI summary" : "No summary",
-                       j.ok ? "by Grok · check it against the document" : "");
+                       j.ok ? "by " + (j.by || "AI") + " · check it against the document" : "");
         if (j.ok) {
           const again = el("button", "fs-again", "Redo");
           again.type = "button";

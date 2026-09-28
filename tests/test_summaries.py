@@ -43,11 +43,11 @@ def test_summary_is_off_without_a_key(app, client):
     login(client, u, p)
     j = _upload(client, "m.pdf", _tiny_pdf())
     r = client.post(j["url"] + "/summary").get_json()
-    assert not r["ok"] and "XAI_API_KEY" in r["error"]
+    assert not r["ok"] and "AI_API_KEY" in r["error"]
 
 
 def test_a_text_pdf_is_summarised_once_and_kept(app, client, monkeypatch):
-    app.config["XAI_API_KEY"] = "test"
+    app.config["AI_API_KEY"] = "test"
     calls = []
     _stub(monkeypatch, calls)
     u, p = make_department(app)
@@ -67,7 +67,7 @@ def test_a_text_pdf_is_summarised_once_and_kept(app, client, monkeypatch):
 
 
 def test_a_scan_is_sent_as_pictures(app, client, monkeypatch):
-    app.config["XAI_API_KEY"] = "test"
+    app.config["AI_API_KEY"] = "test"
     calls = []
     _stub(monkeypatch, calls)
     u, p = make_department(app)
@@ -80,7 +80,7 @@ def test_a_scan_is_sent_as_pictures(app, client, monkeypatch):
 
 
 def test_only_pdfs_are_summarised(app, client, monkeypatch):
-    app.config["XAI_API_KEY"] = "test"
+    app.config["AI_API_KEY"] = "test"
     _stub(monkeypatch, [])
     u, p = make_department(app)
     login(client, u, p)
@@ -90,7 +90,7 @@ def test_only_pdfs_are_summarised(app, client, monkeypatch):
 
 
 def test_the_admin_sees_documents_and_their_summaries(app, client, monkeypatch):
-    app.config["XAI_API_KEY"] = "test"
+    app.config["AI_API_KEY"] = "test"
     calls = []
     _stub(monkeypatch, calls)
     u, p = make_department(app)
@@ -135,7 +135,7 @@ def test_a_refusal_says_xais_own_reason(app, monkeypatch):
             io.BytesIO(b'{"code":"x","error":"Your team has no credits. Purchase them at console.x.ai"}'))
     monkeypatch.setattr(urllib.request, "urlopen", refuse)
     with app.app_context():
-        app.config["XAI_API_KEY"] = "test"
+        app.config["AI_API_KEY"] = "test"
         try:
             summarise._call([{"role": "user", "content": "hi"}], "grok-4")
         except summarise.SummaryError as e:

@@ -496,7 +496,7 @@ def submission_detail(dept_code):
                            board=stage_board(sub), progress=progress(sub),
                            year=year, STAGE_BY_KEY=STAGE_BY_KEY,
                            documents=_documents(dept_code, sub, year),
-                           summaries=bool(current_app.config.get("XAI_API_KEY")))
+                           summaries=bool(current_app.config.get("AI_API_KEY")))
 
 
 # ---------------------------------------------------------------------------
@@ -543,7 +543,7 @@ def _documents(dept_code, sub, year):
             "url": url, "is_pdf": is_pdf,
             "viewable": is_pdf or r["original_name"].lower().rsplit(".", 1)[-1] in ("png", "jpg", "jpeg", "webp", "gif"),
             "thumb": url + "?thumb=1" if is_pdf else None,
-            "summary": r.get("summary"),
+            "summary": r.get("summary"), "summary_by": r.get("summary_by") or "AI",
             "uploaded_at": r.get("uploaded_at"),
         })
     return [{"title": t, "files": groups[t]} for t in order]

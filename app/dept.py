@@ -407,7 +407,7 @@ def download(stage_key, stored):
 @bp.post("/file/<stage_key>/<stored>/summary")
 @department_required
 def file_summary(stage_key, stored):
-    """A short Grok summary of an uploaded PDF, made once and kept."""
+    """A short AI summary of an uploaded PDF, made once and kept."""
     from .summarise import SummaryError, summarise
     dept = _dept()
     rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})

@@ -1,11 +1,11 @@
-"""A short summary of an uploaded PDF, written by Grok (xAI).
+"""A short summary of an uploaded PDF, written by an AI model.
 
 The text layer is read first. BoS documents are often signed scans with no
 text in them, so when there is none the first pages are drawn as pictures
 and sent instead. A summary is made once per file and kept on its record in
 `files`; asking again returns the kept one unless a fresh one is asked for.
 
-Needs XAI_API_KEY in the server's .env. Without it the portal works as
+Needs AI_API_KEY in the server's .env. Without it the portal works as
 before and the Summary button says the feature is not set up.
 """
 
@@ -33,7 +33,7 @@ class SummaryError(Exception):
 
 
 def enabled() -> bool:
-    return bool(current_app.config.get("XAI_API_KEY"))
+    return bool(current_app.config.get("AI_API_KEY"))
 
 
 def field_label(stage_key: str, field: str) -> str:
@@ -99,9 +99,9 @@ PROMPT = (
 
 def _call(messages: list, model: str) -> str:
     body = json.dumps({"model": model, "messages": messages,
-                       "temperature": 0.2, "max_tokens": 450}).encode()
-    req = urllib.request.Request(current_app.config["XAI_API_URL"], data=body, method="POST", headers={
-        "Authorization": f"Bearer {current_app.config['XAI_API_KEY']}",
+                       "temperature": 0.2, "max_tokens": 2000}).encode()
+    req = urllib.request.Request(current_app.config["AI_API_URL"], data=body, method="POST", headers={
+        "Authorization": f"Bearer {current_app.config['AI_API_KEY']}",
         "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=90) as r:
@@ -119,30 +119,31 @@ def _call(messages: list, model: str) -> str:
             reason = detail
         reason = str(reason).strip()[:220]
         if e.code == 401:
-            raise SummaryError(f"Grok refused the API key (401). xAI says: {reason}")
+            raise SummaryError(f"The AI service refused the API key (401). the AI service says: {reason}")
         if e.code == 403:
-            raise SummaryError(f"Grok refused the request (403). xAI says: {reason}")
+            raise SummaryError(f"The AI service refused the request (403). the AI service says: {reason}")
         if e.code in (400, 404) and "model" in reason.lower():
-            raise SummaryError(f"Grok does not know the model “{model}” — set XAI_MODEL in .env. "
-                               f"xAI says: {reason}")
+            raise SummaryError(f"The AI service does not know the model “{model}” — set AI_MODEL in .env. "
+                               f"the AI service says: {reason}")
         if e.code == 429:
-            raise SummaryError("Grok is busy or the key's limit is reached — try again in a minute.")
-        raise SummaryError(f"Grok could not summarise this file ({e.code}).")
+            raise SummaryError("The AI service is busy or today's free limit is used up — try again later.")
+        raise SummaryError(f"The AI service could not summarise this file ({e.code}).")
     except (urllib.error.URLError, TimeoutError) as e:
         current_app.logger.warning("xAI unreachable: %s", e)
-        raise SummaryError("Could not reach Grok from the server — try again shortly.")
+        raise SummaryError("Could not reach the AI service from the server — try again shortly.")
     try:
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError):
-        raise SummaryError("Grok sent back an empty answer.")
+        raise SummaryError("The AI service sent back an empty answer.")
 
 
 def summarise(rec: dict, path: Path, refresh: bool = False) -> dict:
     """The summary for this file record, made now if there is none kept."""
     if rec.get("summary") and not refresh:
-        return {"summary": rec["summary"], "at": rec.get("summary_at"), "cached": True}
+        return {"summary": rec["summary"], "at": rec.get("summary_at"), "cached": True,
+                "by": rec.get("summary_by") or current_app.config["AI_NAME"]}
     if not enabled():
-        raise SummaryError("PDF summaries are not set up — add XAI_API_KEY to the server's .env.")
+        raise SummaryError("PDF summaries are not set up — add AI_API_KEY to the server's .env.")
     if Path(rec["original_name"]).suffix.lower() != ".pdf":
         raise SummaryError("Only PDF files can be summarised.")
     if not path.exists():
@@ -157,7 +158,7 @@ def summarise(rec: dict, path: Path, refresh: bool = False) -> dict:
 
     if len(text) >= MIN_TEXT:
         content = f"{prompt}\n\nThe document ({pages} pages):\n\n{text}"
-        model = current_app.config["XAI_MODEL"]
+        model = current_app.config["AI_MODEL"]
     else:
         # a scan: send the first pages as pictures
         try:
@@ -166,11 +167,12 @@ def summarise(rec: dict, path: Path, refresh: bool = False) -> dict:
             raise SummaryError("The pages of this PDF could not be drawn to be read.")
         content = [{"type": "text", "text": prompt + f"\n\nThe document has {pages} pages; "
                     f"the first {len(images)} are attached as images."}]
-        content += [{"type": "image_url", "image_url": {"url": u, "detail": "high"}} for u in images]
-        model = current_app.config["XAI_VISION_MODEL"]
+        content += [{"type": "image_url", "image_url": {"url": u}} for u in images]
+        model = current_app.config["AI_VISION_MODEL"]
 
     summary = _call([{"role": "user", "content": content}], model)
     at = now()
     get_db().files.update_one({"_id": rec["_id"]},
-                              {"$set": {"summary": summary, "summary_at": at, "summary_model": model}})
-    return {"summary": summary, "at": at, "cached": False}
+                              {"$set": {"summary": summary, "summary_at": at, "summary_model": model,
+                                        "summary_by": current_app.config["AI_NAME"]}})
+    return {"summary": summary, "at": at, "cached": False, "by": current_app.config["AI_NAME"]}
