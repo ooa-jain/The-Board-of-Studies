@@ -571,7 +571,11 @@
     constrain(input, def);
 
     if (def.type === "file") {
-      input.addEventListener("change", () => uploadFile(input, def, onChange));
+      input.className = "sr-only";
+      input.addEventListener("change", () => {
+        uploadFile(input, Array.from(input.files || []), def, onChange);
+        input.value = "";   // choosing the same file again still uploads it
+      });
     } else {
       input.addEventListener("input", () => onChange(readInput(input, def)));
       input.addEventListener("change", () => onChange(readInput(input, def)));
@@ -608,7 +612,10 @@
       : Math.max(1, Math.round(bytes / 1024)) + " KB";
   }
 
-  function filePreview(host, val) {
+  function canView(info) { return info.kind === "pdf" || info.kind === "image"; }
+  function inlineUrl(val) { return val.url + (val.url.includes("?") ? "&" : "?") + "inline=1"; }
+
+  function filePreview(host, val, onRemove) {
     const old = host.querySelector(".file-preview");
     if (old) old.remove();
     if (!val || !val.name) return;
@@ -616,7 +623,12 @@
     const info = fileKind(val.name);
     const card = el("div", "file-preview kind-" + info.kind);
 
-    const thumb = el("div", "file-thumb");
+    const thumb = el(val.url && canView(info) ? "button" : "div", "file-thumb");
+    if (thumb.tagName === "BUTTON") {
+      thumb.type = "button";
+      thumb.title = "View " + val.name;
+      thumb.addEventListener("click", () => openViewer(val));
+    }
 
     // the card that stands in when the real thing cannot be shown: a page
     // with its corner turned, carrying the file's type
@@ -627,15 +639,15 @@
     }
 
     if (val.thumb || (val.url && info.kind === "image")) {
-      /* A picture of the first page, drawn by the server. Whether a browser
-         will render a PDF inside the page is up to the browser; an image is
-         not. If it never arrives — no renderer on the server, an encrypted
-         file — the card takes its place. */
+      /* A picture of the first page, drawn by the server. If it never
+         arrives — no renderer on the server, an encrypted file — the card
+         takes its place. */
       const img = document.createElement("img");
-      img.src = val.thumb || (val.url + "?inline=1");
+      img.src = val.thumb || inlineUrl(val);
       img.alt = info.kind === "pdf"
         ? "First page of " + val.name : "Preview of " + val.name;
       img.loading = "lazy";
+      img.addEventListener("load", () => thumb.classList.add("is-loaded"));
       img.addEventListener("error", function () {
         img.remove();
         thumb.classList.add("is-drawn");
@@ -654,36 +666,153 @@
     facts.textContent = [info.label, sizeLabel(val.size)].filter(Boolean).join(" · ");
     meta.appendChild(facts);
 
+    const acts = el("div", "file-acts");
+    if (val.url && canView(info)) {
+      const view = el("button", "file-act is-view", "View");
+      view.type = "button";
+      view.addEventListener("click", () => openViewer(val));
+      acts.appendChild(view);
+    }
     if (val.url) {
-      const open = el("a", "file-open", info.kind === "pdf" || info.kind === "image"
-        ? "Open full size" : "Open");
-      open.href = val.url;
+      const open = el("a", "file-act", canView(info) ? "New tab" : "Open");
+      open.href = canView(info) ? inlineUrl(val) : val.url;
       open.target = "_blank";
       open.rel = "noopener";
-      meta.appendChild(open);
-      if (info.kind === "doc" || info.kind === "sheet") {
-        meta.appendChild(el("span", "file-note",
-          "Word and Excel files cannot be shown in a browser — open it to check it."));
-      }
+      acts.appendChild(open);
+    }
+    if (onRemove && !CTX.readonly) {
+      const rm = el("button", "file-act is-remove", "Remove");
+      rm.type = "button";
+      rm.setAttribute("aria-label", "Remove " + val.name);
+      rm.addEventListener("click", onRemove);
+      acts.appendChild(rm);
+    }
+    meta.appendChild(acts);
+    if (val.url && (info.kind === "doc" || info.kind === "sheet")) {
+      meta.appendChild(el("span", "file-note",
+        "Word and Excel files cannot be shown in a browser — open it to check it."));
     }
     card.appendChild(meta);
     host.appendChild(card);
   }
 
   /** One preview, or a row of them for a box that takes several files. */
-  function showFiles(host, val) {
+  function showFiles(host, val, onRemove) {
     const oldList = host.querySelector(".file-previews");
     if (oldList) oldList.remove();
-    if (!Array.isArray(val)) { filePreview(host, val); return; }
-    const old = host.querySelector(".file-preview");
+    const old = host.querySelector(":scope > .file-preview");
     if (old) old.remove();
     const list = el("div", "file-previews");
-    val.forEach(v => { const slot = el("div"); filePreview(slot, v); list.appendChild(slot); });
-    host.appendChild(list);
+    const vals = (Array.isArray(val) ? val : [val]).filter(v => v && v.name);
+    vals.forEach((v, i) => {
+      const slot = el("div");
+      filePreview(slot, v, onRemove ? () => onRemove(i) : null);
+      list.appendChild(slot);
+    });
+    if (!vals.length) return;
+    // under the box and its note, above the help line
+    const anchor = host.querySelector(":scope > .upload-note") || host.querySelector(":scope > .upload-folder");
+    if (anchor) anchor.after(list); else host.appendChild(list);
   }
 
   function fileNames(val) {
     return (Array.isArray(val) ? val : [val]).filter(v => v && v.name).map(v => v.name);
+  }
+
+  /* ---------------------------------------------------------------- viewer
+     Every PDF and picture uploaded on the page, in one viewer: the whole
+     document, all its pages, without leaving the form. Arrows step through
+     the other uploads. */
+  let viewer = null;
+  function allViewable() {
+    const out = [];
+    document.querySelectorAll("#sections .field[data-field]").forEach(f => {
+      (f._files ? f._files() : []).forEach(v => {
+        if (v && v.url && canView(fileKind(v.name)) && !out.some(o => o.url === v.url)) out.push(v);
+      });
+    });
+    return out;
+  }
+  function buildViewer() {
+    const d = el("div", "file-viewer");
+    d.hidden = true;
+    d.setAttribute("role", "dialog");
+    d.setAttribute("aria-modal", "true");
+    d.setAttribute("aria-label", "Document viewer");
+    d.innerHTML =
+      '<div class="fv-backdrop" data-close></div>' +
+      '<div class="fv-panel">' +
+      '  <div class="fv-head">' +
+      '    <button type="button" class="fv-nav" data-step="-1" aria-label="Previous document">‹</button>' +
+      '    <div class="fv-title"><strong></strong><span></span></div>' +
+      '    <button type="button" class="fv-nav" data-step="1" aria-label="Next document">›</button>' +
+      '    <a class="fv-btn" target="_blank" rel="noopener" data-newtab>New tab</a>' +
+      '    <a class="fv-btn" data-download>Download</a>' +
+      '    <button type="button" class="fv-close" data-close aria-label="Close viewer">×</button>' +
+      '  </div>' +
+      '  <div class="fv-body"><span class="sk fv-sk"></span></div>' +
+      '</div>';
+    document.body.appendChild(d);
+    d.addEventListener("click", e => {
+      if (e.target.closest("[data-close]")) closeViewer();
+      const step = e.target.closest("[data-step]");
+      if (step) stepViewer(+step.dataset.step);
+    });
+    document.addEventListener("keydown", e => {
+      if (d.hidden) return;
+      if (e.key === "Escape") closeViewer();
+      if (e.key === "ArrowRight") stepViewer(1);
+      if (e.key === "ArrowLeft") stepViewer(-1);
+    });
+    return d;
+  }
+  let viewList = [], viewAt = 0, viewFrom = null;
+  function openViewer(val) {
+    viewer = viewer || buildViewer();
+    viewFrom = document.activeElement;
+    viewList = allViewable();
+    viewAt = Math.max(0, viewList.findIndex(v => v.url === val.url));
+    if (!viewList.length) viewList = [val];
+    showInViewer();
+    viewer.hidden = false;
+    document.body.classList.add("fv-open");
+    viewer.querySelector(".fv-close").focus();
+  }
+  function stepViewer(n) {
+    if (viewList.length < 2) return;
+    viewAt = (viewAt + n + viewList.length) % viewList.length;
+    showInViewer();
+  }
+  function showInViewer() {
+    const v = viewList[viewAt];
+    const info = fileKind(v.name);
+    viewer.querySelector(".fv-title strong").textContent = v.name;
+    viewer.querySelector(".fv-title span").textContent =
+      [info.label, sizeLabel(v.size), viewList.length > 1 ? `${viewAt + 1} of ${viewList.length}` : ""]
+        .filter(Boolean).join(" · ");
+    viewer.querySelectorAll(".fv-nav").forEach(b => { b.hidden = viewList.length < 2; });
+    viewer.querySelector("[data-newtab]").href = inlineUrl(v);
+    viewer.querySelector("[data-download]").href = v.url;
+    const body = viewer.querySelector(".fv-body");
+    body.innerHTML = '<span class="sk fv-sk"></span>';
+    const doc = info.kind === "pdf" ? document.createElement("iframe") : document.createElement("img");
+    doc.className = "fv-doc";
+    if (info.kind === "pdf") {
+      doc.title = v.name;
+      doc.src = inlineUrl(v) + "#view=FitH";
+    } else {
+      doc.alt = v.name;
+      doc.src = inlineUrl(v);
+    }
+    doc.addEventListener("load", () => { const sk = body.querySelector(".fv-sk"); if (sk) sk.remove(); });
+    body.appendChild(doc);
+  }
+  function closeViewer() {
+    if (!viewer) return;
+    viewer.hidden = true;
+    viewer.querySelector(".fv-body").innerHTML = "";
+    document.body.classList.remove("fv-open");
+    if (viewFrom && viewFrom.focus) viewFrom.focus();
   }
 
   function uploadOne(file, def) {
@@ -701,31 +830,92 @@
       });
   }
 
-  function uploadFile(input, def, onChange) {
-    const files = Array.from(input.files || []);
+  // the types a box takes, from its accept list — a dropped file skips the
+  // browser's own picker, so the check happens here
+  function accepts(def, file) {
+    if (!def.accept) return true;
+    const name = file.name.toLowerCase();
+    return def.accept.split(",").map(a => a.trim().toLowerCase()).some(a =>
+      a.startsWith(".") ? name.endsWith(a) : a.endsWith("/*")
+        ? (file.type || "").startsWith(a.slice(0, -1)) : file.type === a);
+  }
+
+  function uploadFile(input, files, def, onChange) {
+    const wrap = input.closest(".field");
     if (!files.length) return;
-    const note = input.parentElement.querySelector(".upload-note") ||
-                 input.parentElement.appendChild(el("span", "help upload-note"));
+    const note = wrap.querySelector(".upload-note") ||
+                 wrap.querySelector(".upload-folder").insertAdjacentElement("afterend", el("span", "help upload-note"));
     note.className = "help upload-note";
     note.setAttribute("role", "status");
-    note.textContent = files.length > 1 ? `Uploading ${files.length} files…` : "Uploading…";
+    const bad = files.filter(f => !accepts(def, f));
+    files = files.filter(f => accepts(def, f));
+    if (!def.multiple) files = files.slice(0, 1);
+    if (!files.length) {
+      note.textContent = `${bad.map(f => f.name).join(", ")} — this box takes ${def.accept} only.`;
+      note.className = "help upload-note is-bad-text";
+      return;
+    }
+    const zone = wrap.querySelector(".upload-folder");
+    zone.classList.add("is-busy");
+    note.textContent = files.length > 1 ? `Uploading ${files.length} files…` : `Uploading ${files[0].name}…`;
     // one after another, so a slow connection is not flooded
     files.reduce((chain, f) => chain.then(done => uploadOne(f, def).then(v => done.concat([v]))),
                  Promise.resolve([]))
       .then(done => {
-        const val = def.multiple ? done : done[0];
-        note.textContent = done.length > 1
+        const had = wrap._files ? wrap._files() : [];
+        const val = def.multiple ? had.concat(done) : done[0];
+        note.textContent = (done.length > 1
           ? `Uploaded ${done.length} files`
-          : `Uploaded: ${done[0].name} (${sizeLabel(done[0].size)})`;
+          : `Uploaded: ${done[0].name} (${sizeLabel(done[0].size)})`) +
+          (bad.length ? ` · skipped ${bad.map(f => f.name).join(", ")} (not ${def.accept})` : "");
         note.className = "help upload-note is-ok";
-        showFiles(input.parentElement, val);
+        wrap._set(val);
         onChange(val);
       })
       .catch(e => {
         note.textContent = (e && e.message) ||
           "Upload failed — check your connection and choose the file again.";
         note.className = "help upload-note is-bad-text";
-      });
+      })
+      .finally(() => zone.classList.remove("is-busy"));
+  }
+
+  /* The upload box: a folder that opens when a file is dragged over it or
+     the pointer rests on it, and takes a click, a keypress or a drop. */
+  function uploadBox(def, input, value, onChange) {
+    const zone = el("div", "upload-folder");
+    const folder = el("div", "folder");
+    folder.setAttribute("aria-hidden", "true");
+    const front = el("div", "front-side");
+    front.appendChild(el("div", "tip"));
+    front.appendChild(el("div", "cover"));
+    folder.appendChild(front);
+    folder.appendChild(el("div", "back-side cover"));
+    zone.appendChild(folder);
+
+    const lab = el("label", "custom-file-upload");
+    lab.setAttribute("for", input.id);
+    lab.appendChild(input);
+    const txt = el("span", "cfu-text");
+    txt.appendChild(el("strong", null, CTX.readonly ? "Uploads are locked"
+      : def.multiple ? "Drop files here or choose files" : "Drop a file here or choose a file"));
+    if (def.accept) txt.appendChild(el("span", "cfu-types",
+      def.accept.replace(/\./g, "").toUpperCase().split(",").join(" · ") + (def.multiple ? " · several at once" : "")));
+    lab.appendChild(txt);
+    zone.appendChild(lab);
+    if (CTX.readonly) { zone.classList.add("is-locked"); return zone; }
+
+    let depth = 0;
+    zone.addEventListener("dragenter", e => { e.preventDefault(); depth++; zone.classList.add("is-over"); });
+    zone.addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    zone.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; zone.classList.remove("is-over"); } });
+    zone.addEventListener("drop", e => {
+      e.preventDefault();
+      depth = 0;
+      zone.classList.remove("is-over");
+      uploadFile(input, Array.from(e.dataTransfer.files || []), def, onChange);
+    });
+    return zone;
   }
 
   function fieldBlock(def, value, onChange) {
@@ -761,13 +951,29 @@
 
     const input = makeInput(def, value, onChange);
     input.id = `f-${def.name}`;
-    wrap.appendChild(input);
-
-    if (value && def.type === "file" && typeof value === "object" && fileNames(value).length) {
-      const n = el("span", "help upload-note", `Uploaded: ${fileNames(value).join(", ")}`);
-      n.classList.add("is-ok");
-      wrap.appendChild(n);
-      showFiles(wrap, value);
+    if (def.type === "file") {
+      let current = value && typeof value === "object" ? value : (def.multiple ? [] : null);
+      const list = () => (Array.isArray(current) ? current : [current]).filter(v => v && v.name);
+      wrap._files = list;
+      wrap._set = v => {
+        current = v;
+        showFiles(wrap, current, i => {
+          const next = def.multiple ? list().filter((_, j) => j !== i) : null;
+          const note = wrap.querySelector(".upload-note");
+          if (note) { note.textContent = "Removed — upload again if that was a mistake."; note.className = "help upload-note"; }
+          wrap._set(next);
+          onChange(def.multiple ? next : "");
+        });
+      };
+      wrap.appendChild(uploadBox(def, input, value, onChange));
+      if (list().length) {
+        const n = el("span", "help upload-note", `Uploaded: ${fileNames(current).join(", ")}`);
+        n.classList.add("is-ok");
+        wrap.appendChild(n);
+      }
+      wrap._set(current);
+    } else {
+      wrap.appendChild(input);
     }
     wrap._input = input;
     if (def.help) {
