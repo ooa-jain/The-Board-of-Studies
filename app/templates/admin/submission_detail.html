@@ -29,6 +29,58 @@
 {% endblock %}
 
 {% block content %}
+{% set ndocs = documents|sum(attribute='files', start=[])|length %}
+<section class="card mb-2 docs-card" id="documents">
+  <div class="card-head">
+    <h3 style="margin:0;font-size:1rem">Uploaded documents</h3>
+    <span class="spacer small muted">
+      {{ ndocs }} file{{ '' if ndocs == 1 else 's' }}
+      {% if summaries %}· press ✦ AI summary on a PDF for a short summary{% endif %}
+    </span>
+  </div>
+  <div class="card-body tight">
+    {% if not documents %}
+      <p class="small muted">Nothing uploaded yet.</p>
+    {% endif %}
+    {% for g in documents %}
+      <div class="docs-group">{{ g.title }}</div>
+      {% for f in g.files %}
+      <div class="doc-row{{ ' has-summary' if f.summary }}">
+        <div class="file-preview kind-{{ 'pdf' if f.is_pdf else 'other' }}">
+          <a class="file-thumb{{ '' if f.thumb else ' is-drawn' }}" href="{{ f.url }}?inline=1" target="_blank" rel="noopener"
+             title="Open {{ f.name }}">
+            {% if f.thumb %}<img src="{{ f.thumb }}" alt="First page of {{ f.name }}" loading="lazy"
+                 onload="this.parentNode.classList.add('is-loaded')"
+                 onerror="this.parentNode.classList.add('is-drawn');this.remove()">{% endif %}
+            {% if not f.thumb %}<span class="file-drawn"><span class="file-ext">{{ f.name.rsplit('.',1)[-1]|upper }}</span></span>{% endif %}
+          </a>
+          <div class="file-meta">
+            <span class="doc-label">{{ f.label }}</span>
+            <strong class="file-name">{{ f.name }}</strong>
+            <span class="file-facts">{% if f.size %}{{ (f.size / 1024)|round|int }} KB{% endif %}{% if f.uploaded_at %} · {{ f.uploaded_at.strftime('%d %b %Y') }}{% endif %}</span>
+            <div class="file-acts">
+              {% if f.viewable %}<a class="file-act is-view" href="{{ f.url }}?inline=1" target="_blank" rel="noopener">View</a>{% endif %}
+              <a class="file-act" href="{{ f.url }}">Download</a>
+              {% if f.is_pdf and summaries %}
+              <button class="file-act is-ai" type="button" data-summary="{{ url_for('admin.document_summary', dept_code=dept.dept_code, stored=f.url.rsplit('/',1)[-1]) }}">✦ AI summary</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% if f.summary %}
+        <div class="file-summary">
+          <div class="fs-head"><span class="fs-spark">✦</span><strong>AI summary</strong><span class="fs-by">by Grok · check it against the document</span></div>
+          <div class="fs-text">{{ f.summary }}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endfor %}
+    {% if not summaries and ndocs %}
+      <p class="small muted mt-1">AI summaries are off — add XAI_API_KEY to the server's .env to turn them on.</p>
+    {% endif %}
+  </div>
+</section>
 {% set ns = namespace(group=None) %}
 {% for s in board %}
   {% if s.group != ns.group %}{% set ns.group = s.group %}<div class="group-label">{{ s.group }}</div>{% endif %}
@@ -147,4 +199,16 @@
 </div>
 {% endfor %}
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script>
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-summary]");
+    if (!b) return;
+    var row = b.closest(".doc-row");
+    window.PortalSummary.load(row, b.dataset.summary, false);
+  });
+</script>
 {% endblock %}

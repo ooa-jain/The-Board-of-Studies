@@ -260,6 +260,7 @@
     synced: {{ synced|tojson }},
     calc: {{ calc|tojson }},
     fill: {{ fill|tojson }},
+    summaries: {{ (config.XAI_API_KEY != '')|tojson }},
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
       validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},
@@ -272,6 +273,7 @@
   };
 </script>
 <script src="{{ url_for('static', filename='js/magic-bento.js') }}"></script>
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
 <script src="{{ url_for('static', filename='js/branch.js') }}"></script>
 {% endblock %}

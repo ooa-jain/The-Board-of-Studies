@@ -27,6 +27,13 @@ class Config:
     UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", BASE_DIR / "uploads"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_MB", "32")) * 1024 * 1024
 
+    # Short PDF summaries by Grok (xAI). Leave the key unset to switch them off.
+    XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
+    XAI_MODEL = os.getenv("XAI_MODEL", "grok-4")
+    XAI_API_URL = os.getenv("XAI_API_URL", "https://api.x.ai/v1/chat/completions")
+    # for scanned PDFs, read as pictures; must be a model that takes images
+    XAI_VISION_MODEL = os.getenv("XAI_VISION_MODEL", os.getenv("XAI_MODEL", "grok-4"))
+
     PORT = int(os.getenv("PORT", "8102"))
     DEBUG = _bool("FLASK_DEBUG", False)
 

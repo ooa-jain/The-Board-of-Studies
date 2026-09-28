@@ -494,7 +494,96 @@ def submission_detail(dept_code):
     sub = get_or_create_submission(dept_code, year)
     return render_template("admin/submission_detail.html", dept=dept, submission=sub,
                            board=stage_board(sub), progress=progress(sub),
-                           year=year, STAGE_BY_KEY=STAGE_BY_KEY)
+                           year=year, STAGE_BY_KEY=STAGE_BY_KEY,
+                           documents=_documents(dept_code, sub, year),
+                           summaries=bool(current_app.config.get("XAI_API_KEY")))
+
+
+# ---------------------------------------------------------------------------
+# a department's uploaded documents: view them, and a short AI summary of each PDF
+# ---------------------------------------------------------------------------
+
+def _stored_names(node, out):
+    """Every uploaded file still attached somewhere in the submission."""
+    if isinstance(node, dict):
+        if node.get("stored") and node.get("name"):
+            out.append(node["stored"])
+        for v in node.values():
+            _stored_names(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _stored_names(v, out)
+    return out
+
+
+def _documents(dept_code, sub, year):
+    from .summarise import field_label
+    names = list(dict.fromkeys(_stored_names(sub.get("stages", {}), []) +
+                               _stored_names(sub.get("programmes", {}), [])))
+    if not names:
+        return []
+    recs = {r["stored_name"]: r for r in get_db().files.find(
+        {"dept_code": dept_code, "stored_name": {"$in": names}})}
+    groups, order = {}, []
+    for n in names:
+        r = recs.get(n)
+        if not r:
+            continue
+        stage = STAGE_BY_KEY.get(r.get("stage"), {})
+        t, grp = stage.get("title", r.get("stage", "")), stage.get("group", "")
+        title = grp if t and t in grp else " · ".join(x for x in (grp, t) if x)
+        if title not in groups:
+            groups[title] = []
+            order.append(title)
+        url = url_for("admin.document", dept_code=dept_code, stored=n)
+        is_pdf = r["original_name"].lower().endswith(".pdf")
+        groups[title].append({
+            "name": r["original_name"], "size": r.get("size"),
+            "label": field_label(r.get("stage", ""), r.get("field", "")),
+            "url": url, "is_pdf": is_pdf,
+            "viewable": is_pdf or r["original_name"].lower().rsplit(".", 1)[-1] in ("png", "jpg", "jpeg", "webp", "gif"),
+            "thumb": url + "?thumb=1" if is_pdf else None,
+            "summary": r.get("summary"),
+            "uploaded_at": r.get("uploaded_at"),
+        })
+    return [{"title": t, "files": groups[t]} for t in order]
+
+
+def _file_rec(dept_code, stored):
+    rec = get_db().files.find_one({"dept_code": dept_code, "stored_name": stored}) or abort(404)
+    path = (current_app.config["UPLOAD_ROOT"] / (rec.get("academic_year") or _year())
+            / dept_code / rec["stage"] / stored)
+    return rec, path
+
+
+@bp.route("/documents/<dept_code>/<stored>")
+@admin_required
+def document(dept_code, stored):
+    from pathlib import Path
+    from .dept import INLINE_EXT, _thumbnail
+    rec, path = _file_rec(dept_code, stored)
+    if not path.exists():
+        abort(404)
+    suffix = Path(rec["original_name"]).suffix.lower()
+    if request.args.get("thumb") == "1":
+        drawn = _thumbnail(path) if suffix == ".pdf" else None
+        if not drawn:
+            abort(404)
+        return send_file(drawn, mimetype="image/png", max_age=86400)
+    inline = request.args.get("inline") == "1" and suffix in INLINE_EXT
+    return send_file(path, as_attachment=not inline, download_name=rec["original_name"])
+
+
+@bp.post("/documents/<dept_code>/<stored>/summary")
+@admin_required
+def document_summary(dept_code, stored):
+    from .summarise import SummaryError, summarise
+    rec, path = _file_rec(dept_code, stored)
+    try:
+        out = summarise(rec, path, refresh=request.args.get("refresh") == "1")
+    except SummaryError as e:
+        return jsonify({"ok": False, "error": str(e)})
+    return jsonify({"ok": True, **out})
 
 
 @bp.route("/submissions/<dept_code>/<stage_key>/return", methods=["POST"])

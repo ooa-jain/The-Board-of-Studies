@@ -404,6 +404,24 @@ def download(stage_key, stored):
                      download_name=rec["original_name"])
 
 
+@bp.post("/file/<stage_key>/<stored>/summary")
+@department_required
+def file_summary(stage_key, stored):
+    """A short Grok summary of an uploaded PDF, made once and kept."""
+    from .summarise import SummaryError, summarise
+    dept = _dept()
+    rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})
+    if not rec:
+        return jsonify({"ok": False, "error": "That file was not found."}), 404
+    path = (current_app.config["UPLOAD_ROOT"] / (rec.get("academic_year") or _year())
+            / dept["dept_code"] / rec["stage"] / stored)
+    try:
+        out = summarise(rec, path, refresh=request.args.get("refresh") == "1")
+    except SummaryError as e:
+        return jsonify({"ok": False, "error": str(e)})
+    return jsonify({"ok": True, **out})
+
+
 # ---------------------------------------------------------------------------
 # department's own exports
 # ---------------------------------------------------------------------------

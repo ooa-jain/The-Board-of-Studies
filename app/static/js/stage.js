@@ -680,6 +680,13 @@
       open.rel = "noopener";
       acts.appendChild(open);
     }
+    let sumBtn = null;
+    if (val.url && info.kind === "pdf" && CTX.summaries) {
+      sumBtn = el("button", "file-act is-ai", "✦ AI summary");
+      sumBtn.type = "button";
+      sumBtn.title = "A short summary of this PDF, written by Grok";
+      acts.appendChild(sumBtn);
+    }
     if (onRemove && !CTX.readonly) {
       const rm = el("button", "file-act is-remove", "Remove");
       rm.type = "button";
@@ -694,6 +701,24 @@
     }
     card.appendChild(meta);
     host.appendChild(card);
+    if (sumBtn) {
+      sumBtn.addEventListener("click", () => {
+        const open = host.querySelector(".file-summary");
+        if (open && !open.classList.contains("is-bad")) { open.remove(); host.classList.remove("has-summary"); return; }
+        loadSummary(host, val, false);
+      });
+      // a PDF just uploaded is read straight away
+      if (freshUploads.delete(val.url)) loadSummary(host, val, false);
+    }
+  }
+
+  /* ------------------------------------------------------------- summaries
+     Grok reads the PDF (pictures of its pages, for a scan) and says in a few
+     lines what it is and whether it looks like the right document for the
+     box. Made once per file on the server and kept. */
+  const freshUploads = new Set();
+  function loadSummary(host, val, refresh) {
+    window.PortalSummary.load(host, val.url + "/summary", refresh);
   }
 
   /** One preview, or a row of them for a box that takes several files. */
@@ -862,6 +887,7 @@
     files.reduce((chain, f) => chain.then(done => uploadOne(f, def).then(v => done.concat([v]))),
                  Promise.resolve([]))
       .then(done => {
+        done.forEach(v => { if (CTX.summaries && fileKind(v.name).kind === "pdf") freshUploads.add(v.url); });
         const had = wrap._files ? wrap._files() : [];
         const val = def.multiple ? had.concat(done) : done[0];
         note.textContent = (done.length > 1
