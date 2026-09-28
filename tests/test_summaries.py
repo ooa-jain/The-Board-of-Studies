@@ -141,3 +141,27 @@ def test_a_refusal_says_xais_own_reason(app, monkeypatch):
         except summarise.SummaryError as e:
             msg = str(e)
     assert "403" in msg and "no credits" in msg
+
+
+def test_a_busy_service_is_tried_again_then_explained(app, monkeypatch):
+    import time
+    import urllib.error
+    import urllib.request
+    from app import summarise
+    tries = []
+
+    def busy(*a, **kw):
+        tries.append(1)
+        raise urllib.error.HTTPError(
+            "u", 429, "Too Many Requests", {},
+            io.BytesIO(b'{"object":"error","message":"Requests rate limit exceeded","type":"rate_limited"}'))
+    monkeypatch.setattr(urllib.request, "urlopen", busy)
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    with app.app_context():
+        app.config.update(AI_API_KEY="test", AI_NAME="Mistral")
+        try:
+            summarise._call([{"role": "user", "content": "hi"}], "mistral-small-latest")
+        except summarise.SummaryError as e:
+            msg = str(e)
+    assert len(tries) == summarise.RETRIES
+    assert "Mistral" in msg and "429" in msg and "rate limit exceeded" in msg

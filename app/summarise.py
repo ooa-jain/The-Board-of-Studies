@@ -73,7 +73,7 @@ def _pdf_images(path: Path) -> list[str]:
         urls = []
         for i in range(min(len(doc), MAX_PAGES_AS_IMAGES)):
             img = doc[i].render(scale=1.3).to_pil().convert("RGB")
-            img.thumbnail((1400, 1400))
+            img.thumbnail((1200, 1200))
             buf = io.BytesIO()
             img.save(buf, "JPEG", quality=80)
             urls.append("data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode())
@@ -97,44 +97,74 @@ PROMPT = (
 )
 
 
+def _reason(detail: str) -> str:
+    """The service's own words from an error body. Services put them in
+    different places: xAI in "error", OpenAI/Gemini in "error.message",
+    Mistral in "message". None of them ever echo the key."""
+    try:
+        body = json.loads(detail)
+    except ValueError:
+        return detail.strip()[:220]
+    if isinstance(body, list) and body:
+        body = body[0]
+    if not isinstance(body, dict):
+        return str(body)[:220]
+    r = body.get("error") or body.get("message") or body.get("detail") or detail
+    if isinstance(r, dict):
+        r = r.get("message") or str(r)
+    return str(r).strip()[:220]
+
+
+RETRIES = 3   # on 429 / 5xx; free tiers often allow one request a second
+
+
 def _call(messages: list, model: str) -> str:
+    import time
     body = json.dumps({"model": model, "messages": messages,
                        "temperature": 0.2, "max_tokens": 2000}).encode()
-    req = urllib.request.Request(current_app.config["AI_API_URL"], data=body, method="POST", headers={
-        "Authorization": f"Bearer {current_app.config['AI_API_KEY']}",
-        "Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=90) as r:
-            data = json.load(r)
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode(errors="replace")[:300]
-        current_app.logger.warning("xAI %s for model %s: %s", e.code, model, detail)
-        # xAI says why in its body: a bad key, no credits, a model the key
-        # may not use. Pass its words on — they never contain the key.
+    name = current_app.config.get("AI_NAME") or "The AI service"
+    for attempt in range(RETRIES):
+        req = urllib.request.Request(current_app.config["AI_API_URL"], data=body, method="POST", headers={
+            "Authorization": f"Bearer {current_app.config['AI_API_KEY']}",
+            "Content-Type": "application/json"})
         try:
-            reason = json.loads(detail).get("error") or detail
-            if isinstance(reason, dict):
-                reason = reason.get("message") or str(reason)
-        except ValueError:
-            reason = detail
-        reason = str(reason).strip()[:220]
-        if e.code == 401:
-            raise SummaryError(f"The AI service refused the API key (401). the AI service says: {reason}")
-        if e.code == 403:
-            raise SummaryError(f"The AI service refused the request (403). the AI service says: {reason}")
-        if e.code in (400, 404) and "model" in reason.lower():
-            raise SummaryError(f"The AI service does not know the model “{model}” — set AI_MODEL in .env. "
-                               f"the AI service says: {reason}")
-        if e.code == 429:
-            raise SummaryError("The AI service is busy or today's free limit is used up — try again later.")
-        raise SummaryError(f"The AI service could not summarise this file ({e.code}).")
-    except (urllib.error.URLError, TimeoutError) as e:
-        current_app.logger.warning("xAI unreachable: %s", e)
-        raise SummaryError("Could not reach the AI service from the server — try again shortly.")
+            with urllib.request.urlopen(req, timeout=90) as r:
+                data = json.load(r)
+            break
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace")[:400]
+            reason = _reason(detail)
+            current_app.logger.warning("AI %s for model %s (try %d): %s", e.code, model, attempt + 1, reason)
+            if (e.code == 429 or e.code >= 500) and attempt < RETRIES - 1:
+                # wait as told, or 2 s then 5 s
+                try:
+                    wait = float(e.headers.get("Retry-After") or 0)
+                except (TypeError, ValueError):
+                    wait = 0
+                time.sleep(min(max(wait, (2, 5)[attempt]), 10))
+                continue
+            if e.code == 401:
+                raise SummaryError(f"{name} refused the API key (401) — check AI_API_KEY in .env. "
+                                   f"{name} says: {reason}")
+            if e.code == 403:
+                raise SummaryError(f"{name} refused the request (403). {name} says: {reason}")
+            if e.code in (400, 404) and "model" in reason.lower():
+                raise SummaryError(f"{name} does not know the model “{model}” — set AI_MODEL in .env. "
+                                   f"{name} says: {reason}")
+            if e.code == 429:
+                raise SummaryError(f"{name} says there are too many requests (429), even after "
+                                   f"waiting and trying again. {name} says: {reason}")
+            raise SummaryError(f"{name} could not summarise this file ({e.code}). {name} says: {reason}")
+        except (urllib.error.URLError, TimeoutError) as e:
+            current_app.logger.warning("AI service unreachable: %s", e)
+            raise SummaryError(f"Could not reach {name} from the server — try again shortly.")
     try:
-        return data["choices"][0]["message"]["content"].strip()
-    except (KeyError, IndexError, TypeError):
-        raise SummaryError("The AI service sent back an empty answer.")
+        content = data["choices"][0]["message"]["content"]
+        if isinstance(content, list):          # some services answer in parts
+            content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
+        return content.strip()
+    except (KeyError, IndexError, TypeError, AttributeError):
+        raise SummaryError(f"{name} sent back an empty answer.")
 
 
 def summarise(rec: dict, path: Path, refresh: bool = False) -> dict:
