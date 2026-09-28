@@ -38,12 +38,88 @@ def _stub(monkeypatch, calls):
     monkeypatch.setattr(summarise, "_call", fake)
 
 
-def test_summary_is_off_without_a_key(app, client):
+def _minutes_pdf():
+    try:
+        import pymupdf
+    except ImportError:
+        import pytest
+        pytest.skip("pymupdf not installed")
+    lines = [
+        "Minutes of the Board of Studies Meeting",
+        "Department of Commerce, held on 12 March 2027 at 10:00 am",
+        "Members present:",
+        "Dr. Anita Rao, Chairperson",
+        "Prof. Ravi Kumar, External Member",
+        "Dr. Meena Shah, Member Secretary",
+        "Resolved that the BBA curriculum for 2027-28 be approved.",
+        "Approved three new electives in the B.Com programme.",
+    ] + [f"Item {i}: the board discussed the course outcomes in detail." for i in range(10)]
+    d = pymupdf.open()
+    page = d.new_page()
+    y = 60
+    for l in lines:
+        page.insert_text((60, y), l, fontsize=10)
+        y += 16
+    return d.tobytes()
+
+
+def test_without_a_key_the_built_in_reader_answers(app, client):
     u, p = make_department(app)
     login(client, u, p)
-    j = _upload(client, "m.pdf", _tiny_pdf())
+    j = _upload(client, "minutes.pdf", _minutes_pdf())
     r = client.post(j["url"] + "/summary").get_json()
-    assert not r["ok"] and "AI_API_KEY" in r["error"]
+    assert r["ok"] and r["by"] == "Built-in reader", r
+    text = r["summary"]
+    assert text.startswith("Minutes of a meeting")
+    assert "12 March 2027" in text
+    assert "Anita Rao" in text and "Chairperson" in text
+    assert "BBA" in text
+    assert "Resolved" in text
+    assert "Check: nothing stands out" in text
+
+
+def test_the_built_in_reader_says_when_a_file_looks_wrong(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    try:
+        import pymupdf
+    except ImportError:
+        import pytest
+        pytest.skip("pymupdf not installed")
+    d = pymupdf.open()
+    pg = d.new_page()
+    for i, l in enumerate(["TAX INVOICE", "Bill to: Some Shop", "GSTIN 29ABCDE1234F1Z5",
+                           "Amount due: Rs 4,500"] + ["Line item for services rendered"] * 12):
+        pg.insert_text((60, 60 + 16 * i), l, fontsize=10)
+    j = _upload(client, "invoice.pdf", d.tobytes())      # into the Minutes box
+    r = client.post(j["url"] + "/summary").get_json()
+    assert "Invoice" in r["summary"]
+    assert "right file" in r["summary"] and "invoice, not a BoS document" in r["summary"]
+
+
+def test_a_scan_without_a_key_is_said_to_be_a_scan(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    j = _upload(client, "scan.pdf", _tiny_pdf())
+    r = client.post(j["url"] + "/summary").get_json()
+    assert r["ok"] and r["summary"].startswith("Scanned PDF")
+
+
+def test_when_the_ai_fails_the_built_in_reader_steps_in(app, client, monkeypatch):
+    from app import summarise
+    app.config["AI_API_KEY"] = "test"
+
+    def busy(messages, model):
+        raise summarise.SummaryError("Mistral says there are too many requests (429).")
+    monkeypatch.setattr(summarise, "_call", busy)
+    u, p = make_department(app)
+    login(client, u, p)
+    j = _upload(client, "minutes.pdf", _minutes_pdf())
+    r = client.post(j["url"] + "/summary").get_json()
+    assert r["ok"] and r["by"] == "Built-in reader"
+    assert "AI not used this time" in r["summary"] and "429" in r["summary"]
+    again = client.post(j["url"] + "/summary").get_json()
+    assert not again["cached"], "a fallback is not kept, so the AI is tried again"
 
 
 def test_a_text_pdf_is_summarised_once_and_kept(app, client, monkeypatch):

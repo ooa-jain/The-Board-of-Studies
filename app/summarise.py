@@ -1,4 +1,5 @@
-"""A short summary of an uploaded PDF, written by an AI model.
+"""A short summary of an uploaded PDF — by an AI service when one is set up,
+else (or when it fails) by the built-in reader in local_summary.py.
 
 The text layer is read first. BoS documents are often signed scans with no
 text in them, so when there is none the first pages are drawn as pictures
@@ -32,7 +33,7 @@ class SummaryError(Exception):
     """Said to the person as it is."""
 
 
-def enabled() -> bool:
+def ai_enabled() -> bool:
     return bool(current_app.config.get("AI_API_KEY"))
 
 
@@ -169,40 +170,58 @@ def _call(messages: list, model: str) -> str:
 
 def summarise(rec: dict, path: Path, refresh: bool = False) -> dict:
     """The summary for this file record, made now if there is none kept."""
+    from . import local_summary as local
     if rec.get("summary") and not refresh:
         return {"summary": rec["summary"], "at": rec.get("summary_at"), "cached": True,
                 "by": rec.get("summary_by") or current_app.config["AI_NAME"]}
-    if not enabled():
-        raise SummaryError("PDF summaries are not set up — add AI_API_KEY to the server's .env.")
     if Path(rec["original_name"]).suffix.lower() != ".pdf":
         raise SummaryError("Only PDF files can be summarised.")
     if not path.exists():
         raise SummaryError("The file is no longer on the server.")
 
     label = field_label(rec.get("stage", ""), rec.get("field", ""))
-    prompt = PROMPT.format(label=label, name=rec["original_name"])
     try:
         text, pages = _pdf_text(path)
     except Exception:
         raise SummaryError("This PDF could not be opened — it may be damaged or password-protected.")
+    has_text = len(text) >= MIN_TEXT
 
-    if len(text) >= MIN_TEXT:
-        content = f"{prompt}\n\nThe document ({pages} pages):\n\n{text}"
-        model = current_app.config["AI_MODEL"]
-    else:
-        # a scan: send the first pages as pictures
+    summary, by, model, ai_problem = None, None, None, None
+    if ai_enabled():
+        prompt = PROMPT.format(label=label, name=rec["original_name"])
         try:
-            images = _pdf_images(path)
-        except Exception:
-            raise SummaryError("The pages of this PDF could not be drawn to be read.")
-        content = [{"type": "text", "text": prompt + f"\n\nThe document has {pages} pages; "
-                    f"the first {len(images)} are attached as images."}]
-        content += [{"type": "image_url", "image_url": {"url": u}} for u in images]
-        model = current_app.config["AI_VISION_MODEL"]
+            if has_text:
+                content = f"{prompt}\n\nThe document ({pages} pages):\n\n{text}"
+                model = current_app.config["AI_MODEL"]
+            else:
+                # a scan: send the first pages as pictures
+                try:
+                    images = _pdf_images(path)
+                except Exception:
+                    raise SummaryError("The pages of this PDF could not be drawn to be read.")
+                content = [{"type": "text", "text": prompt + f"\n\nThe document has {pages} pages; "
+                            f"the first {len(images)} are attached as images."}]
+                content += [{"type": "image_url", "image_url": {"url": u}} for u in images]
+                model = current_app.config["AI_VISION_MODEL"]
+            summary = _call([{"role": "user", "content": content}], model)
+            by = current_app.config["AI_NAME"]
+        except SummaryError as e:
+            ai_problem = str(e)
 
-    summary = _call([{"role": "user", "content": content}], model)
+    if summary is None:
+        # the built-in reader: always there, never leaves the server
+        summary = (local.summarise_text(text, pages, label, rec["original_name"])
+                   if has_text else local.scan_note(pages))
+        by, model = local.NAME, "local"
+        if ai_problem:
+            summary += f"\n(AI not used this time: {ai_problem})"
+
     at = now()
-    get_db().files.update_one({"_id": rec["_id"]},
-                              {"$set": {"summary": summary, "summary_at": at, "summary_model": model,
-                                        "summary_by": current_app.config["AI_NAME"]}})
-    return {"summary": summary, "at": at, "cached": False, "by": current_app.config["AI_NAME"]}
+    # a built-in summary written because the AI failed is not kept, so the
+    # next press tries the AI again
+    keep = not ai_problem
+    if keep:
+        get_db().files.update_one({"_id": rec["_id"]},
+                                  {"$set": {"summary": summary, "summary_at": at,
+                                            "summary_model": model, "summary_by": by}})
+    return {"summary": summary, "at": at, "cached": False, "by": by}

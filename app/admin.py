@@ -496,7 +496,7 @@ def submission_detail(dept_code):
                            board=stage_board(sub), progress=progress(sub),
                            year=year, STAGE_BY_KEY=STAGE_BY_KEY,
                            documents=_documents(dept_code, sub, year),
-                           summaries=bool(current_app.config.get("AI_API_KEY")))
+                           summaries=True)
 
 
 # ---------------------------------------------------------------------------

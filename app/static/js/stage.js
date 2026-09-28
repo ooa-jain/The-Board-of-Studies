@@ -682,9 +682,9 @@
     }
     let sumBtn = null;
     if (val.url && info.kind === "pdf" && CTX.summaries) {
-      sumBtn = el("button", "file-act is-ai", "✦ AI summary");
+      sumBtn = el("button", "file-act is-ai", "✦ Summary");
       sumBtn.type = "button";
-      sumBtn.title = "A short summary of this PDF, written by AI";
+      sumBtn.title = "A short summary of this PDF";
       acts.appendChild(sumBtn);
     }
     if (onRemove && !CTX.readonly) {

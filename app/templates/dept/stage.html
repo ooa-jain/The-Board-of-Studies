@@ -260,7 +260,7 @@
     synced: {{ synced|tojson }},
     calc: {{ calc|tojson }},
     fill: {{ fill|tojson }},
-    summaries: {{ (config.AI_API_KEY != '')|tojson }},
+    summaries: true,
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
       validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},

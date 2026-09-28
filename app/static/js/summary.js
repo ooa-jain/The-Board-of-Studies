@@ -26,7 +26,7 @@
     box.setAttribute("aria-live", "polite");
     box.className = "file-summary is-loading";
     box.innerHTML = "";
-    box.appendChild(head("AI summary", "Reading the PDF…"));
+    box.appendChild(head("Summary", "Reading the PDF…"));
     ["w-90", "w-70", "w-90", "w-50"].forEach(w => box.appendChild(el("span", "sk sk-line " + w)));
 
     fetch(url + (refresh ? "?refresh=1" : ""), { method: "POST", credentials: "same-origin" })
@@ -34,7 +34,7 @@
       .then(j => {
         box.className = "file-summary" + (j.ok ? "" : " is-bad");
         box.innerHTML = "";
-        const h = head(j.ok ? "AI summary" : "No summary",
+        const h = head(j.ok ? "Summary" : "No summary",
                        j.ok ? "by " + (j.by || "AI") + " · check it against the document" : "");
         if (j.ok) {
           const again = el("button", "fs-again", "Redo");

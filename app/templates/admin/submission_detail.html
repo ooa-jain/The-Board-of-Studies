@@ -35,7 +35,7 @@
     <h3 style="margin:0;font-size:1rem">Uploaded documents</h3>
     <span class="spacer small muted">
       {{ ndocs }} file{{ '' if ndocs == 1 else 's' }}
-      {% if summaries %}· press ✦ AI summary on a PDF for a short summary{% endif %}
+      {% if summaries %}· press ✦ Summary on a PDF for a short summary{% endif %}
     </span>
   </div>
   <div class="card-body tight">
@@ -62,23 +62,20 @@
               {% if f.viewable %}<a class="file-act is-view" href="{{ f.url }}?inline=1" target="_blank" rel="noopener">View</a>{% endif %}
               <a class="file-act" href="{{ f.url }}">Download</a>
               {% if f.is_pdf and summaries %}
-              <button class="file-act is-ai" type="button" data-summary="{{ url_for('admin.document_summary', dept_code=dept.dept_code, stored=f.url.rsplit('/',1)[-1]) }}">✦ AI summary</button>
+              <button class="file-act is-ai" type="button" data-summary="{{ url_for('admin.document_summary', dept_code=dept.dept_code, stored=f.url.rsplit('/',1)[-1]) }}">✦ Summary</button>
               {% endif %}
             </div>
           </div>
         </div>
         {% if f.summary %}
         <div class="file-summary">
-          <div class="fs-head"><span class="fs-spark">✦</span><strong>AI summary</strong><span class="fs-by">by {{ f.summary_by }} · check it against the document</span></div>
+          <div class="fs-head"><span class="fs-spark">✦</span><strong>Summary</strong><span class="fs-by">by {{ f.summary_by }} · check it against the document</span></div>
           <div class="fs-text">{{ f.summary }}</div>
         </div>
         {% endif %}
       </div>
       {% endfor %}
     {% endfor %}
-    {% if not summaries and ndocs %}
-      <p class="small muted mt-1">AI summaries are off — add AI_API_KEY to the server's .env to turn them on.</p>
-    {% endif %}
   </div>
 </section>
 {% set ns = namespace(group=None) %}
