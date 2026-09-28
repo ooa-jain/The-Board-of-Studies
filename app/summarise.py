@@ -109,8 +109,22 @@ def _call(messages: list, model: str) -> str:
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace")[:300]
         current_app.logger.warning("xAI %s for model %s: %s", e.code, model, detail)
-        if e.code in (401, 403):
-            raise SummaryError("The Grok API key was refused — check XAI_API_KEY on the server.")
+        # xAI says why in its body: a bad key, no credits, a model the key
+        # may not use. Pass its words on — they never contain the key.
+        try:
+            reason = json.loads(detail).get("error") or detail
+            if isinstance(reason, dict):
+                reason = reason.get("message") or str(reason)
+        except ValueError:
+            reason = detail
+        reason = str(reason).strip()[:220]
+        if e.code == 401:
+            raise SummaryError(f"Grok refused the API key (401). xAI says: {reason}")
+        if e.code == 403:
+            raise SummaryError(f"Grok refused the request (403). xAI says: {reason}")
+        if e.code in (400, 404) and "model" in reason.lower():
+            raise SummaryError(f"Grok does not know the model “{model}” — set XAI_MODEL in .env. "
+                               f"xAI says: {reason}")
         if e.code == 429:
             raise SummaryError("Grok is busy or the key's limit is reached — try again in a minute.")
         raise SummaryError(f"Grok could not summarise this file ({e.code}).")

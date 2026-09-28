@@ -122,3 +122,22 @@ def test_a_department_cannot_reach_the_admin_document_routes(app, client):
     j = _upload(client, "minutes.pdf", _tiny_pdf())
     r = client.get(f"/admin/documents/COM/{j['stored']}")
     assert r.status_code in (302, 403)
+
+
+def test_a_refusal_says_xais_own_reason(app, monkeypatch):
+    import urllib.error
+    import urllib.request
+    from app import summarise
+
+    def refuse(*a, **kw):
+        raise urllib.error.HTTPError(
+            "u", 403, "Forbidden", {},
+            io.BytesIO(b'{"code":"x","error":"Your team has no credits. Purchase them at console.x.ai"}'))
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    with app.app_context():
+        app.config["XAI_API_KEY"] = "test"
+        try:
+            summarise._call([{"role": "user", "content": "hi"}], "grok-4")
+        except summarise.SummaryError as e:
+            msg = str(e)
+    assert "403" in msg and "no credits" in msg
