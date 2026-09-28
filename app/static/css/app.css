@@ -2905,42 +2905,43 @@ footer.site { border-radius: 0; }
 .flow-canvas .flow-loading.sk { position: absolute; inset: 18px; border-radius: 14px; }
 
 /* ==========================================================================
-   Upload box — the folder (after Uiverse.io, 3bdel3ziz-T), drag and drop,
-   and the in-page document viewer
+   Upload box — the folder (after Uiverse.io, 3bdel3ziz-T), in the portal's
+   colours and one row tall; drag and drop; the in-page document viewer
    ========================================================================== */
 .upload-folder {
   --transition: 350ms;
-  --folder-W: 120px;
-  --folder-H: 80px;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  padding: 10px; margin-top: 46px;
-  background: linear-gradient(135deg, #6dd5ed, #2193b0);
-  border-radius: 15px;
-  box-shadow: 0 15px 30px rgba(0, 0, 0, .2);
-  height: calc(var(--folder-H) * 1.7);
+  --folder-W: 52px;
+  --folder-H: 36px;
+  display: flex; align-items: center; gap: 18px;
+  margin-top: 4px; padding: 14px 16px 12px 22px;
+  background: var(--lv-card, #fdfbf7);
+  border: 1.5px dashed var(--lv-border, #e6ddcc);
+  border-radius: 14px;
   position: relative;
-  outline: 3px dashed transparent; outline-offset: 4px;
-  transition: outline-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
 }
+.upload-folder:hover { border-color: var(--lv-gold, #c79c10); background: #fffdf6; }
 .upload-folder .folder {
-  position: absolute; top: -20px; left: calc(50% - 60px);
+  position: relative; flex: none;
+  width: var(--folder-W); height: var(--folder-H); margin-top: 6px;
   animation: folder-float 2.5s infinite ease-in-out;
   transition: transform var(--transition) ease;
-  perspective: 600px;
+  perspective: 300px;
 }
 .upload-folder .folder:hover { transform: scale(1.05); }
 .upload-folder .front-side,
 .upload-folder .back-side {
-  position: absolute;
+  position: absolute; top: 0; left: 0;
   transition: transform var(--transition);
   transform-origin: bottom center;
 }
 .upload-folder .back-side::before,
 .upload-folder .back-side::after {
   content: ""; display: block; position: absolute;
-  background-color: #fff; opacity: .5; z-index: 0;
+  background-color: #fff; opacity: .9; z-index: 0;
   width: var(--folder-W); height: var(--folder-H);
-  transform-origin: bottom center; border-radius: 15px;
+  transform-origin: bottom center; border-radius: 7px;
+  box-shadow: 0 1px 3px rgba(15, 36, 64, .15);
   transition: transform 350ms;
 }
 .upload-folder:hover .back-side::before,
@@ -2952,54 +2953,60 @@ footer.site { border-radius: 0; }
 .upload-folder.is-over .front-side,
 .upload-folder:focus-within .front-side { transform: rotateX(-40deg) skewX(15deg); }
 .upload-folder .tip {
-  background: linear-gradient(135deg, #ff9a56, #ff6f56);
-  width: 80px; height: 20px; border-radius: 12px 12px 0 0;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, .2);
-  position: absolute; top: -10px; z-index: 2;
+  background: linear-gradient(135deg, #f08a3e, var(--lv-orange, #e8620f));
+  width: 26px; height: 9px; border-radius: 6px 6px 0 0;
+  position: absolute; top: -5px; z-index: 2;
 }
 .upload-folder .cover {
-  background: linear-gradient(135deg, #ffe563, #ffc663);
+  background: linear-gradient(135deg, #f3cf55, var(--lv-gold, #c79c10));
   width: var(--folder-W); height: var(--folder-H);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, .3);
-  border-radius: 10px;
+  box-shadow: 0 6px 14px -6px rgba(15, 36, 64, .35);
+  border-radius: 6px;
 }
 .upload-folder .custom-file-upload {
-  font-size: 1.05em; color: #fff; text-align: center;
-  background: rgba(255, 255, 255, .2);
-  border: none; border-radius: 10px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, .1);
-  cursor: pointer;
-  transition: background var(--transition) ease;
-  display: inline-block; width: 100%;
-  padding: 10px 35px; position: relative;
-  margin: 0; text-transform: none; letter-spacing: 0;
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 14px;
+  margin: 0; padding: 0; cursor: pointer;
+  background: none; border: 0; box-shadow: none;
+  color: var(--lv-navy, #0f2440); text-align: left;
+  text-transform: none; letter-spacing: 0; font-size: 1rem;
 }
-.upload-folder .custom-file-upload:hover { background: rgba(255, 255, 255, .4); }
-/* the input stays in the page, visually hidden, so Tab and Enter still reach it */
-.upload-folder .cfu-text { display: grid; gap: 2px; }
-.upload-folder .cfu-text strong { font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
+.upload-folder .cfu-text { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.upload-folder .cfu-text strong { font-size: .92rem; font-weight: 700; color: var(--lv-navy, #0f2440); }
 .upload-folder .cfu-types {
-  font-family: var(--font-mono, monospace); font-size: .7rem; letter-spacing: .08em;
-  color: rgba(255, 255, 255, .9);
+  font-family: var(--font-mono, monospace); font-size: .68rem; letter-spacing: .08em;
+  color: var(--lv-muted-fg, #5f6b7d);
 }
-.upload-folder:focus-within { outline-color: rgba(33, 147, 176, .6); }
+.upload-folder .cfu-btn {
+  flex: none; display: inline-flex; align-items: center; min-height: 34px; padding: 0 16px;
+  border-radius: 999px; background: var(--lv-navy, #0f2440); color: #fff;
+  font-size: .8rem; font-weight: 700; transition: background var(--transition);
+}
+.upload-folder:hover .cfu-btn { background: #1d3a66; }
+/* the input stays in the page, visually hidden, so Tab and Enter still reach it */
+.upload-folder:focus-within { border-color: var(--lv-navy, #0f2440); box-shadow: 0 0 0 3px rgba(15, 36, 64, .12); }
 .upload-folder.is-over {
-  outline-color: #ffc663;
-  box-shadow: 0 0 0 6px rgba(255, 198, 99, .35), 0 15px 30px rgba(0, 0, 0, .25);
+  border-style: solid; border-color: var(--lv-gold, #c79c10);
+  background: var(--lv-soft-gold, #fbf1cf);
+  box-shadow: 0 0 0 4px rgba(199, 156, 16, .18);
 }
-.upload-folder.is-over .custom-file-upload { background: rgba(255, 255, 255, .45); }
 .upload-folder.is-busy .folder { animation-duration: .8s; }
 .upload-folder.is-busy .custom-file-upload { cursor: progress; }
-.upload-folder.is-locked { filter: grayscale(.8); opacity: .6; }
+.upload-folder.is-locked { opacity: .6; }
 .upload-folder.is-locked .custom-file-upload { cursor: not-allowed; }
-.upload-folder.is-locked .folder { animation: none; }
+.upload-folder.is-locked .cfu-btn { background: var(--lv-muted-fg, #5f6b7d); }
+.upload-folder.is-locked .folder { animation: none; filter: grayscale(.8); }
 @keyframes folder-float {
   0% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
+  50% { transform: translateY(-4px); }
   100% { transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .upload-folder .folder { animation: none; }
+}
+@media (max-width: 520px) {
+  .upload-folder { gap: 12px; padding: 12px; }
+  .upload-folder .cfu-btn { display: none; }
 }
 
 /* previews under it: bigger, clickable, with their own buttons */

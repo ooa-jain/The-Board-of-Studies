@@ -898,10 +898,11 @@
     lab.appendChild(input);
     const txt = el("span", "cfu-text");
     txt.appendChild(el("strong", null, CTX.readonly ? "Uploads are locked"
-      : def.multiple ? "Drop files here or choose files" : "Drop a file here or choose a file"));
+      : def.multiple ? "Drag files here to upload" : "Drag a file here to upload"));
     if (def.accept) txt.appendChild(el("span", "cfu-types",
       def.accept.replace(/\./g, "").toUpperCase().split(",").join(" · ") + (def.multiple ? " · several at once" : "")));
     lab.appendChild(txt);
+    if (!CTX.readonly) lab.appendChild(el("span", "cfu-btn", def.multiple ? "Choose files" : "Choose file"));
     zone.appendChild(lab);
     if (CTX.readonly) { zone.classList.add("is-locked"); return zone; }
 
