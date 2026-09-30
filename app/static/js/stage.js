@@ -538,11 +538,12 @@
       input = el("textarea");
       input.rows = def.rows || 3;
       input.value = value ?? "";
-    } else if (def.type === "select") {
+    } else if (def.type === "select" || def.choices) {
+      // a select, or a number picked from a short list (semester 1–8)
       input = el("select");
-      input.appendChild(new Option(def.required ? "Choose…" : "—", ""));
-      (def.options || []).forEach(o => input.appendChild(new Option(o, o)));
-      input.value = value ?? "";
+      input.appendChild(new Option(def.choices ? "—" : def.required ? "Choose…" : "—", ""));
+      (def.options || def.choices || []).forEach(o => input.appendChild(new Option(String(o), String(o))));
+      input.value = value == null ? "" : String(value);
     } else if (def.type === "checkbox") {
       input = el("input");
       input.type = "checkbox";
@@ -2272,6 +2273,10 @@
     'stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" ' +
     'stroke="currentColor" stroke-width="1.8"/></svg>';
 
+  const LOCK = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">' +
+    '<rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
+    '<path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+
   function renderCards(section, block) {
     state[section.key] = state[section.key] || {};
     const vals = () => state[section.key];
@@ -2304,7 +2309,14 @@
         list.appendChild(item);
       });
       card.appendChild(list);
-      if (!CTX.readonly) {
+      if (section.frozen) {
+        // the Office's record: shown, never edited here
+        const lock = el("div", "bento-lock");
+        lock.innerHTML = LOCK;
+        lock.appendChild(el("span", null,
+          "Locked — from the Office of Academics record. To correct it, ask the Office of Academics."));
+        card.appendChild(lock);
+      } else if (!CTX.readonly) {
         const pen = el("button", "bento-edit");
         pen.type = "button";
         pen.innerHTML = PENCIL;
@@ -2597,6 +2609,67 @@
     draw();
   }
 
+  // ------------------------------------------------------------------ expand
+  /* A wide table is easier to fill in on the whole screen. Expand lifts the
+     section itself into a large pop-up — the same inputs, still saving as
+     you type — and Close (or Esc) puts it back where it was. */
+  const WIDE_SECTIONS = ["table", "credit_distribution", "credit_matrix", "revision_summary"];
+  let expanded = null;
+
+  function expandable(block, heading, title) {
+    heading.classList.add("has-expand");
+    const btn = el("button", "btn btn-ghost btn-sm sec-expand");
+    btn.type = "button";
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    btn.appendChild(el("span", null, "Expand"));
+    btn.setAttribute("aria-label", `Expand ${title}`);
+    btn.addEventListener("click", () => (expanded ? collapse() : expand(block, title, btn)));
+    heading.appendChild(btn);
+  }
+
+  function expand(block, title, btn) {
+    const holder = el("div", "sec-holder");
+    block.replaceWith(holder);
+    const pop = el("div", "sec-pop");
+    pop.setAttribute("role", "dialog");
+    pop.setAttribute("aria-modal", "true");
+    pop.setAttribute("aria-label", title);
+    const panel = el("div", "sec-pop-panel");
+    const head = el("div", "sec-pop-head");
+    head.appendChild(el("strong", null, title));
+    head.appendChild(el("span", "sec-pop-hint", "Changes save as you type · Esc to close"));
+    const close = el("button", "btn btn-gold btn-sm", "Close");
+    close.type = "button";
+    close.addEventListener("click", collapse);
+    head.appendChild(close);
+    const body = el("div", "sec-pop-body");
+    body.appendChild(block);
+    panel.appendChild(head);
+    panel.appendChild(body);
+    pop.appendChild(el("div", "sec-pop-backdrop"));
+    pop.appendChild(panel);
+    document.body.appendChild(pop);
+    document.body.classList.add("fv-open");
+    btn.querySelector("span").textContent = "Collapse";
+    expanded = { block, holder, pop, btn };
+    close.focus();
+  }
+
+  function collapse() {
+    if (!expanded) return;
+    const { block, holder, pop, btn } = expanded;
+    holder.replaceWith(block);
+    pop.remove();
+    document.body.classList.remove("fv-open");
+    btn.querySelector("span").textContent = "Expand";
+    expanded = null;
+    btn.focus();
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && expanded && !document.querySelector(".file-viewer:not([hidden])")) collapse();
+  });
+
   // ------------------------------------------------------------------ render
 
   function render() {
@@ -2613,6 +2686,7 @@
       block.id = `sec-${section.key}`;
       const h = el("h3", null, section.title);
       block.appendChild(h);
+      if (WIDE_SECTIONS.includes(section.type) && section.display !== "cards") expandable(block, h, section.title);
       if (section.help) block.appendChild(el("div", "section-help", section.help));
       (section.links || []).forEach(l => {
         const a = el("a", "section-link", `${l.label} →`);

@@ -35,6 +35,9 @@ DEGREE_LEVELS = [
     "PG Diploma - 1 Year",
 ]
 
+# the semesters a course can sit in — picked from a list, never typed
+SEMESTERS = list(range(1, 9))
+
 NEP_CATEGORIES = [
     "Major (Core)",
     "Minor Stream",
@@ -79,8 +82,10 @@ DEPARTMENT_INFORMATION = {
             "key": "identity",
             "title": "Department identity",
             "type": "fields",
-            # shown as cards; the pencil opens the fields for editing
             "display": "cards",
+            # copied from the Office of Academics record on every open; the
+            # department cannot change it — the Office corrects the record
+            "frozen": True,
             "fields": [
                 {"name": "dept_name", "label": "Department name", "type": "text", "required": True,
                  "prefill": "dept_name", "help": "Exactly as it appears on official university records."},
@@ -375,7 +380,7 @@ PROGRAMME_CURRICULUM = {
             "min_rows": 1,
             "columns": [
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
-                 "min": 1, "max": 10, "width": "84px"},
+                 "min": 1, "max": 8, "choices": SEMESTERS, "width": "84px"},
                 {"name": "track", "label": "Applies to", "type": "select", "options": TRACKS,
                  "width": "150px", "help": "Leave as All semesters except for semester 7 and 8 "
                                            "courses that differ between the two tracks."},
@@ -430,7 +435,7 @@ PROGRAMME_CURRICULUM = {
                 {"name": "minor_title", "label": "Minor stream", "type": "text", "required": True,
                  "help": "For example: Analytics"},
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
-                 "min": 1, "max": 10, "width": "84px"},
+                 "min": 1, "max": 8, "choices": SEMESTERS, "width": "84px"},
                 {"name": "course_code", "label": "Course code", "type": "text", "width": "130px"},
                 {"name": "course_title", "label": "Course title", "type": "text", "required": True},
                 {"name": "credits", "label": "Credits", "type": "integer", "required": True,
@@ -439,11 +444,15 @@ PROGRAMME_CURRICULUM = {
         },
         {
             "key": "curriculum_file",
-            "title": "Curriculum document",
+            "title": "Curriculum and syllabus documents",
+            "help": "PDF, Word or Excel. Both are optional.",
             "type": "fields",
             "fields": [
-                {"name": "document", "label": "Curriculum Matrix (Word or PDF)", "type": "file",
-                 "wide": True, "accept": ".docx,.doc,.pdf", "help": "Optional."},
+                {"name": "document", "label": "Curriculum Matrix (PDF, Word or Excel)", "type": "file",
+                 "wide": True, "accept": ".pdf,.docx,.doc,.xlsx,.xls"},
+                {"name": "syllabus_document", "label": "Syllabus (PDF, Word or Excel)", "type": "file",
+                 "wide": True, "multiple": True, "accept": ".pdf,.docx,.doc,.xlsx,.xls",
+                 "help": "The syllabus for this programme — one file or several."},
             ],
         },
     ],
@@ -518,8 +527,8 @@ PROGRAMME_SYLLABUS = {
                  "help": "One per line."},
                 {"name": "books", "label": "Books for reference", "type": "textarea", "required": True,
                  "rows": 4, "min_items": 2, "tab": "syllabus", "wide": True, "help": "One per line."},
-                {"name": "syllabus_file", "label": "Syllabus document", "type": "file",
-                 "accept": ".pdf,.docx,.doc", "tab": "syllabus", "help": "Optional."},
+                {"name": "syllabus_file", "label": "Syllabus document (PDF, Word or Excel)", "type": "file",
+                 "accept": ".pdf,.docx,.doc,.xlsx,.xls", "tab": "syllabus", "help": "Optional."},
             ],
             "rules": ["course_codes_known", "bloom_verbs_present"],
         },

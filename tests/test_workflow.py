@@ -263,8 +263,10 @@ def test_an_invalid_submission_is_refused_with_reasons(app, client):
     body = r.get_json()
     assert body["ok"] is False
     msgs = [i["message"] for i in body["issues"]]
-    assert any("is required" in m for m in msgs)
     assert any("at least one programme" in m for m in msgs)
+    # the identity is the Office's record: a blank sent from the page is not
+    # an error, it is simply replaced by the record
+    assert not any(i.get("section") == "identity" for i in body["issues"])
 
 
 DEPT_INFO_OK = {
@@ -495,10 +497,26 @@ def test_next_action_is_none_once_everything_is_submitted(app):
 def test_autosave_keeps_a_draft(app, client):
     u, p = make_department(app)
     login(client, u, p)
-    client.post("/department/api/dept_info/save",
-                json={"identity": {"dept_name": "Half filled"}})
+    client.post("/department/api/dept_info/save", json={"programmes_offered": [
+        {"programme_code": "", "programme_name": "Half filled programme", "degree": "UG",
+         "source": "new", "decision": "keep"}]})
     r = client.get("/department/stage/dept_info")
-    assert "Half filled" in r.get_data(as_text=True)
+    assert "Half filled programme" in r.get_data(as_text=True)
+
+
+def test_the_department_identity_is_frozen(app, client):
+    from app.db import get_db
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/dept_info/save",
+                json={"identity": {"dept_name": "Renamed by the department", "campus": "Elsewhere"}})
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "COM"})
+    ident = sub["stages"]["dept_info"]["data"]["identity"]
+    assert ident["dept_name"] == "Department of Commerce"
+    assert ident["campus"] == "Jain Global Campus"
+    html = client.get("/department/stage/dept_info").get_data(as_text=True)
+    assert "Renamed by the department" not in html
 
 
 def test_exports_produce_real_files(app, client):

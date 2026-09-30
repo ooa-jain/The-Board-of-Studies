@@ -700,6 +700,9 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     for section in stage.get("sections", []):
         sk = section["key"]
         stype = section.get("type", "fields")
+        if section.get("frozen"):
+            # the Office's own record, not the department's to correct
+            continue
 
         if stype == "table":
             rows = _rows(data, sk)

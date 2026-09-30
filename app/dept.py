@@ -236,6 +236,18 @@ def _guard(stage_key, programme_code=None):
     return dept, sub, programme, None
 
 
+def _pin_frozen(stage_key, data, dept, sub, programme):
+    """A frozen section is whatever the Office's record says, whatever the
+    page sent."""
+    stage_def = STAGE_BY_KEY.get(stage_key) or {}
+    frozen = [s["key"] for s in stage_def.get("sections", []) if s.get("frozen")]
+    if frozen:
+        pinned = prefill_for(stage_key, dept, _year(), programme, sub, readonly_only=True)
+        for key in frozen:
+            data[key] = pinned.get(key, {})
+    return data
+
+
 @bp.post("/api/<stage_key>/save")
 @bp.post("/api/<stage_key>/<programme_code>/save")
 @department_required
@@ -243,7 +255,7 @@ def api_save(stage_key, programme_code=None):
     dept, sub, programme, bad = _guard(stage_key, programme_code)
     if bad:
         return bad
-    data = request.get_json(silent=True) or {}
+    data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
     save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
     return jsonify({"ok": True, "saved_at": now().isoformat()})
 
@@ -267,7 +279,7 @@ def api_submit(stage_key, programme_code=None):
     dept, sub, programme, bad = _guard(stage_key, programme_code)
     if bad:
         return bad
-    data = request.get_json(silent=True) or {}
+    data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])
     if status == "submitted" and programme:

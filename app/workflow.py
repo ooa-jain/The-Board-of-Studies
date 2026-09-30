@@ -490,7 +490,7 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
             continue
         vals = {}
         for f in section.get("fields", []):
-            if readonly_only and f.get("type") != "readonly":
+            if readonly_only and f.get("type") != "readonly" and not section.get("frozen"):
                 continue
             key = f.get("prefill")
             pkey = f.get("prefill_programme", f["name"] if programme else None)

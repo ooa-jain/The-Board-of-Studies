@@ -3108,3 +3108,38 @@ body.fv-open { overflow: hidden; }
 .doc-label { display: block; font-size: .72rem; font-weight: 700; color: var(--lv-gold, #c79c10); margin-bottom: 2px; }
 a.file-thumb { display: block; }
 @media (max-width: 760px) { .doc-row { grid-template-columns: 1fr; } }
+
+/* ---------- a frozen card: the Office's record, not editable ---------- */
+.bento-lock {
+  display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  font-size: .76rem; color: rgba(255, 255, 255, .72);
+}
+.bento-lock svg { flex: none; color: var(--lv-gold, #c79c10); }
+
+/* ---------- Expand: a wide section in a large pop-up ---------- */
+h3.has-expand { display: flex; align-items: center; gap: 12px; }
+.sec-expand { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; }
+.sec-pop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; }
+.sec-pop-backdrop { position: absolute; inset: 0; background: rgba(9, 19, 36, .6); backdrop-filter: blur(2px); }
+.sec-pop-panel {
+  position: relative; width: calc(100vw - 32px); height: calc(100vh - 32px);
+  background: var(--lv-bg, #f6f1e7); border-radius: 16px; overflow: hidden;
+  display: grid; grid-template-rows: auto 1fr; box-shadow: 0 30px 80px rgba(0, 0, 0, .35);
+}
+.sec-pop-head {
+  display: flex; align-items: center; gap: 14px; padding: 12px 18px;
+  background: var(--lv-card, #fdfbf7); border-bottom: 1px solid var(--lv-border, #e6ddcc);
+}
+.sec-pop-head strong { font-size: 1rem; color: var(--lv-navy, #0f2440); }
+.sec-pop-hint { flex: 1; font-size: .75rem; color: var(--lv-muted-fg, #5f6b7d); }
+.sec-pop-body { overflow: auto; padding: 18px 22px 28px; }
+.sec-pop-body .section-block { margin: 0; }
+/* inside the pop-up the table uses the whole width, and the header stays put */
+.sec-pop-body .rt-wrap { max-height: none; overflow: visible; }
+.sec-pop-body table.rt { min-width: 100%; }
+.sec-pop-body table.rt thead th { position: sticky; top: -18px; z-index: 2; }
+.sec-pop-body .sec-expand { display: none; }
+.sec-pop-body .section-block > h3 { display: none; }
+.sec-pop-body table.rt input[type=text]:not([inputmode=numeric]):not([readonly]) { min-width: 220px; }
+.sec-pop-body table.rt select { min-width: 110px; }
