@@ -78,8 +78,7 @@ DEPARTMENT_INFORMATION = {
     "key": "dept_info",
     "group": "Level 0 · Department",
     "title": "Department Information",
-    "blurb": "Confirm the department record and the programmes mapped to it. Every programme "
-             "kept here appears in the Curriculum stage.",
+    "blurb": "",
     "sections": [
         {
             "key": "identity",

@@ -9,7 +9,7 @@
         <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> {{ stage.group }}
       </div>
       <h1>{{ stage.title }}</h1>
-      <p>{{ stage.blurb }}</p>
+      {% if stage.blurb %}<p>{{ stage.blurb }}</p>{% endif %}
     </div>
     <div class="spacer head-aside">
       {% if status == 'submitted' %}<span class="pill pill-ok">All programmes submitted</span>

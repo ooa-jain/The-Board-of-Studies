@@ -2564,11 +2564,6 @@
       card.appendChild(list);
       if (section.frozen) {
         // the Office's record: shown, never edited here
-        const lock = el("div", "bento-lock");
-        lock.innerHTML = LOCK;
-        lock.appendChild(el("span", null,
-          "Locked — from the Office of Academics record. To correct it, ask the Office of Academics."));
-        card.appendChild(lock);
       } else if (!CTX.readonly) {
         const pen = el("button", "bento-edit");
         pen.type = "button";
@@ -2614,6 +2609,13 @@
     plus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     minus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
   };
+
+  // an icon and a word: "− Remove", "+ Keep", "+ Add"
+  function labelButton(cls, icon, text, label) {
+    const b = iconButton(cls + " pl-btn", icon, label || text);
+    b.appendChild(el("span", null, text));
+    return b;
+  }
 
   function iconButton(cls, icon, label) {
     const b = el("button", cls);
@@ -2721,17 +2723,22 @@
       const list = el("ol", "pl");
       panel.appendChild(list);
       if (!CTX.readonly) {
-        const add = el("button", "pl-panel-add");
-        add.type = "button";
-        add.innerHTML = ICON.plus;
-        add.appendChild(el("span", null, `Add ${t.key === "all" ? "a" : t.key} programme`));
-        add.addEventListener("click", () => {
+        const addNew = () => {
           data.push({ source: "new", decision: "keep", programme_code: "",
                       programme_name: "", degree: (t.degrees || [""])[0] });
           draw();
           touch();
+          list.lastElementChild?.scrollIntoView({ block: "nearest", behavior: "smooth" });
           list.lastElementChild?.querySelector("input")?.focus();
-        });
+        };
+        const top = labelButton("pl-head-add", "plus", "Add", `Add a ${t.key === "all" ? "" : t.key + " "}programme`);
+        top.addEventListener("click", addNew);
+        panel.insertBefore(top, list);
+        const add = el("button", "pl-panel-add");
+        add.type = "button";
+        add.innerHTML = ICON.plus;
+        add.appendChild(el("span", null, `Add ${t.key === "all" ? "a" : t.key} programme`));
+        add.addEventListener("click", addNew);
         panel.appendChild(add);
       }
       cols.appendChild(panel);
@@ -2774,7 +2781,7 @@
         body.appendChild(grid);
         li.appendChild(body);
         if (!CTX.readonly) {
-          const del = iconButton("pl-icon pl-minus", "minus", "Take this new programme off");
+          const del = labelButton("pl-minus", "minus", "Remove", "Take this new programme off");
           del.addEventListener("click", () => { data.splice(i, 1); draw(); touch(); });
           li.appendChild(del);
         }
@@ -2800,7 +2807,7 @@
 
       if (!CTX.readonly) {
         if (removed) {
-          const back = iconButton("pl-icon pl-plus", "plus", `Keep ${row.programme_code} after all`);
+          const back = labelButton("pl-plus", "plus", "Add back", `Keep ${row.programme_code} after all`);
           back.addEventListener("click", () => {
             row.decision = "keep";
             delete row.removal_reason;
@@ -2810,7 +2817,7 @@
           });
           li.appendChild(back);
         } else {
-          const rm = iconButton("pl-icon pl-minus", "minus", `Remove ${row.programme_code}`);
+          const rm = labelButton("pl-minus", "minus", "Remove", `Remove ${row.programme_code}`);
           rm.addEventListener("click", async () => {
             const answer = await askRemovalReason(row, section.removal_reasons || ["Other"]);
             if (!answer) { rm.focus(); return; }
@@ -2837,7 +2844,7 @@
         if (!mine.length) {
           list.appendChild(el("li", "pl-empty",
             `No ${tab.key === "all" ? "" : tab.key + " "}programmes on record. ` +
-            "Use the plus button below to add each one you run this year."));
+            "Use Add to put in each one you run this year."));
         }
         mine.forEach(([row, i], n) => list.appendChild(rowItem(row, i, n + 1)));
       });

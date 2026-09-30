@@ -14,7 +14,7 @@
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
       <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{{ stage.title }}</h1>
-      <p>{{ stage.blurb }}</p>
+      {% if stage.blurb %}<p>{{ stage.blurb }}</p>{% endif %}
       {% if stage.source_templates %}
       <p class="small note-gold">
         Replaces: {{ stage.source_templates|join(' · ') }}

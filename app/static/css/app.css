@@ -3209,3 +3209,19 @@ td.rt-file { min-width: 120px; }
   flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--lv-border, #e6ddcc);
   background: #fff; cursor: pointer; line-height: 1; color: var(--err, #b42318);
 }
+
+/* ---------- Programmes offered: labelled Add / Remove ---------- */
+.pl-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  height: 32px; padding: 0 12px 0 9px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid; background: #fff; font: inherit; font-size: .78rem; font-weight: 700;
+  transition: background .15s, color .15s, border-color .15s; white-space: nowrap;
+}
+.pl-btn svg { width: 14px; height: 14px; }
+.pl-btn:focus-visible { outline: 2px solid var(--ink-600); outline-offset: 2px; }
+.pl-panel .pl-btn.pl-minus, .pl-panel .pl-btn.pl-plus { margin-top: 2px; }
+.pl-head-add {
+  position: absolute; top: 8px; right: 14px;
+  color: var(--pc); border-color: var(--pc); background: #fff;
+}
+.pl-head-add:hover { background: var(--pc); color: #fff; }
