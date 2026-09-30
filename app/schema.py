@@ -378,6 +378,10 @@ PROGRAMME_CURRICULUM = {
                     "Multi-disciplinary slot may be left without a code.",
             "type": "table",
             "min_rows": 1,
+            # an Upload button over the table: any file is kept as the
+            # curriculum document, and an Excel or CSV one fills the rows
+            "import": {"attach": ["curriculum_file", "document"],
+                       "accept": ".xlsx,.csv,.xls,.pdf,.docx,.doc"},
             "columns": [
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
                  "min": 1, "max": 8, "choices": SEMESTERS, "width": "84px"},
@@ -444,15 +448,14 @@ PROGRAMME_CURRICULUM = {
         },
         {
             "key": "curriculum_file",
-            "title": "Curriculum and syllabus documents",
-            "help": "PDF, Word or Excel. Both are optional.",
+            "title": "Curriculum document",
+            # not shown on its own: the file is uploaded with the Upload button
+            # over the programme structure table
+            "hidden": True,
             "type": "fields",
             "fields": [
                 {"name": "document", "label": "Curriculum Matrix (PDF, Word or Excel)", "type": "file",
-                 "wide": True, "accept": ".pdf,.docx,.doc,.xlsx,.xls"},
-                {"name": "syllabus_document", "label": "Syllabus (PDF, Word or Excel)", "type": "file",
-                 "wide": True, "multiple": True, "accept": ".pdf,.docx,.doc,.xlsx,.xls",
-                 "help": "The syllabus for this programme — one file or several."},
+                 "wide": True, "accept": ".pdf,.docx,.doc,.xlsx,.xls,.csv"},
             ],
         },
     ],

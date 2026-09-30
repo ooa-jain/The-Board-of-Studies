@@ -1242,6 +1242,137 @@
 
   // ---------------------------------------------------------- repeating table
 
+  // a number box as wide as its value, never under two digits
+  const FIELD_SIZING = window.CSS && CSS.supports && CSS.supports("field-sizing", "content");
+  function fitNum(input) {
+    if (FIELD_SIZING) return;
+    input.style.width = `calc(${Math.max(2, String(input.value || "").length)}ch + 20px)`;
+  }
+  // derived values (credits, total) are written by code, not typed
+  refreshers.push(() => document.querySelectorAll("input.num-cell").forEach(fitNum));
+
+  /* ---------------------------------------------------------- table upload
+     An Upload button over the table. Whatever file is chosen is kept as the
+     section's document (the Curriculum Matrix); an Excel or CSV file is also
+     read, and the rows found are offered to replace the table or go below. */
+  const TABLE_FILE = /\.(xlsx|xlsm|csv|xls)$/i;
+
+  function importButton(block, heading, section) {
+    heading.classList.add("has-expand");
+    const input = el("input");
+    input.type = "file";
+    input.accept = section.import.accept || ".xlsx,.csv";
+    input.className = "sr-only";
+    input.tabIndex = -1;
+    const btn = el("button", "btn btn-gold btn-sm sec-upload");
+    btn.type = "button";
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    btn.appendChild(el("span", null, "Upload"));
+    btn.title = "Upload the curriculum matrix — Excel or CSV fills this table; PDF or Word is attached";
+    btn.addEventListener("click", () => input.click());
+    input.addEventListener("change", () => {
+      const f = input.files && input.files[0];
+      input.value = "";
+      if (f && block._importFile) block._importFile(f);
+    });
+    heading.appendChild(btn);
+    heading.appendChild(input);
+    // a file dropped anywhere on the table does the same
+    block.addEventListener("dragover", e => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); block.classList.add("is-drop"); } });
+    block.addEventListener("dragleave", e => { if (!block.contains(e.relatedTarget)) block.classList.remove("is-drop"); });
+    block.addEventListener("drop", e => {
+      block.classList.remove("is-drop");
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      e.preventDefault();
+      if (block._importFile) block._importFile(f);
+    });
+  }
+
+  function importArea(section, host) {
+    const [attSec, attField] = section.import.attach;
+    const area = el("div", "rt-import");
+    const note = el("div", "rt-import-note");
+    note.setAttribute("role", "status");
+    const files = el("div", "rt-import-file");
+    area.appendChild(note);
+    area.appendChild(files);
+    const current = () => (state[attSec] || {})[attField];
+
+    function showAttached() {
+      files.innerHTML = "";
+      const v = current();
+      if (v && v.name) {
+        showFiles(files, v, () => {
+          state[attSec] = state[attSec] || {};
+          state[attSec][attField] = "";
+          touch();
+          showAttached();
+          say("File removed. The rows it filled stay in the table — remove them with × if you need to.");
+        });
+      }
+    }
+    function say(text, kind) {
+      note.className = "rt-import-note" + (kind ? " is-" + kind : "");
+      note.textContent = "";
+      if (text) note.appendChild(el("span", null, text));
+      return note;
+    }
+
+    host._importFile = file => {
+      const accept = (section.import.accept || "").split(",").map(x => x.trim().toLowerCase());
+      if (accept.length && !accept.some(a => file.name.toLowerCase().endsWith(a))) {
+        say(`${file.name} — this takes ${section.import.accept.replace(/\./g, "").toUpperCase()} only.`, "bad");
+        return;
+      }
+      say(`Uploading ${file.name}…`, "busy");
+      uploadOne(file, { name: attField })
+        .then(val => {
+          state[attSec] = state[attSec] || {};
+          state[attSec][attField] = val;
+          touch();
+          showAttached();
+          if (!TABLE_FILE.test(file.name)) {
+            say(`${file.name} is attached as the curriculum document. Only an Excel or CSV file can fill the table.`, "ok");
+            return null;
+          }
+          say(`Reading ${file.name}…`, "busy");
+          return fetch(CTX.urls.save.replace(/\/save$/, "/import/" + section.key), {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stored: val.stored }),
+          }).then(r => r.json()).then(j => offer(j, file.name));
+        })
+        .catch(e => say((e && e.message) || "Upload failed — check your connection and try again.", "bad"));
+    };
+
+    function offer(j, name) {
+      if (!j.ok) { say(`${name} is attached, but the table could not be filled: ${j.error}`, "bad"); return; }
+      const n = j.rows.length;
+      const had = host._table.count();
+      const bar = say(`Found ${n} course row${n === 1 ? "" : "s"} in ${name}` +
+        (j.skipped ? ` (skipped ${j.skipped} total or blank line${j.skipped === 1 ? "" : "s"})` : "") +
+        (j.missing && j.missing.length ? `. Not in the file: ${j.missing.join(", ")} — fill those in after.` : "."), "found");
+      const act = el("span", "rt-import-acts");
+      const mk = (label, cls, fn) => { const b = el("button", "btn btn-sm " + cls, label); b.type = "button"; b.addEventListener("click", fn); act.appendChild(b); };
+      if (had) {
+        mk(`Replace the ${had} row${had === 1 ? "" : "s"}`, "btn-gold", () => put("replace"));
+        mk("Add below", "btn-ghost", () => put("append"));
+      } else {
+        mk("Fill the table", "btn-gold", () => put("replace"));
+      }
+      mk("Cancel", "btn-ghost", () => say(`${name} is attached; the table was left as it was.`));
+      bar.appendChild(act);
+      function put(mode) {
+        host._table.put(j.rows, mode);
+        say(`${n} row${n === 1 ? "" : "s"} ${mode === "replace" ? "put in the table" : "added below"} from ${name}. ` +
+            "Check them — credits and totals are worked out as usual.", "ok");
+      }
+    }
+
+    showAttached();
+    return area;
+  }
+
   function renderTable(section, host) {
     // Programme Information takes its rows from Department Information:
     // no adding or removing here, and code and name are not retyped.
@@ -1267,7 +1398,8 @@
     htr.appendChild(el("th", null, "#"));
     section.columns.forEach(c => {
       const th = el("th", null, c.label + (c.required ? " *" : ""));
-      if (c.width) th.style.width = c.width;
+      if (c.type === "integer") th.className = "num-col";
+      else if (c.width) th.style.width = c.width;
       if (c.help) th.title = c.help;
       htr.appendChild(th);
     });
@@ -1282,7 +1414,21 @@
     const tbody = el("tbody");
     table.appendChild(tbody);
     wrap.appendChild(table);
+    if (section.import) host.appendChild(importArea(section, host));
     host.appendChild(wrap);
+    host._table = {
+      put(newRows, mode) {
+        const data = rows(section.key);
+        const blank = r => Object.keys(r).filter(k => !k.startsWith("_")).every(k => r[k] === "" || r[k] == null);
+        if (mode === "replace") data.length = 0;
+        else while (data.length && blank(data[data.length - 1])) data.pop();
+        newRows.forEach(r => data.push(Object.assign({}, r)));
+        while (data.length < (section.min_rows || 0)) data.push({});
+        draw();
+        touch();
+      },
+      count: () => rows(section.key).filter(r => r.course_title || r.course_code).length,
+    };
 
     const foot = el("div", "rt-foot");
     const count = el("span", "rt-count");
@@ -1352,7 +1498,12 @@
             if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
             hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, showTotals));
           }
-          if (c.width) input.style.minWidth = c.width;
+          if (c.type === "integer" && !c.choices) {
+            // two digits wide, growing with what is typed
+            input.classList.add("num-cell");
+            fitNum(input);
+            input.addEventListener("input", () => fitNum(input));
+          } else if (c.width) input.style.minWidth = c.width;
           if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) {
             input.readOnly = true;
           }
@@ -2682,10 +2833,12 @@
       return;
     }
     STAGE.sections.forEach(section => {
+      if (section.hidden) return;        // filled from elsewhere on the page
       const block = el("div", "section-block");
       block.id = `sec-${section.key}`;
       const h = el("h3", null, section.title);
       block.appendChild(h);
+      if (section.import && !CTX.readonly) importButton(block, h, section);
       if (WIDE_SECTIONS.includes(section.type) && section.display !== "cards") expandable(block, h, section.title);
       if (section.help) block.appendChild(el("div", "section-help", section.help));
       (section.links || []).forEach(l => {

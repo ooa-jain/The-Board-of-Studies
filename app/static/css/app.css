@@ -3143,3 +3143,44 @@ h3.has-expand { display: flex; align-items: center; gap: 12px; }
 .sec-pop-body .section-block > h3 { display: none; }
 .sec-pop-body table.rt input[type=text]:not([inputmode=numeric]):not([readonly]) { min-width: 220px; }
 .sec-pop-body table.rt select { min-width: 110px; }
+
+/* ---------- compact number cells: two digits, growing as typed ---------- */
+table.rt input.num-cell {
+  field-sizing: content;
+  min-width: calc(2ch + 20px); width: calc(2ch + 20px); max-width: 9ch;
+  padding-left: 8px; padding-right: 8px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+@supports (field-sizing: content) { table.rt input.num-cell { width: auto; } }
+table.rt th.num-col { white-space: normal; min-width: 44px; max-width: 96px; line-height: 1.25; }
+table.rt td:has(> div > select) select { min-width: 64px; }
+
+/* ---------- Upload over a table ---------- */
+.sec-upload { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; }
+h3.has-expand .sec-upload { margin-left: auto; }
+h3.has-expand .sec-upload + .sr-only + .sec-expand,
+h3.has-expand .sec-upload ~ .sec-expand { margin-left: 0; }
+.rt-import { display: grid; gap: 8px; margin: 4px 0 10px; }
+.rt-import:empty { display: none; }
+.rt-import-note:empty { display: none; }
+.rt-import-note {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 10px; font-size: .84rem;
+  background: var(--lv-card, #fdfbf7); border: 1px solid var(--lv-border, #e6ddcc);
+}
+.rt-import-note.is-busy { color: var(--lv-muted-fg, #5f6b7d); }
+.rt-import-note.is-ok { background: var(--lv-soft-green, #e2f1e6); border-color: #bfdcc8; }
+.rt-import-note.is-bad { background: var(--lv-soft-red, #f9e5e1); border-color: #efc9c1; }
+.rt-import-note.is-found { background: var(--lv-soft-gold, #fbf1cf); border-color: #e7cf7a; }
+.rt-import-acts { display: inline-flex; gap: 6px; margin-left: auto; }
+.rt-import-file .file-previews { margin-top: 0; }
+.section-block.is-drop { outline: 3px dashed var(--lv-gold, #c79c10); outline-offset: 6px; border-radius: 12px; }
+/* the table's attached file: one slim strip, not a card */
+.rt-import-file .file-previews { grid-template-columns: minmax(0, 560px); }
+.rt-import-file .file-preview { align-items: center; padding: 8px 10px; gap: 12px; }
+.rt-import-file .file-thumb { width: 38px; height: 48px; }
+.rt-import-file .file-thumb .file-ext { font-size: .5rem; padding: 2px 3px; }
+.rt-import-file .file-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 0; }
+.rt-import-file .file-facts { margin: 0; }
+.rt-import-file .file-acts { margin: 0 0 0 auto; }
+.rt-import-file .file-note { display: none; }

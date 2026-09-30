@@ -416,6 +416,37 @@ def download(stage_key, stored):
                      download_name=rec["original_name"])
 
 
+@bp.post("/api/<stage_key>/import/<section_key>")
+@bp.post("/api/<stage_key>/<programme_code>/import/<section_key>")
+@department_required
+def api_import(stage_key, section_key, programme_code=None):
+    """Rows for a table, read from an Excel or CSV file the department has
+    just uploaded. Nothing is saved here: the page shows what was found and
+    the department chooses to replace or add."""
+    from .table_import import ImportError_, rows_from_file
+    dept, sub, programme, bad = _guard(stage_key, programme_code)
+    if bad:
+        return bad
+    section = next((s for s in STAGE_BY_KEY[stage_key].get("sections", [])
+                    if s["key"] == section_key and s.get("import")), None)
+    if not section:
+        return jsonify({"ok": False, "error": "This table does not take a file."}), 404
+    stored = (request.get_json(silent=True) or {}).get("stored", "")
+    rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})
+    if not rec:
+        return jsonify({"ok": False, "error": "That file was not found."}), 404
+    path = (current_app.config["UPLOAD_ROOT"] / (rec.get("academic_year") or _year())
+            / dept["dept_code"] / rec["stage"] / stored)
+    try:
+        found = rows_from_file(path, section)
+    except ImportError_ as e:
+        return jsonify({"ok": False, "error": str(e)})
+    except Exception:
+        current_app.logger.exception("Import of %s failed", stored)
+        return jsonify({"ok": False, "error": "This file could not be read."})
+    return jsonify({"ok": True, **found})
+
+
 @bp.post("/file/<stage_key>/<stored>/summary")
 @department_required
 def file_summary(stage_key, stored):
