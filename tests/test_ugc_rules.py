@@ -162,15 +162,18 @@ def test_practical_hours_count_half():
     assert not any("works out to" in m for m in errors(issues))
 
 
-def test_one_credit_is_twenty_five_marks_is_advice_not_a_refusal():
-    """The university's own sample gives 3-credit courses 100 marks, so the
-    1 credit = 25 marks guideline warns rather than blocks."""
+def test_every_course_is_out_of_100():
+    """Total marks is fixed at 100 whatever the credits; 150 is refused, and
+    a 2-credit course out of 100 draws no 'usually carries 50' warning."""
     data = {"credit_summary": {}, "semester_structure": [_course(credits=4, total_marks=150,
                                                                  cia=75, ese=75)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
-    assert any("usually carry 100 marks" in i["message"] for i in issues
-               if i["level"] == "warning")
-    assert not any("marks" in m and "credit" in m for m in errors(issues))
+    assert any("Total marks" in m for m in errors(issues))
+    ok = {"credit_summary": {}, "semester_structure": [_course(credits=2, total_marks=100,
+                                                               cia=75, ese=25)]}
+    issues, _ = validate_stage("prog_curriculum", ok, ctx("UG - 3 Year", 6))
+    assert not any("usually carry" in i["message"] for i in issues)
+    assert not any("Total marks" in m or "does not match the total" in m for m in errors(issues))
 
 
 def test_cia_plus_ese_must_equal_the_total():

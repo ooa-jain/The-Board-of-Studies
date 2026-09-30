@@ -3184,3 +3184,28 @@ h3.has-expand .sec-upload ~ .sec-expand { margin-left: 0; }
 .rt-import-file .file-facts { margin: 0; }
 .rt-import-file .file-acts { margin: 0 0 0 auto; }
 .rt-import-file .file-note { display: none; }
+
+/* ---------- marks out of 100, and a file per table row ---------- */
+table.rt input.is-fixed { background: var(--lv-muted, #f1ebdf); color: var(--lv-navy, #0f2440); font-weight: 700; cursor: default; }
+td.rt-file { min-width: 120px; }
+.row-file { display: flex; align-items: center; gap: 6px; max-width: 220px; }
+.row-file-up {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px;
+  border: 1.5px dashed var(--lv-border, #e6ddcc); border-radius: 8px; background: #fff;
+  font: inherit; font-size: .76rem; font-weight: 600; color: var(--lv-navy, #0f2440); cursor: pointer; white-space: nowrap;
+}
+.row-file-up:hover { border-color: var(--lv-gold, #c79c10); background: var(--lv-soft-gold, #fbf1cf); }
+.row-file-up:disabled { cursor: progress; opacity: .7; }
+.row-file-ext {
+  flex: none; font-family: var(--font-mono, monospace); font-size: .58rem; font-weight: 700;
+  letter-spacing: .06em; padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px; color: var(--ink-700, #334);
+}
+.row-file-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: inherit; font-size: .78rem; font-weight: 600; color: var(--lv-navy, #0f2440);
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left; text-decoration: underline;
+}
+.row-file-x {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--lv-border, #e6ddcc);
+  background: #fff; cursor: pointer; line-height: 1; color: var(--err, #b42318);
+}

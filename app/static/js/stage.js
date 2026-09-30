@@ -797,8 +797,9 @@
     viewer = viewer || buildViewer();
     viewFrom = document.activeElement;
     viewList = allViewable();
-    viewAt = Math.max(0, viewList.findIndex(v => v.url === val.url));
-    if (!viewList.length) viewList = [val];
+    viewAt = viewList.findIndex(v => v.url === val.url);
+    // a file outside the upload boxes (a table row's) opens first
+    if (viewAt < 0) { viewList.unshift(val); viewAt = 0; }
     showInViewer();
     viewer.hidden = false;
     document.body.classList.add("fv-open");
@@ -1123,7 +1124,8 @@
         empty: "Fill in the modules and the average works itself out.",
       });
     }
-    if (has("total_marks") && has("cia") && has("ese")) {
+    const fixedTotal = (section.columns || []).some(c => c.name === "total_marks" && c.fixed_value != null);
+    if (has("total_marks") && has("cia") && has("ese") && !fixedTotal) {
       out.push({
         field: "total_marks", title: "Total marks",
         calc: r => num(r.cia) === null || num(r.ese) === null ? null : num(r.cia) + num(r.ese),
@@ -1373,6 +1375,63 @@
     return area;
   }
 
+  /* A file for one row of a table: an Upload button, then the file's name
+     (opening it, or the viewer for a PDF) and × to take it off. */
+  function rowFile(def, row, changed) {
+    const box = el("div", "row-file");
+    const input = el("input");
+    input.type = "file";
+    if (def.accept) input.accept = def.accept;
+    input.className = "sr-only";
+    input.tabIndex = -1;
+    function paint(note) {
+      box.textContent = "";
+      const v = row[def.name];
+      if (v && v.name) {
+        const info = fileKind(v.name);
+        const a = el(canView(info) ? "button" : "a", "row-file-name", v.name);
+        a.title = v.name;
+        if (canView(info)) { a.type = "button"; a.addEventListener("click", () => openViewer(v)); }
+        else { a.href = v.url; a.target = "_blank"; a.rel = "noopener"; }
+        box.appendChild(el("span", "row-file-ext", info.label));
+        box.appendChild(a);
+        if (!CTX.readonly) {
+          const x = el("button", "row-file-x", "×");
+          x.type = "button";
+          x.title = "Remove this file";
+          x.setAttribute("aria-label", `Remove ${v.name}`);
+          x.addEventListener("click", () => { row[def.name] = ""; changed(); paint(); });
+          box.appendChild(x);
+        }
+      } else if (!CTX.readonly) {
+        const b = el("button", "row-file-up");
+        b.type = "button";
+        b.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        b.appendChild(el("span", null, note || "Upload"));
+        b.title = def.help || "Upload a file";
+        b.disabled = note === "Uploading…";
+        b.addEventListener("click", () => input.click());
+        box.appendChild(b);
+      } else {
+        box.appendChild(el("span", "muted", "—"));
+      }
+      box.appendChild(input);
+    }
+    input.addEventListener("change", () => {
+      const f = input.files && input.files[0];
+      input.value = "";
+      if (!f) return;
+      const ok = !def.accept || def.accept.split(",").some(a => f.name.toLowerCase().endsWith(a.trim()));
+      if (!ok) { paint("PDF, Word or Excel"); return; }
+      paint("Uploading…");
+      uploadOne(f, def)
+        .then(v => { row[def.name] = v; changed(); paint(); })
+        .catch(() => paint("Failed — retry"));
+    });
+    paint();
+    return box;
+  }
+
   function renderTable(section, host) {
     // Programme Information takes its rows from Department Information:
     // no adding or removing here, and code and name are not retyped.
@@ -1466,10 +1525,28 @@
       while (data.length < (section.min_rows || 0)) data.push({});
     }
 
+    const FIXED = section.columns.filter(c => c.fixed_value != null);
+    const PAIRS = section.columns.filter(c => c.complement);
+    const OUT_OF = (FIXED.find(c => c.name === "total_marks") || {}).fixed_value ?? 100;
+    // a value typed (or read from a file) in one of a pair sets the other
+    function settle(row) {
+      let changed = false;
+      FIXED.forEach(c => { if (row[c.name] !== c.fixed_value) { row[c.name] = c.fixed_value; changed = true; } });
+      const first = PAIRS[0];
+      if (first) {
+        const a = num(row[first.name]), b = num(row[first.complement]);
+        if (a !== null && a >= 0 && a <= OUT_OF && b !== OUT_OF - a) { row[first.complement] = OUT_OF - a; changed = true; }
+        else if (a === null && b !== null && b >= 0 && b <= OUT_OF) { row[first.name] = OUT_OF - b; changed = true; }
+      }
+      return changed;
+    }
+
     function draw() {
       tbody.innerHTML = "";
       const data = rows(section.key);
+      let settled = false;
       data.forEach((row, i) => {
+        if (!CTX.readonly && settle(row)) settled = true;
         const tr = el("tr");
         tr.dataset.row = i;
         const cells = {};
@@ -1486,8 +1563,27 @@
           }
           const holder = el("div");
           holder.dataset.field = c.name;
+          if (c.type === "file") {
+            holder.appendChild(rowFile(c, row, () => { touch(); }));
+            td.className = "rt-file";
+            td.appendChild(holder);
+            tr.appendChild(td);
+            return;
+          }
           const input = makeInput(c, row[c.name], (v) => {
             row[c.name] = v;
+            if (c.complement) {
+              if (cells[c.name]) cells[c.name].classList.remove("is-auto");   // typed, not worked out
+              const n = num(v);
+              if (n !== null && n >= 0 && n <= OUT_OF) {
+                row[c.complement] = OUT_OF - n;
+                if (cells[c.complement]) {
+                  cells[c.complement].value = String(OUT_OF - n);
+                  cells[c.complement].classList.add("is-auto");
+                  fitNum(cells[c.complement]);
+                }
+              }
+            }
             if (DERIVED[c.name]) markManual(row, c.name, cells);
             derive(RULES, row, cells);
             touch();
@@ -1504,6 +1600,11 @@
             fitNum(input);
             input.addEventListener("input", () => fitNum(input));
           } else if (c.width) input.style.minWidth = c.width;
+          if (c.fixed_value != null) {
+            input.readOnly = true;
+            input.classList.add("is-fixed");
+            input.title = `Every course is out of ${c.fixed_value}`;
+          }
           if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) {
             input.readOnly = true;
           }
@@ -1543,6 +1644,7 @@
         tbody.appendChild(tr);
         if (!CTX.readonly && derive(RULES, row, cells)) touch();
       });
+      if (settled) touch();
       showTotals();
       const min = section.min_rows || 0;
       count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}` +

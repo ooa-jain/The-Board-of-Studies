@@ -35,6 +35,9 @@ DEGREE_LEVELS = [
     "PG Diploma - 1 Year",
 ]
 
+# every course in the programme structure is marked out of this
+MARKS_TOTAL = 100
+
 # the semesters a course can sit in — picked from a list, never typed
 SEMESTERS = list(range(1, 9))
 
@@ -404,16 +407,20 @@ PROGRAMME_CURRICULUM = {
                  "width": "56px", "help": "Experiential hours"},
                 {"name": "credits", "label": "Credits", "type": "integer", "required": True,
                  "min": 0, "max": 20, "width": "76px"},
+                # every course is out of 100: type one of the two marks and the
+                # other is 100 minus it (75 → 25, 35 → 65)
                 {"name": "cia", "label": "Continuous Assessment marks", "type": "integer",
-                 "required": True, "min": 0, "max": 500, "width": "96px"},
+                 "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "ese"},
                 {"name": "ese", "label": "Term End Examination marks", "type": "integer",
-                 "required": True, "min": 0, "max": 500, "width": "96px"},
+                 "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "cia"},
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
-                 "min": 0, "max": 1000, "width": "86px"},
+                 "min": MARKS_TOTAL, "max": MARKS_TOTAL, "fixed_value": MARKS_TOTAL},
+                {"name": "course_file", "label": "Upload", "type": "file",
+                 "accept": ".pdf,.docx,.doc,.xlsx,.xls",
+                 "help": "The syllabus or any document for this course — PDF, Word or Excel. Optional."},
             ],
             "rules": [
                 "ltpe_credit_arithmetic",
-                "credit_marks_ratio",
                 "marks_add_up",
                 "semester_within_duration",
                 "unique_course_codes",
