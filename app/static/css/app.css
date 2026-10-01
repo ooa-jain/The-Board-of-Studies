@@ -3199,3 +3199,43 @@ td.rt-file { min-width: 120px; }
 .pl-head-add:hover { background: var(--pc); color: #fff; }
 .sec-pop-body [data-field=course_title] input { min-width: 140px; }
 td.rt-file { min-width: 104px; }
+
+/* ---------- batches: the current batch tag, and earlier batches ---------- */
+.batch-tag {
+  display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 6px;
+  padding: 4px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700;
+  background: var(--lv-muted, #f1ebdf); color: var(--lv-navy, #0f2440); border: 1px solid var(--lv-border, #e6ddcc);
+}
+.batch-tag.is-current { background: var(--lv-soft-gold, #fbf1cf); border-color: #e7cf7a; color: #6b4f00; }
+.part-tag, .branch-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: .68rem; font-weight: 700; background: var(--lv-soft-gold, #fbf1cf); color: #6b4f00;
+  vertical-align: middle; white-space: nowrap;
+}
+.part-tag.is-old { background: var(--lv-muted, #f1ebdf); color: var(--lv-navy, #0f2440); }
+.part-tabs-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 6px; }
+.part-tabs-label {
+  font-family: var(--font-mono, monospace); font-size: .66rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--lv-muted-fg, #5f6b7d);
+}
+.part-tab.part-tab-sm { padding-top: 6px; padding-bottom: 6px; font-size: .8rem; }
+
+/* ---------- a module, as the syllabus template sets it out ---------- */
+.mod-block { display: grid; gap: 6px; }
+.mod-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mod-no { font-weight: 800; color: var(--lv-navy, #0f2440); font-size: .85rem; white-space: nowrap; }
+.mod-title { flex: 1; min-width: 180px; font-weight: 600; }
+.mod-hours-w { display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; font-weight: 700;
+  color: var(--lv-muted-fg, #5f6b7d); text-transform: uppercase; letter-spacing: .05em; }
+.mod-hours { width: 58px; text-align: center; }
+.mod-content { width: 100%; min-height: 96px; }
+.mod-sum td { font-size: .82rem; font-weight: 700; color: var(--lv-navy, #0f2440); background: var(--lv-muted, #f1ebdf); }
+.mod-sum-note { font-weight: 600; }
+.mod-sum-note.is-ok { color: var(--ok, #1f7a4a); }
+.mod-sum-note.is-off { color: #a35a00; }
+.mod-table td { position: relative; }
+.mod-table .rv-remove { position: absolute; top: 8px; right: 8px; }
+.mod-table .mod-top { padding-right: 80px; }
+.batch-box { border: 1px solid var(--lv-border, #e6ddcc); border-radius: 12px; padding: 12px 16px 6px; margin: 0 0 16px; }
+.batch-box legend { padding: 0 6px; font-weight: 800; font-size: .86rem; color: var(--lv-navy, #0f2440); }
+.batch-now { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

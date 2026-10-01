@@ -186,7 +186,10 @@
   <div class="card-body tight">
     {% for skey, st in stages.items() %}
     <div class="flex small" style="padding:6px 0;border-bottom:1px solid var(--line)">
-      <span>{{ STAGE_BY_KEY[skey].title if skey in STAGE_BY_KEY else skey }}</span>
+      {% set sd = STAGE_BY_KEY.get(skey, {}) %}
+      <span>{{ sd.title or skey }}
+        {% if sd.batch == 'current' %}<span class="part-tag">Current batch {{ batches.current }}</span>
+        {% elif sd.existing_batch %}<span class="part-tag is-old">Existing batch</span>{% endif %}</span>
       <span class="spacer"></span>
       {% if st.summary and st.summary.errors %}<span class="pill pill-err">{{ st.summary.errors }} errors</span>{% endif %}
       <span class="pill {{ 'pill-ok' if st.status == 'submitted' else 'pill-err' if st.status == 'returned' else 'pill-warn' }}">{{ {'submitted': 'Submitted', 'returned': 'Returned', 'draft': 'In progress'}.get(st.status, (st.status or 'Not started')|capitalize) }}</span>

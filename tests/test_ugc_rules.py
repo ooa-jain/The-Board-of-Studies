@@ -264,7 +264,7 @@ def test_syllabus_needs_revised_modules():
 
     issues, _ = validate_stage("prog_syllabus", _syllabus(
         [{"previous": "Old text", "revised": "", "pct": None}]), {})
-    assert any("enter the revised content" in m for m in errors(issues))
+    assert any("enter the module's content" in m for m in errors(issues))
 
     issues, _ = validate_stage("prog_syllabus", _syllabus(
         [{"previous": "Old", "revised": "New", "pct": 140}]), {})

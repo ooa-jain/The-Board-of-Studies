@@ -1133,3 +1133,31 @@ def test_an_empty_box_takes_the_standard_wording_when_checked():
     assert out["profile"]["assessment"] == "Our own wording"
     assert out["profile"]["passing"] == DEFAULT_REGULATIONS["passing"]
     assert out["profile"]["course_specialisation"] == "Bachelor of Arts — Economics"
+
+
+def test_batches_come_from_settings_and_show_as_parts(app, client):
+    from app.db import get_db
+    from app.workflow import batches
+    with app.app_context():
+        b = batches()
+        assert b["current"] == "2026–2027"
+        assert [x["label"] for x in b["existing"]] == ["2024–2025", "2025–2026"]
+        get_db().settings.update_one({"_id": "app"}, {"$set": {
+            "current_batch": "2027-2028", "existing_batches": ["2023-24", "2025-2026", "2027-2028"]}},
+            upsert=True)
+        b = batches()
+        assert b["current"] == "2027–2028"
+        # the current batch is not also an earlier one
+        assert [x["key"] for x in b["existing"]] == ["prog_syllabus_b2023", "prog_syllabus_b2025"]
+
+
+def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, client):
+    _through_bos_documents(app, client)
+    page = client.get("/department/stage/prog_syllabus_b2024/BCMREG").get_data(as_text=True)
+    assert "Syllabus 2024–2025" in page and "Existing batch" in page
+    cur = client.get("/department/stage/prog_syllabus/BCMREG").get_data(as_text=True)
+    assert "Current Batch Syllabus" in cur and "Current batch" in cur and "2026–2027" in cur
+    # the menu lists the earlier batches under the programme
+    assert "/department/stage/prog_syllabus_b2025/BCMREG" in cur
+    from app.schema import STAGE_BY_KEY
+    assert "prog_syllabus_b2024" not in STAGE_BY_KEY["curriculum"]["parts"]

@@ -319,7 +319,120 @@
   /** One course's revision, laid out as the syllabus revision document lays
       it out: the previous and latest year, title and code side by side, then
       each module previous-beside-revised with its % change, and the average. */
+  /* One module as the syllabus template sets it out: "Module No. N:" its
+     title, its hours, and the content under them. */
+  function moduleBlock(m, changed, i) {
+    const wrapB = el("div", "mod-block");
+    const top = el("div", "mod-top");
+    top.appendChild(el("span", "mod-no", `Module No. ${i + 1}:`));
+    const title = el("input", "mod-title");
+    title.type = "text";
+    title.placeholder = "Title of the module";
+    title.value = m.title ?? "";
+    const hrs = el("input", "mod-hours");
+    hrs.type = "text";
+    hrs.inputMode = "numeric";
+    hrs.placeholder = "Hrs";
+    hrs.value = m.hours ?? "";
+    hrs.title = "Hours for this module";
+    const content = el("textarea", "mod-content");
+    content.rows = 5;
+    content.placeholder = "Content of the module";
+    content.value = m.revised ?? "";
+    if (CTX.readonly) { title.disabled = hrs.disabled = content.disabled = true; }
+    title.addEventListener("input", () => { m.title = title.value; changed(); });
+    hrs.addEventListener("input", () => {
+      hrs.value = hrs.value.replace(/[^0-9]/g, "");
+      m.hours = hrs.value === "" ? "" : Number(hrs.value);
+      changed();
+      wrapB.dispatchEvent(new CustomEvent("mod:hours", { bubbles: true }));
+    });
+    content.addEventListener("input", () => { m.revised = content.value; changed(); });
+    top.appendChild(title);
+    const hw = el("span", "mod-hours-w");
+    hw.appendChild(el("span", null, "Hours"));
+    hw.appendChild(hrs);
+    top.appendChild(hw);
+    wrapB.appendChild(top);
+    wrapB.appendChild(content);
+    return wrapB;
+  }
+
+  // the modules' hours against the course's total teaching hours
+  function hoursRow(mods, row, span) {
+    const tr = el("tr", "mod-sum");
+    const td = el("td");
+    td.colSpan = span;
+    const paint = () => {
+      const sum = mods.reduce((a, m) => a + (num(m.hours) || 0), 0);
+      const want = num(row.teaching_hours);
+      td.textContent = "";
+      td.appendChild(el("span", null, `Total hours of the modules: ${sum}`));
+      if (want !== null) {
+        const ok = sum === want;
+        td.appendChild(el("span", "mod-sum-note" + (ok ? " is-ok" : " is-off"),
+          ok ? ` — matches the ${want} teaching hours` : ` — the course has ${want} teaching hours`));
+      }
+    };
+    paint();
+    tr.addEventListener("mod:hours", paint);
+    setTimeout(() => tr.closest("table")?.addEventListener("mod:hours", paint), 0);
+    return tr;
+  }
+
+  /** An earlier batch's syllabus: the template's modules, no comparison. */
+  function plainModules(def, row, commit) {
+    if (!Array.isArray(row[def.name])) row[def.name] = [];
+    const mods = row[def.name];
+    if (!mods.length && !CTX.readonly) mods.push({});
+    const wrap = el("div", "rt-wrap rv-wrap mod-wrap");
+    const table = el("table", "rv-table mod-table");
+    const head = el("thead");
+    const hr = el("tr");
+    const th = el("th", null, "Syllabus");
+    th.colSpan = 2;
+    hr.appendChild(th);
+    head.appendChild(hr);
+    table.appendChild(head);
+    const body = el("tbody");
+    table.appendChild(body);
+    wrap.appendChild(table);
+    function draw() {
+      body.textContent = "";
+      mods.forEach((m, i) => {
+        const tr = el("tr", "rv-module");
+        const td = el("td");
+        td.colSpan = 2;
+        td.appendChild(moduleBlock(m, commit, i));
+        if (!CTX.readonly) {
+          const rm = el("button", "rv-remove", "Remove");
+          rm.type = "button";
+          rm.setAttribute("aria-label", `Remove module ${i + 1}`);
+          rm.addEventListener("click", () => { mods.splice(i, 1); draw(); commit(); });
+          td.appendChild(rm);
+        }
+        tr.appendChild(td);
+        body.appendChild(tr);
+      });
+      if (!CTX.readonly) {
+        const tr = el("tr", "rv-add");
+        const td = el("td");
+        td.colSpan = 2;
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+        add.type = "button";
+        add.addEventListener("click", () => { mods.push({}); draw(); commit(); });
+        td.appendChild(add);
+        tr.appendChild(td);
+        body.appendChild(tr);
+      }
+      body.appendChild(hoursRow(mods, row, 2));
+    }
+    draw();
+    return wrap;
+  }
+
   function revisionTable(def, row, commit) {
+    if (def.compare === false) return plainModules(def, row, commit);
     if (!Array.isArray(row[def.name])) row[def.name] = [];
     const mods = row[def.name];
     if (!mods.length && !CTX.readonly) mods.push({});
@@ -415,8 +528,7 @@
         };
         tr.appendChild(cell(box(m.previous, v => { m.previous = v; recalc(); changed(); },
                                 { multi: true, placeholder: "Leave empty for a new module" })));
-        tr.appendChild(cell(box(m.revised, v => { m.revised = v; recalc(); changed(); },
-                                { multi: true, placeholder: "Module title (hours) — content" })));
+        tr.appendChild(cell(moduleBlock(m, () => { recalc(); changed(); }, i)));
         pct.addEventListener("input", () => {
           const v = pct.value.trim();
           m.pct = v === "" ? null : Number(v);
@@ -445,6 +557,7 @@
         tr.appendChild(td);
         body.appendChild(tr);
       }
+      body.appendChild(hoursRow(mods, row, 4));
       const tr = el("tr", "rv-total");
       tr.appendChild(el("td"));
       const lab = el("td", null, "Average percentage on revision considering all modules");

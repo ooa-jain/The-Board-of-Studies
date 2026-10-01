@@ -44,6 +44,8 @@
         <div class="part-row">
           <div class="part-info">
             <strong>{{ part.title }}</strong>
+            {% if part.tag %}<span class="part-tag{{ ' is-old' if part.existing }}">{{ 'Current batch ' if not part.existing }}{{ part.tag }}</span>{% endif %}
+            {% if part.optional %}<span class="small muted">Optional</span>{% endif %}
             {% if part.note %}<span class="small note-err">Returned: {{ part.note }}</span>{% endif %}
           </div>
           {% if part.errors and part.status != 'submitted' %}<span class="pill pill-err">{{ part.errors }} to fix</span>{% endif %}

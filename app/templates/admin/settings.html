@@ -11,6 +11,29 @@
         <span class="help">New submissions are filed against this year. Changing it starts a fresh
           cycle — existing records stay under their own year.</span>
       </div>
+      <fieldset class="batch-box">
+        <legend>Syllabus batches</legend>
+        <div class="field">
+          <label for="current_batch">Current batch</label>
+          <input type="text" id="current_batch" name="current_batch" required
+                 value="{{ batches.current|replace('–', '-') }}" placeholder="2026-2027">
+          <span class="help">Departments fill the <strong>Current Batch Syllabus</strong> for this
+            batch; it is shown as a tag beside the syllabus everywhere.</span>
+        </div>
+        <div class="field">
+          <label for="existing_batches">Existing batches</label>
+          <textarea id="existing_batches" name="existing_batches" rows="3"
+                    placeholder="2024-2025&#10;2025-2026">{% for b in batches.existing %}{{ b.label|replace('–', '-') }}
+{% endfor %}</textarea>
+          <span class="help">One per line. Each gets its own syllabus, in the same template, under
+            <strong>Existing batches</strong> for every programme. They are a record and do not hold
+            up the Curriculum stage. Removing a year hides it; what was filled in is kept.</span>
+        </div>
+        <p class="batch-now small">
+          Now: <span class="batch-tag is-current">Current batch · {{ batches.current }}</span>
+          {% for b in batches.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}
+        </p>
+      </fieldset>
       <div class="field">
         <label>Banner message</label>
         <textarea name="banner" rows="2"

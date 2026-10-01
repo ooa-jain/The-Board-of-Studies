@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from datetime import datetime
 
 from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
@@ -16,7 +17,7 @@ from .importer import parse_workbook
 from .schema import STAGE_BY_KEY, STAGES
 from .workflow import (compute_status, department_analysis, get_or_create_submission,
                        institution_analysis, progress, stage_analysis, stage_board,
-                       return_stage, stage_board, unlock_stage)
+                       return_stage, stage_board, unlock_stage, batches)
 
 bp = Blueprint("admin", __name__)
 
@@ -496,6 +497,7 @@ def submission_detail(dept_code):
                            board=stage_board(sub), progress=progress(sub),
                            year=year, STAGE_BY_KEY=STAGE_BY_KEY,
                            documents=_documents(dept_code, sub, year),
+                           batches=batches(),
                            summaries=True)
 
 
@@ -682,13 +684,36 @@ def app_settings():
         from .db import settings as _s
         was_dev = bool(_s().get("dev_mode"))
         dev = request.form.get("dev_mode") == "on"
-        db.settings.update_one(
-            {"_id": "app"},
-            {"$set": {"academic_year": (request.form.get("academic_year") or "").strip(),
-                      "submissions_open": request.form.get("submissions_open") == "on",
-                      "dev_mode": dev,
-                      "banner": (request.form.get("banner") or "").strip(),
-                      "updated_at": now()}})
+        fields = {"academic_year": (request.form.get("academic_year") or "").strip(),
+                  "submissions_open": request.form.get("submissions_open") == "on",
+                  "dev_mode": dev,
+                  "banner": (request.form.get("banner") or "").strip(),
+                  "updated_at": now()}
+        # the batches: the current one, and the earlier ones whose syllabi
+        # departments keep — "2024-2025", one per line (or comma-separated)
+        if "current_batch" in request.form:
+            from .schema import batch_start
+            bad = []
+            cur = batch_start(request.form.get("current_batch"))
+            if not cur or not 2010 <= cur <= 2040:
+                bad.append(request.form.get("current_batch") or "(empty)")
+            else:
+                fields["current_batch"] = f"{cur}-{cur + 1}"
+            years = []
+            for raw in re.split(r"[,\n]+", request.form.get("existing_batches") or ""):
+                if not raw.strip():
+                    continue
+                y = batch_start(raw)
+                if not y or not 2010 <= y <= 2040:
+                    bad.append(raw.strip())
+                elif y != cur and f"{y}-{y + 1}" not in years:
+                    years.append(f"{y}-{y + 1}")
+            fields["existing_batches"] = sorted(years)
+            if bad:
+                flash("Not a batch year (use the form 2024-2025, from 2010 to 2040): "
+                      + ", ".join(bad), "error")
+                return redirect(url_for("admin.app_settings"))
+        db.settings.update_one({"_id": "app"}, {"$set": fields})
         audit(_actor(), "settings.updated")
         # Unlocking every stage for every department is worth its own line in
         # the log, separate from whatever else was saved in the same form.
@@ -702,7 +727,7 @@ def app_settings():
             flash("Settings saved.", "success")
         return redirect(url_for("admin.app_settings"))
     from .db import settings as s
-    return render_template("admin/settings.html", settings=s(),
+    return render_template("admin/settings.html", settings=s(), batches=batches(),
                            stage_count=len(STAGES))
 
 

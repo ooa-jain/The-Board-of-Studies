@@ -470,7 +470,9 @@ PROGRAMME_SYLLABUS = {
     "key": "prog_syllabus",
     "parent": "curriculum",
     "group": "Stage 3 · Curriculum",
-    "title": "Syllabus",
+    "title": "Current Batch Syllabus",
+    # shows the current batch (Admin > Settings) beside the title
+    "batch": "current",
     "blurb": "One syllabus per course, as in the syllabus template.",
     "source_templates": ["[Template] Syllabus.pdf"],
     "per_programme": True,
@@ -495,7 +497,7 @@ PROGRAMME_SYLLABUS = {
             "display": "cards",
             "card": {"code": "course_code", "name": "course_title", "noun": "course"},
             "tabs": [{"key": "details", "label": "Course details"},
-                     {"key": "modules", "label": "Modules & revision"},
+                     {"key": "modules", "label": "Syllabus modules"},
                      {"key": "syllabus", "label": "Activities & books"}],
             "columns": [
                 {"name": "course_code", "label": "Course code", "type": "text", "required": True},
@@ -520,18 +522,19 @@ PROGRAMME_SYLLABUS = {
                  "required": True, "pattern": "^[0-9]{4}$", "tab": "modules"},
                 {"name": "prev_code", "in_table": True, "label": "Previous course code", "type": "text", "tab": "modules"},
                 {"name": "prev_title", "in_table": True, "label": "Previous course title", "type": "text", "tab": "modules"},
-                {"name": "modules", "label": "Modules — previous and revised", "type": "module_compare",
+                {"name": "modules", "label": "Syllabus — modules", "type": "module_compare",
                  "required": True, "wide": True, "tab": "modules",
-                 "help": "One entry per module: the previous syllabus beside the revised one. "
-                         "The % change works itself out from the two; type over it if you "
-                         "assessed it differently."},
+                 "help": "As in the syllabus template: Module No., its title, hours and content. "
+                         "Paste the previous batch's text for a module beside it and the % "
+                         "change works itself out; type over it if you assessed it differently."},
                 {"name": "avg_change", "in_table": True, "label": "Average percentage on revision (all modules)",
                  "type": "readonly", "tab": "modules"},
                 {"name": "skill_activities", "label": "Skill development activities", "type": "textarea",
                  "required": True, "rows": 4, "min_items": 1, "tab": "syllabus", "wide": True,
                  "help": "One per line."},
                 {"name": "books", "label": "Books for reference", "type": "textarea", "required": True,
-                 "rows": 4, "min_items": 2, "tab": "syllabus", "wide": True, "help": "One per line."},
+                 "rows": 4, "min_items": 2, "tab": "syllabus", "wide": True,
+                 "help": "One per line. Note: Latest edition of books may be used."},
                 {"name": "syllabus_file", "label": "Syllabus document (PDF, Word or Excel)", "type": "file",
                  "accept": ".pdf,.docx,.doc,.xlsx,.xls", "tab": "syllabus", "help": "Optional."},
             ],
@@ -643,6 +646,60 @@ PROGRAMME_REVISION = {
 
 PARTS = [PROGRAMME_CURRICULUM, PROGRAMME_SYLLABUS, PROGRAMME_REVISION]
 
+
+# --------------------------------------------------------------------------
+# Syllabi of earlier batches — the same template, one form per batch year.
+# Which years are shown is set in Admin > Settings; a form exists for every
+# year from 2010 so a year can be added without a code change. They are a
+# record, not part of the gate: the Curriculum stage completes without them.
+# --------------------------------------------------------------------------
+
+def batch_label(start: int) -> str:
+    return f"{start}–{start + 1}"
+
+
+def batch_key(start: int) -> str:
+    return f"prog_syllabus_b{start}"
+
+
+def batch_start(label) -> int | None:
+    """2024 from "2024-2025", "2024–25", "2024 to 2025" or 2024."""
+    import re
+    m = re.match(r"\s*((?:19|20)\d{2})", str(label or ""))
+    return int(m.group(1)) if m else None
+
+
+def _batch_part(start: int) -> dict:
+    import copy
+    part = copy.deepcopy(PROGRAMME_SYLLABUS)
+    part.update({
+        "key": batch_key(start),
+        "title": f"Syllabus {batch_label(start)}",
+        "batch": batch_label(start),
+        "existing_batch": True,
+        "optional": True,
+        "blurb": f"The syllabus the {batch_label(start)} batch follows, as in the syllabus template.",
+    })
+    for sec in part["sections"]:
+        if sec["key"] == "courses":
+            # an earlier batch is a plain record: no revision columns
+            sec["columns"] = [c for c in sec["columns"]
+                              if c["name"] not in ("year_previous", "year_latest", "prev_code",
+                                                   "prev_title", "avg_change")]
+            for c in sec["columns"]:
+                if c["name"] == "modules":
+                    c.update({"compare": False,
+                              "help": "As in the syllabus template: Module No., its title, hours "
+                                      "and content."})
+            sec["rules"] = ["bloom_verbs_present"]
+    part["sections"] = [s for s in part["sections"] if s["key"] != "revision_summary"]
+    return part
+
+
+BATCH_PARTS = [_batch_part(y) for y in range(2010, 2041)]
+DEFAULT_CURRENT_BATCH = "2026-2027"
+DEFAULT_EXISTING_BATCHES = ["2024-2025", "2025-2026"]
+
 CURRICULUM = {
     "key": "curriculum",
     "group": "Stage 3 · Curriculum",
@@ -668,7 +725,7 @@ STAGES = [
 
 STAGE_KEYS = [s["key"] for s in STAGES]
 # every form that can be opened, the per-programme parts included
-STAGE_BY_KEY = {s["key"]: s for s in STAGES + PARTS}
+STAGE_BY_KEY = {s["key"]: s for s in STAGES + PARTS + BATCH_PARTS}
 PART_KEYS = [p["key"] for p in PARTS]
 
 GROUP_ORDER = [s["group"] for s in STAGES]

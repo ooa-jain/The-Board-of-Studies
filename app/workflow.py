@@ -57,6 +57,33 @@ def programme_stage_state(submission: dict, programme_code: str, stage_key: str)
             .get(stage_key) or {})
 
 
+def batches(s=None) -> dict:
+    """The current batch, and the earlier batches whose syllabi are kept —
+    both set in Admin > Settings."""
+    from .schema import (DEFAULT_CURRENT_BATCH, DEFAULT_EXISTING_BATCHES, batch_key,
+                         batch_label, batch_start)
+    s = settings() if s is None else s
+    cur = batch_start(s.get("current_batch") or DEFAULT_CURRENT_BATCH)
+    raw = s.get("existing_batches")
+    if raw is None:
+        raw = DEFAULT_EXISTING_BATCHES
+    years = sorted({y for y in (batch_start(x) for x in raw) if y and y != cur
+                    and batch_key(y) in STAGE_BY_KEY})
+    return {"current": batch_label(cur) if cur else "",
+            "existing": [{"key": batch_key(y), "label": batch_label(y)} for y in years]}
+
+
+def parts_for(stage: dict, s=None) -> list:
+    """The parts a programme shows, in order: Curriculum, the current batch
+    syllabus, each earlier batch's syllabus, Course Revision."""
+    out = []
+    for k in stage.get("parts", []):
+        out.append(k)
+        if k == "prog_syllabus":
+            out += [b["key"] for b in batches(s)["existing"]]
+    return out
+
+
 def dev_mode() -> bool:
     """Is the sequential lock switched off?
 

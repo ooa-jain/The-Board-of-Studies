@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 from . import ugc_rules as U
 from .auth import department_required
 from .db import audit, get_db, now, rules_doc, settings
+from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
@@ -20,7 +21,7 @@ from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        revision_fill_source,
                        programme_fill_source, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
-                       submit_stage, validate_only)
+                       submit_stage, validate_only, batches, parts_for)
 
 bp = Blueprint("dept", __name__)
 
@@ -139,7 +140,7 @@ def stage(stage_key, programme_code=None):
 
     fill = []
     if status in OPENABLE:
-        if stage_key == "prog_syllabus" and programme:
+        if stage_key.startswith("prog_syllabus") and programme:
             fill = course_fill_source(sub, programme["programme_code"])
         elif stage_key == "prog_revision" and programme:
             fill = revision_fill_source(sub, programme["programme_code"])
@@ -149,9 +150,24 @@ def stage(stage_key, programme_code=None):
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,
+                           batch_tag=(batches()["current"] if stage_def.get("batch") == "current"
+                                      else stage_def.get("batch") or ""),
                            parts=_parts_nav(sub, stage_def, programme),
                            prog_tree=_programme_tree(sub, dept, programme),
                            board=board, groups=grouped_board(board))
+
+
+def _part_item(sub, code, k, s=None):
+    """One part of a programme as the menus show it, with its batch tag."""
+    d = STAGE_BY_KEY[k]
+    tag = ""
+    if d.get("batch") == "current":
+        tag = batches(s)["current"]
+    elif d.get("existing_batch"):
+        tag = d["batch"]
+    return {"key": k, "title": d["title"], "tag": tag,
+            "existing": bool(d.get("existing_batch")), "optional": bool(d.get("optional")),
+            "status": part_status(sub, code, k)}
 
 
 def _programme_tree(sub, dept, current=None):
@@ -160,14 +176,14 @@ def _programme_tree(sub, dept, current=None):
     if not stage_def:
         return []
     here = (current or {}).get("programme_code")
+    cfg = app_settings_doc()
+    keys = parts_for(stage_def, cfg)
     levels = {"UG": [], "PG": []}
     for p in programmes_of(sub, dept):
         levels["PG" if p["level"] in ("PG", "PGD") else "UG"].append({
             "code": p["programme_code"], "name": p["programme_name"],
             "here": p["programme_code"] == here,
-            "parts": [{"key": k, "title": STAGE_BY_KEY[k]["title"],
-                       "status": part_status(sub, p["programme_code"], k)}
-                      for k in stage_def["parts"]],
+            "parts": [_part_item(sub, p["programme_code"], k, cfg) for k in keys],
         })
     tree = []
     for name, progs in levels.items():
@@ -175,7 +191,8 @@ def _programme_tree(sub, dept, current=None):
             tree.append({"name": name, "programmes": progs,
                          "here": any(x["here"] for x in progs),
                          "done": sum(1 for x in progs
-                                     if all(pt["status"] == "submitted" for pt in x["parts"]))})
+                                     if all(pt["status"] == "submitted" for pt in x["parts"]
+                                            if not pt["optional"]))})
     return tree
 
 
@@ -184,9 +201,9 @@ def _parts_nav(sub, stage_def, programme):
     if not programme or not stage_def.get("parent"):
         return []
     parent = STAGE_BY_KEY[stage_def["parent"]]
-    return [{"key": k, "title": STAGE_BY_KEY[k]["title"],
-             "status": part_status(sub, programme["programme_code"], k),
-             "here": k == stage_def["key"]} for k in parent["parts"]]
+    cfg = app_settings_doc()
+    return [dict(_part_item(sub, programme["programme_code"], k, cfg), here=k == stage_def["key"])
+            for k in parts_for(parent, cfg)]
 
 
 def _programme_hub(stage_def, programmes, sub, dept):
@@ -195,12 +212,12 @@ def _programme_hub(stage_def, programmes, sub, dept):
     for p in programmes:
         p = dict(p)
         p["parts"] = []
-        for k in stage_def["parts"]:
+        cfg = app_settings_doc()
+        for k in parts_for(stage_def, cfg):
             st = programme_stage_state(sub, p["programme_code"], k)
-            p["parts"].append({"key": k, "title": STAGE_BY_KEY[k]["title"],
-                               "status": part_status(sub, p["programme_code"], k),
-                               "errors": (st.get("summary") or {}).get("errors", 0),
-                               "note": st.get("returned_note")})
+            p["parts"].append(dict(_part_item(sub, p["programme_code"], k, cfg),
+                                   errors=(st.get("summary") or {}).get("errors", 0),
+                                   note=st.get("returned_note")))
         groups.setdefault("PG" if p["level"] in ("PG", "PGD") else "UG", []).append(p)
     board = stage_board(sub)
     return render_template("dept/choose_programme.html", stage=stage_def, groups=groups,
