@@ -27,7 +27,7 @@
 <div class="group-label">{{ level }} programmes</div>
 <div class="grid grid-2 mb-2">
   {% for p in groups[level] %}
-  <div class="card frame frame-{{ 'orange' if level == 'PG' else 'navy' }} prog-frame">
+  <div class="card frame frame-{{ 'orange' if level == 'PG' else 'navy' }} prog-frame" id="prog-{{ p.programme_code }}">
     <span class="frame-tab">{{ p.programme_code }}</span>
     <div class="card-head">
       <h3>{{ p.programme_name }}</h3>

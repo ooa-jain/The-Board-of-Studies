@@ -188,13 +188,18 @@
                         data-open="{{ 'true' if lv.here or not programme else 'false' }}">
                       {% for pr in lv.programmes %}
                       <li class="branch-row is-open{{ ' is-here-prog' if pr.here }}">
-                        <button class="branch-parent branch-parent-sm" type="button"
-                                aria-expanded="{{ 'true' if pr.here else 'false' }}"
-                                aria-controls="branch-pr-{{ lv.name }}-{{ loop.index }}"
-                                title="{{ pr.name }}">
-                          <span class="branch-caret" aria-hidden="true"></span>
-                          <span class="branch-label">{{ pr.code }}</span>
-                        </button>
+                        {# the arrow opens the programme's parts here; the code
+                           opens its step flowchart #}
+                        <div class="branch-prog-line">
+                          <button class="branch-parent branch-parent-sm branch-caret-btn" type="button"
+                                  aria-expanded="{{ 'true' if pr.here else 'false' }}"
+                                  aria-controls="branch-pr-{{ lv.name }}-{{ loop.index }}"
+                                  aria-label="Show the parts of {{ pr.code }}">
+                            <span class="branch-caret" aria-hidden="true"></span>
+                          </button>
+                          <a class="branch-prog-link" title="{{ pr.name }} — open its steps"
+                             href="{{ url_for('dept.stage', stage_key='curriculum') }}#prog-{{ pr.code }}">{{ pr.code }}</a>
+                        </div>
                         <ul class="branch-children branch-nested" id="branch-pr-{{ lv.name }}-{{ loop.index }}"
                             data-open="{{ 'true' if pr.here else 'false' }}">
                           {% set older = pr.parts|selectattr('existing')|list %}

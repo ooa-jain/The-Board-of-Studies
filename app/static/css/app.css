@@ -3663,3 +3663,26 @@ a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
 .cs-screen { border-radius: 20px; background: var(--lv-bg, #f6f1e7); padding: 22px; overflow: hidden; }
 .cs-screen > .grid:first-child { margin-top: 0; }
 @media (max-width: 760px) { .cs-card { padding: 6px; border-width: 3px; border-radius: 22px; } .cs-screen { padding: 12px; } }
+
+/* ---------- side menu: deep branches fit, and a programme opens its steps ---------- */
+.branch-nested .branch-row { --indent: 24px; --trunk: 8px; }
+.branch-nested .branch-nested .branch-row { --indent: 20px; --trunk: 6px; }
+.branch-text { overflow-wrap: anywhere; }
+.branch-tag { display: table; margin: 3px 0 0; }
+.branch-prog-line { display: flex; align-items: center; gap: 2px; min-height: var(--row-h); }
+.branch-caret-btn { flex: none; width: auto; padding-right: 4px; }
+.branch-prog-link {
+  font-family: var(--font-mono); font-size: .76rem; font-weight: 700; letter-spacing: .06em;
+  color: var(--ink-800, #1f2b3d); text-decoration: none; padding: 3px 8px; border-radius: 999px;
+  transition: background .15s, color .15s;
+}
+.branch-prog-link:hover { background: var(--lv-soft-gold, #fbf1cf); color: var(--lv-navy, #0f2440); text-decoration: none; }
+.is-here-prog > .branch-prog-line .branch-prog-link { background: var(--lv-soft-gold, #fbf1cf); color: var(--lv-navy, #0f2440); }
+/* the programme picked from the menu: brought into view and ringed */
+.prog-frame { scroll-margin-top: 110px; }
+.prog-frame:target { animation: prog-ring 2.4s ease-out 1; }
+@keyframes prog-ring {
+  0% { box-shadow: 0 0 0 0 rgba(199, 156, 16, .0); }
+  15% { box-shadow: 0 0 0 8px rgba(199, 156, 16, .45); }
+  100% { box-shadow: 0 0 0 18px rgba(199, 156, 16, 0); }
+}
