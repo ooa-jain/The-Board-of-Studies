@@ -392,7 +392,8 @@ def test_programme_parts_are_prefilled(app, client):
 
     # Course Revision is in the syllabus template, and offers the same courses
     revp = client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True)
-    assert "header" not in _stage_data(revp)
+    head = _stage_data(revp)["header"]
+    assert head["programme_code"] == "BCMREG" and head["revision_year"] == "2026"
     assert json.loads(revp.split("fill: ")[1].split(",\n")[0])[0]["course_code"] == "26BCC1C01"
 
 
@@ -1164,18 +1165,33 @@ def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, cli
     assert "prog_syllabus_b2024" not in STAGE_BY_KEY["curriculum"]["parts"]
 
 
-def test_course_revision_is_the_syllabus_template():
+def test_course_revision_is_the_revision_template(app, client):
     from app.schema import STAGE_BY_KEY
     rev = STAGE_BY_KEY["prog_revision"]
-    cols = [c["name"] for s in rev["sections"] if s["key"] == "courses" for c in s["columns"]]
-    for want in ("course_code", "course_title", "credits", "hours_per_week", "teaching_hours",
-                 "pedagogy", "outcomes", "modules", "skill_activities", "books"):
+    assert [x["key"] for x in rev["sections"]] == ["header", "revision_summary", "courses"]
+    cols = [c["name"] for x in rev["sections"] if x["key"] == "courses" for c in x["columns"]]
+    for want in ("course_code", "course_title", "semester", "year_previous", "year_latest",
+                 "prev_code", "prev_title", "modules", "avg_change"):
         assert want in cols
-    # the old log is gone
-    assert "revisions" not in [s["key"] for s in rev["sections"]]
-    assert "revised_code" not in cols
 
-
+    # filled from the syllabi: revised from the current batch, previous from the latest earlier one
+    _through_bos_documents(app, client)
+    with app.app_context():
+        from app.db import get_db
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
+    client.post("/department/api/prog_syllabus/BCMREG/save", json={"courses": [{
+        "course_code": "26BCC1C01", "course_title": "Financial Accounting", "semester": 1,
+        "modules": [{"title": "Introduction", "hours": 12, "revised": "Meaning and scope of accounting"}]}]})
+    client.post("/department/api/prog_syllabus_b2025/BCMREG/save", json={"courses": [{
+        "course_code": "26BCC1C01", "course_title": "Basics of Accounting",
+        "modules": [{"title": "Introduction", "hours": 10, "revised": "Meaning of accounting"}]}]})
+    page = client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True)
+    fill = json.loads(page.split("fill: ")[1].split(",\n")[0])
+    row = fill[0]
+    assert row["course_code"] == "26BCC1C01" and row["prev_title"] == "Basics of Accounting"
+    assert row["year_previous"] == "2025"
+    assert row["modules"][0]["revised"].startswith("Introduction (12 Hrs)")
+    assert row["modules"][0]["previous"].startswith("Introduction (10 Hrs)")
 def test_batch_is_worked_out_not_asked(app, client):
     _through_bos_documents(app, client)
     client.post("/department/api/prog_curriculum/BCMREG/save",

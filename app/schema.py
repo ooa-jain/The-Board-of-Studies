@@ -523,8 +523,66 @@ def _plain_syllabus(key: str, title: str, blurb: str) -> dict:
     return part
 
 
-# Course Revision, in the syllabus template: one card per revised course.
-PROGRAMME_REVISION = _plain_syllabus("prog_revision", "Course Revision", "")
+# Course Revision, as the syllabus revision document lays it out (BBA
+# Syllabus Revision 2024): who and when, the (A)–(D) summary with the
+# course-wise % change by semester, then one module-wise table per course —
+# the previous syllabus beside the revised one, % change per module and the
+# average. Filled from the syllabi: revised from the current batch, previous
+# from the latest earlier batch.
+PROGRAMME_REVISION = {
+    "key": "prog_revision",
+    "parent": "curriculum",
+    "group": "Stage 3 · Curriculum",
+    "title": "Course Revision",
+    "blurb": "",
+    "per_programme": True,
+    "sections": [
+        {
+            "key": "header",
+            "title": "Percentage of change in syllabus revision for",
+            "type": "fields",
+            "fields": [
+                {"name": "programme_name", "label": "Name of the programme", "type": "readonly",
+                 "prefill": "programme_name", "wide": True},
+                {"name": "programme_code", "label": "Programme code", "type": "readonly",
+                 "prefill": "programme_code"},
+                {"name": "department", "label": "Name of the department", "type": "readonly",
+                 "prefill": "dept_name"},
+                {"name": "revision_year", "label": "Year of revision", "type": "readonly",
+                 "prefill": "revision_year"},
+            ],
+        },
+        {
+            "key": "revision_summary",
+            "title": "Summary",
+            "type": "revision_summary",
+            "source": "courses",
+            "threshold": 20,
+        },
+        {
+            "key": "courses",
+            "title": "Percentage of change in syllabus — module-wise for all courses",
+            "type": "table",
+            "min_rows": 1,
+            "display": "revision",
+            "columns": [
+                {"name": "course_code", "label": "Subject code", "type": "text", "required": True},
+                {"name": "course_title", "label": "Subject / course title", "type": "text",
+                 "required": True},
+                {"name": "semester", "label": "Semester", "type": "integer", "min": 1, "max": 8,
+                 "choices": SEMESTERS},
+                {"name": "year_previous", "label": "Year of previous revision", "type": "text",
+                 "pattern": "^[0-9]{4}$"},
+                {"name": "year_latest", "label": "Year of latest revision", "type": "text",
+                 "pattern": "^[0-9]{4}$"},
+                {"name": "prev_code", "label": "Previous subject code", "type": "text"},
+                {"name": "prev_title", "label": "Previous subject / course title", "type": "text"},
+                {"name": "modules", "label": "Modules", "type": "module_compare", "required": True},
+                {"name": "avg_change", "label": "Average percentage on revision", "type": "readonly"},
+            ],
+        },
+    ],
+}
 
 
 PARTS = [PROGRAMME_CURRICULUM, PROGRAMME_SYLLABUS, PROGRAMME_REVISION]

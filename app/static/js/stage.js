@@ -261,7 +261,13 @@
         pct.type = "text";
         pct.inputMode = "decimal";
         pct.value = m.pct ?? "";
-        if (!m.pct_manual) pct.classList.add("is-auto");
+        if (!m.pct_manual) {
+          pct.classList.add("is-auto");
+          if (m.pct === undefined || m.pct === null || m.pct === "") {
+            const v0 = percentChange(m.previous, m.revised);
+            if (v0 !== null) { m.pct = v0; pct.value = fmt(v0); }
+          }
+        }
         pct.title = "Worked out from the two versions — type to use your own figure";
         pct.addEventListener("input", () => {
           const v = pct.value.trim();
@@ -528,7 +534,14 @@
         pct.inputMode = "decimal";
         pct.value = m.pct ?? "";
         pct.title = "Worked out from the two versions — type to use your own figure";
-        if (!m.pct_manual) pct.classList.add("is-auto");
+        if (!m.pct_manual) {
+          pct.classList.add("is-auto");
+          // filled in from the syllabi: work the % out straight away
+          if (m.pct === undefined || m.pct === null || m.pct === "") {
+            const v0 = percentChange(m.previous, m.revised);
+            if (v0 !== null) { m.pct = v0; pct.value = fmt(v0); }
+          }
+        }
         if (CTX.readonly) pct.disabled = true;
         const recalc = () => {
           if (m.pct_manual) return;
@@ -538,7 +551,8 @@
         };
         tr.appendChild(cell(box(m.previous, v => { m.previous = v; recalc(); changed(); },
                                 { multi: true, placeholder: "Leave empty for a new module" })));
-        tr.appendChild(cell(moduleBlock(m, () => { recalc(); changed(); }, i)));
+        tr.appendChild(cell(box(m.revised, v => { m.revised = v; recalc(); changed(); },
+                                { multi: true, placeholder: "Module title (hours) — content" })));
         pct.addEventListener("input", () => {
           const v = pct.value.trim();
           m.pct = v === "" ? null : Number(v);
@@ -3116,6 +3130,99 @@
     draw();
   }
 
+  // -------------------------------------------------------- revision tables
+  /* Course Revision as the syllabus revision document has it: one
+     module-wise table per course — year, title and code before and after,
+     each module's previous and revised text with its % change, and the
+     average. "Fill in all courses" brings every course of the current batch
+     syllabus with its modules, and the previous ones from the latest earlier
+     batch, so the percentages work themselves out. */
+  function renderRevisionCourses(section, host) {
+    const data = rows(section.key);
+    if (!data.length && !CTX.readonly) data.push({});
+    const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
+    const blank = r => !String(r.course_code || "").trim() && !String(r.course_title || "").trim()
+      && !(r.modules || []).some(m => m && (m.previous || m.revised));
+    const top = el("div", "sheet-bar");
+    const note = el("span", "sheet-note");
+    note.setAttribute("role", "status");
+    host.appendChild(top);
+    const list = el("div", "rv-list");
+    host.appendChild(list);
+    if (!CTX.readonly && (CTX.fill || []).length) {
+      const fb = el("button", "btn btn-ghost btn-sm", "Fill in all courses from the syllabi");
+      fb.type = "button";
+      fb.title = "Revised modules from the current batch syllabus, previous ones from the latest earlier batch";
+      fb.addEventListener("click", () => {
+        const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+        const add = CTX.fill.filter(p => !have.has(String(p.course_code).toUpperCase()));
+        if (!add.length) { note.textContent = "Every course is already here."; return; }
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        add.forEach(p => data.push(JSON.parse(JSON.stringify(p))));
+        draw(); touch();
+        note.textContent = `Added ${add.length} course${add.length === 1 ? "" : "s"} — the % change is worked out from the two syllabi.`;
+      });
+      top.appendChild(fb);
+    }
+    top.appendChild(note);
+
+    function input(row, name) {
+      const c = C[name];
+      const holder = el("label", "rv-in");
+      holder.dataset.field = name;
+      holder.appendChild(el("span", null, c.label));
+      const i = makeInput(c, row[name], v => { row[name] = v; touch(); });
+      holder.appendChild(i);
+      attachLiveCheck(i, c, holder);
+      return [holder, i];
+    }
+
+    function course(row, i) {
+      const wrap = el("section", "rv-course");
+      wrap.dataset.row = i;
+      const head = el("div", "rv-course-head");
+      head.appendChild(el("span", "rv-course-no", String(i + 1).padStart(2, "0")));
+      const [hc, ic] = input(row, "course_code");
+      const [ht, it] = input(row, "course_title");
+      const [hs] = input(row, "semester");
+      head.appendChild(hc); head.appendChild(ht); head.appendChild(hs);
+      if (!CTX.readonly && data.length > 1) {
+        const rm = el("button", "btn btn-ghost btn-sm", "Remove");
+        rm.type = "button";
+        rm.addEventListener("click", () => {
+          if (!blank(row) && !window.confirm(`Remove ${row.course_code || "this course"} from the revision?`)) return;
+          data.splice(i, 1); draw(); touch();
+        });
+        head.appendChild(rm);
+      }
+      wrap.appendChild(head);
+      let table = revisionTable(C.modules, row, () => touch());
+      wrap.appendChild(table);
+      // the revised side of the table shows the course's code and title
+      const redraw = () => {
+        const t = revisionTable(C.modules, row, () => touch());
+        table.replaceWith(t); table = t;
+      };
+      ic.addEventListener("change", redraw);
+      it.addEventListener("change", redraw);
+      return wrap;
+    }
+
+    function draw() {
+      list.textContent = "";
+      data.forEach((row, i) => list.appendChild(course(row, i)));
+      if (!CTX.readonly) {
+        const add = el("button", "btn btn-ghost sheet-add", "+ Add another course");
+        add.type = "button";
+        add.addEventListener("click", () => { data.push({}); draw(); touch(); });
+        list.appendChild(add);
+      }
+      refresh();
+    }
+    host.showRow = () => draw();
+    draw();
+  }
+
   // ------------------------------------------------------------------ expand
   /* A wide table is easier to fill in on the whole screen. Expand lifts the
      section itself into a large pop-up — the same inputs, still saving as
@@ -3204,6 +3311,8 @@
 
       if (section.type === "table" && section.display === "sheet") {
         renderSheets(section, block);
+      } else if (section.type === "table" && section.display === "revision") {
+        renderRevisionCourses(section, block);
       } else if (section.type === "table" && section.display === "cards") {
         renderRowCards(section, block);
       } else if (section.type === "table") {

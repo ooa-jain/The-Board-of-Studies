@@ -3580,3 +3580,15 @@ a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
   /* no pointer to hover with: show it filled */
   .preload-enter .pe-hover { width: 100%; border-right-color: transparent; }
 }
+
+/* ---------- Course Revision: one module-wise table per course ---------- */
+.rv-list { display: grid; gap: 22px; }
+.rv-course { background: var(--lv-card, #fdfbf7); border: 1px solid var(--lv-border, #e6ddcc); border-radius: 14px; padding: 14px; }
+.rv-course-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-bottom: 12px; }
+.rv-course-no { font-family: var(--font-mono, monospace); font-weight: 800; color: var(--lv-gold, #c79c10); font-size: 1.1rem; padding-bottom: 8px; }
+.rv-in { display: grid; gap: 3px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--lv-muted-fg, #5f6b7d); }
+.rv-in[data-field=course_code] { width: 150px; }
+.rv-in[data-field=course_title] { flex: 1; min-width: 220px; }
+.rv-in[data-field=semester] { width: 92px; }
+.rv-in input, .rv-in select { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.rv-course-head .btn { margin-left: auto; }

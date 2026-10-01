@@ -542,6 +542,9 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
     years = degree_years((programme or {}).get("degree_level"))
     if start:
         source["batch_auto"] = f"{start}-{str(start + years)[-2:]}" if years else batches()["current"]
+    # the year this revision is approved: the BoS meeting's, else the current batch's
+    bos_year = str(source.get("bos_date") or "")[:4]
+    source["revision_year"] = bos_year if bos_year.isdigit() else (str(start) if start else "")
     prog = dict(programme or {})
     try:
         prog["duration_months"] = int(float(prog.get("duration_years"))) * 12
@@ -692,3 +695,65 @@ def form_data(stage_key, submission, department, academic_year, editable):
             data[section["key"]] = sync_programme_rows(data.get(section["key"]), offered)
             synced = True
     return data, synced
+
+
+def _module_text(m):
+    """One module of a syllabus sheet as the revision table shows it:
+    "Module 1: Title (12 Hrs) — content"."""
+    if not isinstance(m, dict):
+        return ""
+    head = str(m.get("title") or "").strip()
+    hrs = str(m.get("hours") or "").strip()
+    body = str(m.get("revised") or "").strip()
+    first = head + (f" ({hrs} Hrs)" if hrs else "")
+    return " — ".join(x for x in (first, body) if x)
+
+
+def revision_fill_source(submission, programme_code):
+    """Courses for Course Revision's "fill in all": every course of the
+    current batch syllabus (or, failing that, of the curriculum), with its
+    revised modules from that syllabus and its previous modules, code, title
+    and year from the latest earlier batch's syllabus of the same course."""
+    progs = (submission.get("programmes") or {}).get(programme_code, {})
+    cur = [c for c in ((progs.get("prog_syllabus") or {}).get("data") or {}).get("courses") or []
+           if isinstance(c, dict) and str(c.get("course_code") or "").strip()]
+    base = {r["course_code"].upper(): r for r in course_fill_source(submission, programme_code)}
+    if not cur:
+        cur = list(base.values())
+    # the earlier batches, latest first
+    older = []
+    for b in reversed(batches()["existing"]):
+        rows = ((progs.get(b["key"]) or {}).get("data") or {}).get("courses") or []
+        older.append((b["label"][:4], {str(c.get("course_code") or "").strip().upper(): c
+                                       for c in rows if isinstance(c, dict)}))
+    out = []
+    for c in cur:
+        code = str(c["course_code"]).strip()
+        row = {"course_code": code, "course_title": c.get("course_title", "")}
+        b = base.get(code.upper()) or {}
+        for k in ("semester", "year_latest"):
+            if (c.get(k) or b.get(k)) not in (None, ""):
+                row[k] = c.get(k) or b.get(k)
+        if not row.get("year_latest"):
+            # no BoS date yet: the current batch's first year
+            from .schema import batch_start
+            start = batch_start(batches()["current"])
+            if start:
+                row["year_latest"] = str(start)
+        revised = [_module_text(m) for m in c.get("modules") or []]
+        prev, year = None, ""
+        for y, courses in older:
+            if code.upper() in courses:
+                prev, year = courses[code.upper()], y
+                break
+        previous = [_module_text(m) for m in (prev or {}).get("modules") or []]
+        n = max(len(revised), len(previous))
+        if n:
+            row["modules"] = [{"previous": previous[i] if i < len(previous) else "",
+                               "revised": revised[i] if i < len(revised) else ""} for i in range(n)]
+        if prev:
+            row["year_previous"] = year
+            row["prev_code"] = prev.get("course_code", "")
+            row["prev_title"] = prev.get("course_title", "")
+        out.append(row)
+    return out
