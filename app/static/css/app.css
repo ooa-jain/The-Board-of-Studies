@@ -3495,3 +3495,88 @@ a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
 }
 .preload-enter { margin-top: 10px; padding-left: 30px; }
 .pe-label { font-size: 1.08rem; }
+
+/* ---------- alert cards (after Uiverse.io, xerith_8140), in mild colours ---------- */
+.notification-container {
+  --content-color: #1f2937; --icon-size: 1.15em;
+  position: fixed; top: 88px; right: 18px; z-index: 90;
+  width: min(380px, calc(100vw - 36px)); margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: .55em; list-style: none;
+  font-family: var(--font, sans-serif); color: var(--content-color); pointer-events: none;
+}
+.notification-item {
+  --grid-color: rgba(225, 225, 225, .7);
+  pointer-events: auto; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between; gap: 1em;
+  padding: 12px 14px; border-radius: 8px; background-color: #f3f3f3;
+  box-shadow: rgba(80, 80, 80, .18) 0 8px 24px;
+  background-image:
+    linear-gradient(0deg, transparent 23%, var(--grid-color) 24%, var(--grid-color) 25%, transparent 26%, transparent 73%, var(--grid-color) 74%, var(--grid-color) 75%, transparent 76%, transparent),
+    linear-gradient(90deg, transparent 23%, var(--grid-color) 24%, var(--grid-color) 25%, transparent 26%, transparent 73%, var(--grid-color) 74%, var(--grid-color) 75%, transparent 76%, transparent);
+  background-size: 55px 55px;
+  animation: note-in .32s cubic-bezier(.2, .8, .2, 1);
+  transition: transform 250ms ease, opacity 250ms ease, background-color 250ms ease;
+}
+.notification-item:hover { transform: scale(1.01); }
+.notification-item.is-link { cursor: pointer; }
+.notification-item.is-leaving { opacity: 0; transform: translateX(24px); }
+@keyframes note-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+.notification-content { display: flex; align-items: flex-start; gap: .6em; min-width: 0; }
+.notification-icon { display: flex; align-items: center; padding-top: 1px; }
+.notification-item svg { width: var(--icon-size); height: var(--icon-size); transition: 250ms ease; }
+.notification-text { display: grid; gap: 2px; font-size: .84rem; line-height: 1.35; }
+.notification-text strong { font-size: .86rem; }
+.notification-close {
+  flex: none; display: grid; place-items: center; padding: 3px; border: 0; background: transparent;
+  border-radius: 5px; cursor: pointer; color: inherit; transition: background-color 250ms;
+}
+.notification-close:hover { background-color: rgba(204, 204, 204, .45); }
+.notification-close svg { width: 1em; height: 1em; }
+.notification-progress-bar {
+  position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+  background: currentColor; opacity: .6; animation: note-bar 5s linear forwards;
+}
+@keyframes note-bar { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.notification-item.success { color: #047857; background-color: #d3f7e5; --grid-color: rgba(16, 185, 129, .18); }
+.notification-item.success:hover { background-color: #c3f2da; }
+.notification-item.info    { color: #1e3a8a; background-color: #dbe9ff; --grid-color: rgba(59, 131, 246, .16); }
+.notification-item.info:hover { background-color: #cddfff; }
+.notification-item.warning { color: #78350f; background-color: #fff1c2; --grid-color: rgba(245, 159, 11, .2); }
+.notification-item.warning:hover { background-color: #ffeaa8; }
+.notification-item.error   { color: #7f1d1d; background-color: #ffdcdc; --grid-color: rgba(239, 68, 68, .16); }
+.notification-item.error:hover { background-color: #ffcdcd; }
+@media (prefers-reduced-motion: reduce) {
+  .notification-item { animation: none; }
+}
+
+/* ---------- "Enter the Portal" as outlined letters that fill with glowing
+   gold from left to right on hover (after Uiverse.io, satyamchaudharydev) ---------- */
+.preload-enter {
+  --border-right: 6px;
+  --text-stroke-color: rgba(255, 255, 255, .7);
+  --animation-color: #f2c230;
+  margin: 8px 0 0; height: auto; padding: 0; border: none; border-radius: 0;
+  background: transparent; box-shadow: none; animation: none; overflow: visible;
+  cursor: pointer; position: relative; display: inline-block;
+  font: 800 clamp(1.4rem, 3.4vw, 2rem)/1.15 "Arial", var(--font), sans-serif;
+  letter-spacing: 3px; text-transform: uppercase; text-decoration: none;
+  color: transparent; -webkit-text-stroke: 1px var(--text-stroke-color);
+}
+.preload-enter:hover { background: transparent; }
+.preload-enter::after { content: none; display: none; }
+.pe-actual { white-space: nowrap; }
+.pe-hover {
+  position: absolute; inset: 0; box-sizing: border-box; width: 0%; white-space: nowrap;
+  color: var(--animation-color); -webkit-text-stroke: 1px var(--animation-color);
+  border-right: var(--border-right) solid var(--animation-color);
+  overflow: hidden; transition: .5s;
+}
+.preload-enter:hover .pe-hover,
+.preload-enter:focus-visible .pe-hover {
+  width: 100%; filter: drop-shadow(0 0 23px var(--animation-color));
+}
+.preload-enter:focus-visible { outline: 2px solid rgba(255, 255, 255, .6); outline-offset: 8px; }
+@media (hover: none) {
+  /* no pointer to hover with: show it filled */
+  .preload-enter .pe-hover { width: 100%; border-right-color: transparent; }
+}

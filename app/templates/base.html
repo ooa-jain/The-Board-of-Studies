@@ -144,7 +144,7 @@
       <div class="flash-stack" role="alert" aria-live="polite">
         {% for category, message in messages %}
           {% set kind = 'error' if category == 'error' else category %}
-          <div class="alert alert-{{ kind }}">
+          <div class="alert alert-{{ kind }}" data-kind="{{ kind }}">
             <span class="alert-icon" aria-hidden="true">{{ {'error': '!', 'warning': '!', 'success': '✓'}.get(kind, 'i') }}</span>
             <div><span class="sr-only">{{ {'error': 'Error: ', 'warning': 'Warning: ', 'success': 'Success: '}.get(kind, '') }}</span>{{ message }}</div>
           </div>
@@ -267,6 +267,20 @@
   });
 </script>
 {% endif %}
+<script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+<script>
+  // the page's messages as alert cards; the plain list stays without JavaScript
+  (function () {
+    var stack = document.querySelector(".flash-stack");
+    if (!stack || !window.Toast) return;
+    var kinds = { error: "error", warning: "warning", success: "success" };
+    stack.querySelectorAll(".alert").forEach(function (a) {
+      var text = (a.querySelector("div") || a).textContent.replace(/^(Error|Warning|Success):\s*/, "").trim();
+      window.Toast.show(kinds[a.dataset.kind] || "info", text);
+    });
+    stack.remove();
+  })();
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

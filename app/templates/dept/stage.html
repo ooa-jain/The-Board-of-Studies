@@ -96,7 +96,7 @@
   </div>
 
   <aside class="stage-side">
-    {# shown only once "Check now" (or Submit) has run the checks #}
+    {# shown once Submit has run the checks #}
     <div class="card" id="checks-card" hidden>
       <div class="card-head">
         <h3 class="card-title-sm">Checks</h3>
@@ -261,7 +261,6 @@
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
     <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
-    <button class="btn btn-ghost" type="button" id="btn-check">Check now</button>
     <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage</button>
   </div>
 </div>

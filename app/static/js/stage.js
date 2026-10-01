@@ -138,7 +138,17 @@
         undescribe(input, `${input.id}-error`);
       }
     };
-    input.addEventListener("blur", show);
+    // leaving a field with a wrong entry raises an alert as well as the
+    // note under it
+    const leave = () => {
+      show();
+      const msg = checkField(def, readInput(input, def));
+      if (msg && window.Toast) {
+        window.Toast.warning(msg, { title: def.label || "Check this entry",
+                                    onClick: () => input.focus() });
+      }
+    };
+    input.addEventListener("blur", leave);
     input.addEventListener("input", () => {
       if (input.classList.contains("is-bad")) show();
       touch();
@@ -3467,6 +3477,7 @@
       btn.textContent = "Submit this stage";
       saveNote.textContent = "Not submitted — there are answers still to fix";
       saveNote.className = "save-note save-note-bad";
+      alertIssues(j.issues || [], j.summary || {}, j.error);
       const first = (j.issues || []).find(i => i.level === "error");
       if (first) focusIssue(first);
       else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -3475,7 +3486,24 @@
       btn.textContent = "Submit this stage";
       saveNote.textContent = "Could not reach the server — nothing was submitted. Try again in a moment.";
       saveNote.className = "save-note save-note-bad";
+      if (window.Toast) window.Toast.error("Could not reach the server — nothing was submitted. Try again in a moment.",
+                                           { title: "Not submitted" });
     });
+  }
+
+  /* A submission that did not go through: one alert saying so, then one per
+     problem (the first few), each taking you to its field when clicked. */
+  function alertIssues(issues, summary, error) {
+    if (!window.Toast) return;
+    const errs = issues.filter(i => i.level === "error");
+    const warns = issues.filter(i => i.level !== "error");
+    if (!errs.length && error) { window.Toast.error(error, { title: "Not submitted" }); return; }
+    window.Toast.error(
+      `${errs.length} thing${errs.length === 1 ? "" : "s"} to fix` +
+      (warns.length ? ` and ${warns.length} to check` : "") + " — the list is in the Checks panel.",
+      { title: "Not submitted" });
+    errs.slice(0, 3).forEach(i => window.Toast.error(i.message, { onClick: () => focusIssue(i), timeout: 11000 }));
+    if (errs.length > 3) window.Toast.info(`…and ${errs.length - 3} more in the Checks panel.`);
   }
 
   // ------------------------------------------------------------------- boot
@@ -3484,7 +3512,6 @@
   refresh();
 
   if (!CTX.readonly) {
-    document.getElementById("btn-check").addEventListener("click", () => check());
     document.getElementById("btn-submit").addEventListener("click", submit);
     window.addEventListener("beforeunload", (e) => {
       if (dirty) { e.preventDefault(); e.returnValue = ""; }

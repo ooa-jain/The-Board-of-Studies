@@ -25,14 +25,9 @@
     {# A real control, not a hint: it takes the focus ring, it answers to
        Enter and to Space, and a screen reader calls it what it is. Clicking
        anywhere else on the curtain does the same thing. #}
-    <button class="preload-enter" type="button" tabindex="-1">
-      <span class="pe-label">Enter the Portal</span>
-      <span class="pe-arrow" aria-hidden="true">
-        <svg class="arrow" viewBox="0 0 24 24" focusable="false">
-          <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
-                stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </span>
+    <button class="preload-enter" type="button" tabindex="-1" data-text="Enter the Portal">
+      <span class="pe-actual">&nbsp;Enter the Portal&nbsp;</span>
+      <span class="pe-hover" aria-hidden="true">&nbsp;Enter the Portal&nbsp;</span>
     </button>
     <span class="preload-bar" aria-hidden="true"><i></i></span>
     <p class="preload-note">BoS Academic Portal</p>
