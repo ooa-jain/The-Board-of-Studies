@@ -3416,3 +3416,18 @@ table.sheet.sh-syl { margin: 0; border-style: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .pcard, .pcard * { transition: none !important; }
 }
+
+/* the identity card in mild colours: a soft blue-grey strip with navy text */
+.pcard { box-shadow: rgba(15, 36, 64, .10) 0 50px 30px -45px, 0 0 0 1px #ece6d8; }
+.pcard-bottom {
+  background: linear-gradient(135deg, #eef3fa 0%, #e6edf6 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 -1px 0 #dfe6f0;
+}
+.pcard-content { color: #1f3352; }
+.pcard-name { color: #1f3352; }
+.pcard-fact dt { color: #a3801c; }
+.pcard-fact dd { color: #2a3d5c; font-weight: 600; }
+.pcard-mono { color: #3a5478; }
+.pcard-pic { border-color: #f1dc9a; }
+.pcard.is-open .pcard-pic { box-shadow: rgba(15, 36, 64, .12) 0 4px 10px 0; }
+.pcard-lock { color: #3a5478; background: rgba(255, 255, 255, .85); }
