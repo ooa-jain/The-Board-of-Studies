@@ -377,7 +377,38 @@ def save_draft(dept_code, academic_year, stage_key, data, programme_code=None):
     )
 
 
+def apply_defaults(stage_key, data):
+    """The standard wording a department sees as grey placeholder text
+    ("prefill_text"), and item 9 worked out from the programme's name and
+    specialisation ("derive_from"), stand in for any box left empty. Applied
+    when checking and submitting, so leaving a box empty means accepting it."""
+    stage = STAGE_BY_KEY.get(stage_key) or {}
+    data = dict(data or {})
+
+    def read(ref):
+        sec, name = ref.split(".", 1)
+        return str(((data.get(sec) or {}) if isinstance(data.get(sec), dict) else {}).get(name) or "").strip()
+
+    for section in stage.get("sections", []):
+        if section.get("type", "fields") != "fields":
+            continue
+        vals = dict(data.get(section["key"]) or {})
+        for f in section.get("fields", []):
+            if f.get("type") == "fixed" or str(vals.get(f["name"]) or "").strip():
+                continue
+            if f.get("prefill_text"):
+                vals[f["name"]] = f["prefill_text"]
+            elif f.get("derive_from"):
+                made = " — ".join(v for v in map(read, f["derive_from"]) if v)
+                if made:
+                    vals[f["name"]] = made
+        if vals:
+            data[section["key"]] = vals
+    return data
+
+
 def validate_only(submission, stage_key, data, programme=None):
+    data = apply_defaults(stage_key, data)
     issues, summary = validate_stage(stage_key, data, _ctx_for(submission, stage_key, programme))
     return issues, summary
 
@@ -386,6 +417,7 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
     """Validate and, if clean, lock the stage and unlock the next one."""
     db = get_db()
     submission = get_or_create_submission(dept_code, academic_year)
+    data = apply_defaults(stage_key, data)
     issues, summary = validate_stage(stage_key, data, _ctx_for(submission, stage_key, programme))
 
     programme_code = (programme or {}).get("programme_code")
@@ -498,8 +530,8 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
                 vals[f["name"]] = source[key]
             elif pkey and prog.get(pkey) not in (None, ""):
                 vals[f["name"]] = prog[pkey]
-            elif f.get("prefill_text") not in (None, ""):
-                vals[f["name"]] = f["prefill_text"]
+            # "prefill_text" is shown as the placeholder and stands in for an
+            # empty box when submitting (apply_defaults) — it is not a value
         if vals:
             out[section["key"]] = vals
     return out

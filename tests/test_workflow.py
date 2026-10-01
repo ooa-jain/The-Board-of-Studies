@@ -371,7 +371,8 @@ def test_programme_parts_are_prefilled(app, client):
                        .get_data(as_text=True))
     assert data["details"]["programme_name"] == "Master of Commerce"
     assert data["details"]["degree_level"] == "PG - 2 Year"
-    assert data["profile"]["medium"] == "English"
+    # standard wording is a placeholder now, not a value the box opens with
+    assert not (data.get("profile") or {}).get("medium")
 
     client.post("/department/api/prog_curriculum/BCMREG/save", json={
         "details": {"degree_level": "UG - 3 Year", "batch": "2026-29"},
@@ -1120,3 +1121,15 @@ def test_flow_maps_one_departments_data_between_stages(app, client):
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(x.data))
     assert wb.sheetnames == ["Data mapping", "By programme"]
+
+
+def test_an_empty_box_takes_the_standard_wording_when_checked():
+    from app.schema import DEFAULT_REGULATIONS
+    from app.workflow import apply_defaults
+    out = apply_defaults("prog_curriculum", {
+        "details": {"programme_name": "Bachelor of Arts", "specialisation": "Economics"},
+        "profile": {"medium": "", "assessment": "Our own wording"}})
+    assert out["profile"]["medium"] == DEFAULT_REGULATIONS["medium"]
+    assert out["profile"]["assessment"] == "Our own wording"
+    assert out["profile"]["passing"] == DEFAULT_REGULATIONS["passing"]
+    assert out["profile"]["course_specialisation"] == "Bachelor of Arts — Economics"

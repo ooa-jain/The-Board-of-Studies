@@ -2836,6 +2836,17 @@
         const grid = el("div", "fields-grid");
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
+          // standard wording is the placeholder: an empty box means "use it".
+          // A draft that still holds the wording word for word shows it the
+          // same way, so the department sees grey text it can type over.
+          if (f.prefill_text && f.type !== "fixed") {
+            // never "required" on the page: empty is a valid answer here
+            f = Object.assign({}, f, { placeholder: f.prefill_text, required: false });
+            if (!CTX.readonly && String(state[section.key][f.name] || "").trim() === f.prefill_text.trim()) {
+              state[section.key][f.name] = "";
+            }
+          }
+          if (f.derive_from) f = Object.assign({}, f, { required: false });
           const b = fieldBlock(f, state[section.key][f.name], v => {
             setVal(section.key, f.name, v);
             // the credit check follows the degree: save, then reopen with it
@@ -2846,15 +2857,13 @@
             // name and specialisation) until the department types its own
             const read = ref => { const [sec, name] = ref.split("."); return String(((state[sec] || {})[name]) || "").trim(); };
             const make = () => f.derive_from.map(read).filter(Boolean).join(" — ");
-            let last = make();
+            const example = f.placeholder || "";
+            // worked out from the programme, shown as the placeholder; a value
+            // that is just the worked-out text is cleared back to placeholder
+            const cur0 = String(state[section.key][f.name] || "").trim();
+            if (!CTX.readonly && cur0 && cur0 === make()) { state[section.key][f.name] = ""; b._input.value = ""; }
             refreshers.push(() => {
-              const v = make();
-              const cur = String(state[section.key][f.name] || "").trim();
-              if (!CTX.readonly && (cur === "" || cur === last) && v !== cur) {
-                state[section.key][f.name] = v;
-                b._input.value = v;
-              }
-              last = v;
+              b._input.placeholder = make() || example;
             });
           }
           if (f.count && b._input) {
