@@ -387,12 +387,12 @@ def test_programme_parts_are_prefilled(app, client):
     assert fill == [{"course_code": "26BCC1C01", "course_title": "Basics of Financial Accounting",
                      "semester": 1, "credits": 4, "year_latest": "2026",
                      "hours_per_week": 4, "teaching_hours": 60}]
-    assert _stage_data(syl)["header"]["batch"] == "2026-29"
+    # the syllabus is the template sheet only: no Programme / Batch header
+    assert "header" not in _stage_data(syl)
 
     # Course Revision is in the syllabus template, and offers the same courses
     revp = client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True)
-    rev = _stage_data(revp)
-    assert rev["header"]["batch"] == "2026-29"
+    assert "header" not in _stage_data(revp)
     assert json.loads(revp.split("fill: ")[1].split(",\n")[0])[0]["course_code"] == "26BCC1C01"
 
 
@@ -1114,7 +1114,7 @@ def test_flow_maps_one_departments_data_between_stages(app, client):
     assert flows["courses"]["to"] == ["prog_syllabus", "prog_revision"]
     assert flows["batch"]["value"] == "2026-29"
     assert flows["credits"]["value"] == "4 credits"
-    assert "57.15" in flows["syllabus_change"]["value"]
+    assert "syllabus_change" not in flows
 
     x = client.get("/admin/flow.xlsx?dept=COM")
     assert x.status_code == 200 and x.data[:2] == b"PK"

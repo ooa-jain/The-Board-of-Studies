@@ -1,36 +1,40 @@
-{# A programme's parts as one flow, in the order they are filled:
-   Curriculum → Syllabus: Current Batch → Existing Batch → Revision.
-   Each step is an oval that opens its form; Existing Batch holds one
-   oval per earlier batch year. Used by the programme page and the list. #}
-{% macro part_flow(parts, code, here=None, show_status=False) %}
+{# A programme's parts as numbered steps, in the order they are filled:
+   STEP 01 Curriculum → STEP 02 Syllabus: Current Batch → STEP 03 Syllabus:
+   Existing Batch → STEP 04 Revision. Each step is a coloured card with a
+   round badge, joined by dotted arrows; Existing Batch holds a pill per
+   earlier batch year. The programme page shows them across, a programme
+   card zig-zags them down. #}
+{% macro icon(name) -%}
+{% if name == 'curriculum' %}<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="20" cy="20" r="11" fill="none" stroke="currentColor" stroke-width="3.2"/><path d="M28 28l11 11" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M15 17a6 6 0 0 1 6-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+{%- elif name == 'current' %}<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 8a12 12 0 0 0-7 21.8V34h14v-4.2A12 12 0 0 0 24 8z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M19 39h10M21 43h6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M24 3v2M9 10l1.5 1.5M39 10l-1.5 1.5M5 22h2M41 22h2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+{%- elif name == 'existing' %}<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M24 6v6M24 36v6M6 24h6M36 24h6M11.3 11.3l4.2 4.2M32.5 32.5l4.2 4.2M11.3 36.7l4.2-4.2M32.5 15.5l4.2-4.2" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>
+{%- else %}<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="22" cy="26" r="15" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="22" cy="26" r="8" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="22" cy="26" r="2.5" fill="currentColor"/><path d="M22 26L40 8M34 8h6v6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- endif %}
+{%- endmacro %}
+
+{% macro arrow() -%}
+<svg class="pflow-arrow" viewBox="0 0 60 50" aria-hidden="true"><path d="M4 6 C 34 2, 52 14, 50 38" fill="none" stroke="currentColor" stroke-width="2.6" stroke-dasharray="2 6" stroke-linecap="round"/><path d="M43 32l7 8 5-9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- endmacro %}
+
+{% macro part_flow(parts, code, here=None, show_status=False, zigzag=False) %}
 {% set older = parts|selectattr('existing')|list %}
 {% set older_keys = older|map(attribute='key')|list %}
 {% set words = {'submitted': 'Submitted', 'returned': 'Returned', 'draft': 'In progress',
                 'open': 'Not started', 'locked': 'Locked'} %}
-<ol class="pflow" aria-label="Parts of this programme, in order">
-  {% for part in parts if not part.existing %}
-  {% set is_here = part.key == here %}
-  <li class="pflow-step is-{{ part.status }}{{ ' is-here' if is_here }}">
-    <a class="pflow-node" href="{{ url_for('dept.stage', stage_key=part.key, programme_code=code) }}"
-       {% if is_here %}aria-current="page"{% endif %}>
-      <span class="pflow-dot" aria-hidden="true"></span>
-      {% if part.key == 'prog_syllabus' %}
-        <span class="pflow-kicker">Syllabus</span>
-        <span class="pflow-title">Current Batch</span>
-      {% elif part.key == 'prog_revision' %}
-        <span class="pflow-title">Revision</span>
-      {% else %}
-        <span class="pflow-title">{{ part.title }}</span>
-      {% endif %}
-      {% if part.tag %}<span class="pflow-tag">{{ part.tag }}</span>{% endif %}
-      {% if show_status %}<span class="pflow-status">{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}</span>{% endif %}
-    </a>
-  </li>
-  {% if part.key == 'prog_syllabus' and older %}
-  <li class="pflow-step pflow-existing{{ ' is-here' if here in older_keys }}">
-    <div class="pflow-node">
-      <span class="pflow-kicker">Syllabus</span>
-      <span class="pflow-title">Existing Batch</span>
+{% set steps = [] %}
+{% for part in parts if not part.existing %}
+  {% set _ = steps.append(part) %}
+  {% if part.key == 'prog_syllabus' and older %}{% set _ = steps.append({'key': '__existing__'}) %}{% endif %}
+{% endfor %}
+<ol class="pflow{{ ' pflow-zig' if zigzag }}" aria-label="Parts of this programme, in order">
+  {% for part in steps %}
+  {% set n = loop.index %}
+  {% if part.key == '__existing__' %}
+  <li class="pflow-step pflow-c3 pflow-existing{{ ' is-here' if here in older_keys }}">
+    <span class="pflow-badge">{{ icon('existing') }}</span>
+    <div class="pflow-card">
+      <span class="pflow-no">Step {{ '%02d'|format(n) }}</span>
+      <span class="pflow-title">Syllabus · Existing Batch</span>
       <span class="pflow-years">
         {% for ob in older %}
         <a class="pflow-year is-{{ ob.status }}{{ ' is-here' if ob.key == here }}"
@@ -40,6 +44,21 @@
         {% endfor %}
       </span>
     </div>
+    {% if not loop.last %}{{ arrow() }}{% endif %}
+  </li>
+  {% else %}
+  {% set kind = 'curriculum' if part.key == 'prog_curriculum' else 'current' if part.key == 'prog_syllabus' else 'revision' %}
+  {% set is_here = part.key == here %}
+  <li class="pflow-step pflow-c{{ {'curriculum': 1, 'current': 2, 'revision': 4}[kind] }} is-{{ part.status }}{{ ' is-here' if is_here }}">
+    <span class="pflow-badge">{{ icon(kind) }}</span>
+    <a class="pflow-card" href="{{ url_for('dept.stage', stage_key=part.key, programme_code=code) }}"
+       {% if is_here %}aria-current="page"{% endif %}>
+      <span class="pflow-no">Step {{ '%02d'|format(n) }}</span>
+      <span class="pflow-title">{% if kind == 'current' %}Syllabus · Current Batch{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
+      {% if part.tag %}<span class="pflow-tag">{{ part.tag }}</span>{% endif %}
+      {% if show_status %}<span class="pflow-status">{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}</span>{% endif %}
+    </a>
+    {% if not loop.last %}{{ arrow() }}{% endif %}
   </li>
   {% endif %}
   {% endfor %}

@@ -473,82 +473,46 @@ PROGRAMME_SYLLABUS = {
     "title": "Current Batch Syllabus",
     # shows the current batch (Admin > Settings) beside the title
     "batch": "current",
-    "blurb": "One syllabus per course, as in the syllabus template.",
+    "blurb": "",
     "source_templates": ["[Template] Syllabus.pdf"],
     "per_programme": True,
     "sections": [
         {
-            "key": "header",
-            "title": "Programme",
-            "type": "fields",
-            "fields": [
-                {"name": "programme_name", "label": "Name of the program", "type": "readonly",
-                 "prefill": "programme_name", "wide": True},
-                {"name": "batch", "label": "Batch", "type": "readonly", "prefill": "batch"},
-            ],
-        },
-        {
+            # one sheet per course, laid out as the syllabus template is —
+            # nothing on the page but the template's own content
             "key": "courses",
-            "title": "Course syllabi",
-            "help": "Every course in the programme structure gets a card — “Fill in all” adds "
-                    "them with title, credits and hours already in.",
+            "title": "",
             "type": "table",
             "min_rows": 1,
-            "display": "cards",
+            "display": "sheet",
             "card": {"code": "course_code", "name": "course_title", "noun": "course"},
-            "tabs": [{"key": "details", "label": "Course details"},
-                     {"key": "modules", "label": "Syllabus modules"},
-                     {"key": "syllabus", "label": "Activities & books"}],
             "columns": [
-                {"name": "course_code", "label": "Course code", "type": "text", "required": True},
-                {"name": "course_title", "label": "Name of the course", "type": "text", "required": True},
-                {"name": "semester", "label": "Semester", "type": "integer", "min": 1, "max": 10},
-                {"name": "credits", "label": "Course credits", "type": "number", "required": True,
+                {"name": "course_code", "label": "Course Code", "type": "text", "required": True},
+                {"name": "course_title", "label": "Name of the Course", "type": "text", "required": True},
+                # kept for the curriculum link and the order of courses; not on the sheet
+                {"name": "semester", "label": "Semester", "type": "integer", "min": 1, "max": 10,
+                 "hidden": True},
+                {"name": "credits", "label": "Course Credits", "type": "number", "required": True,
                  "min": 0, "max": 20},
-                {"name": "hours_per_week", "label": "No. of hours per week", "type": "integer",
+                {"name": "hours_per_week", "label": "No. of Hours per Week", "type": "integer",
                  "required": True, "min": 0, "max": 40},
-                {"name": "teaching_hours", "label": "Total no. of teaching hours", "type": "integer",
+                {"name": "teaching_hours", "label": "Total No. of Teaching Hours", "type": "integer",
                  "required": True, "min": 0, "max": 600},
                 {"name": "pedagogy", "label": "Pedagogy", "type": "textarea", "required": True,
-                 "rows": 2, "wide": True,
-                 "help": "Classroom lecture, case studies, tutorials, seminars, field work…"},
-                {"name": "outcomes", "label": "Course outcomes", "type": "textarea", "required": True,
-                 "rows": 5, "min_items": 3, "wide": True,
-                 "help": "On successful completion the students will be able to… One per line."},
-                {"name": "year_previous", "in_table": True, "label": "Year of previous revision", "type": "text",
-                 "pattern": "^[0-9]{4}$", "tab": "modules",
-                 "help": "Leave empty for a course taught for the first time."},
-                {"name": "year_latest", "in_table": True, "label": "Year of latest revision", "type": "text",
-                 "required": True, "pattern": "^[0-9]{4}$", "tab": "modules"},
-                {"name": "prev_code", "in_table": True, "label": "Previous course code", "type": "text", "tab": "modules"},
-                {"name": "prev_title", "in_table": True, "label": "Previous course title", "type": "text", "tab": "modules"},
-                {"name": "modules", "label": "Syllabus — modules", "type": "module_compare",
-                 "required": True, "wide": True, "tab": "modules",
-                 "help": "As in the syllabus template: Module No., its title, hours and content. "
-                         "Paste the previous batch's text for a module beside it and the % "
-                         "change works itself out; type over it if you assessed it differently."},
-                {"name": "avg_change", "in_table": True, "label": "Average percentage on revision (all modules)",
-                 "type": "readonly", "tab": "modules"},
-                {"name": "skill_activities", "label": "Skill development activities", "type": "textarea",
-                 "required": True, "rows": 4, "min_items": 1, "tab": "syllabus", "wide": True,
-                 "help": "One per line."},
+                 "rows": 2, "placeholder": "Classrooms lecture, Case studies, Tutorial Classes, "
+                                           "Group discussion, Seminar & field work etc.,"},
+                {"name": "outcomes", "label": "Course Outcomes", "type": "textarea", "required": True,
+                 "rows": 5, "min_items": 3,
+                 "placeholder": "a) Understand …\nb) Apply …\nc) …  — one per line"},
+                {"name": "modules", "label": "Syllabus", "type": "module_compare", "compare": False,
+                 "required": True},
+                {"name": "skill_activities", "label": "Skill Development Activities", "type": "textarea",
+                 "required": True, "rows": 5, "min_items": 1,
+                 "placeholder": "1. …\n2. …  — one per line"},
                 {"name": "books", "label": "Books for reference", "type": "textarea", "required": True,
-                 "rows": 4, "min_items": 2, "tab": "syllabus", "wide": True,
-                 "help": "One per line. Note: Latest edition of books may be used."},
-                {"name": "syllabus_file", "label": "Syllabus document (PDF, Word or Excel)", "type": "file",
-                 "accept": ".pdf,.docx,.doc,.xlsx,.xls", "tab": "syllabus", "help": "Optional."},
+                 "rows": 5, "min_items": 2, "placeholder": "1. Author, Title, Publisher.  — one per line"},
             ],
             "rules": ["course_codes_known", "bloom_verbs_present"],
-        },
-        {
-            "key": "revision_summary",
-            "title": "Percentage of change in syllabus revision",
-            "help": "Worked out from the courses above: (A) courses, (B) courses revised above "
-                    "20%, (C) = B / A × 100, (D) average percentage revised, and the course-wise "
-                    "change for every semester.",
-            "type": "revision_summary",
-            "source": "courses",
-            "threshold": 20,
         },
     ],
 }
@@ -557,38 +521,20 @@ PROGRAMME_SYLLABUS = {
 REVISION_TYPES = ["Major Revision", "Minor Revision"]
 
 def _plain_syllabus(key: str, title: str, blurb: str) -> dict:
-    """The syllabus template as a plain record: course details, the modules
-    (Module No., title, hours, content), activities and books — no previous
-    text, no % change. Course Revision and the earlier batches use it."""
+    """The syllabus template, as another form: Course Revision and the
+    earlier batches use the very same sheet."""
     import copy
     part = copy.deepcopy(PROGRAMME_SYLLABUS)
     part.pop("batch", None)
     part.update({"key": key, "title": title, "blurb": blurb})
     for sec in part["sections"]:
         if sec["key"] == "courses":
-            sec["columns"] = [c for c in sec["columns"]
-                              if c["name"] not in ("year_previous", "year_latest", "prev_code",
-                                                   "prev_title", "avg_change")]
-            for c in sec["columns"]:
-                if c["name"] == "modules":
-                    c.update({"compare": False,
-                              "help": "As in the syllabus template: Module No., its title, hours "
-                                      "and content."})
             sec["rules"] = ["bloom_verbs_present"]
-    part["sections"] = [x for x in part["sections"] if x["key"] != "revision_summary"]
     return part
 
 
 # Course Revision, in the syllabus template: one card per revised course.
-PROGRAMME_REVISION = _plain_syllabus(
-    "prog_revision", "Course Revision",
-    "Each revised course, as in the syllabus template.")
-for _sec in PROGRAMME_REVISION["sections"]:
-    if _sec["key"] == "courses":
-        _sec["title"] = "Revised courses"
-        _sec["help"] = ("One card per revised course, in the syllabus template. “Fill in all” adds "
-                        "the programme's courses with title, credits and hours already in; "
-                        "remove the ones that were not revised.")
+PROGRAMME_REVISION = _plain_syllabus("prog_revision", "Course Revision", "")
 
 
 PARTS = [PROGRAMME_CURRICULUM, PROGRAMME_SYLLABUS, PROGRAMME_REVISION]
@@ -617,9 +563,7 @@ def batch_start(label) -> int | None:
 
 
 def _batch_part(start: int) -> dict:
-    part = _plain_syllabus(batch_key(start), f"Syllabus {batch_label(start)}",
-                           f"The syllabus the {batch_label(start)} batch follows, as in the "
-                           "syllabus template.")
+    part = _plain_syllabus(batch_key(start), f"Syllabus {batch_label(start)}", "")
     part.update({"batch": batch_label(start), "existing_batch": True, "optional": True})
     return part
 

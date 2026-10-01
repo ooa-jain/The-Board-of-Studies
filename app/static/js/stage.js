@@ -2845,6 +2845,213 @@
     draw();
   }
 
+  // ------------------------------------------------------------- template sheets
+  /* A syllabus, laid out as the syllabus template is: one bordered sheet
+     per course, with nothing on it but the template's own headings —
+     Name of the Program, Course Code, Name of the Course, credits and
+     hours, Pedagogy, Course Outcomes, the modules with their hours, Skill
+     Development Activities and Books for reference. */
+  function renderSheets(section, host) {
+    const data = rows(section.key);
+    if (!data.length && !CTX.readonly) data.push({});
+    const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
+    const blank = r => Object.keys(r).filter(k => !k.startsWith("_"))
+      .every(k => r[k] === "" || r[k] == null || (Array.isArray(r[k]) && !r[k].some(m => m && (m.title || m.revised || m.hours))));
+
+    const top = el("div", "sheet-bar");
+    const note = el("span", "sheet-note");
+    note.setAttribute("role", "status");
+    host.appendChild(top);
+    const list = el("div", "sheets");
+    host.appendChild(list);
+
+    if (!CTX.readonly && (CTX.fill || []).length) {
+      const fb = el("button", "btn btn-ghost btn-sm", "Fill in all courses from the Curriculum");
+      fb.type = "button";
+      fb.addEventListener("click", () => {
+        const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+        const add = CTX.fill.filter(p => !have.has(String(p.course_code).toUpperCase()));
+        if (!add.length) { note.textContent = "Every course of the Curriculum is already here."; return; }
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        add.forEach(p => data.push(Object.assign({}, p)));
+        draw(); touch();
+        note.textContent = `Added ${add.length} course${add.length === 1 ? "" : "s"} — code, name, credits and hours are in.`;
+      });
+      top.appendChild(fb);
+    }
+    top.appendChild(note);
+
+    function field(row, i, name, extra) {
+      const c = Object.assign({}, C[name], extra || {});
+      const holder = el("div", "sh-in");
+      holder.dataset.field = name;
+      holder.dataset.row = i;
+      const input = makeInput(c, row[name], v => { row[name] = v; touch(); });
+      input.setAttribute("aria-label", c.label);
+      if (c.placeholder) input.placeholder = c.placeholder;
+      holder.appendChild(input);
+      attachLiveCheck(input, c, holder);
+      return holder;
+    }
+    const cell = (tag, cls, kids, span) => {
+      const t = el(tag, cls);
+      if (span) t.colSpan = span;
+      (kids || []).forEach(k => t.appendChild(typeof k === "string" ? el("span", null, k) : k));
+      return t;
+    };
+    const label = (txt, node) => {
+      const d = el("div", "sh-line");
+      d.appendChild(el("strong", "sh-lab", txt));
+      d.appendChild(node);
+      return d;
+    };
+
+    function modulesRows(row, i, tbody) {
+      if (!Array.isArray(row.modules)) row.modules = [];
+      const mods = row.modules;
+      if (!mods.length && !CTX.readonly) mods.push({});
+      const head = el("tr", "sh-syl-head");
+      head.appendChild(cell("th", "sh-left", ["Syllabus:"]));
+      head.appendChild(cell("th", "sh-hours", ["Hours"]));
+      tbody.appendChild(head);
+      const sum = el("span");
+      const paintSum = () => {
+        const total = mods.reduce((a, m) => a + (num(m.hours) || 0), 0);
+        const want = num(row.teaching_hours);
+        sum.textContent = `Total ${total} hours` + (want === null ? "" :
+          total === want ? ` — matches the ${want} teaching hours` : ` — the course has ${want} teaching hours`);
+        sum.className = want === null ? "" : total === want ? "is-ok" : "is-off";
+      };
+      mods.forEach((m, k) => {
+        const tr = el("tr", "sh-mod");
+        const t = el("input", "sh-mod-title");
+        t.type = "text"; t.value = m.title ?? ""; t.placeholder = "Title of the module";
+        t.addEventListener("input", () => { m.title = t.value; touch(); });
+        const lab = el("div", "sh-mod-line");
+        lab.appendChild(el("strong", null, `Module No. ${k + 1}:`));
+        lab.appendChild(t);
+        if (!CTX.readonly && mods.length > 1) {
+          const rm = el("button", "sh-x", "×");
+          rm.type = "button"; rm.title = `Remove module ${k + 1}`;
+          rm.addEventListener("click", () => { mods.splice(k, 1); draw(); touch(); });
+          lab.appendChild(rm);
+        }
+        tr.appendChild(cell("td", "sh-left", [lab]));
+        const h = el("input", "sh-mod-hours");
+        h.type = "text"; h.inputMode = "numeric"; h.value = m.hours ?? ""; h.placeholder = "—";
+        h.addEventListener("input", () => {
+          h.value = h.value.replace(/[^0-9]/g, "");
+          m.hours = h.value === "" ? "" : Number(h.value);
+          paintSum(); touch();
+        });
+        tr.appendChild(cell("td", "sh-hours", [h]));
+        tbody.appendChild(tr);
+        const tr2 = el("tr", "sh-mod-body");
+        const ta = el("textarea", "sh-mod-content");
+        ta.rows = 4; ta.value = m.revised ?? ""; ta.placeholder = "Content of the module";
+        ta.addEventListener("input", () => { m.revised = ta.value; touch(); });
+        if (CTX.readonly) t.disabled = h.disabled = ta.disabled = true;
+        tr2.appendChild(cell("td", null, [ta], 2));
+        tbody.appendChild(tr2);
+      });
+      const foot = el("tr", "sh-mod-foot");
+      const td = cell("td", null, [], 2);
+      if (!CTX.readonly) {
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+        add.type = "button";
+        add.addEventListener("click", () => { mods.push({}); draw(); touch(); });
+        td.appendChild(add);
+      }
+      td.appendChild(sum);
+      foot.appendChild(td);
+      tbody.appendChild(foot);
+      paintSum();
+    }
+
+    function sheet(row, i) {
+      const wrap = el("section", "sheet-wrap");
+      wrap.dataset.row = i;
+      const cap = el("div", "sheet-cap");
+      cap.appendChild(el("span", null, `Course ${i + 1}${row.course_code ? " · " + row.course_code : ""}`));
+      if (!CTX.readonly && data.length > 1) {
+        const rm = el("button", "btn btn-ghost btn-sm", "Remove");
+        rm.type = "button";
+        rm.addEventListener("click", () => {
+          if (!blank(row) && !window.confirm(`Remove ${row.course_code || "this course"} and its syllabus?`)) return;
+          data.splice(i, 1); draw(); touch();
+        });
+        cap.appendChild(rm);
+      }
+      wrap.appendChild(cap);
+
+      const t = el("table", "sheet");
+      const tb = el("tbody");
+      t.appendChild(tb);
+      const r1 = el("tr");
+      const head = el("td", "sh-head");
+      head.colSpan = 3;
+      const prog = el("div", "sh-line sh-center");
+      prog.appendChild(el("strong", "sh-lab", "Name of the Program:"));
+      prog.appendChild(el("span", "sh-prog", CTX.programme_name || ""));
+      head.appendChild(prog);
+      head.appendChild(label("Course Code:", field(row, i, "course_code")));
+      head.appendChild(label("Name of the Course:", field(row, i, "course_title")));
+      r1.appendChild(head);
+      tb.appendChild(r1);
+
+      const r2 = el("tr", "sh-grid-h");
+      ["credits", "hours_per_week", "teaching_hours"].forEach(n => r2.appendChild(cell("th", null, [C[n].label])));
+      tb.appendChild(r2);
+      const r3 = el("tr", "sh-grid");
+      ["credits", "hours_per_week", "teaching_hours"].forEach(n => r3.appendChild(cell("td", null, [field(row, i, n)])));
+      tb.appendChild(r3);
+
+      const block = (lab, name, after) => {
+        const tr = el("tr");
+        const td = cell("td", "sh-block", [], 3);
+        td.appendChild(el("strong", "sh-lab", lab));
+        td.appendChild(field(row, i, name));
+        if (after) td.appendChild(el("strong", "sh-note", after));
+        tr.appendChild(td);
+        tb.appendChild(tr);
+      };
+      block("Pedagogy:", "pedagogy");
+      block("Course Outcomes: On successful completion of the course, the students' will be able to", "outcomes");
+      // the modules sit in a table of their own, so the sheet keeps its
+      // three equal columns above
+      const mr = el("tr");
+      const mtd = cell("td", "sh-nest", [], 3);
+      const mt = el("table", "sheet sh-syl");
+      const mtb = el("tbody");
+      mt.appendChild(mtb);
+      modulesRows(row, i, mtb);
+      mtd.appendChild(mt);
+      mr.appendChild(mtd);
+      tb.appendChild(mr);
+      block("Skill Development Activities:", "skill_activities");
+      block("Books for reference:", "books", "Note: Latest edition of books may be used.");
+      wrap.appendChild(t);
+      return wrap;
+    }
+
+    function draw() {
+      list.textContent = "";
+      data.forEach((row, i) => list.appendChild(sheet(row, i)));
+      if (!CTX.readonly) {
+        const add = el("button", "btn btn-ghost sheet-add", "+ Add another course");
+        add.type = "button";
+        add.addEventListener("click", () => {
+          data.push({});
+          draw(); touch();
+          list.lastElementChild.previousElementSibling?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        list.appendChild(add);
+      }
+    }
+    host.showRow = () => draw();
+    draw();
+  }
+
   // ------------------------------------------------------------------ expand
   /* A wide table is easier to fill in on the whole screen. Expand lifts the
      section itself into a large pop-up — the same inputs, still saving as
@@ -2922,8 +3129,8 @@
       const block = el("div", "section-block");
       block.id = `sec-${section.key}`;
       const h = el("h3", null, section.title);
-      block.appendChild(h);
-      if (WIDE_SECTIONS.includes(section.type) && section.display !== "cards") expandable(block, h, section.title);
+      if (section.title) block.appendChild(h);
+      if (WIDE_SECTIONS.includes(section.type) && !["cards", "sheet"].includes(section.display) && section.title) expandable(block, h, section.title);
       if (section.help) block.appendChild(el("div", "section-help", section.help));
       (section.links || []).forEach(l => {
         const a = el("a", "section-link", `${l.label} →`);
@@ -2931,7 +3138,9 @@
         block.appendChild(a);
       });
 
-      if (section.type === "table" && section.display === "cards") {
+      if (section.type === "table" && section.display === "sheet") {
+        renderSheets(section, block);
+      } else if (section.type === "table" && section.display === "cards") {
         renderRowCards(section, block);
       } else if (section.type === "table") {
         renderTable(section, block);

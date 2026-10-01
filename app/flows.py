@@ -59,9 +59,6 @@ FLOWS = [
      "detail": "From L-T-P-E → Classification of Credits → Summary → UGC Table 2 check"},
     {"id": "marks", "field": "Total marks", "from": "prog_curriculum", "to": ["checks"],
      "how": "worked out", "detail": "Continuous assessment + term end → Summary total marks"},
-    {"id": "syllabus_change", "field": "% change per module and per course", "from": "prog_syllabus",
-     "to": ["checks"], "how": "worked out",
-     "detail": "Module % → course average → (A)–(D) summary"},
 ]
 
 
@@ -123,7 +120,7 @@ def flows_for(submission: dict, department: dict, programme_code: str | None = N
                             if avgs else ""),
     }
     per_programme = {"degree", "batch", "specialisation", "courses", "hours", "credits",
-                     "marks", "syllabus_change"}
+                     "marks"}
     out = []
     for f in FLOWS:
         v = values.get(f["id"], "")

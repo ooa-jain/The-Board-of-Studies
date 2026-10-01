@@ -40,7 +40,7 @@
       <p class="small muted mb-1">
         <span class="mono">{{ p.programme_code }}</span>{% if facts %} · {{ facts|join(' · ') }}{% endif %}
       </p>
-      {{ part_flow(p.parts, p.programme_code, show_status=True) }}
+      {{ part_flow(p.parts, p.programme_code, show_status=True, zigzag=True) }}
       {% for note in p.parts|selectattr('note')|map(attribute='note')|unique %}
       <p class="small note-err mt-1">Returned: {{ note }}</p>
       {% endfor %}

@@ -3240,62 +3240,116 @@ td.rt-file { min-width: 104px; }
 .batch-box legend { padding: 0 6px; font-weight: 800; font-size: .86rem; color: var(--lv-navy, #0f2440); }
 .batch-now { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
-/* ---------- a programme's parts as one flow:
-   Curriculum → Syllabus: Current Batch → Existing Batch → Revision ---------- */
-.pflow-nav { margin: 0 0 18px; overflow-x: auto; padding: 4px 2px 8px; }
+/* ---------- a programme's parts as numbered steps (STEP 01–04): coloured
+   cards with a round badge, joined by dotted arrows ---------- */
+.pflow-nav { margin: 0 0 22px; overflow-x: auto; padding: 8px 4px 14px; }
 .pflow {
-  list-style: none; margin: 0; padding: 0;
-  display: flex; align-items: stretch; gap: 34px; min-width: max-content;
+  --ink: #2d2a26;
+  list-style: none; margin: 0; padding: 0 0 0 18px;
+  display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 0 56px;
+  align-items: start; min-width: 860px;
 }
-.pflow-step { position: relative; display: flex; }
-/* the arrow to the next step */
-.pflow-step:not(:last-child)::after {
-  content: ""; position: absolute; top: 50%; right: -28px; width: 22px; height: 2px;
-  background: var(--lv-gold, #c79c10);
+.pflow-step { position: relative; display: flex; align-items: center; }
+/* staggered: every other step sits lower, as in a hand-drawn flow */
+.pflow:not(.pflow-zig) .pflow-step:nth-child(even) { margin-top: 30px; }
+.pflow-c1 { --c: #f0707f; } .pflow-c2 { --c: #5cc5c0; } .pflow-c3 { --c: #f6a93b; } .pflow-c4 { --c: #b3d23f; }
+.pflow-card {
+  position: relative; flex: 1; display: flex; flex-direction: column; gap: 3px;
+  min-height: 74px; padding: 10px 14px 10px 40px; margin-left: -26px;
+  background: var(--c); color: #1d1a16; text-decoration: none;
+  border: 2px solid var(--ink); border-radius: 12px 18px 12px 16px;
+  box-shadow: 4px 4px 0 rgba(45, 42, 38, .85);
+  transition: transform .15s, box-shadow .15s;
 }
-.pflow-step:not(:last-child)::before {
-  content: ""; position: absolute; top: calc(50% - 4px); right: -29px;
-  border-left: 7px solid var(--lv-gold, #c79c10); border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+a.pflow-card:hover { text-decoration: none; transform: translate(-1px, -2px); box-shadow: 6px 6px 0 rgba(45, 42, 38, .85); }
+.pflow-badge {
+  position: relative; z-index: 1; flex: none; display: grid; place-items: center;
+  width: 58px; height: 58px; border-radius: 50%; background: var(--c); color: #fff;
+  border: 2px solid var(--ink); box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .35), 3px 3px 0 rgba(45, 42, 38, .85);
 }
-.pflow-node {
-  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
-  min-width: 140px; padding: 10px 22px; border-radius: 999px; text-align: center;
-  background: var(--lv-card, #fdfbf7); border: 2px solid var(--lv-border, #e6ddcc);
-  color: var(--lv-navy, #0f2440); text-decoration: none; position: relative;
-  transition: border-color .15s, box-shadow .15s, transform .15s;
+.pflow-badge svg { width: 30px; height: 30px; }
+.pflow-no { font-family: var(--font-display, "Manrope", sans-serif); font-weight: 800; font-size: .95rem;
+  letter-spacing: .04em; text-transform: uppercase; color: #fff; text-shadow: 1px 1px 0 rgba(0, 0, 0, .25); }
+.pflow-title { font-weight: 800; font-size: .86rem; line-height: 1.2; }
+.pflow-tag { align-self: flex-start; font-size: .68rem; font-weight: 800; padding: 1px 8px; border-radius: 999px;
+  background: rgba(255, 255, 255, .78); border: 1.5px solid var(--ink); }
+.pflow-status { font-size: .72rem; font-weight: 700; opacity: .85; }
+.pflow-years { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+.pflow-year { padding: 2px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800;
+  background: rgba(255, 255, 255, .8); border: 1.5px solid var(--ink); color: #1d1a16; text-decoration: none; }
+.pflow-year:hover { background: #fff; text-decoration: none; }
+.pflow-year.is-here { background: var(--ink); color: #fff; }
+/* where you are: a darker outline and a lifted card */
+.pflow-step.is-here .pflow-card { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--ink); transform: translateY(-2px); }
+.pflow-step.is-here .pflow-badge { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--ink); }
+.pflow-step.is-submitted .pflow-no::after { content: " ✓"; }
+/* the dotted arrow to the next step */
+.pflow-arrow { position: absolute; width: 50px; height: 42px; color: var(--ink); pointer-events: none; }
+.pflow:not(.pflow-zig) .pflow-step .pflow-arrow { right: -54px; top: -6px; }
+.pflow:not(.pflow-zig) .pflow-step:nth-child(even) .pflow-arrow { top: auto; bottom: -4px; transform: scaleY(-1); }
+/* a programme card: the steps zig-zag down, two to a row */
+.pflow.pflow-zig { grid-template-columns: 1fr 1fr; min-width: 0; gap: 34px 26px; padding: 6px 4px 4px 18px; }
+.pflow-zig .pflow-step:nth-child(even) { margin-top: 26px; }
+.pflow-zig .pflow-card { min-height: 66px; }
+.pflow-zig .pflow-step:nth-child(odd) .pflow-arrow { right: -30px; top: -14px; }
+.pflow-zig .pflow-step:nth-child(even) .pflow-arrow { left: -6px; bottom: -40px; transform: scaleX(-1) rotate(20deg); }
+@media (max-width: 640px) {
+  .pflow.pflow-zig { grid-template-columns: 1fr; }
+  .pflow-zig .pflow-step:nth-child(even) { margin-top: 0; }
+  .pflow-zig .pflow-arrow { display: none; }
 }
-a.pflow-node:hover { border-color: var(--lv-gold, #c79c10); text-decoration: none; transform: translateY(-1px); }
-.pflow-step.is-here > .pflow-node { background: var(--lv-navy, #0f2440); border-color: var(--lv-navy, #0f2440); color: #fff;
-  box-shadow: 0 8px 22px -12px rgba(15, 36, 64, .6); }
-.pflow-step.is-submitted > .pflow-node { border-color: #9fd0b0; }
-.pflow-step.is-returned > .pflow-node { border-color: #efb4aa; }
-.pflow-step.is-draft > .pflow-node { border-color: #e7cf7a; }
-.pflow-kicker { font-family: var(--font-mono, monospace); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
-.pflow-title { font-weight: 800; font-size: .92rem; line-height: 1.2; }
-.pflow-tag { font-size: .66rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
-  background: var(--lv-soft-gold, #fbf1cf); color: #6b4f00; margin-top: 2px; }
-.pflow-status { font-size: .7rem; font-weight: 600; opacity: .75; }
-.pflow-dot { position: absolute; top: 8px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: #c9c2b2; }
-.pflow-step.is-submitted .pflow-dot { background: var(--ok, #1f7a4a); }
-.pflow-step.is-draft .pflow-dot { background: var(--lv-gold, #c79c10); }
-.pflow-step.is-returned .pflow-dot { background: var(--err, #b42318); }
-/* Existing Batch: one oval holding a small oval per year */
-.pflow-existing > .pflow-node { padding: 8px 18px; }
-.pflow-years { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 4px; }
-.pflow-year {
-  padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 700;
-  border: 1.5px solid var(--lv-border, #e6ddcc); background: #fff; color: var(--lv-navy, #0f2440); text-decoration: none;
+
+/* ---------- the syllabus template sheet ---------- */
+.sheet-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+.sheet-bar:empty { display: none; }
+.sheet-note { font-size: .8rem; color: var(--ok, #1f7a4a); }
+.sheets { display: grid; gap: 26px; }
+.sheet-wrap { max-width: 860px; }
+.sheet-cap {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 6px;
+  font-family: var(--font-mono, monospace); font-size: .72rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--lv-muted-fg, #5f6b7d);
 }
-.pflow-year:hover { border-color: var(--lv-gold, #c79c10); text-decoration: none; }
-.pflow-year.is-submitted { border-color: #9fd0b0; }
-.pflow-year.is-draft { border-color: #e7cf7a; }
-.pflow-year.is-here { background: var(--lv-navy, #0f2440); border-color: var(--lv-navy, #0f2440); color: #fff; }
-.pflow-existing.is-here > .pflow-node { border-color: var(--lv-navy, #0f2440); }
-/* inside a programme card the flow wraps to the card */
-.prog-frame .pflow { min-width: 0; flex-wrap: wrap; gap: 26px 30px; }
-.prog-frame .pflow-node { min-width: 110px; padding: 9px 16px; }
-.prog-frame .pflow-step:not(:last-child)::after { right: -24px; width: 18px; }
-.prog-frame .pflow-step:not(:last-child)::before { right: -25px; }
-.pflow-existing.is-here > .pflow-node { background: var(--lv-navy, #0f2440); color: #fff; }
-.pflow-existing.is-here .pflow-year { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .35); color: #fff; }
-.pflow-existing.is-here .pflow-year.is-here { background: var(--lv-gold, #c79c10); border-color: var(--lv-gold, #c79c10); color: #1a1300; }
+table.sheet {
+  width: 100%; border-collapse: collapse; background: #fff; color: #111;
+  font-family: Calibri, "Carlito", "Inter", sans-serif; font-size: .92rem;
+  box-shadow: 0 10px 28px -20px rgba(15, 36, 64, .45);
+}
+table.sheet td, table.sheet th { border: 1.5px solid #2b2b2b; padding: 6px 10px; vertical-align: top; }
+table.sheet th { font-weight: 700; text-align: center; background: #fff; }
+.sh-head { text-align: left; }
+.sh-line { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 3px 0; }
+.sh-lab { font-weight: 700; white-space: nowrap; }
+.sh-prog { font-weight: 400; }
+.sh-in { flex: 1; min-width: 0; }
+.sh-line .sh-in { max-width: 420px; }
+table.sheet input, table.sheet textarea, table.sheet select {
+  width: 100%; border: 1px dashed #c9c2b2; border-radius: 4px; background: #fffef9;
+  font: inherit; color: #111; padding: 4px 8px; box-shadow: none;
+}
+table.sheet input:focus, table.sheet textarea:focus { border: 1px solid var(--lv-gold, #c79c10); outline: none; background: #fff; }
+.sh-grid td { text-align: center; }
+.sh-grid input { text-align: center; font-weight: 700; }
+.sh-block .sh-lab { display: block; margin-bottom: 4px; }
+.sh-block textarea { min-height: 70px; }
+.sh-note { display: block; margin-top: 6px; }
+.sh-syl-head th { text-align: left; }
+.sh-syl-head th.sh-hours, td.sh-hours { width: 92px; text-align: center; }
+.sh-mod-line { display: flex; align-items: center; gap: 8px; }
+.sh-mod-line strong { white-space: nowrap; }
+.sh-mod-title { font-weight: 700; }
+.sh-mod-hours { text-align: center; font-weight: 700; }
+.sh-mod-body td { border-top: 0; }
+.sh-mod-content { min-height: 84px; }
+.sh-x { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #ddd; background: #fff; color: var(--err, #b42318); cursor: pointer; flex: none; }
+.sh-mod-foot td { font-size: .8rem; font-weight: 700; }
+.sh-mod-foot td > * { vertical-align: middle; margin-right: 10px; }
+.sh-mod-foot .is-ok { color: var(--ok, #1f7a4a); }
+.sh-mod-foot .is-off { color: #a35a00; }
+.sheet-add { justify-self: start; }
+table.sheet:not(.sh-syl) { table-layout: fixed; }
+td.sh-nest { padding: 0; border: 0; }
+table.sh-syl { box-shadow: none; margin: -1.5px 0; width: calc(100% + 0px); }
+table.sh-syl td.sh-hours, table.sh-syl th.sh-hours { width: 92px; }
+table.sheet td.sh-nest { padding: 0; border-left: 0; border-right: 0; }
+table.sheet.sh-syl { margin: 0; border-style: hidden; }
