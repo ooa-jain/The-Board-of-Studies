@@ -380,20 +380,16 @@ PROGRAMME_CURRICULUM = {
                     "Multi-disciplinary slot may be left without a code.",
             "type": "table",
             "min_rows": 1,
-            # an Upload button over the table: any file is kept as the
-            # curriculum document, and an Excel or CSV one fills the rows
-            "import": {"attach": ["curriculum_file", "document"],
-                       "accept": ".xlsx,.csv,.xls,.pdf,.docx,.doc"},
             "columns": [
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
-                 "min": 1, "max": 8, "choices": SEMESTERS, "width": "84px"},
+                 "min": 1, "max": 8, "choices": SEMESTERS, "width": "64px"},
                 {"name": "track", "label": "Applies to", "type": "select", "options": TRACKS,
-                 "width": "150px", "help": "Leave as All semesters except for semester 7 and 8 "
+                 "width": "112px", "help": "Leave as All semesters except for semester 7 and 8 "
                                            "courses that differ between the two tracks."},
                 {"name": "nep_category", "label": "Course group", "type": "select", "required": True,
                  "options": NEP_CATEGORIES},
                 {"name": "course_code", "label": "Course code", "type": "text",
-                 "pattern": "^[A-Za-z0-9][A-Za-z0-9 /\\-.]{1,60}$", "width": "130px",
+                 "pattern": "^[A-Za-z0-9][A-Za-z0-9 /\\-.]{1,60}$", "width": "110px",
                  "help": "For example 26BCC1C01."},
                 {"name": "course_title", "label": "Course title", "type": "text", "required": True},
                 {"name": "l", "label": "L", "type": "integer", "required": True, "min": 0, "max": 10,
