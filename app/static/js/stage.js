@@ -3212,6 +3212,7 @@
         const grid = el("div", "fields-grid");
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
+          if (f.hidden) return;              // kept in the record, not shown
           // standard wording is the placeholder: an empty box means "use it".
           // A draft that still holds the wording word for word shows it the
           // same way, so the department sees grey text it can type over.

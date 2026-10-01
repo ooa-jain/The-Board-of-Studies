@@ -1174,3 +1174,15 @@ def test_course_revision_is_the_syllabus_template():
     # the old log is gone
     assert "revisions" not in [s["key"] for s in rev["sections"]]
     assert "revised_code" not in cols
+
+
+def test_batch_is_worked_out_not_asked(app, client):
+    _through_bos_documents(app, client)
+    client.post("/department/api/prog_curriculum/BCMREG/save",
+                json={"details": {"degree_level": "UG - 3 Year", "batch": "1999-00"}})
+    page = client.get("/department/stage/prog_curriculum/BCMREG").get_data(as_text=True)
+    assert _stage_data(page)["details"]["batch"] == "2026-29"
+    client.post("/department/api/prog_curriculum/MCMNEW/save",
+                json={"details": {"degree_level": "PG Diploma - 1 Year"}})
+    page = client.get("/department/stage/prog_curriculum/MCMNEW").get_data(as_text=True)
+    assert _stage_data(page)["details"]["batch"] == "2026-27"

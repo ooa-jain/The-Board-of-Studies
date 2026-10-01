@@ -39,7 +39,7 @@
       {% elif status == 'draft' %}<span class="pill pill-warn">In progress</span>
       {% else %}<span class="pill pill-gold">Open</span>{% endif %}
       {% if programme %}
-      <div class="small muted mt-1">{{ programme.programme_name }}<br>{{ programme.degree_level }}</div>
+      {% if programme.degree_level %}<div class="small muted mt-1">{{ programme.degree_level }}</div>{% endif %}
       {% endif %}
     </div>
   </div>

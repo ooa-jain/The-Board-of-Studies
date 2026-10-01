@@ -278,20 +278,22 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "details",
             "title": "Programme details",
-            "help": "Code and name come from Department Information. Choose the degree first — "
-                    "the UGC credit check follows it.",
             "type": "fields",
             "fields": [
+                # code and name come from Department Information and head the
+                # page already — kept for the record, not shown or asked again
                 {"name": "programme_code", "label": "Programme code", "type": "readonly",
-                 "prefill": "programme_code"},
+                 "prefill": "programme_code", "hidden": True},
                 {"name": "programme_name", "label": "Programme", "type": "readonly",
-                 "prefill": "programme_name", "wide": True},
+                 "prefill": "programme_name", "wide": True, "hidden": True},
                 {"name": "degree_level", "label": "Degree / Duration", "type": "select",
                  "required": True, "options": DEGREE_LEVELS, "prefill": "degree_level",
                  "reload_on_change": True},
                 {"name": "specialisation", "label": "Specialisation", "type": "text"},
-                {"name": "batch", "label": "Batch", "type": "text", "required": True,
-                 "pattern": "^[0-9]{4}\\s*-\\s*[0-9]{2,4}$", "help": "For example 2026-30."},
+                # worked out, never typed: the current batch's first year to the
+                # year the programme ends (2026-29 for a 3-year UG)
+                {"name": "batch", "label": "Batch", "type": "readonly", "prefill": "batch_auto",
+                 "help": "From the current batch and the degree's duration."},
             ],
         },
         {

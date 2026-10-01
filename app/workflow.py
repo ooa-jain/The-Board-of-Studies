@@ -535,6 +535,13 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
     if programme:
         source.update({k: v for k, v in programme.items() if v not in (None, "")})
         source["specialisation"] = programme.get("specialisation") or "—"
+    # the batch a programme's curriculum is for: the current batch's first
+    # year to the year the programme ends
+    from .schema import batch_start, degree_years
+    start = batch_start(batches()["current"])
+    years = degree_years((programme or {}).get("degree_level"))
+    if start:
+        source["batch_auto"] = f"{start}-{str(start + years)[-2:]}" if years else batches()["current"]
     prog = dict(programme or {})
     try:
         prog["duration_months"] = int(float(prog.get("duration_years"))) * 12
