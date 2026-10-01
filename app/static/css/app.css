@@ -3686,3 +3686,56 @@ a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
   15% { box-shadow: 0 0 0 8px rgba(199, 156, 16, .45); }
   100% { box-shadow: 0 0 0 18px rgba(199, 156, 16, 0); }
 }
+
+/* a hidden file input must stay 1px: a full-width one stretched the
+   scrolling area of the tables it sits in */
+input[type=file].sr-only {
+  position: absolute !important; width: 1px !important; height: 1px !important;
+  min-width: 0 !important; padding: 0 !important; margin: -1px !important; border: 0 !important;
+  overflow: hidden !important; clip: rect(0 0 0 0) !important;
+}
+.row-file { position: relative; }
+
+/* ---------- the revision table: calm colours, tighter, cleaner ---------- */
+.rv-wrap { border: 1px solid #e4ddcd; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 18px -14px rgba(15, 36, 64, .35); background: #fff; }
+.rv-table { border-collapse: separate; border-spacing: 0; min-width: 640px; font-size: .86rem; }
+.rv-table thead th {
+  background: #eef3fa; color: #2a3f60; border: 0; border-bottom: 1px solid #dfe6f0;
+  font-family: var(--font-mono); font-size: .66rem; font-weight: 700; letter-spacing: .08em;
+  padding: 10px 12px; text-align: left;
+}
+.rv-table thead th:first-child { background: #e6edf6; }
+.rv-table th, .rv-table td { border: 0; border-bottom: 1px solid #f0ebe0; padding: 6px 10px; }
+.rv-table tbody tr:last-child > * { border-bottom: 0; }
+.rv-table td + td, .rv-table th + td { border-left: 1px solid #f0ebe0; }
+.rv-table tbody th {
+  width: 130px; background: #faf8f3; color: #3a4a63;
+  font-size: .7rem; letter-spacing: .06em; padding-top: 12px;
+}
+.rv-table input, .rv-table textarea {
+  border: 1px solid transparent; background: #f8f6f1; border-radius: 8px; padding: 7px 10px;
+  font-size: .86rem; box-shadow: none; transition: background .15s, border-color .15s;
+}
+.rv-table input:hover, .rv-table textarea:hover { background: #f3f0e8; }
+.rv-table input:focus, .rv-table textarea:focus { background: #fff; border-color: #c9b98a; outline: none; }
+.rv-table input[readonly], .rv-table textarea[readonly] { background: #eef3fa; color: #2a3f60; font-weight: 600; }
+.rv-table textarea { min-height: 84px; resize: vertical; }
+.rv-meta td, .rv-meta th { padding-top: 5px; padding-bottom: 5px; }
+.rv-table .rv-pct { width: 110px; }
+.rv-pct-in input {
+  width: 64px; text-align: center; font-weight: 800; background: #fbf1cf; color: #6b4f00; border-radius: 999px;
+}
+.rv-pct-in input.is-auto { background: #e2f1e6; color: #1f6b44; }
+.rv-total td { background: #f2f7f3 !important; color: #1f4d35; font-weight: 800; border-top: 1px solid #dcebe1; }
+.rv-total .rv-avg { font-size: 1.05rem; color: #1f6b44; text-align: center; }
+.rv-add td { background: #fff; padding: 8px 10px; }
+.rv-table tbody th .rv-remove { font-size: .7rem; }
+
+/* the course around it: less padding and gap */
+.rv-list { gap: 14px; }
+.rv-course { padding: 10px 12px 12px; border-radius: 16px; }
+.rv-course-head { margin-bottom: 8px; gap: 8px; }
+.rv-course-head input, .rv-course-head select { padding-top: 7px; padding-bottom: 7px; }
+/* the pop-up is as tall as what it holds, up to the window */
+.sec-pop-panel { height: auto; max-height: calc(100vh - 32px); }
+.sec-pop-body { padding-bottom: 22px; }
