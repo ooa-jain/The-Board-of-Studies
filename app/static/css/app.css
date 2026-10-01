@@ -3454,3 +3454,44 @@ a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
 .pflow-step.is-here .pflow-card { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--b), 0 10px 22px -12px rgba(43, 54, 71, .45); }
 .pflow-step.is-here .pflow-badge { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--b); }
 .pflow-arrow { color: #a9b2bf; }
+
+/* ---------- "Enter the Portal": a gold pill with a soft halo, its arrow
+   in a dark round, a slow light sweeping across it ---------- */
+.preload-enter {
+  position: relative; overflow: hidden; gap: 16px;
+  padding: 10px 10px 10px 28px; border-radius: 999px;
+  background: linear-gradient(135deg, #f5d36a 0%, #e9b82a 55%, #d79e12 100%);
+  color: #1a1300; text-align: left;
+  box-shadow: 0 0 0 1px rgba(255, 236, 170, .55) inset,
+              0 14px 34px -12px rgba(233, 184, 42, .65),
+              0 0 0 8px rgba(233, 184, 42, .10);
+  animation: pe-halo 3.2s ease-in-out infinite;
+}
+.preload-enter:hover { background: linear-gradient(135deg, #f8dc80 0%, #edc23d 55%, #dda61a 100%); }
+.pe-text { display: grid; line-height: 1.1; }
+.pe-kicker { font-family: var(--font-mono); font-size: .58rem; font-weight: 700; letter-spacing: .22em;
+  text-transform: uppercase; opacity: .7; }
+.pe-label { font-family: var(--font-display, var(--font)); font-size: 1.05rem; font-weight: 800; letter-spacing: -.01em; }
+.pe-arrow {
+  display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%;
+  background: #14213a; color: #f5d36a; flex: none;
+  transition: transform .25s ease;
+}
+.preload-enter:hover .pe-arrow { transform: translateX(3px); }
+.preload-enter .arrow { width: 18px; height: 18px; }
+/* the light that sweeps across it now and then */
+.preload-enter::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .55), transparent);
+  transform: skewX(-20deg); animation: pe-sweep 3.6s ease-in-out infinite 1.2s;
+}
+@keyframes pe-sweep { 0%, 60% { left: -60%; } 100% { left: 130%; } }
+@keyframes pe-halo {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 236, 170, .55) inset, 0 14px 34px -12px rgba(233, 184, 42, .65), 0 0 0 8px rgba(233, 184, 42, .10); }
+  50% { box-shadow: 0 0 0 1px rgba(255, 236, 170, .55) inset, 0 14px 34px -12px rgba(233, 184, 42, .75), 0 0 0 14px rgba(233, 184, 42, .04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preload-enter, .preload-enter::after { animation: none; }
+}
+.preload-enter { margin-top: 10px; padding-left: 30px; }
+.pe-label { font-size: 1.08rem; }

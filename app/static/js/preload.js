@@ -107,9 +107,9 @@
       scatter: 190,
       gatherDuration: 1600,
       stagger: 420,
-      pointerRepel: 42,
+      pointerRepel: 0,       // the logo holds still under the pointer
       repelRadius: 120,
-      idleDrift: 0.8,
+      idleDrift: 0,          // and does not drift once formed
       glow: true,
       onSettle: function () { offerTheWayIn(); ready(); }
     });

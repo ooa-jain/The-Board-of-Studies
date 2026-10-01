@@ -254,6 +254,8 @@
         settled = true;
         if (typeof o.onSettle === "function") o.onSettle();
       }
+      // nothing left to move: draw the finished letters once and stop
+      if (done && !o.idleDrift && !o.pointerRepel) { paintStatic(); return; }
       raf = global.requestAnimationFrame(frame);
     }
 

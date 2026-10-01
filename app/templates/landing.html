@@ -26,11 +26,13 @@
        Enter and to Space, and a screen reader calls it what it is. Clicking
        anywhere else on the curtain does the same thing. #}
     <button class="preload-enter" type="button" tabindex="-1">
-      Click to enter
-      <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
-              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <span class="pe-label">Enter the Portal</span>
+      <span class="pe-arrow" aria-hidden="true">
+        <svg class="arrow" viewBox="0 0 24 24" focusable="false">
+          <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
+                stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
     </button>
     <span class="preload-bar" aria-hidden="true"><i></i></span>
     <p class="preload-note">BoS Academic Portal</p>
