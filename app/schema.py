@@ -556,93 +556,40 @@ PROGRAMME_SYLLABUS = {
 
 REVISION_TYPES = ["Major Revision", "Minor Revision"]
 
-PROGRAMME_REVISION = {
-    "key": "prog_revision",
-    "parent": "curriculum",
-    "group": "Stage 3 · Curriculum",
-    "title": "Course Revision",
-    "blurb": "The Course Revision Log for this programme.",
-    "source_templates": ["Course Revisions Log_Template_2026.xlsx"],
-    "per_programme": True,
-    "sections": [
-        {
-            "key": "header",
-            "title": "Course Revision Log",
-            "type": "fields",
-            "fields": [
-                {"name": "department", "label": "Department", "type": "readonly", "prefill": "dept_name"},
-                {"name": "programme", "label": "Program", "type": "readonly", "prefill": "programme_name"},
-                {"name": "specialisation", "label": "Specialization", "type": "readonly",
-                 "prefill": "specialisation"},
-                {"name": "degree_level", "label": "Degree level (UG/PG/PGD)", "type": "readonly",
-                 "prefill": "level"},
-                {"name": "bos_date", "label": "BoS date", "type": "readonly", "prefill": "bos_date"},
-                {"name": "major_count", "label": "No. of courses with major revisions", "type": "readonly",
-                 "count": {"section": "revisions", "field": "revision_type", "value": "Major Revision"}},
-                {"name": "minor_count", "label": "No. of courses with minor revisions", "type": "readonly",
-                 "count": {"section": "revisions", "field": "revision_type", "value": "Minor Revision"}},
-                {"name": "prepared_by", "label": "Revision log prepared by", "type": "text", "required": True},
-                {"name": "approved_by", "label": "Approved by HoD", "type": "text", "required": True},
-            ],
-        },
-        {
-            "key": "revisions",
-            "title": "Revised courses",
-            "help": "One card per revised or new course. “Fill in all revisions” brings every "
-                    "course revised in the Syllabus, with its previous code, title, year and "
-                    "% change. Leave empty if nothing was revised.",
-            "type": "table",
-            "min_rows": 0,
-            "display": "cards",
-            "card": {"code": "revised_code", "name": "revised_title", "noun": "revision"},
-            "tabs": [{"key": "details", "label": "Revision"},
-                     {"key": "content", "label": "Content & feedback"}],
-            "columns": [
-                {"name": "semester", "label": "Semester", "type": "integer", "required": True,
-                 "min": 1, "max": 10},
-                {"name": "code_before", "label": "Course code (before revision)", "type": "text",
-                 "help": "N/A for a new course."},
-                {"name": "title_before", "label": "Course title (before revision)", "type": "text"},
-                {"name": "revision_type", "label": "Type of revision", "type": "select", "required": True,
-                 "options": REVISION_TYPES},
-                {"name": "percent_change", "label": "% change", "type": "integer", "required": True,
-                 "min": 0, "max": 100},
-                {"name": "revised_code", "label": "Revised course code (if major revision)", "type": "text"},
-                {"name": "revised_title", "label": "Revised course title (if changed)", "type": "text",
-                 "required": True},
-                {"name": "modifications", "label": "Modifications / updates made (content, structure "
-                 "or assessment)", "type": "textarea", "required": True, "rows": 2, "wide": True},
-                {"name": "rationale", "label": "Overall rationale for revision", "type": "textarea",
-                 "required": True, "rows": 2, "wide": True},
-                {"name": "module_nos", "label": "Module nos. where revisions are made", "type": "text",
-                 "tab": "content"},
-                {"name": "existing_content", "label": "Existing content", "type": "textarea", "rows": 2,
-                 "tab": "content", "wide": True},
-                {"name": "proposed_content", "label": "Proposed content", "type": "textarea",
-                 "required": True, "rows": 2, "tab": "content", "wide": True},
-                {"name": "introduced_year", "label": "Introduction of the course for the first time "
-                 "in the program (year)", "type": "text", "tab": "content"},
-                {"name": "previous_revision", "label": "Year/s of previous revision", "type": "text",
-                 "tab": "content"},
-                {"name": "feedback_from", "label": "Stakeholder feedback from", "type": "select",
-                 "options": ["Industry", "Academia", "Alumni", "Student", "Others"], "tab": "content"},
-                {"name": "key_suggestions", "label": "Key suggestions", "type": "textarea", "rows": 2,
-                 "tab": "content", "wide": True},
-                {"name": "remarks", "label": "Remarks, if any", "type": "textarea", "rows": 2,
-                 "tab": "content", "wide": True},
-            ],
-        },
-        {
-            "key": "revision_file",
-            "title": "Revision log document",
-            "type": "fields",
-            "fields": [
-                {"name": "document", "label": "Signed Course Revision Log (Excel or PDF)", "type": "file",
-                 "wide": True, "accept": ".xlsx,.xls,.pdf", "help": "Optional."},
-            ],
-        },
-    ],
-}
+def _plain_syllabus(key: str, title: str, blurb: str) -> dict:
+    """The syllabus template as a plain record: course details, the modules
+    (Module No., title, hours, content), activities and books — no previous
+    text, no % change. Course Revision and the earlier batches use it."""
+    import copy
+    part = copy.deepcopy(PROGRAMME_SYLLABUS)
+    part.pop("batch", None)
+    part.update({"key": key, "title": title, "blurb": blurb})
+    for sec in part["sections"]:
+        if sec["key"] == "courses":
+            sec["columns"] = [c for c in sec["columns"]
+                              if c["name"] not in ("year_previous", "year_latest", "prev_code",
+                                                   "prev_title", "avg_change")]
+            for c in sec["columns"]:
+                if c["name"] == "modules":
+                    c.update({"compare": False,
+                              "help": "As in the syllabus template: Module No., its title, hours "
+                                      "and content."})
+            sec["rules"] = ["bloom_verbs_present"]
+    part["sections"] = [x for x in part["sections"] if x["key"] != "revision_summary"]
+    return part
+
+
+# Course Revision, in the syllabus template: one card per revised course.
+PROGRAMME_REVISION = _plain_syllabus(
+    "prog_revision", "Course Revision",
+    "Each revised course, as in the syllabus template.")
+for _sec in PROGRAMME_REVISION["sections"]:
+    if _sec["key"] == "courses":
+        _sec["title"] = "Revised courses"
+        _sec["help"] = ("One card per revised course, in the syllabus template. “Fill in all” adds "
+                        "the programme's courses with title, credits and hours already in; "
+                        "remove the ones that were not revised.")
+
 
 PARTS = [PROGRAMME_CURRICULUM, PROGRAMME_SYLLABUS, PROGRAMME_REVISION]
 
@@ -670,29 +617,10 @@ def batch_start(label) -> int | None:
 
 
 def _batch_part(start: int) -> dict:
-    import copy
-    part = copy.deepcopy(PROGRAMME_SYLLABUS)
-    part.update({
-        "key": batch_key(start),
-        "title": f"Syllabus {batch_label(start)}",
-        "batch": batch_label(start),
-        "existing_batch": True,
-        "optional": True,
-        "blurb": f"The syllabus the {batch_label(start)} batch follows, as in the syllabus template.",
-    })
-    for sec in part["sections"]:
-        if sec["key"] == "courses":
-            # an earlier batch is a plain record: no revision columns
-            sec["columns"] = [c for c in sec["columns"]
-                              if c["name"] not in ("year_previous", "year_latest", "prev_code",
-                                                   "prev_title", "avg_change")]
-            for c in sec["columns"]:
-                if c["name"] == "modules":
-                    c.update({"compare": False,
-                              "help": "As in the syllabus template: Module No., its title, hours "
-                                      "and content."})
-            sec["rules"] = ["bloom_verbs_present"]
-    part["sections"] = [s for s in part["sections"] if s["key"] != "revision_summary"]
+    part = _plain_syllabus(batch_key(start), f"Syllabus {batch_label(start)}",
+                           f"The syllabus the {batch_label(start)} batch follows, as in the "
+                           "syllabus template.")
+    part.update({"batch": batch_label(start), "existing_batch": True, "optional": True})
     return part
 
 

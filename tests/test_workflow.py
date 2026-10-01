@@ -389,9 +389,11 @@ def test_programme_parts_are_prefilled(app, client):
                      "hours_per_week": 4, "teaching_hours": 60}]
     assert _stage_data(syl)["header"]["batch"] == "2026-29"
 
-    rev = _stage_data(client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True))
-    assert rev["header"]["bos_date"] == "2026-03-12"
-    assert rev["header"]["degree_level"] == "UG"
+    # Course Revision is in the syllabus template, and offers the same courses
+    revp = client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True)
+    rev = _stage_data(revp)
+    assert rev["header"]["batch"] == "2026-29"
+    assert json.loads(revp.split("fill: ")[1].split(",\n")[0])[0]["course_code"] == "26BCC1C01"
 
 
 def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
@@ -1094,12 +1096,10 @@ def test_flow_maps_one_departments_data_between_stages(app, client):
         "course_code": "26BCC1C01", "course_title": "Accounting", "semester": 1,
         "prev_code": "16BBA1C03", "prev_title": "Business Management", "year_previous": "2020",
         "avg_change": 57.15}]})
-    # the Course Revision offers the revised course with what the Syllabus holds
+    # Course Revision offers the programme's courses, in the syllabus template
     page = client.get("/department/stage/prog_revision/BCMREG").get_data(as_text=True)
     fill = json.loads(page.split("fill: ")[1].split(",\n")[0])
-    assert fill == [{"revised_code": "26BCC1C01", "revised_title": "Accounting", "semester": 1,
-                     "code_before": "16BBA1C03", "title_before": "Business Management",
-                     "previous_revision": "2020", "percent_change": 57}]
+    assert fill[0]["course_code"] == "26BCC1C01" and fill[0]["course_title"] == "Accounting"
     client.get("/logout")
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
 
@@ -1110,7 +1110,8 @@ def test_flow_maps_one_departments_data_between_stages(app, client):
     data = client.get("/admin/flow.json?dept=COM&prog=BCMREG").get_json()
     flows = {f["id"]: f for f in data["flows"]}
     assert flows["bos_date"]["value"] == "2026-03-12"
-    assert flows["bos_date"]["to"] == ["prog_revision", "prog_syllabus"]
+    assert flows["bos_date"]["to"] == ["prog_syllabus"]
+    assert flows["courses"]["to"] == ["prog_syllabus", "prog_revision"]
     assert flows["batch"]["value"] == "2026-29"
     assert flows["credits"]["value"] == "4 credits"
     assert "57.15" in flows["syllabus_change"]["value"]
@@ -1161,3 +1162,15 @@ def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, cli
     assert "/department/stage/prog_syllabus_b2025/BCMREG" in cur
     from app.schema import STAGE_BY_KEY
     assert "prog_syllabus_b2024" not in STAGE_BY_KEY["curriculum"]["parts"]
+
+
+def test_course_revision_is_the_syllabus_template():
+    from app.schema import STAGE_BY_KEY
+    rev = STAGE_BY_KEY["prog_revision"]
+    cols = [c["name"] for s in rev["sections"] if s["key"] == "courses" for c in s["columns"]]
+    for want in ("course_code", "course_title", "credits", "hours_per_week", "teaching_hours",
+                 "pedagogy", "outcomes", "modules", "skill_activities", "books"):
+        assert want in cols
+    # the old log is gone
+    assert "revisions" not in [s["key"] for s in rev["sections"]]
+    assert "revised_code" not in cols

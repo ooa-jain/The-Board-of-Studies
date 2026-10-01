@@ -30,31 +30,29 @@ NODES = [
 
 FLOWS = [
     {"id": "dept_name", "field": "Department name", "from": "dept_info",
-     "to": ["prog_revision"], "how": "copied",
-     "detail": "Department Information → Course Revision Log header"},
+     "to": ["checks"], "how": "copied",
+     "detail": "Department Information → the department's exports and reports"},
     {"id": "programmes", "field": "Programmes offered (code and name)", "from": "dept_info",
      "to": ["prog_curriculum", "prog_syllabus", "prog_revision"], "how": "copied",
      "detail": "Every programme kept here gets its own Curriculum, Syllabus and Course "
                "Revision, with its code and name filled in"},
     {"id": "degree", "field": "Degree / duration", "from": "prog_curriculum",
-     "to": ["prog_revision", "checks"], "how": "copied",
-     "detail": "Curriculum → Course Revision (UG / PG / PGD), duration in months and the "
-               "UGC Table 2 column the credits are checked against"},
-    {"id": "batch", "field": "Batch", "from": "prog_curriculum", "to": ["prog_syllabus"],
-     "how": "copied", "detail": "Curriculum programme details → Syllabus header"},
+     "to": ["checks"], "how": "copied",
+     "detail": "Curriculum → the UGC Table 2 column the credits are checked against"},
+    {"id": "batch", "field": "Batch", "from": "prog_curriculum",
+     "to": ["prog_syllabus", "prog_revision"],
+     "how": "copied", "detail": "Curriculum programme details → Syllabus and Course Revision headers"},
     {"id": "specialisation", "field": "Specialisation", "from": "prog_curriculum",
-     "to": ["prog_curriculum", "prog_revision"], "how": "copied",
-     "detail": "Programme details → item 9 Course & specialisation, and the Course "
-               "Revision Log header"},
+     "to": ["prog_curriculum"], "how": "copied",
+     "detail": "Programme details → item 9 Course & specialisation"},
     {"id": "bos_date", "field": "BoS meeting date", "from": "bos_documents",
-     "to": ["prog_revision", "prog_syllabus"], "how": "copied",
-     "detail": "BoS Documents → Course Revision Log BoS date, and the year of latest "
-               "revision on every syllabus"},
+     "to": ["prog_syllabus"], "how": "copied",
+     "detail": "BoS Documents → the year of latest revision on every syllabus"},
     {"id": "courses", "field": "Courses (code, title, semester, credits)", "from": "prog_curriculum",
-     "to": ["prog_syllabus"], "how": "offered",
-     "detail": "Programme structure → Syllabus “Fill in all courses”"},
+     "to": ["prog_syllabus", "prog_revision"], "how": "offered",
+     "detail": "Programme structure → Syllabus and Course Revision “Fill in all courses”"},
     {"id": "hours", "field": "Hours per week and teaching hours", "from": "prog_curriculum",
-     "to": ["prog_syllabus"], "how": "worked out",
+     "to": ["prog_syllabus", "prog_revision"], "how": "worked out",
      "detail": "L + T + P + E hours per week, × 15 weeks for total teaching hours"},
     {"id": "credits", "field": "Credits", "from": "prog_curriculum", "to": ["checks"],
      "how": "worked out",
@@ -62,15 +60,8 @@ FLOWS = [
     {"id": "marks", "field": "Total marks", "from": "prog_curriculum", "to": ["checks"],
      "how": "worked out", "detail": "Continuous assessment + term end → Summary total marks"},
     {"id": "syllabus_change", "field": "% change per module and per course", "from": "prog_syllabus",
-     "to": ["checks", "prog_revision"], "how": "worked out",
-     "detail": "Module % → course average → (A)–(D) summary, and the % change on the "
-               "Course Revision Log"},
-    {"id": "previous", "field": "Previous code, title and year", "from": "prog_syllabus",
-     "to": ["prog_revision"], "how": "offered",
-     "detail": "Syllabus revision table → Course Revision “Fill in all revisions”"},
-    {"id": "revision_counts", "field": "Major / minor revision counts", "from": "prog_revision",
-     "to": ["prog_revision"], "how": "worked out",
-     "detail": "Counted from the revised courses into the log header"},
+     "to": ["checks"], "how": "worked out",
+     "detail": "Module % → course average → (A)–(D) summary"},
 ]
 
 
@@ -106,7 +97,7 @@ def flows_for(submission: dict, department: dict, programme_code: str | None = N
     cur, syl, rev = pdata("prog_curriculum"), pdata("prog_syllabus"), pdata("prog_revision")
     structure = [r for r in cur.get("semester_structure") or [] if isinstance(r, dict)]
     courses = [r for r in syl.get("courses") or [] if isinstance(r, dict)]
-    revisions = [r for r in rev.get("revisions") or [] if isinstance(r, dict)]
+    revised = [r for r in rev.get("courses") or [] if isinstance(r, dict)]
     ug = sum(1 for p in progs if p.get("level") not in ("PG", "PGD"))
 
     credits = sum(_num(r.get("credits")) or 0 for r in structure)
@@ -123,21 +114,16 @@ def flows_for(submission: dict, department: dict, programme_code: str | None = N
         "specialisation": (prog or {}).get("specialisation") or "",
         "bos_date": meeting.get("bos_date") or "",
         "courses": (f"{_n(len(structure), 'course')} in the structure · "
-                    f"{_n(len(courses), 'syllabus', 'syllabi')}" if prog else ""),
+                    f"{_n(len(courses), 'syllabus', 'syllabi')} · {len(revised)} revised"
+                    if prog else ""),
         "hours": (f"{int(sum(hours))} hours a week across {_n(len(hours), 'course')}" if hours else ""),
         "credits": f"{_fmt(credits)} credits" if structure else "",
         "marks": f"{_fmt(marks)} marks" if structure else "",
         "syllabus_change": (f"Average {_fmt(sum(avgs) / len(avgs))}% across {_n(len(avgs), 'course')}"
                             if avgs else ""),
-        "previous": (f"{_n(sum(1 for c in courses if c.get('prev_code') or c.get('prev_title')), 'course')} "
-                     f"with a previous version" if courses else ""),
-        "revision_counts": (
-            f"{sum(1 for r in revisions if r.get('revision_type') == 'Major Revision')} major · "
-            f"{sum(1 for r in revisions if r.get('revision_type') == 'Minor Revision')} minor"
-            if revisions else ""),
     }
     per_programme = {"degree", "batch", "specialisation", "courses", "hours", "credits",
-                     "marks", "syllabus_change", "previous", "revision_counts"}
+                     "marks", "syllabus_change"}
     out = []
     for f in FLOWS:
         v = values.get(f["id"], "")

@@ -18,7 +18,6 @@ from .schema import STAGE_BY_KEY, STAGE_KEYS
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
                        course_fill_source, form_data, part_status, prefill_for,
-                       revision_fill_source,
                        programme_fill_source, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only, batches, parts_for)
@@ -140,10 +139,8 @@ def stage(stage_key, programme_code=None):
 
     fill = []
     if status in OPENABLE:
-        if stage_key.startswith("prog_syllabus") and programme:
+        if (stage_key.startswith("prog_syllabus") or stage_key == "prog_revision") and programme:
             fill = course_fill_source(sub, programme["programme_code"])
-        elif stage_key == "prog_revision" and programme:
-            fill = revision_fill_source(sub, programme["programme_code"])
 
     board = stage_board(sub)
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
