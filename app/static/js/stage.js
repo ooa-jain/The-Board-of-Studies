@@ -2506,7 +2506,61 @@
     '<rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
     '<path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
 
+  /* The department's identity as a profile card (after Uiverse.io,
+     Smit-Prajapati). It is the Office's record, so nothing is edited here.
+     At rest a large monogram fills the card with the name on a strip at the
+     foot; as the card scrolls into view the strip rises over it and the
+     monogram shrinks into a round badge — scrolling drives it, no click. */
+  function renderProfileCard(section, block) {
+    const v = state[section.key] || {};
+    const name = String(v.dept_name || CTX.dept_name || "Department").trim();
+    const words = name.replace(/^Department of\s+/i, "").split(/\s+/).filter(w => /^[A-Z]/.test(w) && !/^(and|of|the)$/i.test(w));
+    const mono = (words.slice(0, 2).map(w => w[0]).join("") || name[0] || "D").toUpperCase();
+    const card = el("div", "pcard");
+    card.setAttribute("aria-label", `${name} — department identity`);
+    const pic = el("div", "pcard-pic");
+    pic.setAttribute("aria-hidden", "true");
+    pic.innerHTML =
+      '<svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice">' +
+      '<defs><pattern id="pcard-dots" width="18" height="18" patternUnits="userSpaceOnUse">' +
+      '<circle cx="2" cy="2" r="1.6" fill="#c79c10" opacity=".35"/></pattern></defs>' +
+      '<rect width="400" height="240" fill="#fbf1cf"/><rect width="400" height="240" fill="url(#pcard-dots)"/>' +
+      '<circle cx="330" cy="40" r="70" fill="#f6dd8f" opacity=".7"/>' +
+      '<circle cx="60" cy="210" r="56" fill="#f3c9a4" opacity=".55"/></svg>';
+    pic.appendChild(el("span", "pcard-mono", mono));
+    card.appendChild(pic);
+
+    const lock = el("span", "pcard-lock");
+    lock.innerHTML = LOCK;
+    lock.title = "From the Office of Academics record";
+    card.appendChild(lock);
+
+    const bottom = el("div", "pcard-bottom");
+    const content = el("div", "pcard-content");
+    content.appendChild(el("span", "pcard-name", name));
+    const facts = el("dl", "pcard-facts");
+    section.fields.filter(f => f.name !== "dept_name").forEach(f => {
+      const val = v[f.name];
+      const d = el("div", "pcard-fact");
+      d.appendChild(el("dt", null, f.label));
+      d.appendChild(el("dd", null, val == null || String(val).trim() === "" ? "—" : String(val)));
+      facts.appendChild(d);
+    });
+    content.appendChild(facts);
+    bottom.appendChild(content);
+    card.appendChild(bottom);
+    block.appendChild(card);
+
+    // open while the card is well in view, close as it leaves
+    const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still || !("IntersectionObserver" in window)) { card.classList.add("is-open"); return; }
+    new IntersectionObserver(entries => entries.forEach(e => {
+      card.classList.toggle("is-open", e.intersectionRatio >= 0.6);
+    }), { threshold: [0, 0.6, 1] }).observe(card);
+  }
+
   function renderCards(section, block) {
+    if (section.frozen) return renderProfileCard(section, block);
     state[section.key] = state[section.key] || {};
     const vals = () => state[section.key];
 

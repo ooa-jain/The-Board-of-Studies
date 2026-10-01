@@ -286,6 +286,7 @@
     key: {{ stage.key|tojson }},
     programme: {{ (programme.programme_code if programme else None)|tojson }},
     programme_name: {{ (programme.programme_name if programme else '')|tojson }},
+    dept_name: {{ dept.dept_name|tojson }},
     readonly: {{ readonly|tojson }},
     synced: {{ synced|tojson }},
     calc: {{ calc|tojson }},
