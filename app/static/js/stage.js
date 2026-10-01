@@ -3566,7 +3566,7 @@
   function submit() {
     const btn = document.getElementById("btn-submit");
     btn.disabled = true;
-    btn.textContent = "Checking…";
+    btn.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Checking…';
     save();
     fetch(CTX.urls.submit, {
       method: "POST",

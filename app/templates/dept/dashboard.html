@@ -78,6 +78,15 @@
 </div>
 {% endif %}
 
+{# The submission in a container that starts tilted back and straightens
+   as it scrolls into view (after Aceternity UI's container scroll). #}
+<section class="cs" id="cs">
+  <div class="cs-title">
+    <span class="cs-kicker">Board of Studies · {{ year }}</span>
+    <h2>Your submission,<br><span class="cs-big">stage by stage</span></h2>
+  </div>
+  <div class="cs-card">
+    <div class="cs-screen">
 <div class="grid grid-4 mb-2">
   <div class="stat frame frame-navy">
     <div class="n">{{ progress.done }}</div><div class="l">Stages submitted</div>
@@ -149,4 +158,31 @@
   {% endfor %}
   {% if ns.group is not none %}</div></section>{% endif %}
 </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var box = document.getElementById("cs");
+    if (!box) return;
+    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var card = box.querySelector(".cs-card"), title = box.querySelector(".cs-title");
+    function tick() {
+      // 0 when the container's top meets the bottom of the window, 1 once
+      // it is a third of the way up
+      var r = box.getBoundingClientRect(), vh = window.innerHeight;
+      var p = still ? 1 : Math.min(1, Math.max(0, (vh - r.top) / (vh * 0.75)));
+      var small = window.innerWidth < 760;
+      var from = small ? 0.8 : 1.05, to = small ? 0.95 : 1;
+      card.style.transform = "rotateX(" + (20 * (1 - p)).toFixed(2) + "deg) scale(" + (from + (to - from) * p).toFixed(3) + ")";
+      title.style.transform = "translateY(" + (-40 * p).toFixed(1) + "px)";
+    }
+    window.addEventListener("scroll", tick, { passive: true });
+    window.addEventListener("resize", tick);
+    tick();
+  })();
+</script>
 {% endblock %}

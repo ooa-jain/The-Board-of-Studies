@@ -3592,3 +3592,74 @@ a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
 .rv-in[data-field=semester] { width: 92px; }
 .rv-in input, .rv-in select { text-transform: none; letter-spacing: 0; font-weight: 600; }
 .rv-course-head .btn { margin-left: auto; }
+
+/* ---------- resizable navbar (after Aceternity UI): at the top a full bar,
+   once scrolled a floating frosted pill ---------- */
+.topbar { transition: background .35s ease, border-color .35s ease; }
+.topbar .wrap {
+  transition: width .45s cubic-bezier(.2, .8, .2, 1), transform .45s cubic-bezier(.2, .8, .2, 1),
+              background .35s ease, box-shadow .35s ease, border-radius .45s ease, height .35s ease;
+}
+.topbar.is-shrunk { background: transparent; border-bottom-color: transparent; }
+.topbar.is-shrunk::before { opacity: 0; height: 0; }
+.topbar.is-shrunk .wrap {
+  width: min(980px, calc(100% - 28px)); height: 60px; transform: translateY(10px);
+  background: rgba(253, 251, 247, .82) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.4); backdrop-filter: blur(12px) saturate(1.4);
+  border-radius: 999px !important;
+  box-shadow: 0 0 24px rgba(34, 42, 53, .06), 0 1px 1px rgba(0, 0, 0, .05),
+              0 0 0 1px rgba(34, 42, 53, .04), 0 16px 68px rgba(47, 48, 55, .07),
+              0 1px 0 rgba(255, 255, 255, .1) inset !important;
+}
+.topbar-wide.is-shrunk .wrap { width: min(1180px, calc(100% - 28px)); }
+.topbar.is-shrunk .brand-text span { display: none; }
+/* the pill that slides under the link the pointer is on */
+.nav-left, .nav-right { position: relative; }
+.nav-left > a, .nav-right > a, .nav-right > .who { position: relative; z-index: 1; }
+.nav-pill {
+  position: absolute; top: 0; left: 0; z-index: 0; width: 0; height: 0;
+  border-radius: 999px; background: #efe9dc; opacity: 0; pointer-events: none;
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1), width .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease;
+}
+.nav-pill.is-on { opacity: 1; }
+.nav-left a.active, .nav-left a[aria-current="page"] { border-radius: 0; }
+@media (max-width: 900px) {
+  .topbar.is-shrunk .wrap { width: calc(100% - 20px); }
+  .nav-pill { display: none; }
+}
+
+/* ---------- LoaderOne (after Aceternity UI): three dots that bounce in turn ---------- */
+.loader-one { display: inline-flex; align-items: center; gap: 6px; height: 22px; }
+.loader-one i {
+  width: 10px; height: 10px; border-radius: 50%; display: block;
+  background: linear-gradient(to bottom, #d4d4d4, #a3a3a3);
+  border: 1px solid #d4d4d4;
+  animation: loader-one .9s ease-in-out infinite;
+}
+.loader-one i:nth-child(2) { animation-delay: .2s; }
+.loader-one i:nth-child(3) { animation-delay: .4s; }
+@keyframes loader-one { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+.loader-one.is-gold i { background: linear-gradient(to bottom, #f3cf55, #c79c10); border-color: #e7cf7a; }
+.loader-one.is-light i { background: linear-gradient(to bottom, #fff, #e7e2d6); border-color: #fff; }
+.loader-center { display: flex; justify-content: center; margin: 4px auto 18px; }
+.btn .loader-one { height: 16px; gap: 4px; margin-right: 8px; vertical-align: middle; }
+.btn .loader-one i { width: 7px; height: 7px; animation-name: loader-one-sm; }
+@keyframes loader-one-sm { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .loader-one i { animation: none; } }
+
+/* ---------- My Submission: the container scroll (after Aceternity UI) ---------- */
+.cs { perspective: 1000px; padding: 30px 0 10px; }
+.cs-title { text-align: center; margin: 0 auto 26px; max-width: 760px; will-change: transform; }
+.cs-kicker { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--lv-gold, #c79c10); }
+.cs-title h2 { margin: 8px 0 0; font-size: clamp(1.6rem, 3vw, 2.3rem); font-weight: 600; color: var(--lv-navy, #0f2440); line-height: 1.1; }
+.cs-big { display: inline-block; margin-top: 4px; font-size: clamp(2.4rem, 6vw, 4.6rem); font-weight: 800; letter-spacing: -.02em; }
+.cs-card {
+  max-width: 1100px; margin: -6px auto 0; padding: 10px; border-radius: 30px;
+  border: 4px solid #6c6c6c; background: #222;
+  box-shadow: 0 0 #0000004d, 0 9px 20px #0000004a, 0 37px 37px #00000042, 0 84px 50px #00000026,
+              0 149px 60px #0000000a, 0 233px 65px #00000003;
+  transform-origin: center top; will-change: transform;
+}
+.cs-screen { border-radius: 20px; background: var(--lv-bg, #f6f1e7); padding: 22px; overflow: hidden; }
+.cs-screen > .grid:first-child { margin-top: 0; }
+@media (max-width: 760px) { .cs-card { padding: 6px; border-width: 3px; border-radius: 22px; } .cs-screen { padding: 12px; } }
