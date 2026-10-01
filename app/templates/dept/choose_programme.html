@@ -22,6 +22,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "dept/_part_flow.html" import part_flow %}
 {% for level in ('UG', 'PG') if groups.get(level) %}
 <div class="group-label">{{ level }} programmes</div>
 <div class="grid grid-2 mb-2">
@@ -39,28 +40,10 @@
       <p class="small muted mb-1">
         <span class="mono">{{ p.programme_code }}</span>{% if facts %} · {{ facts|join(' · ') }}{% endif %}
       </p>
-      <div class="part-list">
-        {% for part in p.parts %}
-        <div class="part-row">
-          <div class="part-info">
-            <strong>{{ part.title }}</strong>
-            {% if part.tag %}<span class="part-tag{{ ' is-old' if part.existing }}">{{ 'Current batch ' if not part.existing }}{{ part.tag }}</span>{% endif %}
-            {% if part.optional %}<span class="small muted">Optional</span>{% endif %}
-            {% if part.note %}<span class="small note-err">Returned: {{ part.note }}</span>{% endif %}
-          </div>
-          {% if part.errors and part.status != 'submitted' %}<span class="pill pill-err">{{ part.errors }} to fix</span>{% endif %}
-          {% if part.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
-          {% elif part.status == 'returned' %}<span class="pill pill-err">Returned</span>
-          {% elif part.status == 'draft' %}<span class="pill pill-warn">In progress</span>
-          {% else %}<span class="pill">Not started</span>{% endif %}
-          <a class="btn btn-sm {{ 'btn-ghost' if part.status == 'submitted' else 'btn-gold' if part.status == 'open' else '' }}"
-             href="{{ url_for('dept.stage', stage_key=part.key, programme_code=p.programme_code) }}">
-            {{ 'View' if part.status == 'submitted' else 'Correct' if part.status == 'returned'
-               else 'Continue' if part.status == 'draft' else 'Start' }}
-          </a>
-        </div>
-        {% endfor %}
-      </div>
+      {{ part_flow(p.parts, p.programme_code, show_status=True) }}
+      {% for note in p.parts|selectattr('note')|map(attribute='note')|unique %}
+      <p class="small note-err mt-1">Returned: {{ note }}</p>
+      {% endfor %}
     </div>
   </div>
   {% endfor %}

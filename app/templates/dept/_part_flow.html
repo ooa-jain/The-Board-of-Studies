@@ -1,0 +1,47 @@
+{# A programme's parts as one flow, in the order they are filled:
+   Curriculum → Syllabus: Current Batch → Existing Batch → Revision.
+   Each step is an oval that opens its form; Existing Batch holds one
+   oval per earlier batch year. Used by the programme page and the list. #}
+{% macro part_flow(parts, code, here=None, show_status=False) %}
+{% set older = parts|selectattr('existing')|list %}
+{% set older_keys = older|map(attribute='key')|list %}
+{% set words = {'submitted': 'Submitted', 'returned': 'Returned', 'draft': 'In progress',
+                'open': 'Not started', 'locked': 'Locked'} %}
+<ol class="pflow" aria-label="Parts of this programme, in order">
+  {% for part in parts if not part.existing %}
+  {% set is_here = part.key == here %}
+  <li class="pflow-step is-{{ part.status }}{{ ' is-here' if is_here }}">
+    <a class="pflow-node" href="{{ url_for('dept.stage', stage_key=part.key, programme_code=code) }}"
+       {% if is_here %}aria-current="page"{% endif %}>
+      <span class="pflow-dot" aria-hidden="true"></span>
+      {% if part.key == 'prog_syllabus' %}
+        <span class="pflow-kicker">Syllabus</span>
+        <span class="pflow-title">Current Batch</span>
+      {% elif part.key == 'prog_revision' %}
+        <span class="pflow-title">Revision</span>
+      {% else %}
+        <span class="pflow-title">{{ part.title }}</span>
+      {% endif %}
+      {% if part.tag %}<span class="pflow-tag">{{ part.tag }}</span>{% endif %}
+      {% if show_status %}<span class="pflow-status">{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}</span>{% endif %}
+    </a>
+  </li>
+  {% if part.key == 'prog_syllabus' and older %}
+  <li class="pflow-step pflow-existing{{ ' is-here' if here in older_keys }}">
+    <div class="pflow-node">
+      <span class="pflow-kicker">Syllabus</span>
+      <span class="pflow-title">Existing Batch</span>
+      <span class="pflow-years">
+        {% for ob in older %}
+        <a class="pflow-year is-{{ ob.status }}{{ ' is-here' if ob.key == here }}"
+           href="{{ url_for('dept.stage', stage_key=ob.key, programme_code=code) }}"
+           {% if ob.key == here %}aria-current="page"{% endif %}
+           title="Syllabus {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}">{{ ob.tag }}</a>
+        {% endfor %}
+      </span>
+    </div>
+  </li>
+  {% endif %}
+  {% endfor %}
+</ol>
+{% endmacro %}

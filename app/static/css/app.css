@@ -3239,3 +3239,63 @@ td.rt-file { min-width: 104px; }
 .batch-box { border: 1px solid var(--lv-border, #e6ddcc); border-radius: 12px; padding: 12px 16px 6px; margin: 0 0 16px; }
 .batch-box legend { padding: 0 6px; font-weight: 800; font-size: .86rem; color: var(--lv-navy, #0f2440); }
 .batch-now { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* ---------- a programme's parts as one flow:
+   Curriculum → Syllabus: Current Batch → Existing Batch → Revision ---------- */
+.pflow-nav { margin: 0 0 18px; overflow-x: auto; padding: 4px 2px 8px; }
+.pflow {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: stretch; gap: 34px; min-width: max-content;
+}
+.pflow-step { position: relative; display: flex; }
+/* the arrow to the next step */
+.pflow-step:not(:last-child)::after {
+  content: ""; position: absolute; top: 50%; right: -28px; width: 22px; height: 2px;
+  background: var(--lv-gold, #c79c10);
+}
+.pflow-step:not(:last-child)::before {
+  content: ""; position: absolute; top: calc(50% - 4px); right: -29px;
+  border-left: 7px solid var(--lv-gold, #c79c10); border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+}
+.pflow-node {
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
+  min-width: 140px; padding: 10px 22px; border-radius: 999px; text-align: center;
+  background: var(--lv-card, #fdfbf7); border: 2px solid var(--lv-border, #e6ddcc);
+  color: var(--lv-navy, #0f2440); text-decoration: none; position: relative;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+a.pflow-node:hover { border-color: var(--lv-gold, #c79c10); text-decoration: none; transform: translateY(-1px); }
+.pflow-step.is-here > .pflow-node { background: var(--lv-navy, #0f2440); border-color: var(--lv-navy, #0f2440); color: #fff;
+  box-shadow: 0 8px 22px -12px rgba(15, 36, 64, .6); }
+.pflow-step.is-submitted > .pflow-node { border-color: #9fd0b0; }
+.pflow-step.is-returned > .pflow-node { border-color: #efb4aa; }
+.pflow-step.is-draft > .pflow-node { border-color: #e7cf7a; }
+.pflow-kicker { font-family: var(--font-mono, monospace); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; opacity: .7; }
+.pflow-title { font-weight: 800; font-size: .92rem; line-height: 1.2; }
+.pflow-tag { font-size: .66rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  background: var(--lv-soft-gold, #fbf1cf); color: #6b4f00; margin-top: 2px; }
+.pflow-status { font-size: .7rem; font-weight: 600; opacity: .75; }
+.pflow-dot { position: absolute; top: 8px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: #c9c2b2; }
+.pflow-step.is-submitted .pflow-dot { background: var(--ok, #1f7a4a); }
+.pflow-step.is-draft .pflow-dot { background: var(--lv-gold, #c79c10); }
+.pflow-step.is-returned .pflow-dot { background: var(--err, #b42318); }
+/* Existing Batch: one oval holding a small oval per year */
+.pflow-existing > .pflow-node { padding: 8px 18px; }
+.pflow-years { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin-top: 4px; }
+.pflow-year {
+  padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 700;
+  border: 1.5px solid var(--lv-border, #e6ddcc); background: #fff; color: var(--lv-navy, #0f2440); text-decoration: none;
+}
+.pflow-year:hover { border-color: var(--lv-gold, #c79c10); text-decoration: none; }
+.pflow-year.is-submitted { border-color: #9fd0b0; }
+.pflow-year.is-draft { border-color: #e7cf7a; }
+.pflow-year.is-here { background: var(--lv-navy, #0f2440); border-color: var(--lv-navy, #0f2440); color: #fff; }
+.pflow-existing.is-here > .pflow-node { border-color: var(--lv-navy, #0f2440); }
+/* inside a programme card the flow wraps to the card */
+.prog-frame .pflow { min-width: 0; flex-wrap: wrap; gap: 26px 30px; }
+.prog-frame .pflow-node { min-width: 110px; padding: 9px 16px; }
+.prog-frame .pflow-step:not(:last-child)::after { right: -24px; width: 18px; }
+.prog-frame .pflow-step:not(:last-child)::before { right: -25px; }
+.pflow-existing.is-here > .pflow-node { background: var(--lv-navy, #0f2440); color: #fff; }
+.pflow-existing.is-here .pflow-year { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .35); color: #fff; }
+.pflow-existing.is-here .pflow-year.is-here { background: var(--lv-gold, #c79c10); border-color: var(--lv-gold, #c79c10); color: #1a1300; }

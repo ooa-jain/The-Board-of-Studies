@@ -48,26 +48,9 @@
 
 {% block content %}
 {% if parts %}
-<nav class="part-tabs" aria-label="Parts of this programme">
-  {% for part in parts if not part.existing %}
-  <a href="{{ url_for('dept.stage', stage_key=part.key, programme_code=programme.programme_code) }}"
-     class="part-tab{{ ' is-here' if part.here }}"{% if part.here %} aria-current="page"{% endif %}>
-    <span class="mini-dot mini-{{ part.status }}" aria-hidden="true"></span>{{ part.title }}
-    {% if part.tag %}<span class="part-tag">{{ part.tag }}</span>{% endif %}
-  </a>
-  {% endfor %}
-  {% set older = parts|selectattr('existing')|list %}
-  {% if older %}
-  <span class="part-tabs-group">
-    <span class="part-tabs-label">Existing batches</span>
-    {% for part in older %}
-    <a href="{{ url_for('dept.stage', stage_key=part.key, programme_code=programme.programme_code) }}"
-       class="part-tab part-tab-sm{{ ' is-here' if part.here }}"{% if part.here %} aria-current="page"{% endif %}>
-      <span class="mini-dot mini-{{ part.status }}" aria-hidden="true"></span>{{ part.tag }}
-    </a>
-    {% endfor %}
-  </span>
-  {% endif %}
+{% from "dept/_part_flow.html" import part_flow %}
+<nav class="pflow-nav" aria-label="Parts of this programme">
+  {{ part_flow(parts, programme.programme_code, stage.key) }}
 </nav>
 {% endif %}
 {% if state.returned_note %}
