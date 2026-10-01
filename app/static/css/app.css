@@ -3431,3 +3431,26 @@ table.sheet.sh-syl { margin: 0; border-style: hidden; }
 .pcard-pic { border-color: #f1dc9a; }
 .pcard.is-open .pcard-pic { box-shadow: rgba(15, 36, 64, .12) 0 4px 10px 0; }
 .pcard-lock { color: #3a5478; background: rgba(255, 255, 255, .85); }
+
+/* the steps in mild colours: pastel cards, softer outlines and shadows */
+.pflow { --ink: #7b8798; }
+.pflow-c1 { --c: #fbe0e3; --b: #ee9ca7; --t: #b2475a; }
+.pflow-c2 { --c: #d8f1ef; --b: #84d0cb; --t: #2f7f7a; }
+.pflow-c3 { --c: #fdebd0; --b: #f3c27b; --t: #a1661a; }
+.pflow-c4 { --c: #eaf3d2; --b: #bcd977; --t: #5e7d1f; }
+.pflow-card {
+  border: 1.5px solid var(--b); color: #2b3647;
+  box-shadow: 0 6px 16px -10px rgba(43, 54, 71, .35);
+}
+a.pflow-card:hover { box-shadow: 0 10px 22px -12px rgba(43, 54, 71, .4); }
+.pflow-badge {
+  background: var(--b); border: 1.5px solid #fff; color: #fff;
+  box-shadow: 0 0 0 1.5px var(--b), 0 6px 14px -8px rgba(43, 54, 71, .45);
+}
+.pflow-no { color: var(--t); text-shadow: none; }
+.pflow-title { color: #2b3647; }
+.pflow-tag, .pflow-year { border: 1px solid var(--b); background: rgba(255, 255, 255, .9); color: #2b3647; }
+.pflow-year.is-here { background: var(--t); border-color: var(--t); color: #fff; }
+.pflow-step.is-here .pflow-card { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--b), 0 10px 22px -12px rgba(43, 54, 71, .45); }
+.pflow-step.is-here .pflow-badge { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--b); }
+.pflow-arrow { color: #a9b2bf; }
