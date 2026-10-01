@@ -272,18 +272,7 @@ PROGRAMME_CURRICULUM = {
     "parent": "curriculum",
     "group": "Stage 3 · Curriculum",
     "title": "Curriculum",
-    "blurb": "The programme's details, its structure semester by semester with the credit "
-             "classification checked against UGC Table 2, and items 1–12 of the Curriculum "
-             "Matrix template.",
-    "source_templates": [
-        "Curriculum Matrix Template.docx",
-        "BCom (Corporate Finance) Honours / Honours with Research V1 25 Jun.docx",
-    ],
-    "samples": [
-        {"label": "Curriculum Matrix template (blank)", "file": "docs/Curriculum_Matrix_Template.docx"},
-        {"label": "Curriculum sample — BCom (Corporate Finance)",
-         "file": "docs/Curriculum_Sample_BCom_Corporate_Finance.docx"},
-    ],
+    "blurb": "",
     "per_programme": True,
     "sections": [
         {
@@ -474,7 +463,6 @@ PROGRAMME_SYLLABUS = {
     # shows the current batch (Admin > Settings) beside the title
     "batch": "current",
     "blurb": "",
-    "source_templates": ["[Template] Syllabus.pdf"],
     "per_programme": True,
     "sections": [
         {
