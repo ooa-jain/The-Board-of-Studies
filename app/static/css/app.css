@@ -3739,3 +3739,76 @@ input[type=file].sr-only {
 /* the pop-up is as tall as what it holds, up to the window */
 .sec-pop-panel { height: auto; max-height: calc(100vh - 32px); }
 .sec-pop-body { padding-bottom: 22px; }
+
+/* ==========================================================================
+   Type and text colour after jainuniversity.ac.in: Roboto throughout, headings
+   in the JAIN blue at a medium weight, running text in a deep blue, the short
+   gold-and-grey rule under page titles, links in the site's link blue, and
+   orange for accents and separators.
+   ========================================================================== */
+:root {
+  --font: "Roboto", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-head: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --jain-blue: #0e3d7c;     /* headings (10.5:1 on white) */
+  --jain-text: #1d3c6e;     /* running text (11:1 on white) */
+  --jain-link: #0b63ce;     /* "Click Here" blue (5.2:1 on white) */
+  --jain-orange: #f47c20;   /* accents, separators, call-to-action */
+  --jain-gold: #f2a900;
+  --jain-grey: #5f6672;     /* nav and quiet labels (5.9:1 on white) */
+  --lv-navy: var(--jain-text);
+  --ink-800: var(--jain-blue);
+  --ink-600: var(--jain-link);
+  --ink: var(--jain-text);
+}
+html, body { font-family: var(--font); color: var(--jain-text); font-size: 15.5px; line-height: 1.6; }
+body { color: var(--jain-text); }
+p, li, td, label, .muted { font-family: var(--font); }
+
+h1, h2, h3, h4, h5, .page-head h1, .display {
+  font-family: var(--font-head); color: var(--jain-blue);
+  font-weight: 500; letter-spacing: 0; font-stretch: normal; line-height: 1.25;
+}
+h1, .page-head h1 { font-size: clamp(1.6rem, 2.6vw, 2.05rem); }
+h2 { font-size: clamp(1.3rem, 2vw, 1.6rem); }
+h3 { font-size: 1.18rem; }
+h4 { font-size: 1.02rem; font-weight: 700; }
+
+/* the short gold rule and grey rule under a page title, as on the site */
+.page-head h1::after {
+  content: ""; display: block; width: 88px; height: 2px; margin-top: 12px;
+  background: linear-gradient(90deg, var(--jain-gold) 0 26px, transparent 26px 38px, #9aa0a8 38px 88px);
+}
+.page-head[style*="center"] h1::after, .center h1::after { margin-left: auto; margin-right: auto; }
+
+a { color: var(--jain-link); }
+strong, b { color: var(--jain-blue); font-weight: 500; }
+
+/* micro-labels: plain Roboto caps rather than a mono face */
+.eyebrow, .crumbs, .group-label, table.data th, table.rt th, .stat .l,
+.rt-count, .bar-label, .pill-tabs a, .pill-tabs button, .chart-label {
+  font-family: var(--font); letter-spacing: .04em;
+}
+.eyebrow { color: var(--jain-orange); font-weight: 500; }
+
+/* top navigation: grey caps like the site's menu */
+.nav-left a, .nav-right > a {
+  font-family: var(--font); font-weight: 500; text-transform: uppercase;
+  font-size: .82rem; letter-spacing: .02em; color: var(--jain-grey);
+}
+.nav-left a:hover, .nav-right > a:hover { color: var(--jain-blue); }
+.nav-left a[aria-current="page"], .nav-left a.is-on, .nav-left a.active {
+  color: var(--jain-blue); box-shadow: inset 0 -2px 0 var(--jain-orange);
+}
+
+/* buttons keep their shapes; their words take the site's type */
+.btn, button, input, select, textarea { font-family: var(--font); }
+.btn { font-weight: 500; letter-spacing: .01em; }
+
+/* form labels and hints */
+.field label, .fld-label, label { color: var(--jain-blue); font-weight: 500; }
+.hint, .help, .field-hint, .muted { color: var(--jain-grey); }
+
+/* course codes and numbers still line up */
+.mono, code, kbd { font-family: "Roboto Mono", ui-monospace, Consolas, monospace; }
