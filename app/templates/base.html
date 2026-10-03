@@ -58,7 +58,9 @@
       <nav class="nav-left" aria-label="Main">
         {# Home is in the bar for anyone signed in: the wordmark goes there
            too, but a named link is what people look for. #}
-        {% if current_user %}
+        {% if current_user and current_user.role == 'department' %}
+          {{ nav_link(url_for('dept.dashboard'), 'Home', request.endpoint == 'dept.dashboard') }}
+        {% elif current_user %}
           {{ nav_link(url_for('public.landing'), 'Home', request.endpoint == 'public.landing') }}
         {% endif %}
         {% if current_user and current_user.role == 'admin' %}
@@ -68,7 +70,6 @@
           {{ nav_link(url_for('admin.flow'), 'Flow 3D', request.endpoint == 'admin.flow') }}
           {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
         {% elif current_user and current_user.role == 'department' %}
-          {{ nav_link(url_for('dept.dashboard'), 'My Submission', request.endpoint == 'dept.dashboard') }}
         {% else %}
           {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
         {% endif %}

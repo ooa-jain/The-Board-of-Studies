@@ -1,6 +1,6 @@
 """Public landing page and campus information."""
 
-from flask import Blueprint, current_app, render_template, request, session
+from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
 from .db import get_db, settings
 from .workflow import get_or_create_submission, next_action, progress
@@ -31,6 +31,10 @@ CAMPUS_INFO = [
 
 @bp.route("/")
 def landing():
+    # a signed-in department's home is its submission page
+    user = session.get("user") or {}
+    if user.get("role") == "department" and user.get("dept_code"):
+        return redirect(url_for("dept.dashboard"))
     db = get_db()
     # somewhere behind a login sent us here; the form carries it back
     nxt = request.args.get("next")

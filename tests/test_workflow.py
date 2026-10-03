@@ -793,21 +793,17 @@ def test_files_download_unless_the_page_asks_to_show_them(app, client):
 
 
 def test_a_signed_in_department_is_not_asked_to_sign_in_again(app, client):
+    """Their home is the submission page."""
     u, p = make_department(app)
     login(client, u, p)
-    body = client.get("/").get_data(as_text=True)
+    r = client.get("/")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/department/")
+    body = client.get("/", follow_redirects=True).get_data(as_text=True)
 
     assert 'name="password"' not in body, "the home page still asks for a password"
     assert "Sign out" in body
     assert ">Home</a>" in body, "no way back to the home page from the bar"
-    # and it shows where they had got to
-    assert "0 of 4 stages completed" in body
-    assert "Next Stage" in body and "Department Information" in body
-
-    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
-    body = client.get("/").get_data(as_text=True)
-    assert "1 of 4 stages completed" in body
-    assert "Pre-BoS" in body
+    assert "Department Information" in body
 
 
 def test_the_admin_gets_the_console_not_a_department_panel(app, client):

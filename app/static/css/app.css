@@ -3757,8 +3757,6 @@ input[type=file].sr-only {
   --jain-orange: #f47c20;   /* accents, separators, call-to-action */
   --jain-gold: #f2a900;
   --jain-grey: #5f6672;     /* nav and quiet labels (5.9:1 on white) */
-  --lv-navy: var(--jain-text);
-  --ink-800: var(--jain-blue);
   --ink-600: var(--jain-link);
   --ink: var(--jain-text);
 }
@@ -3799,8 +3797,12 @@ strong, b { color: var(--jain-blue); font-weight: 500; }
 }
 .nav-left a:hover, .nav-right > a:hover { color: var(--jain-blue); }
 .nav-left a[aria-current="page"], .nav-left a.is-on, .nav-left a.active {
-  color: var(--jain-blue); box-shadow: inset 0 -2px 0 var(--jain-orange);
+  color: var(--jain-blue); font-weight: 700; box-shadow: none !important; border-bottom: 0 !important;
 }
+.nav-left a::after, .nav-left a::before { content: none !important; }
+
+/* dark cards stay the deep navy of the logo, not a bright blue */
+.next-step:not(.is-done), .resume-card, .resume { background: linear-gradient(135deg, #0b1a33 0%, #10264a 100%) !important; }
 
 /* buttons keep their shapes; their words take the site's type */
 .btn, button, input, select, textarea { font-family: var(--font); }
