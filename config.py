@@ -39,6 +39,19 @@ class Config:
     # shown under each summary: "by Gemini"
     AI_NAME = os.getenv("AI_NAME") or ("Grok" if "x.ai" in AI_API_URL else "AI")
 
+    # Email connector. The server and its password live only in .env; the
+    # admin chooses who receives updates on the Connectors page.
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM = os.getenv("SMTP_FROM", "") or os.getenv("SMTP_USER", "")
+    SMTP_SSL = _bool("SMTP_SSL", False)       # True for port 465
+    # links in emails and chat messages point here
+    PUBLIC_URL = os.getenv("PUBLIC_URL", "").rstrip("/")
+    # tests send connectors inline instead of on a thread
+    CONNECTORS_SYNC = _bool("CONNECTORS_SYNC", False)
+
     PORT = int(os.getenv("PORT", "8102"))
     DEBUG = _bool("FLASK_DEBUG", False)
 

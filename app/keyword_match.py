@@ -38,8 +38,45 @@ STOP = {"the", "and", "for", "with", "from", "this", "that", "upload", "file", "
 READABLE = {".pdf", ".docx", ".xlsx", ".csv"}
 
 
+def upload_boxes():
+    """Every upload box in the forms, once each: [{field, label, where}]."""
+    from .schema import PARTS, STAGES
+    out, seen = [], set()
+    for stage in STAGES + PARTS:
+        for sec in stage.get("sections", []):
+            for f in sec.get("fields", []) + sec.get("columns", []):
+                if f.get("type") == "file" and f["name"] not in seen:
+                    seen.add(f["name"])
+                    label = f.get("label") or f["name"]
+                    if f["name"] == "course_file":
+                        label = "Course document (syllabus row upload)"
+                    out.append({"field": f["name"], "label": label,
+                                "where": stage.get("group") or stage.get("title", "")})
+    return out
+
+
+def overrides() -> dict:
+    """The admin's own lists, from Admin → Keywords; {} outside a request."""
+    try:
+        from .db import settings
+        return (settings() or {}).get("keywords") or {}
+    except Exception:
+        return {}
+
+
+def default_keywords(field: str, label: str) -> list[str]:
+    if field in KEYWORDS:
+        return KEYWORDS[field]
+    words = [w for w in re.findall(r"[A-Za-z]{4,}", label or "") if w.lower() not in STOP]
+    return list(dict.fromkeys(words))
+
+
 def keywords_for(field: str, label: str) -> list[str]:
-    """The words to look for: the box's own list, else the label's words."""
+    """The words to look for: the admin's list, else the box's own list,
+    else the label's words."""
+    mine = overrides().get(field)
+    if mine:
+        return mine
     if field in KEYWORDS:
         return KEYWORDS[field]
     words = [w for w in re.findall(r"[A-Za-z]{4,}", label or "") if w.lower() not in STOP]

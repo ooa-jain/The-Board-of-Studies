@@ -203,6 +203,7 @@ def departments():
                 if not place or db.departments.count_documents(
                     {"place": place, "campus": c})]
     return render_template("admin/departments.html", departments=depts,
+                           demo=db.departments.find_one({"dept_code": "DEMO"}),
                            schools=sorted(x for x in db.departments.distinct("school") if x),
                            campuses=campuses,
                            places=current_app.config["PLACES"],
@@ -768,3 +769,290 @@ def export_department_word(dept_code):
                      download_name=f"BoS-Report-{dept_code}-{_year()}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument."
                               "wordprocessingml.document")
+
+
+# ---------------------------------------------------------------------------
+# updates: what departments changed, as it happens
+# ---------------------------------------------------------------------------
+
+def _updates_query(args):
+    q = {}
+    if args.get("dept"):
+        q["dept_code"] = args["dept"]
+    if args.get("event"):
+        q["event"] = args["event"]
+    if args.get("show") == "unread":
+        q["read"] = False
+    return q
+
+
+@bp.route("/updates")
+@admin_required
+def updates():
+    from .notify import EVENTS
+    db = get_db()
+    q = _updates_query(request.args)
+    items = list(db.notifications.find(q).sort("at", -1).limit(300))
+    days, order = {}, []
+    for n in items:
+        d = n["at"].strftime("%A, %d %B %Y")
+        if d not in days:
+            days[d] = []
+            order.append(d)
+        days[d].append(n)
+    depts = sorted({(n["dept_code"], n.get("dept_name", "")) for n in
+                    db.notifications.find({}, {"dept_code": 1, "dept_name": 1})}, key=lambda x: x[1])
+    counts = {k: db.notifications.count_documents({"event": k}) for k in EVENTS}
+    return render_template("admin/updates.html", days=[(d, days[d]) for d in order],
+                           events=EVENTS, depts=depts, counts=counts, args=request.args,
+                           unread=db.notifications.count_documents({"read": False}),
+                           total=db.notifications.count_documents({}))
+
+
+@bp.post("/updates/read")
+@admin_required
+def updates_read():
+    from bson import ObjectId
+    db = get_db()
+    one = request.form.get("id")
+    if one:
+        try:
+            db.notifications.update_one({"_id": ObjectId(one)}, {"$set": {"read": True}})
+        except Exception:
+            abort(400)
+    else:
+        db.notifications.update_many({"read": False}, {"$set": {"read": True}})
+    if request.accept_mimetypes.best == "application/json" or request.is_json:
+        return jsonify({"ok": True})
+    return redirect(request.referrer or url_for("admin.updates"))
+
+
+@bp.route("/updates.json")
+@admin_required
+def updates_json():
+    """For the bell: how many are unread, and any newer than `after`."""
+    db = get_db()
+    q = {"read": False}
+    after = request.args.get("after")
+    items = []
+    if after:
+        try:
+            since = datetime.fromisoformat(after)
+            items = [{"id": str(n["_id"]), "text": n["text"], "event": n["event"],
+                      "at": n["at"].isoformat(),
+                      "link": url_for("admin.submission_detail", dept_code=n["dept_code"])}
+                     for n in db.notifications.find({"at": {"$gt": since}}).sort("at", 1).limit(5)]
+        except ValueError:
+            pass
+    return jsonify({"unread": db.notifications.count_documents(q), "items": items,
+                    "now": now().isoformat()})
+
+
+# ---------------------------------------------------------------------------
+# connectors: where updates are sent
+# ---------------------------------------------------------------------------
+
+def _connector_form(f):
+    from .notify import EVENTS, KINDS
+    kind = f.get("kind")
+    if kind not in KINDS:
+        return None, "Choose what kind of connector this is."
+    target = (f.get("target") or "").strip()
+    if kind == "email":
+        emails = [e.strip() for e in target.replace(";", ",").split(",") if e.strip()]
+        if not emails or not all(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", e) for e in emails):
+            return None, "Give one or more email addresses, separated by commas."
+        target = ", ".join(emails)
+    elif not target.startswith("https://"):
+        return None, "The webhook address must start with https://"
+    events = [e for e in f.getlist("events") if e in EVENTS]
+    if not events:
+        return None, "Choose at least one kind of update to send."
+    return {"kind": kind, "name": (f.get("name") or KINDS[kind]).strip()[:80], "target": target,
+            "events": events, "departments": (f.get("departments") or "").strip()[:400],
+            "active": True}, None
+
+
+def _mask(c):
+    if c["kind"] == "email":
+        return c["target"]
+    t = c["target"]
+    return t[:28] + "…" + t[-4:] if len(t) > 40 else t
+
+
+@bp.route("/connectors", methods=["GET", "POST"])
+@admin_required
+def connectors():
+    from .notify import EVENTS, KINDS, smtp_ready
+    db = get_db()
+    if request.method == "POST":
+        doc, err = _connector_form(request.form)
+        if err:
+            flash(err, "error")
+        else:
+            doc.update(created_at=now(), sent=0, failed=0)
+            db.connectors.insert_one(doc)
+            audit(_actor(), "connector.added", doc["kind"], {"name": doc["name"]})
+            flash(f"{doc['name']} connected. Use “Send test” to check it.", "success")
+        return redirect(url_for("admin.connectors"))
+    items = list(db.connectors.find().sort("created_at", 1))
+    for c in items:
+        c["shown"] = _mask(c)
+    return render_template("admin/connectors.html", items=items, kinds=KINDS, events=EVENTS,
+                           smtp=smtp_ready())
+
+
+def _connector(cid):
+    from bson import ObjectId
+    try:
+        c = get_db().connectors.find_one({"_id": ObjectId(cid)})
+    except Exception:
+        c = None
+    if not c:
+        abort(404)
+    return c
+
+
+@bp.post("/connectors/<cid>/toggle")
+@admin_required
+def connector_toggle(cid):
+    c = _connector(cid)
+    get_db().connectors.update_one({"_id": c["_id"]}, {"$set": {"active": not c.get("active")}})
+    audit(_actor(), "connector." + ("paused" if c.get("active") else "resumed"), c["kind"])
+    return redirect(url_for("admin.connectors"))
+
+
+@bp.post("/connectors/<cid>/delete")
+@admin_required
+def connector_delete(cid):
+    c = _connector(cid)
+    get_db().connectors.delete_one({"_id": c["_id"]})
+    audit(_actor(), "connector.removed", c["kind"], {"name": c.get("name")})
+    flash(f"{c.get('name')} removed.", "success")
+    return redirect(url_for("admin.connectors"))
+
+
+@bp.post("/connectors/<cid>/test")
+@admin_required
+def connector_test(cid):
+    from .notify import send_one, test_note
+    c = _connector(cid)
+    ok, words = send_one(c, test_note())
+    get_db().connectors.update_one({"_id": c["_id"]}, {
+        "$set": {"last_at": now(), "last_ok": ok, "last_status": "Test: " + words}})
+    flash(f"Test sent to {c.get('name')}." if ok else f"{c.get('name')}: the test failed — {words}",
+          "success" if ok else "error")
+    return redirect(url_for("admin.connectors"))
+
+
+# ---------------------------------------------------------------------------
+# keywords: what each upload box is checked for
+# ---------------------------------------------------------------------------
+
+@bp.route("/keywords", methods=["GET", "POST"])
+@admin_required
+def keywords():
+    from .keyword_match import default_keywords, overrides, upload_boxes
+    db = get_db()
+    boxes = upload_boxes()
+    if request.method == "POST":
+        mine = {}
+        for b in boxes:
+            raw = request.form.get("kw_" + b["field"], "")
+            words = list(dict.fromkeys(w.strip() for w in re.split(r"[,\n]+", raw) if w.strip()))[:30]
+            if words and words != default_keywords(b["field"], b["label"]):
+                mine[b["field"]] = words
+        db.settings.update_one({"_id": "app"}, {"$set": {"keywords": mine}}, upsert=True)
+        audit(_actor(), "keywords.updated", detail={"boxes": len(mine)})
+        flash("Keywords saved. They apply to the next upload — use “Check all files again” "
+              "for the ones already in.", "success")
+        return redirect(url_for("admin.keywords"))
+
+    mine = overrides()
+    for b in boxes:
+        b["default"] = default_keywords(b["field"], b["label"])
+        b["words"] = mine.get(b["field"]) or b["default"]
+        b["custom"] = b["field"] in mine
+        stats = {"match": 0, "weak": 0, "miss": 0, "unread": 0}
+        for r in db.files.find({"field": b["field"], "academic_year": _year()}, {"keyword_match": 1}):
+            s = (r.get("keyword_match") or {}).get("status")
+            if s in stats:
+                stats[s] += 1
+        b["stats"] = stats
+
+    status = request.args.get("status", "")
+    q = {"academic_year": _year(), "keyword_match": {"$exists": True}}
+    if status:
+        q["keyword_match.status"] = status
+    names = {d["dept_code"]: d.get("dept_name", "") for d in db.departments.find({}, {"dept_code": 1, "dept_name": 1})}
+    files = []
+    for r in db.files.find(q).sort("uploaded_at", -1).limit(400):
+        files.append({"dept_code": r["dept_code"], "dept_name": names.get(r["dept_code"], r["dept_code"]),
+                      "name": r["original_name"], "field": r.get("field"),
+                      "match": r.get("keyword_match") or {}, "at": r.get("uploaded_at"),
+                      "url": url_for("admin.document", dept_code=r["dept_code"], stored=r["stored_name"])})
+    totals = {k: db.files.count_documents({"academic_year": _year(), "keyword_match.status": k})
+              for k in ("match", "weak", "miss", "unread")}
+    unchecked = db.files.count_documents({"academic_year": _year(), "keyword_match": {"$exists": False}})
+    return render_template("admin/keywords.html", boxes=boxes, files=files, totals=totals,
+                           status=status, unchecked=unchecked)
+
+
+@bp.post("/keywords/reset")
+@admin_required
+def keywords_reset():
+    get_db().settings.update_one({"_id": "app"}, {"$set": {"keywords": {}}}, upsert=True)
+    audit(_actor(), "keywords.reset")
+    flash("Every box is back to its standard keywords.", "success")
+    return redirect(url_for("admin.keywords"))
+
+
+@bp.post("/keywords/recheck")
+@admin_required
+def keywords_recheck():
+    """Run the check again on every file this year — for files uploaded
+    before the check existed, or after the keywords changed."""
+    from .keyword_match import check
+    from .summarise import field_label
+    db = get_db()
+    root = current_app.config["UPLOAD_ROOT"]
+    done = gone = 0
+    for r in db.files.find({"academic_year": _year()}):
+        path = root / (r.get("academic_year") or _year()) / r["dept_code"] / r["stage"] / r["stored_name"]
+        if not path.exists():
+            gone += 1
+            continue
+        m = check(path, r.get("field", ""), field_label(r.get("stage", ""), r.get("field", "")))
+        db.files.update_one({"_id": r["_id"]}, {"$set": {"keyword_match": m}})
+        done += 1
+    audit(_actor(), "keywords.rechecked", detail={"files": done})
+    flash(f"Checked {done} file{'s' if done != 1 else ''} again"
+          + (f"; {gone} no longer on the server." if gone else "."), "success")
+    return redirect(url_for("admin.keywords"))
+
+
+# ---------------------------------------------------------------------------
+# the demo department
+# ---------------------------------------------------------------------------
+
+@bp.post("/demo-department")
+@admin_required
+def demo_department():
+    from . import demo_dept
+    user, pw, _ = demo_dept.create(_year(), current_app.config["UPLOAD_ROOT"], actor=_actor())
+    audit(_actor(), "demo.created", demo_dept.CODE)
+    session["demo_login"] = {"username": user, "password": pw}
+    flash(f"{demo_dept.NAME} is ready. Sign in as {user} with the password shown on "
+          "this page to see it as a department.", "success")
+    return redirect(url_for("admin.submission_detail", dept_code=demo_dept.CODE))
+
+
+@bp.post("/demo-department/remove")
+@admin_required
+def demo_department_remove():
+    from . import demo_dept
+    demo_dept.remove()
+    session.pop("demo_login", None)
+    audit(_actor(), "demo.removed", demo_dept.CODE)
+    flash(f"{demo_dept.NAME} removed.", "success")
+    return redirect(url_for("admin.departments"))

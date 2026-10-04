@@ -57,7 +57,15 @@ def create_app(config_object=Config):
     @app.context_processor
     def _inject():
         from .schema import GROUP_ORDER, STAGES
+        user = session.get("user") or {}
+        unread = 0
+        if user.get("role") == "admin":
+            try:
+                unread = database.get_db().notifications.count_documents({"read": False})
+            except Exception:
+                unread = 0
         return {
+            "updates_unread": unread,
             "current_user": session.get("user"),
             "app_settings": database.settings(),
             "STAGES": STAGES,

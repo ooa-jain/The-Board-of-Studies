@@ -10,7 +10,7 @@
         {{ dept.campus }} <span>›</span> {{ dept.school }}
       </div>
       <h1>{{ dept.dept_name }}</h1>
-      <p>{{ dept.dept_code }} · {{ dept.school }} · {{ dept.campus }}</p>
+      <p>{{ dept.dept_code }}{% if dept.place %} · {{ dept.place }}{% endif %}</p>
     </div>
     <div class="spacer" style="text-align:right">
       <div class="flex" style="justify-content:flex-end">
@@ -29,6 +29,16 @@
 {% endblock %}
 
 {% block content %}
+{% if dept.demo and session.get('demo_login') %}
+<div class="demo-strip">
+  <span class="demo-badge" aria-hidden="true">DEMO</span>
+  <div><strong>Sign in as this department</strong>
+    <span class="small muted">In a private window, so you stay signed in here:
+      username <code class="mono">{{ session.demo_login.username }}</code>, password
+      <code class="mono">{{ session.demo_login.password }}</code>. Change anything there and watch it
+      arrive under the bell.</span></div>
+</div>
+{% endif %}
 {% set ndocs = documents|sum(attribute='files', start=[])|length %}
 <section class="card mb-2 docs-card" id="documents">
   <div class="card-head">

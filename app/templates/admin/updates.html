@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Updates{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Updates</div>
+      <h1>Updates from departments</h1>
+      <p>Every change a department makes — what it changed, field by field — as it happens.
+         New ones also pop up on any admin page and go to your
+         <a href="{{ url_for('admin.connectors') }}">connectors</a>.</p>
+    </div>
+    <div class="spacer head-aside">
+      <form method="post" action="{{ url_for('admin.updates_read') }}">
+        <button class="btn btn-ghost btn-sm" {% if not unread %}disabled{% endif %}>Mark all {{ unread }} as read</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set icons = {'submitted': '✓', 'saved': '✎', 'uploaded': '⇪', 'keyword_miss': '!', 'programme': '≡', 'password': '⚿'} %}
+<div class="upd-layout">
+  <aside class="upd-filters card">
+    <form method="get" class="upd-filter-form">
+      <div class="field">
+        <label for="f-show">Show</label>
+        <select id="f-show" name="show" onchange="this.form.submit()">
+          <option value="">Everything ({{ total }})</option>
+          <option value="unread" {{ 'selected' if args.show == 'unread' }}>Unread only ({{ unread }})</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-dept">Department</label>
+        <select id="f-dept" name="dept" onchange="this.form.submit()">
+          <option value="">All departments</option>
+          {% for code, name in depts %}<option value="{{ code }}" {{ 'selected' if args.dept == code }}>{{ name or code }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <span class="label-like">Kind</span>
+        <div class="upd-kinds">
+          <a href="{{ url_for('admin.updates', show=args.show, dept=args.dept) }}" class="{{ 'is-on' if not args.event }}">All</a>
+          {% for k, (label, _) in events.items() %}
+          <a href="{{ url_for('admin.updates', show=args.show, dept=args.dept, event=k) }}" class="ev-{{ k }}{{ ' is-on' if args.event == k }}">
+            <span class="upd-dot">{{ icons[k] }}</span>{{ label }}<span class="upd-n">{{ counts[k] }}</span></a>
+          {% endfor %}
+        </div>
+      </div>
+    </form>
+  </aside>
+
+  <div class="upd-feed">
+    {% for day, items in days %}
+    <h3 class="upd-day">{{ day }}</h3>
+    <ol class="upd-list">
+      {% for n in items %}
+      <li class="upd-item ev-{{ n.event }}{{ ' is-unread' if not n.read }}">
+        <span class="upd-dot" aria-hidden="true">{{ icons[n.event] }}</span>
+        <div class="upd-body">
+          <div class="upd-head">
+            <a class="upd-dept" href="{{ url_for('admin.submission_detail', dept_code=n.dept_code) }}">{{ n.dept_name or n.dept_code }}</a>
+            <span class="upd-kind">{{ events[n.event][0] }}</span>
+            {% if n.programme_name %}<span class="upd-tag">{{ n.programme_name }}</span>{% endif %}
+            {% if n.stage_title %}<span class="upd-tag">{{ n.stage_title }}</span>{% endif %}
+            {% if n.demo %}<span class="upd-tag is-demo">demo</span>{% endif %}
+            <time class="upd-time" datetime="{{ n.at.isoformat() }}">{{ n.at.strftime('%H:%M') }}{% if n.saves and n.saves > 1 %} · {{ n.saves }} saves since {{ n.first_at.strftime('%H:%M') }}{% endif %}</time>
+          </div>
+          {% if n.event in ('uploaded', 'keyword_miss', 'password') %}
+          <p class="upd-text">{{ n.text.split('. ', 1)[1] if '. ' in n.text else n.text }}</p>
+          {% endif %}
+          {% if n.changes %}
+          <table class="upd-changes">
+            <thead><tr><th scope="col">Section</th><th scope="col">Field</th><th scope="col">Was</th><th scope="col">Now</th></tr></thead>
+            <tbody>
+              {% for c in n.changes %}
+              <tr><td>{{ c.section }}</td><td>{{ c.field }}</td><td class="was">{{ c.before }}</td><td class="now">{{ c.after }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
+        {% if not n.read %}
+        <form method="post" action="{{ url_for('admin.updates_read') }}" class="upd-read">
+          <input type="hidden" name="id" value="{{ n._id }}">
+          <button class="btn btn-ghost btn-sm" title="Mark as read">Read</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="card"><div class="card-body empty">
+      Nothing yet. When a department saves, submits or uploads anything, it appears here.
+      {% if not depts %}Make the <strong>demo department</strong> on the
+      <a href="{{ url_for('admin.departments') }}">Departments</a> page to see how it looks.{% endif %}
+    </div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

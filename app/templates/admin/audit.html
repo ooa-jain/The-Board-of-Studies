@@ -1,9 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Audit log{% endblock %}
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Settings <span>›</span> Audit log</div>
+      <h1>Audit log</h1>
+      <p>The last 300 actions taken in the portal — sign-ins, submissions, exports and every change to the settings.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block content %}
-<h1>Audit log</h1>
-<p class="muted">The last 300 actions taken in the portal.</p>
-<div class="card mt-2">
+{% include "admin/_tabs.html" %}
+<div class="card">
   <div class="card-body" style="padding:0">
     <table class="data">
       <thead><tr><th scope="col" style="width:170px">When</th><th scope="col">Who</th>

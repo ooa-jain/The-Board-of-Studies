@@ -24,6 +24,26 @@
 {% endblock %}
 
 {% block content %}
+<div class="demo-strip">
+  <span class="demo-badge" aria-hidden="true">DEMO</span>
+  <div>
+    <strong>Demo department</strong>
+    <span class="small muted">“Department of Demonstration Studies”, filled like a real one — two stages
+      submitted, BoS documents half done, one wrong file the keyword check catches — so you can
+      see the admin side, the updates and the keyword check working.</span>
+  </div>
+  <div class="spacer flex">
+    {% if demo %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code='DEMO') }}">Open it</a>{% endif %}
+    <form method="post" action="{{ url_for('admin.demo_department') }}"
+          {% if demo %}onsubmit="return confirm('Start the demo department again from scratch?')"{% endif %}>
+      <button class="btn btn-sm">{{ 'Make it again' if demo else 'Make the demo department' }}</button></form>
+    {% if demo %}
+    <form method="post" action="{{ url_for('admin.demo_department_remove') }}" onsubmit="return confirm('Remove the demo department and everything in it?')">
+      <button class="btn btn-ghost btn-sm is-danger">Remove</button></form>
+    {% endif %}
+  </div>
+</div>
+
 {# Two levels: the city first, because most of the time that is the whole
    question, and then the campus within it. Choosing a city narrows the
    campus row to the campuses that city actually has. #}

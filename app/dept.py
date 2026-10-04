@@ -15,12 +15,15 @@ from .db import audit, get_db, now, rules_doc, settings
 from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
+from .notify import describe_changes
+from .notify import record as notify_record
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
                        course_fill_source, form_data, part_status, prefill_for,
                        programme_fill_source, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
-                       submit_stage, validate_only, batches, parts_for, revision_fill_source)
+                       submit_stage, validate_only, batches, parts_for, revision_fill_source,
+                       apply_defaults)
 
 bp = Blueprint("dept", __name__)
 
@@ -272,8 +275,25 @@ def api_save(stage_key, programme_code=None):
     if bad:
         return bad
     data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
+    before = _stored_data(sub, stage_key, programme_code)
     save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
+    _tell(dept, "saved", stage_key, programme, changes=describe_changes(stage_key, before, data))
     return jsonify({"ok": True, "saved_at": now().isoformat()})
+
+
+def _stored_data(sub, stage_key, programme_code=None):
+    if programme_code:
+        return (((sub.get("programmes") or {}).get(programme_code) or {}).get(stage_key) or {}).get("data") or {}
+    return ((sub.get("stages") or {}).get(stage_key) or {}).get("data") or {}
+
+
+def _tell(dept, event, stage_key=None, programme=None, **kw):
+    """An update for the Office; never in the way of the department's work."""
+    try:
+        notify_record(dept, event, stage_key=stage_key, programme=programme,
+                      actor=_me()["username"], **kw)
+    except Exception:
+        current_app.logger.exception("Could not record an update")
 
 
 @bp.post("/api/<stage_key>/validate")
@@ -296,8 +316,12 @@ def api_submit(stage_key, programme_code=None):
     if bad:
         return bad
     data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
+    before = _stored_data(sub, stage_key, programme_code)
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])
+    if status == "submitted":
+        _tell(dept, "submitted", stage_key, programme,
+              changes=describe_changes(stage_key, before, apply_defaults(stage_key, data)))
     if status == "submitted" and programme:
         audit(_me()["username"], "stage.submitted",
               f"{dept['dept_code']}/{programme['programme_code']}/{stage_key}")
@@ -365,6 +389,11 @@ def api_upload():
            "size": size, "uploaded_by": _me()["username"], "uploaded_at": now(),
            "keyword_match": match}
     get_db().files.insert_one(rec)
+    words = {"match": "keywords match", "weak": "few keywords match",
+             "miss": "no expected keywords found", "unread": "no text to check"}[match["status"]]
+    _tell(dept, "keyword_miss" if match["status"] == "miss" else "uploaded", stage_key,
+          text=f"“{f.filename}” for {match['label']} — {words}"
+               + (f" ({', '.join(match['found'])})" if match["found"] else ""))
 
     url = url_for("dept.download", stage_key=stage_key, stored=stored)
     return jsonify({

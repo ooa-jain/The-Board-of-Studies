@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Settings <span>›</span> Portal settings</div>
+      <h1>Portal settings</h1>
+      <p>The academic year, the syllabus batches, the banner, and whether departments can submit.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="card" style="max-width:620px;margin:24px auto">
-  <div class="card-head"><h3>Portal settings</h3></div>
+{% include "admin/_tabs.html" %}
+<div class="card" style="max-width:720px">
+  <div class="card-head"><h3>Academic cycle</h3></div>
   <div class="card-body">
     <form method="post">
       <div class="field">

@@ -80,8 +80,13 @@
            configuration, and five links on the left would push the wordmark
            off the centre of the bar. #}
         {% if current_user and current_user.role == 'admin' %}
-          {{ nav_link(url_for('admin.rules'), 'Rules', request.endpoint == 'admin.rules') }}
-          {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint == 'admin.app_settings') }}
+          <a class="nav-bell{{ ' is-on' if request.endpoint == 'admin.updates' }}" href="{{ url_for('admin.updates') }}"
+             title="Updates from departments" data-updates-url="{{ url_for('admin.updates_json') }}">
+            <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span class="sr-only">Updates</span>
+            <span class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</span>
+          </a>
+          {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log')) }}
         {% endif %}
         {% if current_user %}
         <div class="who">
@@ -315,5 +320,38 @@
   })();
 </script>
 {% block scripts %}{% endblock %}
+{% if current_user and current_user.role == 'admin' %}
+<script>
+/* Updates as they happen: every 20 seconds the bell asks for anything new
+   and shows it as a message card; clicking one opens that department. */
+(function () {
+  var bell = document.querySelector(".nav-bell");
+  if (!bell || !window.fetch) return;
+  var url = bell.getAttribute("data-updates-url"), after = null, count = bell.querySelector(".nav-bell-count");
+  var kinds = { submitted: "success", keyword_miss: "warning", uploaded: "info", saved: "info", programme: "info", password: "info" };
+  var titles = { submitted: "Stage submitted", keyword_miss: "Keyword check failed", uploaded: "File uploaded",
+                 saved: "Data changed", programme: "Programmes changed", password: "Password changed" };
+  function tick() {
+    if (document.hidden) return;
+    fetch(url + (after ? "?after=" + encodeURIComponent(after) : ""), { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        if (after && window.Toast) j.items.forEach(function (n) {
+          window.Toast.show(kinds[n.event] || "info", n.text, { title: titles[n.event] || "Update",
+            timeout: 9000, onClick: function () { location.href = n.link; } });
+        });
+        after = j.now;
+        count.hidden = !j.unread;
+        count.textContent = j.unread > 99 ? "99+" : j.unread;
+        bell.classList.toggle("has-new", !!j.unread);
+      }).catch(function () {});
+  }
+  tick();
+  setInterval(tick, 20000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(); });
+})();
+</script>
+{% endif %}
 </body>
 </html>

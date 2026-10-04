@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Connectors{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Settings <span>›</span> Connectors</div>
+      <h1>Connectors</h1>
+      <p>Where updates from departments are sent: email, Slack, Microsoft Teams, Google Chat,
+         Discord, or any system that takes a webhook. Each one chooses which updates it hears.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "admin/_tabs.html" %}
+
+<div class="conn-grid">
+  <section class="card">
+    <div class="card-head"><h3>Connected</h3></div>
+    <div class="card-body" style="padding:0">
+      {% for c in items %}
+      <div class="conn-row{{ ' is-paused' if not c.active }}">
+        <span class="conn-badge k-{{ c.kind }}">{{ kinds[c.kind][:1] }}</span>
+        <div class="conn-main">
+          <strong>{{ c.name }}</strong> <span class="pill">{{ kinds[c.kind] }}</span>
+          {% if not c.active %}<span class="pill">paused</span>{% endif %}
+          <div class="small muted mono conn-target">{{ c.shown }}</div>
+          <div class="conn-events">{% for e in c.events %}<span class="kw-tag is-hit">{{ events[e][0] }}</span>{% endfor %}
+            {% if c.departments %}<span class="small muted"> · only {{ c.departments }}</span>{% endif %}</div>
+          <div class="small {{ 'conn-ok' if c.last_ok else 'conn-bad' if c.last_at else 'muted' }}">
+            {% if c.last_at %}Last: {{ c.last_status }} · {{ c.last_at.strftime('%d %b %H:%M') }}{% else %}Not used yet{% endif %}
+            · sent {{ c.sent or 0 }}{% if c.failed %}, failed {{ c.failed }}{% endif %}
+          </div>
+        </div>
+        <div class="conn-acts">
+          <form method="post" action="{{ url_for('admin.connector_test', cid=c._id) }}"><button class="btn btn-ghost btn-sm">Send test</button></form>
+          <form method="post" action="{{ url_for('admin.connector_toggle', cid=c._id) }}"><button class="btn btn-ghost btn-sm">{{ 'Pause' if c.active else 'Resume' }}</button></form>
+          <form method="post" action="{{ url_for('admin.connector_delete', cid=c._id) }}" onsubmit="return confirm('Remove {{ c.name|e }}?')"><button class="btn btn-ghost btn-sm is-danger">Remove</button></form>
+        </div>
+      </div>
+      {% else %}
+      <p class="empty">No connectors yet. Updates still collect under the bell in the top bar.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h3>Add a connector</h3></div>
+    <div class="card-body">
+      <form method="post" id="conn-form">
+        <div class="field">
+          <label for="c-kind">Send to</label>
+          <select id="c-kind" name="kind" required>
+            {% for k, label in kinds.items() %}<option value="{{ k }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="c-name">Name</label>
+          <input id="c-name" name="name" placeholder="e.g. Office of Academics team" maxlength="80">
+        </div>
+        <div class="field">
+          <label for="c-target" id="c-target-label">Webhook address</label>
+          <input id="c-target" name="target" required placeholder="https://hooks.slack.com/services/…">
+          <span class="help" id="c-help"></span>
+        </div>
+        <fieldset class="field conn-ev">
+          <legend>Send these updates</legend>
+          {% for k, (label, on) in events.items() %}
+          <label class="check"><input type="checkbox" name="events" value="{{ k }}" {{ 'checked' if on }}> {{ label }}</label>
+          {% endfor %}
+          <span class="help">“Data changed” is every save — many messages while a department is typing; they are folded into one update every half hour.</span>
+        </fieldset>
+        <div class="field">
+          <label for="c-depts">Only these departments <span class="muted">(optional)</span></label>
+          <input id="c-depts" name="departments" placeholder="Department codes, e.g. COM, ECON-JYN — empty for all">
+        </div>
+        <button class="btn">Add connector</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var help = {
+    email: ["Email addresses", "you@jainuniversity.ac.in, dean@jainuniversity.ac.in",
+            {{ ('Sent through the server set in .env (SMTP_HOST).' if smtp else 'Email is not set up on the server yet: add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD and SMTP_FROM to .env, then restart.')|tojson }}],
+    slack: ["Slack webhook address", "https://hooks.slack.com/services/…", "Slack → Apps → Incoming Webhooks → Add to a channel → copy the Webhook URL."],
+    teams: ["Teams webhook address", "https://…webhook.office.com/…", "In the Teams channel: ⋯ → Workflows → “Post to a channel when a webhook request is received” → copy the URL."],
+    google_chat: ["Google Chat webhook address", "https://chat.googleapis.com/v1/spaces/…", "In the Chat space: Apps & integrations → Webhooks → Add webhook → copy the URL."],
+    discord: ["Discord webhook address", "https://discord.com/api/webhooks/…", "Server settings → Integrations → Webhooks → New Webhook → Copy Webhook URL."],
+    webhook: ["Webhook address", "https://your-system.example.edu/bos-updates", "Each update is POSTed as JSON: event, department, stage, changes, link."]
+  };
+  var kind = document.getElementById("c-kind");
+  function set() {
+    var h = help[kind.value];
+    document.getElementById("c-target-label").textContent = h[0];
+    document.getElementById("c-target").placeholder = h[1];
+    document.getElementById("c-help").textContent = h[2];
+  }
+  kind.addEventListener("change", set); set();
+})();
+</script>
+{% endblock %}

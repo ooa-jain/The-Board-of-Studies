@@ -156,6 +156,13 @@ def change_password():
             session["user"]["must_change"] = False
             session.modified = True
             audit(user["username"], "password.changed")
+            if user.get("role") == "department" and user.get("dept_code"):
+                try:
+                    from .notify import record
+                    dept = db.departments.find_one({"dept_code": user["dept_code"]}) or {"dept_code": user["dept_code"]}
+                    record(dept, "password", actor=user["username"], text="The department set a new password")
+                except Exception:
+                    pass
             flash("Your password has been changed.", "success")
             return _home_for(session["user"])
 
