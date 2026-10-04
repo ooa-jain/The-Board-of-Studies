@@ -547,6 +547,7 @@ def _documents(dept_code, sub, year):
             "thumb": url + "?thumb=1" if is_pdf else None,
             "summary": r.get("summary"), "summary_by": r.get("summary_by") or "AI",
             "uploaded_at": r.get("uploaded_at"),
+            "match": r.get("keyword_match"),
         })
     return [{"title": t, "files": groups[t]} for t in order]
 

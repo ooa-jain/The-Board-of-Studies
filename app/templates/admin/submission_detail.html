@@ -65,6 +65,15 @@
               <button class="file-act is-ai" type="button" data-summary="{{ url_for('admin.document_summary', dept_code=dept.dept_code, stored=f.url.rsplit('/',1)[-1]) }}">✦ Summary</button>
               {% endif %}
             </div>
+            {% set m = f.match %}
+            {% if m and m.status %}
+            <div class="kw-match is-{{ m.status }}">
+              <span class="kw-icon">{{ '✓' if m.status == 'match' else '–' if m.status == 'unread' else '!' }}</span>
+              <strong>{{ {'match': 'Keywords match', 'weak': 'Few keywords match', 'miss': 'No expected keywords found', 'unread': 'Keywords not checked'}[m.status] }}</strong>
+              {% if m.status == 'unread' %}<span class="kw-sub">no text to read (a scan, image or zip) — open it to check</span>
+              {% else %}<span class="kw-tags">{% for w in m.expected %}<span class="kw-tag{{ ' is-hit' if w in m.found }}">{{ w }}</span>{% endfor %}</span>{% endif %}
+            </div>
+            {% endif %}
           </div>
         </div>
         {% if f.summary %}

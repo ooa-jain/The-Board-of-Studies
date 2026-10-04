@@ -355,9 +355,15 @@ def api_upload():
     f.save(folder / stored)
     size = (folder / stored).stat().st_size
 
+    # does it carry the words a document for this box always has?
+    from .keyword_match import check as keyword_check
+    from .summarise import field_label
+    match = keyword_check(folder / stored, field, field_label(stage_key, field))
+
     rec = {"dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
            "field": field, "original_name": f.filename, "stored_name": stored,
-           "size": size, "uploaded_by": _me()["username"], "uploaded_at": now()}
+           "size": size, "uploaded_by": _me()["username"], "uploaded_at": now(),
+           "keyword_match": match}
     get_db().files.insert_one(rec)
 
     url = url_for("dept.download", stage_key=stage_key, stored=stored)
@@ -366,6 +372,7 @@ def api_upload():
         # drawn on the first request for it, then kept; the page falls back to
         # a card if it never arrives
         "thumb": url + "?thumb=1" if ext == ".pdf" else None,
+        "match": match,
     })
 
 

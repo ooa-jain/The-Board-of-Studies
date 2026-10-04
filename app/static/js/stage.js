@@ -833,6 +833,8 @@
       acts.appendChild(rm);
     }
     meta.appendChild(acts);
+    const kw = matchLine(val);
+    if (kw) meta.appendChild(kw);
     if (val.url && (info.kind === "doc" || info.kind === "sheet")) {
       meta.appendChild(el("span", "file-note",
         "Word and Excel files cannot be shown in a browser — open it to check it."));
@@ -989,9 +991,50 @@
       .then(j => {
         if (!j.ok) throw new Error(j.error || `Upload of ${file.name} failed.`);
         // thumb comes along too, or the preview has no picture to show
-        return { name: j.name, stored: j.stored, size: j.size,
-                 url: j.url, thumb: j.thumb || null };
+        const v = { name: j.name, stored: j.stored, size: j.size,
+                    url: j.url, thumb: j.thumb || null };
+        if (j.match) v.match = j.match;
+        matchToast(v);
+        return v;
       });
+  }
+
+  /* --------------------------------------------------------- keyword match
+     The server reads an upload and looks for the words a document for its box
+     always carries; the answer shows as a line on the file and, when nothing
+     matches, as a warning straight away. */
+  const MATCH_WORDS = { match: "Keywords match", weak: "Few keywords match",
+                        miss: "No expected keywords found", unread: "Keywords not checked" };
+  function matchLine(val) {
+    const m = val && val.match;
+    if (!m || !m.status) return null;
+    const line = el("div", "kw-match is-" + m.status);
+    line.appendChild(el("span", "kw-icon", m.status === "match" ? "✓" : m.status === "unread" ? "–" : "!"));
+    line.appendChild(el("strong", null, MATCH_WORDS[m.status] || ""));
+    if (m.status === "unread") {
+      line.appendChild(el("span", "kw-sub", "this file has no text to read (a scan, image or zip) — open it to check"));
+    } else {
+      const tags = el("span", "kw-tags");
+      (m.expected || []).forEach(w => {
+        const hit = (m.found || []).includes(w);
+        const t = el("span", "kw-tag" + (hit ? " is-hit" : ""), w);
+        t.title = hit ? "Found in the file" : "Not found in the file";
+        tags.appendChild(t);
+      });
+      line.appendChild(tags);
+      if (m.status === "miss") line.appendChild(el("span", "kw-sub", "make sure this is the right file for “" + m.label + "”"));
+    }
+    return line;
+  }
+  function matchToast(v) {
+    const m = v.match;
+    if (!m || !window.Toast) return;
+    if (m.status === "miss") {
+      window.Toast.warning(`None of the words a “${m.label}” carries (${(m.expected || []).slice(0, 4).join(", ")}…) are in ${v.name}. Check it is the right file.`,
+                           { title: "Keywords do not match" });
+    } else if (m.status === "match") {
+      window.Toast.success(`${v.name} carries ${m.found.slice(0, 4).join(", ")}.`, { title: "Keywords match" });
+    }
   }
 
   // the types a box takes, from its accept list — a dropped file skips the
@@ -1410,6 +1453,14 @@
         else { a.href = v.url; a.target = "_blank"; a.rel = "noopener"; }
         box.appendChild(el("span", "row-file-ext", info.label));
         box.appendChild(a);
+        if (v.match && v.match.status && v.match.status !== "unread") {
+          const ok = v.match.status === "match";
+          const mk = el("span", "row-file-kw " + (ok ? "is-match" : "is-" + v.match.status), ok ? "✓" : "!");
+          mk.title = ok ? "Keywords match: " + v.match.found.join(", ")
+                        : v.match.status === "weak" ? "Few keywords match: " + v.match.found.join(", ")
+                        : "No expected keywords found — check this is the right file";
+          box.appendChild(mk);
+        }
         if (!CTX.readonly) {
           const x = el("button", "row-file-x", "×");
           x.type = "button";

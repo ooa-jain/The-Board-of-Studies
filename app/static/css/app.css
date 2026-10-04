@@ -3814,3 +3814,30 @@ strong, b { color: var(--jain-blue); font-weight: 500; }
 
 /* course codes and numbers still line up */
 .mono, code, kbd { font-family: "Roboto Mono", ui-monospace, Consolas, monospace; }
+
+/* keyword match under an uploaded file */
+.kw-match { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin-top:8px;
+  padding:7px 10px; border-radius:10px; font-size:.8rem; border:1px solid transparent; }
+.kw-match strong { font-weight:600; }
+.kw-icon { display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%;
+  font-size:.72rem; font-weight:700; color:#fff; }
+.kw-match.is-match { background:#e8f4ec; border-color:#cfe6d7; color:#1f5e3a; }
+.kw-match.is-match .kw-icon { background:#2f8a55; }
+.kw-match.is-weak { background:#fdf4e1; border-color:#f1e0b8; color:#7a5306; }
+.kw-match.is-weak .kw-icon { background:#d39a16; }
+.kw-match.is-miss { background:#fbebe8; border-color:#f1cfc9; color:#9a2f22; }
+.kw-match.is-miss .kw-icon { background:#c2412f; }
+.kw-match.is-unread { background:#f1f3f6; border-color:#e1e5ea; color:#5f6672; }
+.kw-match.is-unread .kw-icon { background:#98a0ab; }
+.kw-tags { display:flex; flex-wrap:wrap; gap:4px; }
+.kw-tag { padding:1px 8px; border-radius:999px; font-size:.72rem; background:rgba(255,255,255,.7);
+  color:#8a919c; text-decoration:line-through; text-decoration-color:rgba(0,0,0,.25); }
+.kw-tag.is-hit { color:#1f5e3a; background:#fff; text-decoration:none; font-weight:600;
+  box-shadow: inset 0 0 0 1px #bfdcc9; }
+.kw-match.is-miss .kw-tag, .kw-match.is-weak .kw-tag:not(.is-hit) { color:#9a6b62; }
+.kw-sub { flex-basis:100%; font-size:.76rem; opacity:.9; }
+.row-file-kw { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%;
+  font-size:.66rem; font-weight:700; color:#fff; flex:none; }
+.row-file-kw.is-match { background:#2f8a55; }
+.row-file-kw.is-weak { background:#d39a16; }
+.row-file-kw.is-miss { background:#c2412f; }
