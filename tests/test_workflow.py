@@ -808,9 +808,11 @@ def test_a_signed_in_department_is_not_asked_to_sign_in_again(app, client):
 
 def test_the_admin_gets_the_console_not_a_department_panel(app, client):
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
-    body = client.get("/").get_data(as_text=True)
+    r = client.get("/")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/admin/")
+    body = client.get("/", follow_redirects=True).get_data(as_text=True)
     assert 'name="password"' not in body
-    assert "The admin dashboard" in body
+    assert "Board of Studies" in body and "Latest from departments" in body
     assert "stages completed" not in body
 
 

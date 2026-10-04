@@ -54,6 +54,7 @@
     {% endif %}
     {% for g in documents %}
       <div class="docs-group">{{ g.title }}</div>
+      <div class="docs-files">
       {% for f in g.files %}
       <div class="doc-row{{ ' has-summary' if f.summary }}">
         <div class="file-preview kind-{{ 'pdf' if f.is_pdf else 'other' }}">
@@ -94,6 +95,7 @@
         {% endif %}
       </div>
       {% endfor %}
+      </div>
     {% endfor %}
   </div>
 </section>

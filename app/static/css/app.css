@@ -3958,3 +3958,24 @@ td .kw-tag { display: inline-block; margin: 1px 0; }
   font-weight: 700; font-size: .74rem; letter-spacing: .08em; }
 .demo-strip .spacer { gap: 8px; align-items: center; }
 .demo-strip code { background: #fff; border: 1px solid #f0d3b8; padding: 1px 6px; border-radius: 6px; }
+
+.docs-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; margin-bottom: 6px; }
+.docs-files .doc-row { margin-bottom: 0; grid-template-columns: 1fr; }
+.docs-files .doc-row.has-summary { grid-column: 1 / -1; grid-template-columns: minmax(280px, 380px) 1fr; }
+@media (max-width: 760px) { .docs-files .doc-row.has-summary { grid-template-columns: 1fr; } }
+.dash-upd { display: flex; align-items: center; gap: 12px; padding: 11px 20px; border-bottom: 1px solid var(--line);
+  color: var(--jain-text); text-decoration: none !important; font-size: .9rem; }
+.dash-upd:last-child { border-bottom: 0; }
+.dash-upd:hover { background: #f6f8fb; }
+.dash-upd.is-unread { box-shadow: inset 3px 0 0 var(--jain-orange); }
+.dash-upd-text { flex: 1; min-width: 0; }
+
+/* four stages fit across, so their names read level, not on their side */
+table.data th.col-vertical { writing-mode: horizontal-tb; height: auto; padding: 10px 6px;
+  text-align: center; white-space: normal; max-width: 110px; font-size: .72rem; line-height: 1.25; vertical-align: bottom; }
+
+/* room for the keyword tags beside the file's thumbnail */
+.field .file-previews { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
+@media (max-width: 520px) { .field .file-previews { grid-template-columns: 1fr; } }
+.file-preview .file-meta { flex: 1; min-width: 0; }
+.file-preview .file-acts { display: flex; flex-wrap: wrap; gap: 6px; }

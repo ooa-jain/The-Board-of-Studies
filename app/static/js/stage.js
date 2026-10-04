@@ -1074,7 +1074,7 @@
         const val = def.multiple ? had.concat(done) : done[0];
         note.textContent = (done.length > 1
           ? `Uploaded ${done.length} files`
-          : `Uploaded: ${done[0].name} (${sizeLabel(done[0].size)})`) +
+          : "✓ Uploaded") +
           (bad.length ? ` · skipped ${bad.map(f => f.name).join(", ")} (not ${def.accept})` : "");
         note.className = "help upload-note is-ok";
         wrap._set(val);
@@ -1175,11 +1175,7 @@
         });
       };
       wrap.appendChild(uploadBox(def, input, value, onChange));
-      if (list().length) {
-        const n = el("span", "help upload-note", `Uploaded: ${fileNames(current).join(", ")}`);
-        n.classList.add("is-ok");
-        wrap.appendChild(n);
-      }
+      // the file card under the box already names what is uploaded
       wrap._set(current);
     } else {
       wrap.appendChild(input);

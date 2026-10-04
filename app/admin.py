@@ -75,7 +75,7 @@ def dashboard():
     return render_template("admin/dashboard.html", rows=rows, counts=counts,
                            by_campus=by_campus, stage_counts=stage_counts,
                            year=year, total=len(departments),
-                           recent=list(db.audit.find().sort("at", -1).limit(12)))
+                           latest=list(db.notifications.find().sort("at", -1).limit(8)))
 
 
 # ---------------------------------------------------------------------------

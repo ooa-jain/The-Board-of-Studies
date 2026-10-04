@@ -90,17 +90,19 @@ def read_text(path: Path, limit: int = 60000) -> str | None:
     try:
         if ext == ".pdf":
             import pypdfium2 as pdfium
-            doc = pdfium.PdfDocument(path)
-            try:
-                out = []
-                for i in range(min(len(doc), 30)):
-                    tp = doc[i].get_textpage()
-                    out.append(tp.get_text_range())
-                    tp.close()
-                    if sum(map(len, out)) > limit:
-                        break
-            finally:
-                doc.close()
+            from .pdflock import PDF_LOCK
+            with PDF_LOCK:
+                doc = pdfium.PdfDocument(path)
+                try:
+                    out = []
+                    for i in range(min(len(doc), 30)):
+                        tp = doc[i].get_textpage()
+                        out.append(tp.get_text_range())
+                        tp.close()
+                        if sum(map(len, out)) > limit:
+                            break
+                finally:
+                    doc.close()
             text = "\n".join(out)
         elif ext == ".docx":
             with zipfile.ZipFile(path) as z:

@@ -60,11 +60,12 @@
            too, but a named link is what people look for. #}
         {% if current_user and current_user.role == 'department' %}
           {{ nav_link(url_for('dept.dashboard'), 'Home', request.endpoint == 'dept.dashboard') }}
+        {% elif current_user and current_user.role == 'admin' %}
+          {{ nav_link(url_for('admin.dashboard'), 'Home', request.endpoint == 'admin.dashboard') }}
         {% elif current_user %}
           {{ nav_link(url_for('public.landing'), 'Home', request.endpoint == 'public.landing') }}
         {% endif %}
         {% if current_user and current_user.role == 'admin' %}
-          {{ nav_link(url_for('admin.dashboard'), 'Dashboard', request.endpoint == 'admin.dashboard') }}
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
           {{ nav_link(url_for('admin.analysis'), 'Analysis', request.endpoint == 'admin.analysis') }}
           {{ nav_link(url_for('admin.flow'), 'Flow 3D', request.endpoint == 'admin.flow') }}

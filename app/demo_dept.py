@@ -118,6 +118,8 @@ def create(year, upload_root, actor="system"):
     db.departments.insert_one({**DEPT, "created_at": t, "updated_at": t})
     dept = db.departments.find_one({"dept_code": CODE})
     username, password = issue_department_login(db, dept, actor=actor)
+    # as if it had been signed in to and worked on an hour ago
+    db.users.update_one({"username": username}, {"$set": {"last_login": t - timedelta(minutes=45)}})
 
     files = {}
     for name, (stage, field, lines) in DOCS.items():
@@ -132,7 +134,8 @@ def create(year, upload_root, actor="system"):
                              "size": path.stat().st_size, "uploaded_by": username,
                              "uploaded_at": t, "keyword_match": match, "demo": True})
         files[field] = {"name": name, "stored": stored, "size": path.stat().st_size,
-                        "url": f"/department/file/{stage}/{stored}", "match": match}
+                        "url": f"/department/file/{stage}/{stored}",
+                        "thumb": f"/department/file/{stage}/{stored}?thumb=1", "match": match}
 
     dept_info = {
         "identity": {"dept_name": NAME, "faculty": DEPT["faculty"], "school": DEPT["school"],

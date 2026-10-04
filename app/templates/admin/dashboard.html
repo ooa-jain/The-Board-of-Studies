@@ -106,28 +106,20 @@
   </div>
 </div>
 
+{% set icons = {'submitted': '✓', 'saved': '✎', 'uploaded': '⇪', 'keyword_miss': '!', 'programme': '≡', 'password': '⚿'} %}
 <div class="card">
-  <div class="card-head"><h3>Recent activity</h3>
-    <span class="spacer"><a class="small" href="{{ url_for('admin.audit_log') }}">Full log</a></span></div>
+  <div class="card-head"><h3>Latest from departments</h3>
+    <span class="spacer"><a class="small" href="{{ url_for('admin.updates') }}">All updates{% if updates_unread %} · {{ updates_unread }} unread{% endif %}</a></span></div>
   <div class="card-body" style="padding:0">
-    <table class="data">
-      <thead>
-        <tr>
-          <th scope="col" style="width:150px">When</th><th scope="col">Who</th>
-          <th scope="col">Action</th><th scope="col">Target</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for e in recent %}
-        <tr>
-          <td class="small mono">{{ e.at.strftime('%d %b %H:%M') }}</td>
-          <td class="small">{{ e.actor }}</td>
-          <td class="small"><span class="pill">{{ e.action }}</span></td>
-          <td class="small muted">{{ e.target }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {% for n in latest %}
+    <a class="dash-upd ev-{{ n.event }}{{ ' is-unread' if not n.read }}" href="{{ url_for('admin.submission_detail', dept_code=n.dept_code) }}">
+      <span class="upd-dot" aria-hidden="true">{{ icons.get(n.event, '•') }}</span>
+      <span class="dash-upd-text">{{ n.text }}</span>
+      <time class="small muted">{{ n.at.strftime('%d %b %H:%M') }}</time>
+    </a>
+    {% else %}
+    <p class="empty">Nothing from departments yet. Their saves, submissions and uploads appear here as they happen.</p>
+    {% endfor %}
   </div>
 </div>
 {% endblock %}

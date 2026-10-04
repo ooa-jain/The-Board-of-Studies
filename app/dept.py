@@ -429,14 +429,18 @@ def _thumbnail(source: Path) -> Path | None:
     except ImportError:          # renderer not installed on this deployment
         current_app.logger.info("No PDF renderer; previews fall back to a card.")
         return None
+    from .pdflock import PDF_LOCK
     try:
-        doc = pdfium.PdfDocument(source)
-        try:
-            image = doc[0].render(scale=1.4).to_pil()
-        finally:
-            doc.close()
-        image.thumbnail(THUMB_MAX)
-        image.save(thumb, "PNG", optimize=True)
+        with PDF_LOCK:
+            if thumb.exists():           # drawn by another request meanwhile
+                return thumb
+            doc = pdfium.PdfDocument(source)
+            try:
+                image = doc[0].render(scale=1.4).to_pil()
+            finally:
+                doc.close()
+            image.thumbnail(THUMB_MAX)
+            image.save(thumb, "PNG", optimize=True)
         return thumb
     except Exception:
         current_app.logger.warning("Could not draw a preview of %s", source.name)

@@ -47,6 +47,12 @@ def field_label(stage_key: str, field: str) -> str:
 
 
 def _pdf_text(path: Path) -> tuple[str, int]:
+    from .pdflock import PDF_LOCK
+    with PDF_LOCK:
+        return _pdf_text_unlocked(path)
+
+
+def _pdf_text_unlocked(path: Path) -> tuple[str, int]:
     import pypdfium2 as pdfium
     doc = pdfium.PdfDocument(path)
     try:
@@ -68,6 +74,12 @@ def _pdf_text(path: Path) -> tuple[str, int]:
 
 
 def _pdf_images(path: Path) -> list[str]:
+    from .pdflock import PDF_LOCK
+    with PDF_LOCK:
+        return _pdf_images_unlocked(path)
+
+
+def _pdf_images_unlocked(path: Path) -> list[str]:
     import pypdfium2 as pdfium
     doc = pdfium.PdfDocument(path)
     try:
