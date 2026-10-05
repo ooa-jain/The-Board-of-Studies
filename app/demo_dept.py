@@ -38,10 +38,6 @@ PROGRAMMES = [
 # file name → (stage, field, lines of text inside it); every one the right
 # document for its box, so the keyword check passes throughout
 DOCS = {
-    "bos_composition.pdf": ("bos_documents", "bos_composition", [
-        "Composition of the Board of Studies (BoS)", "Dr. Demo Head, Chairperson",
-        "Prof. Leela Iyer, External Member", "Mr. Vikram Das, Alumni Member",
-        "Ms. Priya Menon, Student Member"]),
     "vision_mission.pdf": ("bos_documents", "vision_mission", [
         "Department Vision, Mission and Programme Overview",
         "Vision: to be a centre of excellence in management education.",
@@ -237,9 +233,9 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
     if stage_key == "pre_bos":
         return {"pre_bos_files": {k: files[k] for k in ("diac_signed", "dpac_signed") if k in files}}
     if stage_key == "bos_documents":
-        box = {k: files[k] for k in ("bos_composition", "vision_mission", "minutes", "attendance",
-                                     "feedback_curriculum") if k in files}
-        for k in ("external_profiles", "geotagged_photos"):
+        box = {k: files[k] for k in ("bos_composition", "vision_mission", "minutes", "attendance")
+               if k in files}
+        for k in ("external_profiles", "geotagged_photos", "feedback_curriculum"):
             if k in files:
                 box[k] = files[k] if isinstance(files[k], list) else [files[k]]
         return {"meeting": {"bos_date": "2027-03-12"}, "bos_files": box}
@@ -314,7 +310,7 @@ def _files_for(db, year):
              "url": f"/department/file/{r['stage']}/{r['stored_name']}", "match": r.get("keyword_match")}
         if r["original_name"].lower().endswith(".pdf"):
             v["thumb"] = v["url"] + "?thumb=1"
-        if r["field"] in ("geotagged_photos", "external_profiles"):
+        if r["field"] in ("geotagged_photos", "external_profiles", "feedback_curriculum"):
             files.setdefault(r["field"], []).append(v)
         else:
             files[r["field"]] = v
@@ -346,6 +342,9 @@ def create(year, upload_root, actor="system"):
         src = static / TEMPLATES[field]["file"]
         _store(db, upload_root, year, username, "pre_bos", field, name,
                (lambda path, src=src, field=field: fill(src, path, field, people=PEOPLE)), t)
+    from .template_check import make_bos_composition
+    _store(db, upload_root, year, username, "bos_documents", "bos_composition",
+           "Composition_of_BoS_Members.docx", (lambda path: make_bos_composition(path, PEOPLE)), t)
     for i, n in enumerate(PHOTOS, 1):
         _store(db, upload_root, year, username, "bos_documents", "geotagged_photos", n,
                (lambda path, i=i: _photo(path, i)), t)

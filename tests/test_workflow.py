@@ -291,7 +291,7 @@ BOS_DOCS_OK = {
         "bos_composition": _file("bos.pdf"), "vision_mission": _file("vm.pdf"),
         "minutes": _file("minutes.pdf"), "geotagged_photos": [_file("a.jpg"), _file("b.jpg")],
         "external_profiles": [_file("p1.pdf")], "attendance": _file("att.pdf"),
-        "feedback_curriculum": _file("fb.pdf"),
+        "feedback_curriculum": [_file("fb.pdf")],
     },
 }
 
@@ -343,10 +343,10 @@ def test_bos_documents_needs_every_upload_but_the_new_programme_feedback(app, cl
     msgs = [i["message"] for i in
             client.post("/department/api/bos_documents/validate", json={}).get_json()["issues"]]
     for label in ("Composition of BoS Members", "Minutes of Meeting",
-                  "Geotagged photos", "Profiles of External Members", "Scanned Attendance Sheet",
+                  "Geotagged photos", "Profiles of External Experts", "Scanned Attendance Sheet",
                   "Stakeholder Feedback (For Curriculum Design and Development)"):
         assert any(label in m for m in msgs), label
-    assert not any("New Program" in m for m in msgs)
+    assert not any("New Programme" in m for m in msgs)
 
 
 def test_curriculum_lists_the_programmes_kept_under_ug_and_pg(app, client):
@@ -1166,7 +1166,7 @@ def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, cli
 def test_course_revision_is_the_revision_template(app, client):
     from app.schema import STAGE_BY_KEY
     rev = STAGE_BY_KEY["prog_revision"]
-    assert [x["key"] for x in rev["sections"]] == ["header", "revision_summary", "courses"]
+    assert [x["key"] for x in rev["sections"]] == ["header", "revision_summary", "courses", "revision_log"]
     cols = [c["name"] for x in rev["sections"] if x["key"] == "courses" for c in x["columns"]]
     for want in ("course_code", "course_title", "semester", "year_previous", "year_latest",
                  "prev_code", "prev_title", "modules", "avg_change"):

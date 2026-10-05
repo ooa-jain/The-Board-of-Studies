@@ -26,23 +26,83 @@ KEYWORDS = {
     "dpac_signed": ["Program Assessment Committee / Programme Assessment Committee / PAC / DPAC",
                     "Chairperson", "Co-Chairperson", "Non-Teaching", "Office of Academics / OOA",
                     "Student", "Professor", "Industry", "Alumni", "Parent", "Academician"],
-    "bos_composition": ["board of studies / BoS", "composition", "member", "chairperson / chairman / chair",
-                        "external"],
-    "vision_mission": ["vision", "mission", "programme overview / program overview / overview",
-                       "objectives / outcomes / PEO / PSO"],
-    "minutes": ["minutes / proceedings", "meeting", "resolved / approved / decided", "agenda",
-                "members present / present / attendance"],
-    "external_profiles": ["profile / curriculum vitae / CV / resume", "experience", "qualification / Ph.D / degree",
-                          "designation", "publications"],
-    "attendance": ["attendance", "signature / signed", "present", "name", "designation"],
-    "feedback_curriculum": ["feedback", "stakeholder / students / alumni / employer / faculty", "curriculum",
-                            "survey / questionnaire / response", "rating / scale"],
-    "feedback_new_programme": ["feedback", "stakeholder / students / alumni / employer / industry",
-                               "new programme / new program / proposed", "survey / questionnaire / response"],
+    # from the CS & IT department's Composition of BoS Members
+    "bos_composition": ["board of studies / BoS / composition", "Category", "Role / Chairperson",
+                        "Members / Name", "Dean / Director", "Head of Department / HOD",
+                        "Industry", "Alumni", "Academician", "Parent", "Student"],
+    # from the CS & IT Vision, Mission, PEOs and POs
+    "vision_mission": ["vision", "mission", "PEO / Programme Educational Objectives / Program Educational Objectives",
+                       "PO / Programme Outcomes / Program Outcomes", "PSO / Programme Specific Outcomes / Program Specific Outcomes",
+                       "Department"],
+    # from the CS & IT Minutes of Meeting, 30.10.2025
+    "minutes": ["minutes / proceedings / MoM", "Board of Studies / BOS", "meeting", "agenda",
+                "members present / present / attendance", "date", "venue",
+                "approved / resolved / decided / recommended", "course matrix / curriculum / syllabus",
+                "observation / recommendation"],
+    "external_profiles": ["profile / curriculum vitae / CV / resume / biodata", "experience",
+                          "qualification / Ph.D / degree / education", "designation / position / role",
+                          "publications / research / projects", "email / contact / phone / mobile"],
+    "attendance": ["attendance", "signature / signed", "name", "designation",
+                   "S. No / Sl. No / S.No / Sl.No", "Board of Studies / BoS / meeting"],
+    # from the e-mailed review of the BCA course matrix
+    "feedback_curriculum": ["feedback / comments / suggestions / review", "curriculum / course matrix / syllabus",
+                            "recommendation / recommend / suggest", "stakeholder / industry / alumni / employer / parent / students / faculty",
+                            "survey / questionnaire / response / e-mail / email / regards"],
+    "feedback_new_programme": ["feedback / comments / suggestions / review", "new programme / new program / proposed",
+                               "curriculum / course matrix / syllabus", "recommendation / recommend / suggest",
+                               "stakeholder / industry / alumni / employer / parent / students / faculty"],
+    # from the MCA (Cybersecurity) Course Revisions Log 2026
+    "revision_log": ["Course Revision Log / Revision Log / Course Revisions", "Course Code", "Course Title",
+                     "Type of revision / Major / Minor", "% Change / Percentage", "rationale",
+                     "Existing Content", "Proposed Content", "Stakeholder feedback", "BoS Date / BoS"],
     "course_file": ["syllabus", "course", "module / unit", "credits", "outcomes / CO", "hours"],
     "document": ["curriculum", "semester", "credits", "course code", "course title / course name",
                  "programme structure / program structure / scheme"],
 }
+
+# what each document says at the top — its title. Keywords alone can be fooled
+# (the minutes talk about the vision and mission); the title cannot.
+LEADS = {
+    "minutes": ("the Minutes of Meeting", r"minutes|proceedings"),
+    "vision_mission": ("the Vision and Mission", r"\bvision\b|\bmission\b"),
+    "bos_composition": ("the Composition of BoS Members",
+                        r"composition\s+of\s+(the\s+)?(bos|board)|bos\s+members|\bcategory\b.{0,40}\brole\b.{0,40}\bmembers\b"),
+    "diac_signed": ("the Composition of DIAC", r"\bdiac\b|industry[- ]academi"),
+    "dpac_signed": ("the Composition of the DPAC / PAC", r"assessment\s+committee|\bd?pac\b"),
+    "attendance": ("an Attendance Sheet", r"attendance"),
+    "external_profiles": ("a profile / CV", r"profile|curriculum\s+vitae|\bcv\b|resume|bio-?data"),
+    "feedback_curriculum": ("stakeholder feedback", r"feedback|review|survey|questionnaire|requisition"),
+    "feedback_new_programme": ("stakeholder feedback", r"feedback|review|survey|questionnaire|requisition"),
+    "revision_log": ("a Course Revision Log", r"revision"),
+}
+# titles specific enough to say “this is really X”
+_TELLTALE = ("minutes", "vision_mission", "bos_composition", "diac_signed", "dpac_signed",
+             "attendance", "revision_log")
+
+
+def looks_like(field: str, text: str) -> str | None:
+    """When a file's title is another box's document, which one."""
+    head = " ".join(text[:600].split())
+    # the title: the first line with words in it
+    title = next((" ".join(l.split()) for l in text[:600].splitlines() if re.search(r"[A-Za-z]{3}", l)), "")[:90]
+    own = LEADS.get(field)
+    # the title itself names another box's document (and not this one's)
+    if not (own and re.search(own[1], title, re.I)):
+        for other in _TELLTALE:
+            if other != field and re.search(LEADS[other][1], title, re.I) and \
+                    LEADS[other][0] != (own or ("",))[0]:
+                return LEADS[other][0]
+    if own and re.search(own[1], head, re.I):
+        return None
+    best = None
+    for other in _TELLTALE:
+        if other == field or LEADS[other][0] == (own or ("",))[0]:
+            continue
+        m = re.search(LEADS[other][1], head, re.I)
+        if m and (best is None or m.start() < best[0]):
+            best = (m.start(), LEADS[other][0])
+    return best[1] if best else None
+
 
 STOP = {"the", "and", "for", "with", "from", "this", "that", "upload", "file", "files",
         "scanned", "signed", "only", "department", "documents", "document"}
@@ -176,6 +236,12 @@ def check(path: Path, field: str, label: str) -> dict:
             seen.append(hit)
     status = "match" if len(found) >= 2 or (found and len(words) <= 2) else "weak" if found else "miss"
     out = {**base, "status": status, "found": found, "seen": seen}
+    other = looks_like(field, text)
+    if other:
+        out["status"] = "miss"
+        out["looks_like"] = other
+    elif field in LEADS and status == "match" and not re.search(LEADS[field][1], " ".join(text[:600].split()), re.I):
+        out["status"] = "weak"           # the right words, but not under the right title
     # a box with a university template: is the form itself filled in?
     from .template_check import check as template_check
     tpl = template_check(path, field, text)

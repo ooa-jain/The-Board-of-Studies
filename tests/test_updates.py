@@ -79,21 +79,23 @@ def test_the_admin_edits_keywords_and_rechecks(app, client):
     from app.db import get_db
     u, p = make_department(app)
     login(client, u, p)
-    j = _upload(client, "minutes.pdf", _minutes_pdf(), field="external_profiles")
-    assert j["match"]["status"] != "match"
+    j = _upload(client, "minutes.pdf", _minutes_pdf(), field="minutes")
+    assert j["match"]["status"] == "match"
 
     _admin(app, client)
     body = client.get("/admin/keywords").get_data(as_text=True)
-    assert "Profiles of External Members" in body and "minutes.pdf" in body
-    client.post("/admin/keywords", data={"kw_external_profiles": "Chairperson, External Member, Member Secretary"})
+    assert "Minutes of Meeting" in body and "minutes.pdf" in body
+    # words the minutes do not carry: checked again, they no longer match
+    client.post("/admin/keywords", data={"kw_minutes": "zebra, giraffe, okapi"})
     client.post("/admin/keywords/recheck")
     with app.app_context():
-        rec = get_db().files.find_one({"field": "external_profiles"})
-    assert rec["keyword_match"]["status"] == "match", rec["keyword_match"]
+        assert get_db().files.find_one({"field": "minutes"})["keyword_match"]["status"] == "miss"
 
     client.post("/admin/keywords/reset")
+    client.post("/admin/keywords/recheck")
     with app.app_context():
         assert get_db().settings.find_one({"_id": "app"})["keywords"] == {}
+        assert get_db().files.find_one({"field": "minutes"})["keyword_match"]["status"] == "match"
 
 
 def test_every_settings_page_has_the_tabs(app, client):

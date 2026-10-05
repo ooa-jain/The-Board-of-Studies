@@ -94,7 +94,7 @@
             {% if m and m.status %}
             <div class="kw-match is-{{ m.status }}">
               <span class="kw-icon">{{ '✓' if m.status == 'match' else '–' if m.status == 'unread' else '!' }}</span>
-              <strong>{{ {'match': 'Keywords match', 'weak': 'Few keywords match', 'miss': 'No expected keywords found', 'unread': 'Keywords not checked'}[m.status] }}</strong>
+              <strong>{% if m.looks_like %}Wrong document — looks like {{ m.looks_like }}{% else %}{{ {'match': 'Keywords match', 'weak': 'Few keywords match', 'miss': 'No expected keywords found', 'unread': 'Keywords not checked'}[m.status] }}{% endif %}</strong>
               {% if m.status == 'unread' %}<span class="kw-sub">no text to read (a scan, image or zip) — open it to check</span>
               {% else %}<span class="kw-tags">{{ kw_tags(m) }}</span>{% endif %}
             </div>

@@ -18,7 +18,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-PLACEHOLDER = re.compile(r"^\s*(words\s*only|name|designation|-+|—|na|n/a|nil|\.+)?\s*$", re.I)
+PLACEHOLDER = re.compile(r"^\s*(words\s*only|name|designation|-+|—|nil|\.+)?\s*$", re.I)
+# “NA” is a deliberate answer — the department has no such member — not a blank
+NOT_APPLICABLE = re.compile(r"^\s*(na|n/a|n\.a\.?|not\s+applicable)\s*$", re.I)
 
 # each template's categories, in its order: (how the form names it, how to find it)
 TEMPLATES = {
@@ -34,6 +36,11 @@ TEMPLATES = {
             ("Industry Experts", r"industry"),
             ("Alumni", r"alumn"),
         ],
+    },
+    "bos_composition": {
+        "title": "Composition of BoS Members",
+        "file": None,
+        "categories": None,          # the PAC's, filled in below
     },
     "dpac_signed": {
         "title": "Composition of the Program Assessment Committee",
@@ -58,6 +65,9 @@ TEMPLATES = {
 }
 
 
+TEMPLATES["bos_composition"]["categories"] = TEMPLATES["dpac_signed"]["categories"]
+
+
 def _which(categories, text):
     t = text.lower()
     for name, pat in categories:
@@ -78,28 +88,33 @@ def check_docx(path: Path, tpl: dict) -> dict | None:
         head = None
         for i, r in enumerate(rows[:4]):
             texts = [_cell(c).lower() for c in r.cells]
-            if "name" in texts and "designation" in texts:
+            who = next((t for t in ("name", "members", "member", "name of the member") if t in texts), None)
+            if who:
                 head = (i, texts.index("category") if "category" in texts else 1,
-                        texts.index("name"), texts.index("designation"))
+                        texts.index(who), texts.index("designation") if "designation" in texts else None)
                 break
         if not head:
             continue
         start, ci, ni, di = head
-        found = {name: {"rows": 0, "filled": 0, "no_designation": 0} for name, _ in tpl["categories"]}
+        found = {name: {"rows": 0, "filled": 0, "no_designation": 0, "na": 0}
+                 for name, _ in tpl["categories"]}
         placeholders = 0
         for r in rows[start + 1:]:
             cells = r.cells
-            if len(cells) <= max(ci, ni, di):
+            if len(cells) <= max(ci, ni, di if di is not None else 0):
                 continue
-            cat = _which(tpl["categories"], cells[ci].text.split("\n")[0])
+            cat = _which(tpl["categories"], " ".join(cells[ci].text.split())[:90])
             if not cat:
                 continue
-            name, des = _cell(cells[ni]), _cell(cells[di])
+            name = _cell(cells[ni])
+            des = _cell(cells[di]) if di is not None else "given"
             f = found[cat]
             f["rows"] += 1
             if re.match(r"^\s*words\s*only\s*$", name, re.I) or re.match(r"^\s*words\s*only\s*$", des, re.I):
                 placeholders += 1
-            if not PLACEHOLDER.match(name):
+            if NOT_APPLICABLE.match(name):
+                f["na"] += 1
+            elif not PLACEHOLDER.match(name):
                 f["filled"] += 1
                 if PLACEHOLDER.match(des):
                     f["no_designation"] += 1
@@ -118,12 +133,14 @@ def check_text(text: str, tpl: dict) -> dict:
 
 
 def _verdict(tpl, found, placeholders, kind):
-    blank = [n for n, f in found.items() if not f["filled"]]
+    blank = [n for n, f in found.items() if not f["filled"] and not f.get("na")]
     half = [n for n, f in found.items() if f["filled"] and f["no_designation"]]
+    na = [n for n, f in found.items() if not f["filled"] and f.get("na")]
     return {
         "template": tpl["title"], "kind": kind,
         "categories": [{"name": n, **f} for n, f in found.items()],
-        "filled": sum(1 for f in found.values() if f["filled"]),
+        "filled": sum(1 for f in found.values() if f["filled"] or f.get("na")),
+        "not_applicable": na,
         "total": len(found),
         "blank": blank, "half": half, "placeholders": placeholders,
         "ok": not blank and not half and not placeholders,
@@ -176,7 +193,7 @@ def fill(src: Path, dst: Path, field: str, skip=(), people=None) -> Path:
     done = set()
     people = people or {}
     for n, r in enumerate(rows[start + 1:], 1):
-        cat = _which(tpl["categories"], r.cells[ci].text.split("\n")[0])
+        cat = _which(tpl["categories"], " ".join(r.cells[ci].text.split())[:90])
         if not cat or cat in skip:
             continue
         name, des = people.get(cat, (f"Dr. Sample Person {n}", cat.split(" /")[0]))
@@ -189,5 +206,27 @@ def fill(src: Path, dst: Path, field: str, skip=(), people=None) -> Path:
         r.cells[ni].text = name
         r.cells[di].text = des
         done.add(cat)
+    doc.save(str(dst))
+    return dst
+
+
+def make_bos_composition(dst: Path, people: dict) -> Path:
+    """A Composition of BoS Members in the department's own layout —
+    S.No, Category, Role, Members — one row per category. For the demo."""
+    import docx
+    roles = {"Dean of Faculty / Director of School": "Chairperson", "Head of Department": "Co-Chairperson"}
+    externals = {"Industry Expert", "Alumni", "Parent", "Academician"}
+    doc = docx.Document()
+    doc.add_heading("Composition of BoS Members", level=1)
+    cats = TEMPLATES["bos_composition"]["categories"]
+    t = doc.add_table(rows=1, cols=4)
+    for c, h in zip(t.rows[0].cells, ("S.No", "Category", "Role", "Members")):
+        c.text = h
+    for i, (name, _) in enumerate(cats, 1):
+        who, what = people.get(name, (f"Dr. Sample Person {i}", name))
+        role = roles.get(name, "External Invitee" if name in externals else
+                         "Internal Invitee" if i > 5 else "Member")
+        r = t.add_row().cells
+        r[0].text, r[1].text, r[2].text, r[3].text = str(i), name, role, f"{who}, {what}"
     doc.save(str(dst))
     return dst

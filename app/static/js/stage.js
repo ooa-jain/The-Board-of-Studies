@@ -1032,7 +1032,8 @@
     if (!m || !m.status) return null;
     const line = el("div", "kw-match is-" + m.status);
     line.appendChild(el("span", "kw-icon", m.status === "match" ? "✓" : m.status === "unread" ? "–" : "!"));
-    line.appendChild(el("strong", null, MATCH_WORDS[m.status] || ""));
+    line.appendChild(el("strong", null, m.looks_like ? "Wrong document — this looks like " + m.looks_like
+                                                     : (MATCH_WORDS[m.status] || "")));
     if (m.status === "unread") {
       line.appendChild(el("span", "kw-sub", "this file has no text to read (a scan, image or zip) — open it to check"));
     } else {
@@ -1045,13 +1046,19 @@
         tags.appendChild(t);
       });
       line.appendChild(tags);
-      if (m.status === "miss") line.appendChild(el("span", "kw-sub", "make sure this is the right file for “" + m.label + "”"));
+      if (m.looks_like) line.appendChild(el("span", "kw-sub", `This looks like ${m.looks_like}, not the “${m.label}” — check you chose the right box.`));
+      else if (m.status === "miss") line.appendChild(el("span", "kw-sub", "make sure this is the right file for “" + m.label + "”"));
     }
     return line;
   }
   function matchToast(v) {
     const m = v.match;
     if (!m || !window.Toast) return;
+    if (m.looks_like) {
+      window.Toast.warning(`${v.name} looks like ${m.looks_like}, not the ${m.label}. Check you chose the right box.`,
+                           { title: "Wrong document?", timeout: 12000 });
+      return;
+    }
     const t = m.template;
     if (t && ((t.blank || []).length || (t.half || []).length || t.placeholders)) {
       const what = (t.blank || []).length ? t.blank.join(", ") : (t.half || []).length ? "designation for " + t.half.join(", ") : "the “Words only” places";
@@ -3369,6 +3376,56 @@
 
   // ------------------------------------------------------------------ render
 
+  /* One row per document, in order, each opened with a click to upload.
+     Closed, a row still says where it stands: not uploaded, uploaded (how
+     many), the keyword check, a form with blanks. The first required one
+     still missing is opened for you. */
+  function docStatus(f, v) {
+    const vals = (Array.isArray(v) ? v : [v]).filter(x => x && x.name);
+    if (!vals.length) return f.required ? ["is-todo", "Not uploaded"] : ["is-opt", "Optional"];
+    const bad = vals.find(x => x.match && x.match.template &&
+      ((x.match.template.blank || []).length || (x.match.template.half || []).length || x.match.template.placeholders));
+    if (bad) return ["is-bad", "Blank in the form — fill it"];
+    const wrong = vals.find(x => x.match && x.match.looks_like);
+    if (wrong) return ["is-bad", "Looks like " + wrong.match.looks_like];
+    const miss = vals.find(x => x.match && x.match.status === "miss");
+    if (miss) return ["is-warn", "Keywords do not match"];
+    const weak = vals.find(x => x.match && x.match.status === "weak");
+    const n = vals.length > 1 ? ` (${vals.length} files)` : "";
+    if (weak) return ["is-warn", "Uploaded" + n + " · few keywords"];
+    return ["is-ok", "Uploaded" + n + " ✓"];
+  }
+
+  function accordion(section, grid, made) {
+    grid.classList.add("acc");
+    let opened = false;
+    made.forEach(([f, b], i) => {
+      const d = el("details", "acc-item");
+      const sum = el("summary", "acc-head");
+      sum.appendChild(el("span", "acc-n", String(i + 1)));
+      const t = el("span", "acc-title", f.label);
+      if (f.required) t.appendChild(el("span", "req", " *"));
+      sum.appendChild(t);
+      const chip = el("span", "acc-chip");
+      sum.appendChild(chip);
+      sum.appendChild(el("span", "acc-caret", "›"));
+      d.appendChild(sum);
+      const body = el("div", "acc-body");
+      b.replaceWith(d);
+      body.appendChild(b);
+      d.appendChild(body);
+      const paint = () => {
+        const [cls, words] = docStatus(f, (state[section.key] || {})[f.name]);
+        chip.className = "acc-chip " + cls;
+        chip.textContent = words;
+        d.classList.toggle("is-done", cls === "is-ok");
+      };
+      paint();
+      refreshers.push(paint);
+      if (!opened && !CTX.readonly && f.required && chip.classList.contains("is-todo")) { d.open = true; opened = true; }
+    });
+  }
+
   function render() {
     root.textContent = "";
     if (!STAGE.sections || !STAGE.sections.length) {
@@ -3412,6 +3469,7 @@
         renderCards(section, block);
       } else {
         const grid = el("div", "fields-grid");
+        const made = [];
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
           if (f.hidden) return;              // kept in the record, not shown
@@ -3455,8 +3513,10 @@
             });
           }
           grid.appendChild(b);
+          made.push([f, b]);
         });
         block.appendChild(grid);
+        if (section.display === "accordion") accordion(section, grid, made);
       }
       root.appendChild(block);
     });
