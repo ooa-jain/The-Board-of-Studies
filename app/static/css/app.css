@@ -4158,3 +4158,19 @@ button.pmap-pill:disabled { cursor: default; opacity: .55; box-shadow: none; }
 .acc-body { padding: 4px 16px 16px; border-top: 1px solid #f0f2f5; }
 .acc-body > .field > label:first-child { display: none; }   /* the row already names it */
 @media (max-width: 560px) { .acc-head { flex-wrap: wrap; } .acc-chip { order: 3; margin-left: 40px; } }
+
+/* Submit, inside the Stages panel */
+.branch-submit { padding: 14px 16px 16px; border-top: 1px solid var(--line); background: #fffdf8; }
+.branch-submit .btn-block { width: 100%; justify-content: center; text-align: center; white-space: normal; line-height: 1.3; }
+.branch-submit p { margin: 8px 0 0; line-height: 1.45; }
+.branch-done { color: #1f6b44; font-weight: 600; margin: 0 0 8px !important; }
+.branch-submit .flex { gap: 8px; flex-wrap: wrap; }
+/* the whole record, at the top of the final review */
+.rv-record-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .86rem; }
+.rv-record-list li { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px dashed #edf0f4; }
+.rv-rec-dot { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: .7rem; font-weight: 700; flex: none; background: #f1f3f6; color: #5f6672; }
+.is-submitted .rv-rec-dot { background: #e2f1e6; color: #1f6b44; }
+.is-now .rv-rec-dot { background: var(--jain-orange); color: #fff; }
+.rv-rec-title { flex: 1; }
+.rv-rec-at { font-size: .76rem; color: var(--jain-grey); }
+.is-now .rv-rec-title { font-weight: 600; color: var(--jain-blue); }

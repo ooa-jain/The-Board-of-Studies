@@ -71,3 +71,28 @@ def test_the_admin_makes_reviews_and_removes_the_demo(app, client):
     with app.app_context():
         assert not get_db().departments.find_one({"dept_code": "DEMO"})
         assert not get_db().users.find_one({"dept_code": "DEMO"})
+
+
+def test_only_the_step_that_completes_the_record_reviews_first(app, client):
+    from app import demo_dept
+    from app.db import get_db
+    with app.app_context():
+        user, pw = demo_dept.create("2027-28", app.config["UPLOAD_ROOT"])
+    login(client, user, pw)
+    client.post("/department/demo/fill-all")
+    page = client.get("/department/stage/dept_info").get_data(as_text=True)
+    assert "Submit this stage &amp; go to next" in page and "Submit everything" not in page
+
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "DEMO"})
+    for key in ("dept_info", "pre_bos", "bos_documents"):
+        assert client.post(f"/department/api/{key}/submit", json=sub["stages"][key]["data"]).get_json()["ok"]
+    parts = [(code, part) for code in ("DEMOBBA", "DEMOBCOM")
+             for part in ("prog_curriculum", "prog_syllabus", "prog_revision")]
+    for code, part in parts[:-1]:
+        data = sub["programmes"][code][part]["data"]
+        assert client.post(f"/department/api/{part}/{code}/submit", json=data).get_json()["ok"]
+    code, part = parts[-1]
+    page = client.get(f"/department/stage/{part}/{code}").get_data(as_text=True)
+    assert "Submit everything — review first" in page
+    assert '"final": true' in page.replace("final: true", '"final": true')

@@ -3712,9 +3712,10 @@
      section, and a confirmation to tick — once submitted the stage is
      locked until the Office sends it back. After it goes through, the same
      review can be downloaded as a copy. */
+  const SUBMIT_LABEL = (document.getElementById("btn-submit") || {}).textContent || "Submit";
   function submitLabel(btn, text) {
     btn.disabled = false;
-    btn.textContent = text || "Submit";
+    btn.textContent = text || SUBMIT_LABEL.trim();
   }
 
   function submit() {
@@ -3730,9 +3731,43 @@
       const errs = (j.issues || []).filter(i => i.level === "error");
       if (!j.ok || errs.length) { notSubmitted(btn, j); return; }
       paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
-      submitLabel(btn);
-      openReview(j.issues || []);
+      // only the step that completes the record is reviewed first
+      if (CTX.final) { submitLabel(btn); openReview(j.issues || []); }
+      else submitAndGo(btn);
     }).catch(() => unreachable(btn));
+  }
+
+  /* An intermediate stage: submitted as soon as the checks pass, then on
+     to the next one. */
+  function submitAndGo(btn) {
+    btn.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Submitting…';
+    fetch(CTX.urls.submit, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state)
+    }).then(r => r.json()).then(j => {
+      if (!j.ok) { notSubmitted(btn, j); return; }
+      dirty = false;
+      btn.textContent = "Submitted ✓";
+      window.location = j.redirect || CTX.urls.dashboard;
+    }).catch(() => unreachable(btn));
+  }
+
+  function recordBlock() {
+    const box = el("section", "rv-sec rv-record");
+    const h = el("div", "rv-sec-head");
+    h.appendChild(el("h4", null, "Your whole record"));
+    box.appendChild(h);
+    const ul = el("ul", "rv-record-list");
+    (CTX.record || []).forEach(r => {
+      const li = el("li", "is-" + r.status);
+      li.appendChild(el("span", "rv-rec-dot", r.status === "submitted" ? "✓" : r.status === "now" ? "→" : "!"));
+      li.appendChild(el("span", "rv-rec-title", r.title));
+      li.appendChild(el("span", "rv-rec-at", r.status === "now" ? "this one — below" : r.status === "submitted" ? (r.at ? "submitted " + r.at : "submitted") : r.status));
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+    return box;
   }
 
   function notSubmitted(btn, j) {
@@ -3793,7 +3828,8 @@
   function openReview(issues) {
     const warnings = (issues || []).filter(i => i.level !== "error").length;
     let ctl = null;
-    const draw = () => Review.build(STAGE, state, {
+    const draw = () => { const wrap = el("div"); if (CTX.final && (CTX.record || []).length) wrap.appendChild(recordBlock());
+      wrap.appendChild(Review.build(STAGE, state, {
       viewFile: v => openViewer(v),
       removeFile: path => {
         if (!window.confirm("Remove this file? You will need to upload it again to submit.")) return;
@@ -3807,7 +3843,7 @@
         const sec = document.getElementById("sec-" + key);
         if (sec) { sec.scrollIntoView({ behavior: "smooth", block: "start" }); sec.classList.add("is-flash"); setTimeout(() => sec.classList.remove("is-flash"), 1600); }
       }
-    });
+    })); return wrap; };
 
     const foot = el("div", "rv-foot-in");
     const terms = el("label", "rv-terms");
@@ -3815,8 +3851,8 @@
     tick.type = "checkbox";
     terms.appendChild(tick);
     terms.appendChild(el("span", null,
-      "I have checked everything above. I understand that once submitted, this stage is locked and " +
-      "cannot be changed — only the Office of Academics can send it back for correction."));
+      "I have checked everything above. I understand that once submitted, the whole Board of Studies " +
+      "record goes to the Office of Academics and is locked — only the Office can send a part back for correction."));
     foot.appendChild(terms);
     const row = el("div", "rv-actions");
     const copy = el("button", "btn btn-ghost", "Download a copy");
@@ -3834,7 +3870,7 @@
     tick.addEventListener("change", () => { go.disabled = !tick.checked; });
 
     ctl = Review.modal({
-      title: "Review before you submit",
+      title: "Final submission — review everything",
       sub: reviewTitle() + " — " + CTX.dept_name,
       top: statsBar(Review.stats(STAGE, state), warnings),
       body: draw(),
@@ -3864,6 +3900,11 @@
         ctl.panel.querySelector(".rv-head h3").textContent = "Submitted";
         ctl.panel.querySelector(".rv-sub").textContent = reviewTitle() + " — " + CTX.dept_name + " · " + new Date().toLocaleString();
         ctl.panel.querySelectorAll(".rv-edit, .rv-file-rm").forEach(b => b.remove());
+        ctl.panel.querySelectorAll(".rv-record-list li.is-now").forEach(li => {
+          li.className = "is-submitted";
+          li.querySelector(".rv-rec-dot").textContent = "✓";
+          li.querySelector(".rv-rec-at").textContent = "submitted now";
+        });
         const done = el("div", "rv-done");
         done.appendChild(el("span", "rv-done-tick", "✓"));
         const w = el("div");

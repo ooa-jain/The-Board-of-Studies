@@ -191,8 +191,9 @@
       }
       (sec.fields || []).forEach(f => {
         if (!enterable(f) || f.type === "fixed" || f.type === "file" && !f.required && f.help && /only if/i.test(f.help)) return;
-        total += 1;
         const v = (d || {})[f.name];
+        if (empty(v) && !f.required && !f.prefill_text) return;   // optional and left empty: not missing
+        total += 1;
         if (!empty(v)) filled += 1;
         else if (f.required || f.prefill_text) {
           if (!f.prefill_text) missing.push(f.label || f.name);

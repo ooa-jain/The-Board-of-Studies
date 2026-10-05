@@ -256,6 +256,23 @@
           {% endfor %}
         </ul>
       </div>
+      {# submitting lives with the stages: this one, then on to the next;
+         only the last one — the one that completes the record — opens the
+         review of everything first #}
+      <div class="branch-submit">
+        {% if not readonly %}
+        <button class="btn btn-gold btn-block" type="button" id="btn-submit">
+          {{ 'Submit everything — review first' if final else 'Submit this stage & go to next →' }}</button>
+        <p class="small muted">{% if final %}This is the last one: you will see the whole record, confirm it, and send it to the Office of Academics.
+          {% else %}The checks run first. Anything to fix is listed above; if all is well it is submitted and the next stage opens.{% endif %}</p>
+        {% else %}
+        <p class="small branch-done">✓ Submitted {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '' }}</p>
+        <div class="flex">
+          <button class="btn btn-ghost btn-sm" type="button" id="btn-review">Review</button>
+          <button class="btn btn-ghost btn-sm" type="button" id="btn-copy">Download a copy</button>
+        </div>
+        {% endif %}
+      </div>
     </nav>
   </aside>
 </div>
@@ -266,7 +283,6 @@
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
     {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
-    <button class="btn btn-gold" type="button" id="btn-submit">Submit</button>
   </div>
 </div>
 {% else %}
@@ -275,8 +291,6 @@
     <span class="save-note">Submitted on
       {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
     <span class="spacer"></span>
-    <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
-    <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
     <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
   </div>
 </div>
@@ -294,6 +308,8 @@
     programme_name: {{ (programme.programme_name if programme else '')|tojson }},
     dept_name: {{ dept.dept_name|tojson }},
     title: {{ stage.title|tojson }},
+    final: {{ final|tojson }},
+    record: {{ record|tojson }},
     submitted_at: {{ (state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},
     readonly: {{ readonly|tojson }},
     synced: {{ synced|tojson }},

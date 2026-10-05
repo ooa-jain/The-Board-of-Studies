@@ -148,7 +148,9 @@ def stage(stage_key, programme_code=None):
             fill = revision_fill_source(sub, programme["programme_code"])
 
     board = stage_board(sub)
+    final, record = _final_step(sub, dept, stage_key, (programme or {}).get("programme_code"))
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
+                           final=final, record=record,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,
@@ -253,6 +255,42 @@ def _guard(stage_key, programme_code=None):
             return None, None, None, (jsonify({"ok": False,
                                                "error": "Unknown programme."}), 404)
     return dept, sub, programme, None
+
+
+def _final_step(sub, dept, stage_key, programme_code=None):
+    """Whether submitting this stage completes the whole record — the one
+    submit that opens the review — and the record, stage by stage and part
+    by part, for that review."""
+    from .workflow import programme_stage_state
+    record, final = [], True
+    progs = programmes_of(sub, dept)
+    for k in STAGE_KEYS:
+        sd = STAGE_BY_KEY[k]
+        if sd.get("parts"):
+            for p in progs:
+                for part in sd["parts"]:
+                    st = programme_stage_state(sub, p["programme_code"], part)
+                    here = part == stage_key and p["programme_code"] == programme_code
+                    record.append({"title": f"{p.get('programme_name') or p['programme_code']} · "
+                                            f"{STAGE_BY_KEY[part]['title']}",
+                                   "status": "now" if here else (st.get("status") or "open"),
+                                   "at": st["submitted_at"].strftime("%d %b %Y") if st.get("submitted_at") else ""})
+                    if not here and st.get("status") != "submitted":
+                        final = False
+            if not progs:
+                final = False
+            continue
+        st = (sub.get("stages") or {}).get(k) or {}
+        here = k == stage_key
+        status = compute_status(sub, k)
+        record.append({"title": sd["title"], "status": "now" if here else status,
+                       "at": st["submitted_at"].strftime("%d %b %Y") if st.get("submitted_at") else ""})
+        if not here and status != "submitted":
+            final = False
+    # an optional part (an earlier batch's syllabus) is never the final step
+    if (STAGE_BY_KEY.get(stage_key) or {}).get("optional"):
+        final = False
+    return final, record
 
 
 def _pin_frozen(stage_key, data, dept, sub, programme):
