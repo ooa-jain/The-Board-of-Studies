@@ -78,6 +78,19 @@
               {% endif %}
             </div>
             {% set m = f.match %}
+            {% set t = m.template if m else None %}
+            {% if t %}
+            {% set bad = t.blank or t.half or t.placeholders %}
+            <div class="tpl-check {{ 'is-bad' if bad else 'is-ok' }}">
+              <span class="kw-icon">{{ '!' if bad else '✓' }}</span>
+              <strong>{% if bad %}Blank in the {{ t.template }}{% else %}{{ t.template }}: every category filled ({{ t.filled }} of {{ t.total }}){% endif %}</strong>
+              {% if bad %}<ul>
+                {% if t.blank %}<li>No name yet: {{ t.blank|join(', ') }}</li>{% endif %}
+                {% if t.half %}<li>Designation missing: {{ t.half|join(', ') }}</li>{% endif %}
+                {% if t.placeholders %}<li>“Words only” still written in {{ t.placeholders }} place(s)</li>{% endif %}
+              </ul>{% endif %}
+            </div>
+            {% endif %}
             {% if m and m.status %}
             <div class="kw-match is-{{ m.status }}">
               <span class="kw-icon">{{ '✓' if m.status == 'match' else '–' if m.status == 'unread' else '!' }}</span>

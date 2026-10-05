@@ -326,6 +326,28 @@ def demo_fill_all():
     return redirect(url_for("dept.dashboard"))
 
 
+def _template_issues(dept, stage_key, data):
+    """A signed composition form with categories left blank cannot be
+    submitted: one error per form, naming what to fill."""
+    from .template_check import TEMPLATES, problems
+    stage = STAGE_BY_KEY.get(stage_key) or {}
+    out = []
+    for sec in stage.get("sections", []):
+        for f in sec.get("fields", []):
+            if f.get("name") not in TEMPLATES:
+                continue
+            v = ((data or {}).get(sec["key"]) or {}).get(f["name"])
+            if not isinstance(v, dict) or not v.get("stored"):
+                continue
+            rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": v["stored"]})
+            tpl = ((rec or {}).get("keyword_match") or {}).get("template")
+            for msg in problems(tpl):
+                out.append({"level": "error", "section": sec["key"], "field": f["name"],
+                            "message": f"{f.get('label', f['name'])}: {msg}. Fill it in the form, "
+                                       "sign it and upload it again."})
+    return out
+
+
 @bp.post("/api/<stage_key>/validate")
 @bp.post("/api/<stage_key>/<programme_code>/validate")
 @department_required
@@ -335,6 +357,10 @@ def api_validate(stage_key, programme_code=None):
         return bad
     data = request.get_json(silent=True) or {}
     issues, summary = validate_only(sub, stage_key, data, programme)
+    extra = _template_issues(dept, stage_key, data)
+    if extra:
+        issues = extra + issues
+        summary = {**summary, "errors": summary.get("errors", 0) + len(extra)}
     return jsonify({"ok": True, "issues": issues, "summary": summary})
 
 
@@ -346,6 +372,12 @@ def api_submit(stage_key, programme_code=None):
     if bad:
         return bad
     data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
+    blanks = _template_issues(dept, stage_key, data)
+    if blanks:
+        save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
+        issues, summary = validate_only(sub, stage_key, data, programme)
+        return jsonify({"ok": False, "status": "draft", "issues": blanks + issues,
+                        "summary": {**summary, "errors": summary.get("errors", 0) + len(blanks)}})
     before = _stored_data(sub, stage_key, programme_code)
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])

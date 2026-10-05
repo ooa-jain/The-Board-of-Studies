@@ -38,15 +38,6 @@ PROGRAMMES = [
 # file name → (stage, field, lines of text inside it); every one the right
 # document for its box, so the keyword check passes throughout
 DOCS = {
-    "diac.pdf": ("pre_bos", "diac_signed", [
-        "Composition of the Department Industry-Academia Cell (DIAC)",
-        "Department of Demonstration Studies, 2027-28",
-        "Dr. Demo Head, Chairperson", "Ms. Asha Rao, Industry Member, Demo Industries Ltd",
-        "Mr. Kiran Shetty, Member, Academia", "Signed: Chairperson, DIAC"]),
-    "dpac.pdf": ("pre_bos", "dpac_signed", [
-        "Composition of the Department Programme Assessment Committee (DPAC)",
-        "Committee members for 2027-28", "Dr. Demo Head, Chairperson",
-        "Prof. Leela Iyer, Member", "Dr. Arun Nair, Member Secretary"]),
     "bos_composition.pdf": ("bos_documents", "bos_composition", [
         "Composition of the Board of Studies (BoS)", "Dr. Demo Head, Chairperson",
         "Prof. Leela Iyer, External Member", "Mr. Vikram Das, Alumni Member",
@@ -80,6 +71,26 @@ DOCS = {
         "Feedback: more case studies and analytics in the curriculum."]),
 }
 PHOTOS = ["meeting_photo_1.jpg", "meeting_photo_2.jpg"]
+
+# who sits on the demo's DIAC and PAC — made up, one per category
+PEOPLE = {
+    "Dean of Faculty / Director of School": ("Dr. Meera Kulkarni", "Dean, Faculty of Demonstration"),
+    "Head of Department": ("Dr. Demo Head", "Professor and Head"),
+    "Area Chair / Area Head": ("Dr. Arun Nair", "Area Chair, Finance"),
+    "Program Head / Program Co-Ordinator": ("Prof. Leela Iyer", "Programme Head, BBA"),
+    "Faculty Placement Coordinators": ("Ms. Divya Rao", "Placement Coordinator"),
+    "Industry Experts": ("Ms. Asha Rao", "Director, Demo Industries Ltd"),
+    "Industry Expert": ("Ms. Asha Rao", "Director, Demo Industries Ltd"),
+    "Alumni": ("Mr. Vikram Das", "Analyst, Demo Bank (BBA 2019)"),
+    "Senior Non-Teaching Staff": ("Mr. Ravi Kumar", "Academic Administrator"),
+    "Representative of the Office of Academics": ("Dr. Sunita Menon", "Deputy Director, OOA"),
+    "Current Student": ("Ms. Priya Menon", "BBA, Semester 5"),
+    "Professor": ("Prof. Karthik Bhat", "Professor"),
+    "Associate Professor": ("Dr. Neha Shetty", "Associate Professor"),
+    "Assistant Professor": ("Mr. Rahul Joshi", "Assistant Professor"),
+    "Parent": ("Mr. Suresh Gowda", "Parent of a BBA student"),
+    "Academician": ("Prof. R. Srinivasan", "Professor (retd.), 30 years in management education"),
+}
 
 def _pdf(lines):
     """A one-page PDF with these lines in Helvetica — enough for the text
@@ -326,6 +337,15 @@ def create(year, upload_root, actor="system"):
 
     for name, (stage, field, lines) in DOCS.items():
         _store(db, upload_root, year, username, stage, field, name, _pdf(lines), t)
+    # the signed composition forms: the university's own templates, filled in
+    from pathlib import Path
+    from .template_check import TEMPLATES, fill
+    static = Path(__file__).resolve().parent / "static"
+    for field, name in (("diac_signed", "Composition_of_DIAC_signed.docx"),
+                        ("dpac_signed", "Composition_of_PAC_signed.docx")):
+        src = static / TEMPLATES[field]["file"]
+        _store(db, upload_root, year, username, "pre_bos", field, name,
+               (lambda path, src=src, field=field: fill(src, path, field, people=PEOPLE)), t)
     for i, n in enumerate(PHOTOS, 1):
         _store(db, upload_root, year, username, "bos_documents", "geotagged_photos", n,
                (lambda path, i=i: _photo(path, i)), t)

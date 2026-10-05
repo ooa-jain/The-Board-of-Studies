@@ -4122,3 +4122,14 @@ button.pmap-pill:disabled { cursor: default; opacity: .55; box-shadow: none; }
 .error-why code { white-space: pre-wrap; word-break: break-word; }
 .demo-login { font-size: .92rem; margin: 2px 0; }
 .demo-login code { font-size: .9rem; font-weight: 600; color: var(--jain-blue); }
+
+/* signed composition forms: every category filled? */
+.tpl-link { display: inline-block; margin: 0 0 8px; font-size: .84rem; font-weight: 500; color: var(--jain-link); }
+.tpl-check { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; padding: 8px 10px;
+  border-radius: 10px; font-size: .8rem; border: 1px solid transparent; }
+.tpl-check strong { font-weight: 600; }
+.tpl-check ul { flex-basis: 100%; margin: 2px 0 0 22px; padding: 0; }
+.tpl-check.is-ok { background: #e8f4ec; border-color: #cfe6d7; color: #1f5e3a; }
+.tpl-check.is-ok .kw-icon { background: #2f8a55; }
+.tpl-check.is-bad { background: #fbebe8; border-color: #f1cfc9; color: #9a2f22; }
+.tpl-check.is-bad .kw-icon { background: #c2412f; }

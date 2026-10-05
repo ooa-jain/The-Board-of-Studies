@@ -199,10 +199,16 @@ PRE_BOS = {
             "fields": [
                 {"name": "diac_signed",
                  "label": "Composition of the Department Industry-Academia Cell (DIAC)",
-                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc"},
+                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                 "template": "templates/Composition_of_DIAC.docx",
+                 "help": "Fill a name and designation for every category in the template. A Word "
+                         "file is checked row by row; anything left blank is listed."},
                 {"name": "dpac_signed",
                  "label": "Composition of the Department Programme Assessment Committee (DPAC)",
-                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc"},
+                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                 "template": "templates/Composition_of_PAC.docx",
+                 "help": "Fill a name and designation for every category in the template. A Word "
+                         "file is checked row by row; anything left blank is listed."},
                 {"name": "notes", "label": "Note to the Office of Academics", "type": "textarea",
                  "rows": 2, "wide": True, "help": "Optional."},
             ],

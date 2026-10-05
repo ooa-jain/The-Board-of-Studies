@@ -833,6 +833,8 @@
       acts.appendChild(rm);
     }
     meta.appendChild(acts);
+    const tl = templateLine(val);
+    if (tl) meta.appendChild(tl);
     const kw = matchLine(val);
     if (kw) meta.appendChild(kw);
     if (val.url && (info.kind === "doc" || info.kind === "sheet")) {
@@ -1005,6 +1007,26 @@
      matches, as a warning straight away. */
   const MATCH_WORDS = { match: "Keywords match", weak: "Few keywords match",
                         miss: "No expected keywords found", unread: "Keywords not checked" };
+  /* A signed composition form: is every category filled in? */
+  function templateLine(val) {
+    const t = val && val.match && val.match.template;
+    if (!t) return null;
+    const bad = (t.blank || []).length || (t.half || []).length || t.placeholders;
+    const line = el("div", "tpl-check " + (bad ? "is-bad" : "is-ok"));
+    line.appendChild(el("span", "kw-icon", bad ? "!" : "✓"));
+    line.appendChild(el("strong", null, bad ? `Blank in the ${t.template} — fill it`
+                                            : `${t.template}: every category filled (${t.filled} of ${t.total})`));
+    if (bad) {
+      const ul = el("ul");
+      if ((t.blank || []).length) ul.appendChild(el("li", null, "No name yet: " + t.blank.join(", ")));
+      if ((t.half || []).length) ul.appendChild(el("li", null, "Designation missing: " + t.half.join(", ")));
+      if (t.placeholders) ul.appendChild(el("li", null, `“Words only” still written in ${t.placeholders} place${t.placeholders === 1 ? "" : "s"}`));
+      line.appendChild(ul);
+      line.appendChild(el("span", "kw-sub", "Fill these in the form, sign it and upload it again — it cannot be submitted with blanks."));
+    }
+    return line;
+  }
+
   function matchLine(val) {
     const m = val && val.match;
     if (!m || !m.status) return null;
@@ -1030,6 +1052,13 @@
   function matchToast(v) {
     const m = v.match;
     if (!m || !window.Toast) return;
+    const t = m.template;
+    if (t && ((t.blank || []).length || (t.half || []).length || t.placeholders)) {
+      const what = (t.blank || []).length ? t.blank.join(", ") : (t.half || []).length ? "designation for " + t.half.join(", ") : "the “Words only” places";
+      window.Toast.warning(`${v.name}: blank — fill ${what}.`, { title: "Blank in the form", timeout: 12000 });
+      return;
+    }
+    if (t) { window.Toast.success(`${v.name}: every category in the ${t.template} is filled.`, { title: "Form complete" }); return; }
     if (m.status === "miss") {
       window.Toast.warning(`None of the words a “${m.label}” carries (${(m.expected || []).slice(0, 4).join(", ")}…) are in ${v.name}. Check it is the right file.`,
                            { title: "Keywords do not match" });
@@ -1175,6 +1204,12 @@
           onChange(def.multiple ? next : "");
         });
       };
+      if (def.template) {
+        const t = el("a", "tpl-link", "⤓ Download the template (Word)");
+        t.href = CTX.urls.static + def.template;
+        t.setAttribute("download", "");
+        wrap.appendChild(t);
+      }
       wrap.appendChild(uploadBox(def, input, value, onChange));
       // the file card under the box already names what is uploaded
       wrap._set(current);
@@ -3619,7 +3654,7 @@
      review can be downloaded as a copy. */
   function submitLabel(btn, text) {
     btn.disabled = false;
-    btn.textContent = text || "Submit this stage";
+    btn.textContent = text || "Submit";
   }
 
   function submit() {

@@ -56,6 +56,12 @@
     a.rel = "noopener";
     if (opts.viewFile) a.addEventListener("click", e => { e.preventDefault(); opts.viewFile(v); });
     chip.appendChild(a);
+    const tp = v.match && v.match.template;
+    if (tp && ((tp.blank || []).length || (tp.half || []).length || tp.placeholders)) {
+      const mk = el("span", "rv-kw is-miss", "! blank: " + ((tp.blank || []).concat(tp.half || []).join(", ") || "“Words only” left"));
+      mk.title = "Fill these in the form and upload it again";
+      chip.appendChild(mk);
+    } else if (tp) chip.appendChild(el("span", "rv-kw is-match", "✓ form filled"));
     if (v.match && v.match.status && v.match.status !== "unread") {
       const ok = v.match.status === "match";
       const mk = el("span", "rv-kw is-" + v.match.status, ok ? "✓ keywords" : v.match.status === "weak" ? "! few keywords" : "! no keywords");

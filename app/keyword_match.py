@@ -19,9 +19,13 @@ from pathlib import Path
 # per upload box: the words a right document carries; any one is a match,
 # more is better
 KEYWORDS = {
-    "diac_signed": ["DIAC / industry-academia", "industry", "cell", "composition", "member", "chairperson / chairman / chair"],
-    "dpac_signed": ["DPAC / programme assessment / program assessment", "committee", "composition", "member",
-                    "chairperson / chairman / chair"],
+    # from the university's templates: their title and categories
+    "diac_signed": ["DIAC / Industry-Academia", "Dean / Director", "Head of Department / HOD",
+                    "Area Chair / Area Head", "Program Head / Programme Head / Co-Ordinator",
+                    "Placement", "Industry", "Alumni", "Designation"],
+    "dpac_signed": ["Program Assessment Committee / Programme Assessment Committee / PAC / DPAC",
+                    "Chairperson", "Co-Chairperson", "Non-Teaching", "Office of Academics / OOA",
+                    "Student", "Professor", "Industry", "Alumni", "Parent", "Academician"],
     "bos_composition": ["board of studies / BoS", "composition", "member", "chairperson / chairman / chair",
                         "external"],
     "vision_mission": ["vision", "mission", "programme overview / program overview / overview",
@@ -171,4 +175,10 @@ def check(path: Path, field: str, label: str) -> dict:
             found.append(w)
             seen.append(hit)
     status = "match" if len(found) >= 2 or (found and len(words) <= 2) else "weak" if found else "miss"
-    return {**base, "status": status, "found": found, "seen": seen}
+    out = {**base, "status": status, "found": found, "seen": seen}
+    # a box with a university template: is the form itself filled in?
+    from .template_check import check as template_check
+    tpl = template_check(path, field, text)
+    if tpl:
+        out["template"] = tpl
+    return out

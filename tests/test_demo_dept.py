@@ -18,6 +18,8 @@ def test_every_demo_stage_and_part_submits_as_filled(app, client):
         db = get_db()
         assert not db.submissions.find_one({"dept_code": "DEMO"}), "the forms start empty"
         assert db.files.count_documents({"dept_code": "DEMO"}) == 10
+        for r in db.files.find({"dept_code": "DEMO", "field": {"$in": ["diac_signed", "dpac_signed"]}}):
+            assert r["keyword_match"]["template"]["ok"], r["keyword_match"]["template"]
         bad = [r["original_name"] for r in db.files.find({"dept_code": "DEMO"})
                if r["keyword_match"]["status"] not in ("match", "unread")]
         assert not bad, f"demo files that fail the keyword check: {bad}"
