@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BoS Academic Portal — Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<!--
+  A self-contained walk-through of the BoS Academic Portal for showing to
+  people: no server, no database, no login. Everything is sample data held
+  in this page; nothing is sent anywhere. Reload to start again.
+-->
+<style>
+:root{--navy:#0b1a33;--blue:#0e3d7c;--text:#1d3c6e;--link:#0b63ce;--gold:#f2a900;--gold2:#c79c10;--orange:#f47c20;
+  --grey:#5f6672;--line:#e2dacb;--bg:#f5f1e8;--card:#fdfbf7;--ok:#2f8a55;--okbg:#e2f1e6;--warn:#d39a16;--warnbg:#fbf1cf;--err:#c2412f;--errbg:#fbe4df}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 Roboto,"Segoe UI",system-ui,sans-serif;color:var(--text);background:var(--bg)}
+button,input,select,textarea{font:inherit}
+a{color:var(--link)}
+h1,h2,h3,h4{color:var(--blue);font-weight:500;margin:0 0 .4em;line-height:1.25}
+.top{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line)}
+.top::before{content:"";display:block;height:4px;background:linear-gradient(90deg,var(--gold2) 0 72%,var(--orange) 72%)}
+.top-in{max-width:1180px;margin:auto;display:flex;align-items:center;gap:18px;padding:10px 16px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:var(--navy)}
+.brand img{height:30px}
+.views{display:flex;gap:4px;background:#f1f3f6;border-radius:999px;padding:3px;margin-left:auto}
+.views button{border:0;background:transparent;padding:7px 16px;border-radius:999px;cursor:pointer;color:var(--grey);font-weight:500}
+.views button.on{background:var(--navy);color:#fff}
+.bell{position:relative;border:0;background:#f1f3f6;width:38px;height:38px;border-radius:50%;cursor:pointer;color:var(--grey)}
+.bell b{position:absolute;top:-2px;right:-4px;min-width:18px;height:18px;border-radius:999px;background:var(--orange);color:#fff;font-size:.66rem;display:grid;place-items:center;padding:0 4px}
+.bell b[hidden]{display:none}
+.demo-band{background:var(--navy);color:#fff;font-size:.82rem;text-align:center;padding:6px 12px}
+.demo-band b{color:var(--gold)}
+main{max-width:1180px;margin:auto;padding:24px 16px 80px}
+.head h1{font-size:1.9rem}
+.head h1::after{content:"";display:block;width:88px;height:2px;margin-top:10px;background:linear-gradient(90deg,var(--gold) 0 26px,transparent 26px 38px,#9aa0a8 38px)}
+.head p{color:var(--grey);margin:.3em 0 1.2em}
+.crumbs{font-size:.82rem;color:var(--grey);margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:16px}
+.btn{border:1px solid var(--line);background:#fff;color:var(--text);padding:9px 16px;border-radius:10px;cursor:pointer;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:#c8d3e3}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#1b1300}
+.btn.navy{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.red{background:var(--err);border-color:var(--err);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.sm{padding:5px 11px;font-size:.84rem}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.muted{color:var(--grey)} .small{font-size:.84rem}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.74rem;font-weight:600}
+.p-ok{background:var(--okbg);color:#1f6b44}.p-warn{background:var(--warnbg);color:#85600a}.p-err{background:var(--errbg);color:#b23a2a}.p-lock{background:#eceef2;color:var(--grey)}.p-open{background:#e5effa;color:#1d5fa8}
+.demo-strip{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 18px;margin-bottom:16px;background:#fff8f1;border:1px dashed #f0b98a;border-radius:14px}
+.badge{padding:6px 10px;border-radius:8px;background:var(--orange);color:#fff;font-weight:700;font-size:.74rem;letter-spacing:.08em}
+.next{display:flex;align-items:center;gap:16px;padding:22px 26px;border-radius:18px;background:linear-gradient(135deg,#0b1a33,#10264a);color:#fff;margin-bottom:18px}
+.next small{color:var(--gold);letter-spacing:.06em;text-transform:uppercase;font-size:.72rem}
+.next h2{color:#fff;font-size:1.5rem;margin:2px 0 0;font-weight:700}
+.stages{display:grid;gap:12px}
+.stage{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 18px}
+.stage .n{width:34px;height:34px;border-radius:10px;background:#fcefd0;color:#85600a;display:grid;place-items:center;font-weight:700;flex:none}
+.stage.locked{opacity:.6}
+/* one-line map */
+.pmap{list-style:none;display:flex;flex-wrap:wrap;gap:6px 0;padding:0;margin:0 0 16px;align-items:center}
+.pmap li{display:flex;align-items:center}
+.pmap li+li::before{content:"";width:22px;height:2px;margin:0 2px;background:repeating-linear-gradient(90deg,#b9c2cf 0 4px,transparent 4px 7px)}
+.pmap button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;color:var(--text);font-size:.82rem;font-weight:500}
+.pmap button.here{border-color:var(--blue);box-shadow:0 0 0 2px rgba(14,61,124,.12);font-weight:700;color:var(--blue)}
+.pmap .num{font-size:.7rem;font-weight:700}
+.dot{width:7px;height:7px;border-radius:50%;background:#c7ccd4;display:inline-block}
+.dot.submitted{background:var(--ok)}.dot.draft{background:var(--warn)}.dot.returned{background:var(--err)}
+.c1 .num{color:#b5485a}.c2 .num{color:#24806f}.c3 .num{color:#a8690f}.c4 .num{color:#5b8a1f}
+.tag{font-size:.7rem;padding:1px 7px;border-radius:999px;background:#f1f3f6;color:var(--grey)}
+/* form */
+.sec{margin-bottom:22px}
+.sec h3{font-size:1.1rem;border-bottom:1px solid var(--line);padding-bottom:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.f label{display:block;font-size:.82rem;font-weight:500;color:var(--blue);margin-bottom:4px}
+.f label i{color:var(--err);font-style:normal}
+.f input,.f select,.f textarea{width:100%;padding:9px 11px;border:1px solid #d9dee6;border-radius:9px;background:#fff;color:var(--text)}
+.f textarea{min-height:70px;resize:vertical}
+.f.wide{grid-column:1/-1}
+.f.bad input,.f.bad textarea,.f.bad select{border-color:var(--err);background:#fff6f5}
+.f input[readonly]{background:#f3f4f6;color:var(--grey)}
+.lockbox{font-size:.72rem;color:var(--grey);background:#f1f3f6;padding:1px 8px;border-radius:999px;margin-left:6px}
+table.t{width:100%;border-collapse:collapse;font-size:.84rem;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+table.t th{background:#eef3fa;color:#2a3f60;text-align:left;padding:7px 9px;font-weight:600;font-size:.76rem}
+table.t td{padding:6px 9px;border-top:1px solid #edf0f4}
+.tablewrap{overflow:auto}
+/* uploads */
+.up{border:1px dashed #d9c9a3;border-radius:12px;background:#fff;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.folder{width:40px;height:30px;border-radius:5px;background:linear-gradient(#f6c344,#e3a91b);position:relative;flex:none}
+.folder::before{content:"";position:absolute;top:-5px;left:0;width:16px;height:7px;background:#f47c20;border-radius:3px 3px 0 0}
+.files{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.file{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;min-width:280px;flex:1}
+.thumb{width:54px;height:70px;border:1px solid #dde3ea;border-radius:4px;background:#fff;flex:none;padding:6px;cursor:pointer}
+.thumb i{display:block;height:3px;background:#d9dee6;margin:3px 0;border-radius:2px}
+.thumb i:first-child{background:#9fb1cc;width:70%}
+.kw{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;padding:6px 8px;border-radius:8px;font-size:.74rem}
+.kw.match{background:#e8f4ec;color:#1f5e3a}.kw.miss{background:#fbebe8;color:#9a2f22}
+.kw span{padding:1px 7px;border-radius:999px;background:#fff}
+.kw span.miss{color:#9aa0a8;text-decoration:line-through}
+/* save bar */
+.savebar{position:sticky;bottom:0;margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px;display:flex;gap:10px;align-items:center;box-shadow:0 -8px 24px rgba(9,19,36,.06)}
+/* modal */
+.modal{position:fixed;inset:0;z-index:100;background:rgba(9,19,36,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.panel{width:min(940px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;background:#fbfaf7;border-radius:18px;overflow:hidden;box-shadow:0 30px 80px rgba(9,19,36,.35)}
+.panel-h{display:flex;gap:12px;padding:16px 22px;background:#fff;border-bottom:1px solid var(--line)}
+.panel-h h3{margin:0;font-size:1.2rem}
+.x{border:0;background:#f1f3f6;width:34px;height:34px;border-radius:50%;font-size:1.3rem;cursor:pointer;margin-left:auto}
+.stats{display:flex;gap:14px;align-items:center;padding:12px 22px;background:#f3f6fb;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ring{--p:0;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--ok) calc(var(--p)*1%),#dfe5ec 0);position:relative;flex:none}
+.ring::before{content:"";position:absolute;inset:6px;border-radius:50%;background:#f3f6fb}
+.ring b{position:relative;font-size:.8rem;color:var(--blue)}
+.facts{margin-left:auto;display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.8rem;color:var(--grey)}
+.facts b{color:var(--blue)}
+.panel-b{overflow:auto;padding:16px 22px;flex:1}
+.panel-f{background:#fff;border-top:1px solid var(--line);padding:14px 22px}
+.rsec{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:12px}
+.rsec h4{font-size:.98rem;font-weight:600;display:flex;gap:10px;align-items:center}
+.rsec h4 button{margin-left:auto;border:1px solid var(--line);background:#fff;color:var(--link);border-radius:999px;padding:2px 12px;font-size:.78rem;cursor:pointer}
+dl{display:grid;grid-template-columns:minmax(150px,240px) 1fr;gap:5px 16px;margin:0;font-size:.88rem}
+dt{color:var(--grey)} dd{margin:0}
+.empty{color:var(--err);font-weight:500}
+.chip{display:inline-flex;gap:6px;align-items:center;padding:3px 6px;border-radius:8px;background:#f3f6fb;border:1px solid #e1e7ef;font-size:.82rem;margin:0 6px 4px 0}
+.chip em{font-style:normal;font-size:.62rem;font-weight:700;padding:2px 5px;border-radius:5px;background:var(--err);color:#fff}
+.chip a{cursor:pointer;text-decoration:underline}
+.chip .ok{font-size:.7rem;background:var(--okbg);color:#1f6b44;padding:1px 6px;border-radius:999px}
+.chip button{border:0;background:none;color:var(--err);cursor:pointer;font-size:.74rem}
+.terms{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;padding:10px 12px;background:#fff8ec;border:1px solid #f1dcb4;border-radius:10px;font-size:.86rem;color:#6b4a0b;cursor:pointer}
+.done{display:flex;gap:14px;align-items:center;padding:14px 22px;background:#e8f4ec;border-bottom:1px solid #cfe6d7;color:#1f5e3a}
+.done span{width:40px;height:40px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center;font-size:1.2rem;flex:none}
+.pdfpage{background:#fff;max-width:560px;margin:auto;padding:40px 46px;box-shadow:0 4px 20px rgba(0,0,0,.12);font-family:Georgia,serif;color:#222;min-height:520px}
+.pdfpage h5{font-size:1.05rem;margin:0 0 14px;text-align:center}
+/* admin */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media(max-width:720px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold2);border-radius:14px;padding:14px 16px}
+.kpi b{font-size:1.8rem;color:var(--navy);display:block;line-height:1.1}
+.kpi span{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey)}
+.upd{display:flex;gap:12px;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.upd.new{border-left:3px solid var(--orange)}
+.ud{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:700;flex:none;background:#e9eef7;color:var(--blue)}
+.ud.s{background:var(--okbg);color:#1f6b44}.ud.u{background:#e5effa;color:#1d5fa8}.ud.r{background:var(--errbg);color:#b23a2a}
+.toasts{position:fixed;top:72px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 32px))}
+.toast{padding:11px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(9,19,36,.18);font-size:.86rem;animation:tin .25s ease}
+.toast b{display:block}
+.toast.ok{background:#d6f2e2;color:#145233}.toast.info{background:#dbe8fb;color:#123d74}.toast.warn{background:#fdf0cf;color:#6b4a0b}.toast.err{background:#fbe0db;color:#7a2a1f}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}}
+.login{max-width:420px;margin:40px auto}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><img src="../img/jain-logo.png" alt="" onerror="this.remove()"> BoS Academic Portal</div>
+    <div class="views" role="tablist" aria-label="Whose side to show">
+      <button id="v-dept" class="on" type="button">Department view</button>
+      <button id="v-admin" type="button">Office (admin) view</button>
+    </div>
+    <button class="bell" id="bell" type="button" title="Updates from departments">🔔<b id="bell-n" hidden>0</b></button>
+  </div>
+  <div class="demo-band"><b>Demo</b> · sample data only, nothing is saved or sent — reload to start again</div>
+</header>
+<main id="app"></main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function () {
+"use strict";
+/* ---------------------------------------------------------------- data */
+const DEPT = { name: "Department of Demonstration Studies", code: "DEMO", school: "School of Demonstration",
+               campus: "Jain Global Campus", user: "demo.dept" };
+const PROGS = [{ code: "DEMOBBA", name: "BBA in Demonstration Management" },
+               { code: "DEMOBCOM", name: "B.Com in Demonstration Accounting" }];
+const DOCS = {
+  diac: ["Composition of the Department Industry-Academia Cell (DIAC)", "Dr. Demo Head, Chairperson", "Ms. Asha Rao, Industry Member", "Mr. Kiran Shetty, Member"],
+  dpac: ["Composition of the Programme Assessment Committee (DPAC)", "Dr. Demo Head, Chairperson", "Prof. Leela Iyer, Member", "Dr. Arun Nair, Member Secretary"],
+  minutes: ["Minutes of the Board of Studies Meeting", "Held on 12 March 2027 at 10:00 am", "Members present: 6", "Resolved that the BBA curriculum for 2027-28 be approved."],
+  vision: ["Department Vision, Mission and Programme Overview", "Vision: a centre of excellence in management education.", "Mission: ethical, skilled professionals."],
+  attendance: ["Attendance Sheet — BoS Meeting, 12 March 2027", "1. Dr. Demo Head — Chairperson — signed", "2. Prof. Leela Iyer — External Member — signed"],
+};
+const KW = { diac: ["DIAC", "industry", "composition", "member", "chairperson"],
+             dpac: ["DPAC", "committee", "composition", "member", "chairperson"],
+             minutes: ["minutes", "meeting", "resolved", "agenda", "present"],
+             vision: ["vision", "mission", "overview", "objectives"],
+             attendance: ["attendance", "signature", "present", "designation"] };
+function kwOf(doc) {
+  const text = (DOCS[doc] || []).join(" ").toLowerCase();
+  const exp = KW[doc] || [];
+  const found = exp.filter(w => text.includes(w.toLowerCase()) || (w === "signature" && text.includes("signed")));
+  return { exp, found, ok: found.length >= 2 };
+}
+const COURSES = [
+  ["27BBA1C01", "Principles of Management", 1, "Major (Core)", 4], ["27BBA1C02", "Financial Accounting", 1, "Major (Core)", 4],
+  ["27BBA1C03", "English Communication I", 1, "AEC", 2], ["27BBA2C01", "Business Economics", 2, "Major (Core)", 4],
+  ["27BBA2C02", "Digital Marketing", 2, "Minor Stream", 4], ["27BBA3C01", "Marketing Management", 3, "Major (Core)", 4],
+  ["27BBA3C02", "Spreadsheet Skills", 3, "SEC", 3], ["27BBA4C01", "Corporate Finance", 4, "Major (Core)", 4],
+  ["27BBA5C01", "Strategic Management", 5, "Major (Core)", 4], ["27BBA6C01", "Summer Internship", 6, "Internship", 2]];
+
+// each stage: sections of fields; `sample` is what “Fill” puts in
+const STAGES = [
+  { key: "info", title: "Department Information", blurb: "Who the department is and the programmes it runs.",
+    sections: [
+      { title: "Department identity", frozen: true, fields: [
+        ["Department name", DEPT.name, 1], ["School", DEPT.school, 1], ["Campus", DEPT.campus, 1], ["Academic year", "2027-28", 1]] },
+      { title: "Contact", fields: [["Office email", "demo.office@example.edu"], ["Number of faculty", "18"]] },
+      { title: "Programmes offered", programmes: true }] },
+  { key: "pre", title: "Pre-BoS", blurb: "Upload the signed DIAC and DPAC composition documents.",
+    sections: [{ title: "Signed composition documents", files: [["Composition of DIAC", "diac.pdf", "diac"], ["Composition of DPAC", "dpac.pdf", "dpac"]] }] },
+  { key: "bos", title: "BoS Documents", blurb: "The date of the Board of Studies meeting and its documents.",
+    sections: [
+      { title: "BoS meeting", fields: [["Date of the BoS meeting", "2027-03-12"]] },
+      { title: "BoS documents", files: [["Minutes of Meeting", "minutes.pdf", "minutes"], ["Vision, Mission and Overview", "vision_mission.pdf", "vision"],
+                                       ["Scanned Attendance Sheet", "attendance.pdf", "attendance"]] }] },
+  { key: "cur", title: "Curriculum", blurb: "Every programme: its Curriculum, the Current and Existing Batch syllabi, and the Revision.",
+    programme: true, parts: ["Curriculum", "Current Batch", "Existing Batch", "Revision"] }];
+
+/* --------------------------------------------------------------- state */
+const S = { view: "dept", logged: false, open: 0, stage: null, part: 0, prog: 0, data: {}, status: {}, started: {},
+            submitted: {}, returned: {}, updates: [], unread: 0 };
+STAGES.forEach((s, i) => { S.status[s.key] = i === 0 ? "open" : "locked"; S.data[s.key] = {}; });
+PROGS.forEach(p => STAGES[3].parts.forEach((_, i) => { S.status[p.code + i] = "open"; S.data[p.code + i] = {}; }));
+
+const $ = s => document.querySelector(s);
+const app = $("#app");
+const el = (t, c, h) => { const n = document.createElement(t); if (c) n.className = c; if (h != null) n.innerHTML = h; return n; };
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = d => d ? d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+function took(a, b) { if (!a || !b) return ""; const m = Math.max(0, Math.round((b - a) / 60000)); return m < 1 ? "under a minute" : m + " min"; }
+function toast(kind, title, text) {
+  const t = el("div", "toast " + kind, `<b>${esc(title)}</b>${esc(text)}`);
+  $("#toasts").appendChild(t); setTimeout(() => t.remove(), 5200);
+}
+function notify(kind, text, stageKey) {
+  S.updates.unshift({ kind, text, at: new Date(), read: false, stage: stageKey });
+  S.unread++; bell();
+  if (S.view === "admin" && kind !== "r") toast(kind === "s" ? "ok" : "info", "Update from " + DEPT.name, text);
+}
+function bell() { const b = $("#bell-n"); b.hidden = !S.unread; b.textContent = S.unread; }
+
+/* ------------------------------------------------------------ helpers */
+function fieldsOf(key) {
+  const st = STAGES.find(s => s.key === key);
+  if (!st || st.programme) return [];
+  const out = [];
+  st.sections.forEach(sec => {
+    (sec.fields || []).forEach(f => out.push({ id: sec.title + "|" + f[0], label: f[0], sample: f[1], frozen: sec.frozen || f[2], sec: sec.title }));
+    (sec.files || []).forEach(f => out.push({ id: sec.title + "|" + f[0], label: f[0], sample: { name: f[1], doc: f[2] }, file: true, sec: sec.title }));
+    if (sec.programmes) out.push({ id: "progs", label: "Programmes", sample: PROGS.map(p => p.name), sec: sec.title, list: true });
+  });
+  return out;
+}
+function partSample(i) {
+  if (i === 0) return { "Degree / Duration": "UG - 3 Year", "Intake": "120", "Courses": COURSES.length + " courses, 128 credits" };
+  if (i === 1) return { "Batch": "2026–2027", "Syllabi": COURSES.length + " courses, 5 modules each" };
+  if (i === 2) return { "Batches": "2024–2025, 2025–2026", "Syllabi": "kept for both batches" };
+  return { "Revised courses": COURSES.length + "", "Average change": "22%" };
+}
+function stats(key) {
+  if (key.length > 4) { const d = S.data[key]; const n = Object.keys(partSample(+key.slice(-1))).length;
+    return { filled: Object.keys(d).length, total: n, missing: [] }; }
+  const fs = fieldsOf(key).filter(f => !f.frozen);
+  const missing = fs.filter(f => !S.data[key][f.id]).map(f => f.label);
+  return { filled: fs.length - missing.length, total: fs.length, missing };
+}
+const pct = s => s.total ? Math.round(s.filled * 100 / s.total) : 100;
+
+/* --------------------------------------------------------------- views */
+function render() {
+  $("#v-dept").classList.toggle("on", S.view === "dept");
+  $("#v-admin").classList.toggle("on", S.view === "admin");
+  app.innerHTML = "";
+  if (S.view === "admin") return S.adminDept ? adminDept() : adminHome();
+  if (!S.logged) return login();
+  if (S.stage !== null) return stagePage();
+  deptHome();
+}
+
+function login() {
+  const c = el("div", "card login");
+  c.innerHTML = `<h2>Sign in</h2><p class="muted small">The demo department's login is filled in for you.</p>
+    <div class="f"><label>Username</label><input value="${DEPT.user}" readonly></div><br>
+    <div class="f"><label>Password</label><input type="password" value="demo-password" readonly></div><br>
+    <button class="btn navy" id="go">Sign in</button>`;
+  app.appendChild(c);
+  $("#go").onclick = () => { S.logged = true; render(); };
+}
+
+function deptHome() {
+  const next = STAGES.findIndex(s => S.status[s.key] !== "submitted");
+  app.innerHTML = `<div class="head"><div class="crumbs">${DEPT.campus} › ${DEPT.school}</div><h1>${DEPT.name}</h1>
+    <p>Board of Studies submission for 2027-28. Stages open in order — finish one to unlock the next.</p></div>
+    <div class="demo-strip"><span class="badge">DEMO</span><div class="spacer"><b>This is the practice department.</b>
+      <div class="small muted">One press fills every stage with sample answers and documents. Then open each stage, press Submit, review and confirm.</div></div>
+      <button class="btn gold" id="fillall">Fill everything with sample data</button></div>
+    ${next >= 0 ? `<div class="next"><div class="spacer"><small>Next stage</small><h2>${STAGES[next].title}</h2></div>
+      <button class="btn gold" data-open="${next}">Continue →</button></div>`
+      : `<div class="card" style="background:#e8f4ec;border-color:#cfe6d7"><b>All stages submitted.</b> The Office of Academics has the full record.</div>`}
+    <div class="stages" id="stages"></div>`;
+  const box = $("#stages");
+  STAGES.forEach((s, i) => {
+    const st = S.status[s.key];
+    const r = el("div", "stage" + (st === "locked" ? " locked" : ""));
+    r.innerHTML = `<span class="n">${i + 1}</span><div class="spacer"><b>${s.title}</b><div class="small muted">${s.blurb}</div></div>
+      ${statusPill(st)} ${st !== "locked" ? `<button class="btn sm" data-open="${i}">${st === "submitted" ? "View" : "Open"}</button>` : ""}`;
+    box.appendChild(r);
+  });
+  app.querySelectorAll("[data-open]").forEach(b => b.onclick = () => { S.stage = +b.dataset.open; render(); window.scrollTo(0, 0); });
+  $("#fillall").onclick = () => {
+    STAGES.forEach(s => { if (S.status[s.key] === "submitted") return; fillStage(s.key); });
+    PROGS.forEach(p => STAGES[3].parts.forEach((_, i) => { if (S.status[p.code + i] !== "submitted") fillPart(p.code + i); }));
+    toast("ok", "Filled", "Every stage and programme part is filled with sample data.");
+    notify("u", `${DEPT.name} — Data changed: every stage filled in`, "info");
+    render();
+  };
+}
+function statusPill(st) {
+  return { submitted: '<span class="pill p-ok">Submitted</span>', draft: '<span class="pill p-warn">In progress</span>',
+           returned: '<span class="pill p-err">Sent back</span>', locked: '<span class="pill p-lock">Locked</span>',
+           open: '<span class="pill p-open">Open</span>' }[st] || "";
+}
+function touch(key) { if (!S.started[key]) S.started[key] = new Date(); if (S.status[key] === "open" || S.status[key] === "returned") S.status[key] = "draft"; }
+function fillStage(key) {
+  fieldsOf(key).forEach(f => { if (!f.frozen) S.data[key][f.id] = f.sample; });
+  touch(key);
+}
+function fillPart(key) { Object.assign(S.data[key], partSample(+key.slice(-1))); touch(key); }
+
+function stagePage() {
+  const s = STAGES[S.stage];
+  const key = s.programme ? PROGS[S.prog].code + S.part : s.key;
+  const ro = S.status[key] === "submitted";
+  app.innerHTML = `<div class="head"><div class="crumbs"><a href="#" id="home">${DEPT.name}</a> › Stage ${S.stage + 1}</div>
+    <h1>${s.programme ? PROGS[S.prog].name + " — " + s.parts[S.part] : s.title}</h1><p>${s.blurb}</p></div>`;
+  if (S.returned[key]) app.appendChild(el("div", "card", `<b style="color:var(--err)">Sent back by the Office:</b> ${esc(S.returned[key])}`));
+  if (s.programme) {
+    const tabs = el("div", "row"); tabs.style.marginBottom = "12px";
+    PROGS.forEach((p, i) => { const b = el("button", "btn sm" + (i === S.prog ? " navy" : ""), esc(p.name)); b.onclick = () => { S.prog = i; render(); }; tabs.appendChild(b); });
+    app.appendChild(tabs);
+    const map = el("ol", "pmap");
+    s.parts.forEach((pt, i) => {
+      const k = PROGS[S.prog].code + i;
+      const li = el("li", "c" + (i + 1));
+      li.innerHTML = `<button class="${i === S.part ? "here" : ""}"><span class="num">${i + 1}</span>${pt}${i === 1 ? ' <span class="tag">2026–27</span>' : i === 2 ? ' <span class="tag">24–25 · 25–26</span>' : ""} <i class="dot ${S.status[k]}"></i></button>`;
+      li.querySelector("button").onclick = () => { S.part = i; render(); };
+      map.appendChild(li);
+    });
+    app.appendChild(map);
+    const c = el("div", "card");
+    const d = S.data[key];
+    const sample = partSample(S.part);
+    c.innerHTML = `<div class="grid">${Object.keys(sample).map(l => `<div class="f"><label>${l} <i>*</i></label>
+      <input data-k="${esc(l)}" value="${esc(d[l] || "")}" ${ro ? "readonly" : ""} placeholder="${esc(sample[l])}"></div>`).join("")}</div>`;
+    if (S.part === 0) {
+      c.innerHTML += `<h4 style="margin-top:16px">Programme structure (sample)</h4><div class="tablewrap"><table class="t"><tr><th>Sem</th><th>Code</th><th>Course</th><th>Group</th><th>Credits</th><th>CIA</th><th>ESE</th><th>Total</th></tr>
+      ${COURSES.map(r => `<tr><td>${r[2]}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[3]}</td><td>${r[4]}</td><td>50</td><td>50</td><td>100</td></tr>`).join("")}</table></div>`;
+    }
+    app.appendChild(c);
+    c.querySelectorAll("input[data-k]").forEach(i => i.oninput = () => { d[i.dataset.k] = i.value; touch(key); });
+  } else {
+    s.sections.forEach(sec => app.appendChild(section(sec, key, ro)));
+  }
+  const bar = el("div", "savebar");
+  bar.innerHTML = `<span class="small muted">${ro ? "Submitted " + fmt(S.submitted[key]) : "Saved as you type"}</span><span class="spacer"></span>
+    ${ro ? "" : '<button class="btn" id="fill">Fill with sample data</button>'}
+    <button class="btn" id="back">Back</button>
+    ${ro ? '<button class="btn" id="rev">Review</button>' : '<button class="btn gold" id="sub">Submit this stage</button>'}`;
+  app.appendChild(bar);
+  $("#home").onclick = $("#back").onclick = e => { e.preventDefault(); S.stage = null; render(); };
+  if (!ro) {
+    $("#fill").onclick = () => { s.programme ? fillPart(key) : fillStage(key); render(); toast("ok", "Filled", "This stage is filled with sample data."); };
+    $("#sub").onclick = () => submit(key, s);
+  } else $("#rev").onclick = () => review(key, s, "dept-view");
+}
+
+function section(sec, key, ro) {
+  const box = el("div", "sec");
+  box.innerHTML = `<h3>${sec.title}${sec.frozen ? '<span class="lockbox">from the Office record</span>' : ""}</h3>`;
+  const d = S.data[key];
+  if (sec.fields) {
+    const g = el("div", "grid");
+    sec.fields.forEach(f => {
+      const id = sec.title + "|" + f[0];
+      const frozen = sec.frozen || f[2];
+      const w = el("div", "f");
+      w.dataset.id = id;
+      w.innerHTML = `<label>${f[0]} ${frozen ? "" : "<i>*</i>"}</label><input value="${esc(frozen ? f[1] : d[id] || "")}" ${frozen || ro ? "readonly" : ""}>`;
+      if (!frozen) w.querySelector("input").oninput = e => { d[id] = e.target.value; touch(key); w.classList.remove("bad"); };
+      g.appendChild(w);
+    });
+    box.appendChild(g);
+  }
+  if (sec.programmes) {
+    const list = d["progs"];
+    box.appendChild(el("div", "f", list ? `<table class="t"><tr><th>Degree</th><th>Programme</th><th>Code</th><th>Decision</th></tr>${PROGS.map(p => `<tr><td>UG</td><td>${p.name}</td><td>${p.code}</td><td>New</td></tr>`).join("")}</table>`
+      : `<div class="up" data-id="progs"><span class="muted small">No programmes yet.</span>${ro ? "" : '<button class="btn sm" id="addp">+ Add the two sample programmes</button>'}</div>`));
+    setTimeout(() => { const b = box.querySelector("#addp"); if (b) b.onclick = () => { d["progs"] = PROGS.map(p => p.name); touch(key); render(); }; });
+  }
+  (sec.files || []).forEach(f => {
+    const id = sec.title + "|" + f[0];
+    const w = el("div", "f wide"); w.dataset.id = id;
+    w.innerHTML = `<label>${f[0]} <i>*</i></label>`;
+    const v = d[id];
+    if (!ro) {
+      const up = el("div", "up", `<span class="folder"></span><div class="spacer"><b>Drag a file here to upload</b><div class="small muted">PDF · DOCX</div></div><button class="btn sm navy">Choose file</button>`);
+      up.querySelector("button").onclick = () => { d[id] = { name: f[1], doc: f[2] }; touch(key); render();
+        const k = kwOf(f[2]); toast(k.ok ? "ok" : "warn", k.ok ? "Keywords match" : "Keywords do not match", `${f[1]} carries ${k.found.join(", ")}.`);
+        notify("u", `${DEPT.name} — File uploaded: “${f[1]}” for ${f[0]} — keywords ${k.ok ? "match" : "missing"}`, key); };
+      w.appendChild(up);
+    }
+    if (v) w.appendChild(fileCard(v, ro ? null : () => { d[id] = ""; render(); }));
+    box.appendChild(w);
+  });
+  return box;
+}
+
+function fileCard(v, onRemove) {
+  const k = kwOf(v.doc);
+  const c = el("div", "files");
+  const f = el("div", "file");
+  f.innerHTML = `<div class="thumb" title="View"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="spacer"><b>${esc(v.name)}</b><div class="small muted">PDF · 1 KB</div>
+    <div class="row" style="margin-top:6px"><button class="btn sm navy" data-v>View</button>${onRemove ? '<button class="btn sm" data-r style="color:var(--err)">Remove</button>' : ""}</div>
+    <div class="kw ${k.ok ? "match" : "miss"}"><b>${k.ok ? "✓ Keywords match" : "! Few keywords"}</b> ${k.exp.map(w => `<span class="${k.found.includes(w) ? "" : "miss"}">${w}</span>`).join("")}</div></div>`;
+  f.querySelector("[data-v]").onclick = f.querySelector(".thumb").onclick = () => viewPdf(v);
+  if (onRemove) f.querySelector("[data-r]").onclick = onRemove;
+  c.appendChild(f);
+  return c;
+}
+function viewPdf(v) {
+  const m = modal(v.name, "Document viewer", null, el("div", "pdfpage", `<h5>${esc((DOCS[v.doc] || [])[0] || v.name)}</h5>` +
+    (DOCS[v.doc] || []).slice(1).map(l => `<p>${esc(l)}</p>`).join("")));
+  return m;
+}
+
+/* -------------------------------------------- submit: check → review → done */
+function submit(key, s) {
+  let missing;
+  if (s.programme) missing = Object.keys(partSample(S.part)).filter(l => !S.data[key][l]);
+  else missing = fieldsOf(key).filter(f => !f.frozen && !S.data[key][f.id]).map(f => f.label);
+  document.querySelectorAll(".f.bad").forEach(x => x.classList.remove("bad"));
+  if (missing.length) {
+    toast("err", "Not submitted", `${missing.length} thing${missing.length > 1 ? "s" : ""} to fill: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}`);
+    fieldsOf(key).forEach(f => { if (missing.includes(f.label)) { const w = document.querySelector(`[data-id="${CSS.escape(f.id)}"]`); if (w) w.classList.add("bad"); } });
+    return;
+  }
+  review(key, s, "submit");
+}
+
+function reviewBody(key, s, editable) {
+  const b = el("div");
+  if (s.programme) {
+    const d = S.data[key];
+    const r = el("div", "rsec", `<h4>${s.parts[+key.slice(-1)]}</h4><dl>${Object.keys(d).map(l => `<dt>${l}</dt><dd>${esc(d[l])}</dd>`).join("")}</dl>`);
+    b.appendChild(r);
+    return b;
+  }
+  s.sections.forEach(sec => {
+    const r = el("div", "rsec");
+    r.innerHTML = `<h4>${sec.title}${sec.frozen ? '<span class="lockbox">from the Office record</span>' : editable ? "<button>Change</button>" : ""}</h4>`;
+    if (editable && !sec.frozen) r.querySelector("h4 button").onclick = () => { closeModal(); };
+    const dl = el("dl");
+    (sec.fields || []).forEach(f => { const v = sec.frozen || f[2] ? f[1] : S.data[key][sec.title + "|" + f[0]];
+      dl.innerHTML += `<dt>${f[0]}</dt><dd>${v ? esc(v) : '<span class="empty">Not filled — required</span>'}</dd>`; });
+    (sec.files || []).forEach(f => {
+      const id = sec.title + "|" + f[0], v = S.data[key][id];
+      const dt = el("dt", null, f[0]), dd = el("dd");
+      if (v) {
+        const k = kwOf(v.doc);
+        const chip = el("span", "chip", `<em>PDF</em><a>${esc(v.name)}</a>${k.ok ? '<span class="ok">✓ keywords</span>' : ""}${editable ? "<button>Remove</button>" : ""}`);
+        chip.querySelector("a").onclick = () => viewPdf(v);
+        if (editable) chip.querySelector("button").onclick = () => { S.data[key][id] = ""; closeModal(); render(); toast("warn", "Removed", v.name + " — upload it again to submit."); };
+        dd.appendChild(chip);
+      } else dd.innerHTML = '<span class="empty">Not uploaded</span>';
+      dl.appendChild(dt); dl.appendChild(dd);
+    });
+    if (sec.programmes) dl.innerHTML += `<dt>Programmes</dt><dd>${(S.data[key].progs || []).map(esc).join("<br>") || '<span class="empty">None</span>'}</dd>`;
+    r.appendChild(dl);
+    b.appendChild(r);
+  });
+  return b;
+}
+function statsBar(key, extra) {
+  const st = stats(key), p = pct(st);
+  const bar = el("div", "stats");
+  bar.innerHTML = `<div class="ring" style="--p:${p}"><b>${p}%</b></div><div><b>${st.filled} of ${st.total} filled</b>
+    <div class="small muted">${st.missing.length ? "Empty: " + st.missing.join(", ") : "Everything asked for is filled in."}</div></div>${extra || ""}`;
+  return bar;
+}
+
+function review(key, s, mode) {
+  const title = s.programme ? PROGS[+S.prog].name + " · " + s.parts[+key.slice(-1)] : s.title;
+  if (mode === "dept-view") return modal("What was submitted", title, statsBar(key), reviewBody(key, s, false), copyRow(title, key, s));
+  const foot = el("div");
+  foot.innerHTML = `<label class="terms"><input type="checkbox" id="agree"> <span>I have checked everything above. I understand that once submitted,
+    this stage is locked and cannot be changed — only the Office of Academics can send it back for correction.</span></label>
+    <div class="row"><button class="btn" id="copy">Download a copy</button><span class="spacer"></span>
+    <button class="btn" id="backedit">Back to editing</button><button class="btn gold" id="now" disabled>Submit now</button></div>`;
+  modal("Review before you submit", title + " — " + DEPT.name, statsBar(key), reviewBody(key, s, true), foot);
+  $("#agree").onchange = e => { $("#now").disabled = !e.target.checked; };
+  $("#backedit").onclick = closeModal;
+  $("#copy").onclick = () => printCopy(title, key, s);
+  $("#now").onclick = () => {
+    S.status[key] = "submitted"; S.submitted[key] = new Date(); delete S.returned[key];
+    if (!s.programme) {
+      const i = STAGES.findIndex(x => x.key === key);
+      if (STAGES[i + 1] && S.status[STAGES[i + 1].key] === "locked") S.status[STAGES[i + 1].key] = "open";
+    } else if (PROGS.every(p => s.parts.every((_, j) => S.status[p.code + j] === "submitted"))) S.status.cur = "submitted";
+    notify("s", `${DEPT.name} — Stage submitted: ${title}`, key);
+    const panel = document.querySelector(".panel");
+    panel.querySelector("h3").textContent = "Submitted";
+    panel.querySelector(".stats").replaceWith(el("div", "done", `<span>✓</span><div><b>Submitted to the Office of Academics.</b><br>Keep a copy of what you sent.</div>`));
+    panel.querySelectorAll(".rsec h4 button, .chip button").forEach(b => b.remove());
+    const f = panel.querySelector(".panel-f"); f.innerHTML = "";
+    const r = copyRow(title, key, s);
+    const go = el("button", "btn gold", "Continue"); go.onclick = () => { closeModal(); S.stage = s.programme ? S.stage : null; render(); };
+    r.appendChild(go); f.appendChild(r);
+  };
+}
+function copyRow(title, key, s) {
+  const r = el("div", "row");
+  const c = el("button", "btn", "Download a copy"); c.onclick = () => printCopy(title, key, s);
+  r.appendChild(c); r.appendChild(el("span", "spacer"));
+  return r;
+}
+function printCopy(title, key, s) {
+  const w = window.open("", "_blank");
+  if (!w) return toast("warn", "Pop-up blocked", "Allow pop-ups to download a copy.");
+  w.document.write(`<!doctype html><title>${esc(title)}</title><style>body{font:14px/1.5 Roboto,Arial;color:#1d3c6e;margin:32px}
+    h1{font-size:20px;color:#0e3d7c}.rsec{border:1px solid #dde3ea;border-radius:10px;padding:10px 14px;margin:0 0 12px}
+    dl{display:grid;grid-template-columns:220px 1fr;gap:4px 12px}dt{color:#5f6672}dd{margin:0}button{display:none}em{font-style:normal;font-weight:700;font-size:10px}</style>
+    <h1>${esc(title)}</h1><p>${esc(DEPT.name)} · ${new Date().toLocaleString()}</p>${reviewBody(key, s, false).innerHTML}`);
+  w.document.close(); setTimeout(() => w.print(), 300);
+}
+
+let modalEl = null;
+function modal(title, sub, top, body, foot) {
+  closeModal();
+  modalEl = el("div", "modal");
+  const p = el("div", "panel");
+  p.appendChild(el("div", "panel-h", `<div><h3>${esc(title)}</h3><div class="small muted">${esc(sub || "")}</div></div><button class="x" aria-label="Close">×</button>`));
+  if (top) p.appendChild(top);
+  const b = el("div", "panel-b"); b.appendChild(body); p.appendChild(b);
+  if (foot) { const f = el("div", "panel-f"); f.appendChild(foot); p.appendChild(f); }
+  modalEl.appendChild(p);
+  document.body.appendChild(modalEl);
+  p.querySelector(".x").onclick = closeModal;
+  modalEl.onclick = e => { if (e.target === modalEl) closeModal(); };
+  return modalEl;
+}
+function closeModal() { if (modalEl) modalEl.remove(); modalEl = null; }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+/* --------------------------------------------------------------- admin */
+function adminHome() {
+  const done = STAGES.filter(s => S.status[s.key] === "submitted").length;
+  app.innerHTML = `<div class="head"><div class="crumbs">Office of Academics</div><h1>Board of Studies — 2027-28</h1><p>Where every department stands this academic year.</p></div>
+    <div class="kpis"><div class="kpi"><b>4</b><span>Departments</span></div><div class="kpi"><b>${done === 4 ? 1 : 0}</b><span>Complete</span></div>
+    <div class="kpi"><b>${done ? 1 : 0}</b><span>In progress</span></div><div class="kpi"><b>${done ? 3 : 4}</b><span>Not started</span></div></div>
+    <div class="card"><h3>Departments</h3><div class="tablewrap"><table class="t"><tr><th>Department</th><th>Campus</th><th>Progress</th><th></th></tr>
+      <tr><td><b>${DEPT.name}</b> <span class="tag">demo</span><div class="small muted">${DEPT.code} · login ${DEPT.user}</div></td><td>${DEPT.campus}</td><td>${done} / 4</td><td><button class="btn sm navy" id="opend">Open</button></td></tr>
+      <tr><td>Department of Commerce</td><td>Jayanagar Campus</td><td>0 / 4</td><td></td></tr>
+      <tr><td>Department of Economics</td><td>Jayanagar Campus</td><td>0 / 4</td><td></td></tr>
+      <tr><td>Department of English</td><td>JC Road Campus</td><td>0 / 4</td><td></td></tr></table></div></div>
+    <div class="card"><div class="row"><h3 style="margin:0">Latest from departments</h3><span class="spacer"></span>
+      <button class="btn sm" id="readall">Mark all read</button></div><div id="feed" style="margin-top:12px"></div></div>`;
+  feed($("#feed"));
+  $("#opend").onclick = () => { S.adminDept = true; render(); };
+  $("#readall").onclick = () => { S.updates.forEach(u => u.read = true); S.unread = 0; bell(); render(); };
+}
+function feed(box) {
+  if (!S.updates.length) { box.innerHTML = '<p class="muted small">Nothing yet. Switch to the Department view, fill and submit a stage, then come back — it appears here, and pops up while you are on this side.</p>'; return; }
+  S.updates.forEach(u => box.appendChild(el("div", "upd" + (u.read ? "" : " new"),
+    `<span class="ud ${u.kind}">${u.kind === "s" ? "✓" : u.kind === "r" ? "↩" : "⇪"}</span><div class="spacer">${esc(u.text)}</div><span class="small muted">${fmt(u.at)}</span>`)));
+}
+function adminDept() {
+  app.innerHTML = `<div class="head"><div class="crumbs"><a href="#" id="ahome">Home</a> › Submissions</div><h1>${DEPT.name}</h1>
+    <p>${DEPT.code} · login <b>${DEPT.user}</b></p></div><div id="list"></div>`;
+  $("#ahome").onclick = e => { e.preventDefault(); S.adminDept = false; render(); };
+  const list = $("#list");
+  STAGES.forEach((s, i) => {
+    const c = el("div", "card");
+    if (!s.programme) {
+      const st = S.status[s.key];
+      c.innerHTML = `<div class="row"><span class="pill p-open">${i + 1}</span><b>${s.title}</b><span class="spacer"></span>${statusPill(st)}
+        ${Object.keys(S.data[s.key]).length ? `<button class="btn sm navy">Review</button>` : '<span class="small muted">nothing entered yet</span>'}</div>`;
+      const b = c.querySelector("button"); if (b) b.onclick = () => adminReview(s.key, s);
+    } else {
+      c.innerHTML = `<div class="row" style="margin-bottom:8px"><span class="pill p-open">${i + 1}</span><b>${s.title}</b> <span class="small muted">— click a step to review it</span></div>`;
+      PROGS.forEach((p, pi) => {
+        c.appendChild(el("div", "small", `<b>${p.name}</b>`));
+        const map = el("ol", "pmap");
+        s.parts.forEach((pt, j) => {
+          const k = p.code + j, li = el("li", "c" + (j + 1));
+          li.innerHTML = `<button ${Object.keys(S.data[k]).length ? "" : "disabled"}><span class="num">${j + 1}</span>${pt} <i class="dot ${S.status[k]}"></i></button>`;
+          li.querySelector("button").onclick = () => { S.prog = pi; adminReview(k, s); };
+          map.appendChild(li);
+        });
+        c.appendChild(map);
+      });
+    }
+    list.appendChild(c);
+  });
+}
+function adminReview(key, s) {
+  const title = s.programme ? PROGS[S.prog].name + " · " + s.parts[+key.slice(-1)] : s.title;
+  const st = S.status[key];
+  const facts = `<div class="facts"><span>Status <b>${{ submitted: "Submitted", draft: "In progress", returned: "Sent back", open: "Not started" }[st] || st}</b></span>
+    ${S.started[key] ? `<span>Started <b>${fmt(S.started[key])}</b></span>` : ""}
+    ${S.submitted[key] ? `<span>Submitted <b>${fmt(S.submitted[key])}</b></span><span>Time taken <b>${took(S.started[key], S.submitted[key])}</b></span>` : ""}</div>`;
+  const foot = el("div");
+  if (st === "submitted") {
+    foot.innerHTML = `<div class="row"><textarea id="note" rows="2" style="flex:1;min-width:240px;padding:8px;border-radius:9px;border:1px solid #d9dee6" placeholder="Send back: what must the department correct?"></textarea>
+      <button class="btn red" id="sendback">Send back</button></div><div class="row" style="margin-top:10px"><button class="btn" id="acopy">Download a copy</button></div>`;
+  } else foot.innerHTML = '<div class="row"><button class="btn" id="acopy">Download a copy</button><span class="small muted">Send back appears once it is submitted.</span></div>';
+  modal(title, DEPT.name, statsBar(key, facts), reviewBody(key, s, false), foot);
+  $("#acopy").onclick = () => printCopy(title, key, s);
+  const sb = $("#sendback");
+  if (sb) sb.onclick = () => {
+    const note = $("#note").value.trim();
+    if (!note) return toast("warn", "Say what to correct", "Write a short note for the department first.");
+    S.status[key] = "returned"; S.returned[key] = note;
+    if (!s.programme) { /* the department can edit it again */ }
+    notify("r", `Office of Academics — sent back ${title}: ${note}`, key);
+    closeModal(); render();
+    toast("ok", "Sent back", "The department sees the note and can correct the stage.");
+  };
+}
+
+/* ---------------------------------------------------------------- boot */
+$("#v-dept").onclick = () => { S.view = "dept"; render(); };
+$("#v-admin").onclick = () => { S.view = "admin"; render(); };
+$("#bell").onclick = () => { S.view = "admin"; S.adminDept = false; render(); };
+render();
+})();
+</script>
+</body>
+</html>
