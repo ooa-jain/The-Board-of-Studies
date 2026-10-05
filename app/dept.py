@@ -409,50 +409,139 @@ def api_submit(stage_key, programme_code=None):
     dept, sub, programme, bad = _guard(stage_key, programme_code)
     if bad:
         return bad
-    data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
+    data = request.get_json(silent=True) or {}
+    res = _submit_one(dept, sub, stage_key, programme, data)
+    if not res["ok"]:
+        return jsonify(res)
+    if programme:
+        nxt = _next_part(dept, stage_key, programme_code)
+        flash(f"{programme['programme_name']}: “{STAGE_BY_KEY[stage_key]['title']}” is submitted."
+              + (f" Next: {nxt['title']}." if nxt else ""), "success")
+        return jsonify({**res, "next": nxt,
+                        "redirect": nxt["url"] if nxt else
+                        url_for("dept.stage", stage_key=STAGE_BY_KEY[stage_key]["parent"])})
+    stage_title = STAGE_BY_KEY[stage_key]["title"]
+    nxt = next_action(get_or_create_submission(dept["dept_code"], _year()))
+    if nxt:
+        flash(f"“{stage_title}” is submitted. Next: “{nxt['title']}”.", "success")
+        target = url_for("dept.stage", stage_key=nxt["key"])
+    else:
+        flash(f"“{stage_title}” is submitted. Your Board of Studies record is complete.", "success")
+        target = url_for("dept.dashboard")
+    return jsonify({**res, "next": {"key": nxt["key"], "title": nxt["title"]} if nxt else None,
+                    "redirect": target})
+
+
+def _submit_one(dept, sub, stage_key, programme, data):
+    """Submit one stage or programme part: the form checks and the signed
+    forms' blanks first, then submitted, told to the Office, logged."""
+    programme_code = (programme or {}).get("programme_code")
+    data = _pin_frozen(stage_key, data or {}, dept, sub, programme)
     blanks = _template_issues(dept, stage_key, data)
     if blanks:
         save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
         issues, summary = validate_only(sub, stage_key, data, programme)
-        return jsonify({"ok": False, "status": "draft", "issues": blanks + issues,
-                        "summary": {**summary, "errors": summary.get("errors", 0) + len(blanks)}})
+        return {"ok": False, "status": "draft", "issues": blanks + issues,
+                "summary": {**summary, "errors": summary.get("errors", 0) + len(blanks)}}
     before = _stored_data(sub, stage_key, programme_code)
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])
-    if status == "submitted":
-        _tell(dept, "submitted", stage_key, programme,
-              changes=describe_changes(stage_key, before, apply_defaults(stage_key, data)))
-    if status == "submitted" and programme:
-        audit(_me()["username"], "stage.submitted",
-              f"{dept['dept_code']}/{programme['programme_code']}/{stage_key}")
-        flash(f"{programme['programme_name']}: “{STAGE_BY_KEY[stage_key]['title']}” is submitted.",
-              "success")
-        return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
-                        "next": None,
-                        "redirect": url_for("dept.stage",
-                                            stage_key=STAGE_BY_KEY[stage_key]["parent"])})
-    if status == "submitted":
-        audit(_me()["username"], "stage.submitted", f"{dept['dept_code']}/{stage_key}")
-        nxt_key = None
-        i = STAGE_KEYS.index(stage_key)
-        if i + 1 < len(STAGE_KEYS):
-            nxt_key = STAGE_KEYS[i + 1]
-        # Confirm on the page we send them to, rather than in a browser dialog,
-        # and carry them straight into whatever is next instead of dropping
-        # them back on the dashboard to find it themselves.
-        stage_title = STAGE_BY_KEY[stage_key]["title"]
-        nxt = next_action(get_or_create_submission(dept["dept_code"], _year()))
-        if nxt:
-            flash(f"“{stage_title}” is submitted. Next: “{nxt['title']}”.", "success")
-            target = url_for("dept.stage", stage_key=nxt["key"])
-        else:
-            flash(f"“{stage_title}” is submitted. Your Board of Studies record is complete.",
-                  "success")
-            target = url_for("dept.dashboard")
-        return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
-                        "next": {"key": nxt["key"], "title": nxt["title"]} if nxt else None,
-                        "redirect": target})
-    return jsonify({"ok": False, "status": status, "issues": issues, "summary": summary})
+    if status != "submitted":
+        return {"ok": False, "status": status, "issues": issues, "summary": summary}
+    _tell(dept, "submitted", stage_key, programme,
+          changes=describe_changes(stage_key, before, apply_defaults(stage_key, data)))
+    audit(_me()["username"], "stage.submitted",
+          f"{dept['dept_code']}/{programme_code + '/' if programme_code else ''}{stage_key}")
+    return {"ok": True, "status": status, "issues": issues, "summary": summary}
+
+
+def _next_part(dept, stage_key, programme_code):
+    """After a programme part: the next part of the same programme not yet
+    submitted, else the first one of the next programme."""
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for item in _record_items(sub, dept):
+        if item["programme"] and item["status"] != "submitted" and not item["optional"]:
+            return {"key": item["key"], "title": item["title"], "url": item["url"]}
+    return None
+
+
+def _record_items(sub, dept):
+    """Every stage and programme part, in the order they are filled, with
+    what is in it — for the review of the whole record."""
+    from .workflow import programme_stage_state
+    items = []
+    for k in STAGE_KEYS:
+        sd = STAGE_BY_KEY[k]
+        if sd.get("parts"):
+            for p in programmes_of(sub, dept):
+                code = p["programme_code"]
+                for part in parts_for(sd):
+                    pd = STAGE_BY_KEY[part]
+                    st = programme_stage_state(sub, code, part)
+                    optional = bool(pd.get("optional"))
+                    if optional and not st.get("data"):
+                        continue
+                    title = pd["title"]
+                    items.append({"key": part, "programme": code,
+                                  "title": f"{p.get('programme_name') or code} · {title}",
+                                  "group": sd.get("group", ""), "optional": optional,
+                                  "status": st.get("status") or "open",
+                                  "url": url_for("dept.stage", stage_key=part, programme_code=code),
+                                  "stage": {"title": pd["title"], "sections": pd.get("sections", [])},
+                                  "data": st.get("data") or {}})
+            continue
+        st = (sub.get("stages") or {}).get(k) or {}
+        items.append({"key": k, "programme": "", "title": sd["title"], "group": sd.get("group", ""),
+                      "optional": False, "status": compute_status(sub, k),
+                      "url": url_for("dept.stage", stage_key=k),
+                      "stage": {"title": sd["title"], "sections": sd.get("sections", [])},
+                      "data": st.get("data") or {}})
+    return items
+
+
+@bp.route("/api/record")
+@department_required
+def api_record():
+    """The whole record, for “Review & submit all”."""
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    return jsonify({"ok": True, "dept_name": dept.get("dept_name", ""), "items": _record_items(sub, dept)})
+
+
+@bp.post("/api/submit-all")
+@department_required
+def api_submit_all():
+    """Submit every stage and programme part not yet submitted, in order,
+    as saved. Stops at the first that cannot go, and says which and why."""
+    dept = _dept()
+    done = []
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for item in _record_items(sub, dept):
+        if item["status"] == "submitted":
+            continue
+        sub = get_or_create_submission(dept["dept_code"], _year())
+        programme = None
+        if item["programme"]:
+            programme = next((p for p in programmes_of(sub, dept)
+                              if p.get("programme_code") == item["programme"]), None)
+        if not item["data"]:
+            return jsonify({"ok": False, "done": done,
+                            "failed": {"title": item["title"], "url": item["url"],
+                                       "issues": [{"level": "error", "message": "Nothing has been filled in here yet."}]}})
+        if compute_status(sub, item["key"] if not item["programme"] else STAGE_BY_KEY[item["key"]]["parent"]) == "locked":
+            return jsonify({"ok": False, "done": done,
+                            "failed": {"title": item["title"], "url": item["url"],
+                                       "issues": [{"level": "error", "message": "This stage is still locked."}]}})
+        res = _submit_one(dept, sub, item["key"], programme, item["data"])
+        if not res["ok"]:
+            return jsonify({"ok": False, "done": done,
+                            "failed": {"title": item["title"], "url": item["url"],
+                                       "issues": [i for i in res.get("issues", []) if i.get("level") == "error"][:8]}})
+        done.append(item["title"])
+    if done:
+        flash(f"Submitted {len(done)} stage{'s' if len(done) != 1 else ''} and parts. "
+              "Your Board of Studies record is with the Office of Academics.", "success")
+    return jsonify({"ok": True, "done": done, "redirect": url_for("dept.dashboard")})
 
 
 @bp.post("/api/upload")

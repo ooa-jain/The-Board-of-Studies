@@ -3542,10 +3542,10 @@
   }
 
   function save() {
-    if (CTX.readonly || !dirty) return;
+    if (CTX.readonly || !dirty) return Promise.resolve();
     saveNote.textContent = "Saving…";
     saveNote.className = "save-note saving";
-    fetch(CTX.urls.save, {
+    return fetch(CTX.urls.save, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state)
@@ -3731,14 +3731,18 @@
       const errs = (j.issues || []).filter(i => i.level === "error");
       if (!j.ok || errs.length) { notSubmitted(btn, j); return; }
       paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
-      // only the step that completes the record is reviewed first
-      if (CTX.final) { submitLabel(btn); openReview(j.issues || []); }
+      // the step that completes the record opens the review of everything
+      if (CTX.final) { submitLabel(btn); openAll(); }
       else submitAndGo(btn);
     }).catch(() => unreachable(btn));
   }
 
   /* An intermediate stage: submitted as soon as the checks pass, then on
      to the next one. */
+  function openAll() {
+    window.SubmitAll.open({ record: CTX.urls.record, submit: CTX.urls.submit_all, beforeOpen: () => save() });
+  }
+
   function submitAndGo(btn) {
     btn.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Submitting…';
     fetch(CTX.urls.submit, {
@@ -3950,6 +3954,8 @@
 
   render();
   refresh();
+  const allBtn = document.getElementById("btn-all");
+  if (allBtn) allBtn.addEventListener("click", () => openAll());
 
   if (!CTX.readonly) {
     document.getElementById("btn-submit").addEventListener("click", submit);

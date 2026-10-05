@@ -81,7 +81,7 @@ def test_only_the_step_that_completes_the_record_reviews_first(app, client):
     login(client, user, pw)
     client.post("/department/demo/fill-all")
     page = client.get("/department/stage/dept_info").get_data(as_text=True)
-    assert "Submit this stage &amp; go to next" in page and "Submit everything" not in page
+    assert "Submit this stage &amp; go to next" in page and "final: false" in page
 
     with app.app_context():
         sub = get_db().submissions.find_one({"dept_code": "DEMO"})
@@ -94,5 +94,31 @@ def test_only_the_step_that_completes_the_record_reviews_first(app, client):
         assert client.post(f"/department/api/{part}/{code}/submit", json=data).get_json()["ok"]
     code, part = parts[-1]
     page = client.get(f"/department/stage/{part}/{code}").get_data(as_text=True)
-    assert "Submit everything — review first" in page
-    assert '"final": true' in page.replace("final: true", '"final": true')
+    assert "final: true" in page, "the last step opens the review of everything"
+
+
+def test_review_and_submit_all_stages_at_once(app, client):
+    from app import demo_dept
+    from app.db import get_db
+    with app.app_context():
+        user, pw = demo_dept.create("2027-28", app.config["UPLOAD_ROOT"])
+    login(client, user, pw)
+
+    # nothing filled: it stops at the first stage and says so
+    j = client.post("/department/api/submit-all").get_json()
+    assert not j["ok"] and j["failed"]["title"] == "Department Information"
+
+    client.post("/department/demo/fill-all")
+    rec = client.get("/department/api/record").get_json()
+    titles = [i["title"] for i in rec["items"]]
+    assert titles[:3] == ["Department Information", "Pre-BoS", "BoS Documents"]
+    assert any("Course Revision" in t for t in titles)
+    assert all(i["data"] for i in rec["items"]), "every stage is filled"
+
+    j = client.post("/department/api/submit-all").get_json()
+    assert j["ok"], j
+    assert len(j["done"]) == len(rec["items"])
+    with app.app_context():
+        assert get_db().submissions.find_one({"dept_code": "DEMO"})["status"] == "sealed"
+    page = client.get("/department/").get_data(as_text=True)
+    assert "Review &amp; submit all stages" in page

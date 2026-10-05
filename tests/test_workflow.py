@@ -404,10 +404,16 @@ def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
     # every part validates clean — the parts' own checks are covered elsewhere
     monkeypatch.setattr(workflow, "validate_stage",
                         lambda *a, **k: ([], {"errors": 0, "warnings": 0}))
-    for code in ("BCMREG", "MCMNEW"):
-        for part in ("prog_curriculum", "prog_syllabus", "prog_revision"):
-            body = client.post(f"/department/api/{part}/{code}/submit", json={}).get_json()
-            assert body["ok"]
+    order = [(code, part) for code in ("BCMREG", "MCMNEW")
+             for part in ("prog_curriculum", "prog_syllabus", "prog_revision")]
+    for n, (code, part) in enumerate(order):
+        body = client.post(f"/department/api/{part}/{code}/submit", json={}).get_json()
+        assert body["ok"]
+        # on to the next part not yet submitted; after the last, back to Curriculum
+        if n + 1 < len(order):
+            nc, np_ = order[n + 1]
+            assert body["redirect"].endswith(f"/department/stage/{np_}/{nc}"), body["redirect"]
+        else:
             assert body["redirect"].endswith("/department/stage/curriculum")
 
     # a submitted part is read only

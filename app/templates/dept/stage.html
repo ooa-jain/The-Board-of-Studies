@@ -260,13 +260,11 @@
          only the last one — the one that completes the record — opens the
          review of everything first #}
       <div class="branch-submit">
-        {% if not readonly %}
-        <button class="btn btn-gold btn-block" type="button" id="btn-submit">
-          {{ 'Submit everything — review first' if final else 'Submit this stage & go to next →' }}</button>
-        <p class="small muted">{% if final %}This is the last one: you will see the whole record, confirm it, and send it to the Office of Academics.
-          {% else %}The checks run first. Anything to fix is listed above; if all is well it is submitted and the next stage opens.{% endif %}</p>
-        {% else %}
-        <p class="small branch-done">✓ Submitted {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '' }}</p>
+        <button class="btn btn-navy btn-block" type="button" id="btn-all">Review &amp; submit all stages</button>
+        <p class="small muted">Every stage and programme part in one review — open any to see what is in it —
+          then one confirmation submits all that are filled.</p>
+        {% if readonly %}
+        <p class="small branch-done">✓ This one was submitted {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '' }}</p>
         <div class="flex">
           <button class="btn btn-ghost btn-sm" type="button" id="btn-review">Review</button>
           <button class="btn btn-ghost btn-sm" type="button" id="btn-copy">Download a copy</button>
@@ -283,6 +281,7 @@
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
     {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
+    <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage &amp; go to next →</button>
   </div>
 </div>
 {% else %}
@@ -322,6 +321,8 @@
       submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
       upload:   {{ url_for('dept.api_upload')|tojson }},
       static:   {{ url_for('static', filename='')|tojson }},
+      record:   {{ url_for('dept.api_record')|tojson }},
+      submit_all: {{ url_for('dept.api_submit_all')|tojson }},
       sample:   {{ (url_for('dept.api_sample', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_sample', stage_key=stage.key))|tojson }},
       dashboard:{{ url_for('dept.dashboard')|tojson }},
       dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }},
@@ -332,6 +333,7 @@
 <script src="{{ url_for('static', filename='js/magic-bento.js') }}"></script>
 <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
 <script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/submit-all.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
 <script src="{{ url_for('static', filename='js/branch.js') }}"></script>
 {% endblock %}

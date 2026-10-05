@@ -18,7 +18,11 @@
       </div>
       <div class="flex mt-1 head-aside-row">
         {# the downloads are the finished record, so they appear once it is #}
-        {% if submission.status == 'sealed' %}
+        <div class="dash-all">
+  <span class="small muted">Filled in your stages? See every one together and submit them all at once.</span>
+  <button class="btn btn-navy" type="button" id="btn-all">Review &amp; submit all stages</button>
+</div>
+{% if submission.status == 'sealed' %}
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
         {% endif %}
@@ -177,6 +181,12 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/submit-all.js') }}"></script>
+<script>
+  document.getElementById("btn-all").addEventListener("click", () => window.SubmitAll.open({
+    record: {{ url_for('dept.api_record')|tojson }}, submit: {{ url_for('dept.api_submit_all')|tojson }} }));
+</script>
 <script>
   (function () {
     var box = document.getElementById("cs");
