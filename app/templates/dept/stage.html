@@ -49,6 +49,13 @@
 {% block content %}
 {% if parts %}
 {% from "dept/_part_flow.html" import part_flow %}
+{% if back_to_structure %}
+<div class="back-bar">
+  <a class="back-link" href="{{ back_to_structure }}">← Back to Programme structure</a>
+  <span class="back-prog"><strong>{{ programme.programme_name }}</strong> <span class="mono">{{ programme.programme_code }}</span>
+    {% if course_map %}· {{ course_map|length }} courses{% endif %}</span>
+</div>
+{% endif %}
 <nav class="pflow-nav" aria-label="Parts of this programme">
   {{ part_flow(parts, programme.programme_code, stage.key) }}
 </nav>
@@ -323,6 +330,7 @@
     title: {{ stage.title|tojson }},
     final: {{ final|tojson }},
     syllabi: {{ syllabi|tojson }},
+    course_map: {{ course_map|tojson }},
     record: {{ record|tojson }},
     submitted_at: {{ (state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},
     readonly: {{ readonly|tojson }},

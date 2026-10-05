@@ -155,6 +155,17 @@ def stage(stage_key, programme_code=None):
             fill = revision_fill_source(sub, programme["programme_code"])
 
     syllabi = _syllabus_index(sub, stage_key, programme) if stage_key == "prog_curriculum" else []
+    course_map, back = {}, None
+    if programme and (stage_key.startswith("prog_syllabus") or stage_key == "prog_revision"):
+        # each course's semester and course group, from the programme structure
+        cur = programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {}
+        for r in cur.get("semester_structure") or []:
+            code = str((r or {}).get("course_code") or "").strip().upper()
+            if code and code not in course_map:
+                course_map[code] = {"semester": r.get("semester"), "group": r.get("nep_category") or "",
+                                    "title": r.get("course_title") or ""}
+        back = url_for("dept.stage", stage_key="prog_curriculum",
+                       programme_code=programme["programme_code"]) + "#sec-semester_structure"
     comments = list(get_db().comments.find({
         "dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
         "programme_code": (programme or {}).get("programme_code", ""),
@@ -163,6 +174,7 @@ def stage(stage_key, programme_code=None):
     final, record = _final_step(sub, dept, stage_key, (programme or {}).get("programme_code"))
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
                            final=final, record=record, syllabi=syllabi, comments=comments,
+                           course_map=course_map, back_to_structure=back,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,

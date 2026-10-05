@@ -3254,16 +3254,86 @@
       return wrap;
     }
 
+    /* Semester → course group → course: pick one and only its sheet shows. */
+    const MAP = CTX.course_map || {};
+    const nav = el("div", "syl-nav");
+    host.insertBefore(nav, list);
+    const info = r => {
+      const m = MAP[String(r.course_code || "").trim().toUpperCase()] || {};
+      return { sem: String(r.semester || m.semester || ""), group: m.group || "Other courses" };
+    };
+    const isFilled = r => !!(String(r.outcomes || "").trim() && (r.modules || []).some(m => m && String(m.revised || m.title || "").trim()));
+    let pick = { sem: "", group: "", idx: -1 };
+    const wanted = location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
+    const hit = wanted ? data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === wanted) : -1;
+    if (hit >= 0) pick = { sem: info(data[hit]).sem, group: info(data[hit]).group, idx: hit };
+    else if (data.length) pick = { sem: info(data[0]).sem, group: "", idx: 0 };
+
+    const inPick = (r) => (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group);
+    function paintNav() {
+      nav.textContent = "";
+      if (data.length < 2) { nav.hidden = true; return; }
+      nav.hidden = false;
+      const row1 = el("div", "syl-nav-row");
+      const sems = [...new Set(data.map(r => info(r).sem).filter(Boolean))].sort((a, b) => +a - +b);
+      const semSel = el("select");
+      semSel.setAttribute("aria-label", "Semester");
+      semSel.appendChild(new Option("All semesters", ""));
+      sems.forEach(x => semSel.appendChild(new Option("Semester " + x, x)));
+      semSel.value = pick.sem;
+      const groups = [...new Set(data.filter(r => !pick.sem || info(r).sem === pick.sem).map(r => info(r).group))];
+      const grpSel = el("select");
+      grpSel.setAttribute("aria-label", "Course group");
+      grpSel.appendChild(new Option("All course groups", ""));
+      groups.forEach(g => grpSel.appendChild(new Option(g, g)));
+      grpSel.value = groups.includes(pick.group) ? pick.group : "";
+      const lab = (t, sel) => { const w = el("label", "syl-nav-field"); w.appendChild(el("span", null, t)); w.appendChild(sel); return w; };
+      row1.appendChild(lab("Semester", semSel));
+      row1.appendChild(lab("Course group", grpSel));
+      const done = data.filter(isFilled).length;
+      row1.appendChild(el("span", "syl-nav-count", `${done} of ${data.length} courses filled`));
+      nav.appendChild(row1);
+      const choose = () => {
+        const first = data.findIndex(inPick);
+        pick.idx = first;
+        draw();
+      };
+      semSel.addEventListener("change", () => { pick.sem = semSel.value; pick.group = ""; choose(); });
+      grpSel.addEventListener("change", () => { pick.group = grpSel.value; choose(); });
+
+      const chips = el("div", "syl-courses");
+      data.forEach((r, i) => {
+        if (!inPick(r)) return;
+        const b = el("button", "syl-course" + (i === pick.idx ? " is-on" : "") + (isFilled(r) ? " is-filled" : ""));
+        b.type = "button";
+        b.appendChild(el("span", "syl-course-dot", isFilled(r) ? "✓" : String(i + 1)));
+        const t = el("span", "syl-course-text");
+        t.appendChild(el("strong", null, r.course_title || "Untitled course"));
+        t.appendChild(el("span", null, (r.course_code || "no code") + " · " + info(r).group));
+        b.appendChild(t);
+        b.addEventListener("click", () => { pick.idx = i; draw(); list.scrollIntoView({ behavior: "smooth", block: "start" }); });
+        chips.appendChild(b);
+      });
+      if (!chips.childElementCount) chips.appendChild(el("p", "small muted", "No courses here."));
+      nav.appendChild(chips);
+    }
+
     function draw() {
       list.textContent = "";
-      data.forEach((row, i) => list.appendChild(sheet(row, i)));
+      paintNav();
+      data.forEach((row, i) => {
+        // with the picker, only the chosen course's sheet shows
+        if (data.length >= 2 && i !== pick.idx) return;
+        list.appendChild(sheet(row, i));
+      });
       if (!CTX.readonly) {
         const add = el("button", "btn btn-ghost sheet-add", "+ Add another course");
         add.type = "button";
         add.addEventListener("click", () => {
           data.push({});
+          pick = { sem: "", group: "", idx: data.length - 1 };
           draw(); touch();
-          list.lastElementChild.previousElementSibling?.scrollIntoView({ behavior: "smooth", block: "start" });
+          list.scrollIntoView({ behavior: "smooth", block: "start" });
         });
         list.appendChild(add);
       }

@@ -4270,3 +4270,29 @@ td.rt-syl { white-space: nowrap; }
 .oc-form { display: flex; gap: 8px; flex-wrap: wrap; }
 .oc-form input { flex: 1 1 260px; padding: 7px 10px; border: 1px solid #e3d6bb; border-radius: 8px; }
 .oc-list { margin: 6px 0 0 18px; padding: 0; }
+
+/* back to the programme structure, from a syllabus or the revision */
+.back-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 12px; }
+.back-link { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 999px; background: #fff;
+  border: 1px solid #c9d4e6; color: var(--btn-blue, #0e2a5c); font-weight: 600; font-size: .86rem; text-decoration: none !important; }
+.back-link:hover { background: var(--btn-blue, #0e2a5c); color: #fff; }
+.back-prog { font-size: .86rem; color: var(--jain-grey); }
+.back-prog strong { color: var(--jain-blue); }
+
+/* semester → course group → course */
+.syl-nav { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 16px; }
+.syl-nav-row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.syl-nav-field { display: flex; flex-direction: column; gap: 4px; font-size: .78rem; font-weight: 500; color: var(--jain-blue); }
+.syl-nav-field select { min-width: 200px; padding: 8px 10px; border-radius: 9px; border: 1px solid #d9dee6; background: #fff; }
+.syl-nav-count { margin-left: auto; font-size: .82rem; color: var(--jain-grey); }
+.syl-courses { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; max-height: 260px; overflow: auto; }
+.syl-course { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid #e3e8ef; background: #fbfcfd; cursor: pointer; font: inherit; color: var(--jain-text); }
+.syl-course:hover { border-color: #c8d3e3; background: #fff; }
+.syl-course.is-on { border-color: var(--btn-blue, #0e2a5c); box-shadow: 0 0 0 2px rgba(14,42,92,.12); background: #fff; }
+.syl-course-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: #fdf0cf; color: #85600a; font-size: .72rem; font-weight: 700; }
+.syl-course.is-filled .syl-course-dot { background: #e2f1e6; color: #1f6b44; }
+.syl-course-text { display: flex; flex-direction: column; min-width: 0; }
+.syl-course-text strong { font-size: .84rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.syl-course-text span { font-size: .72rem; color: var(--jain-grey); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
