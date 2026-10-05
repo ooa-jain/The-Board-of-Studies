@@ -4118,3 +4118,7 @@ button.pmap-pill:disabled { cursor: default; opacity: .55; box-shadow: none; }
 .pmap.is-compact .pmap-pill { font-size: .74rem; padding: 3px 8px; gap: 4px; }
 .pmap.is-compact .pmap-node + .pmap-node::before { width: 8px; margin: 0 1px; }
 .pmap.is-compact .pmap-twig { padding: 1px 5px; font-size: .68rem; }
+.error-why { margin-top: 12px; padding: 10px 12px; background: #fbeae8; border: 1px solid #f1cfc9; border-radius: 10px; font-size: .86rem; color: #7a2a1f; max-width: 760px; }
+.error-why code { white-space: pre-wrap; word-break: break-word; }
+.demo-login { font-size: .92rem; margin: 2px 0; }
+.demo-login code { font-size: .9rem; font-weight: 600; color: var(--jain-blue); }

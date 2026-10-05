@@ -9,6 +9,8 @@
       <div class="crumbs"><a href="{{ url_for('public.landing') }}">BoS Academic Portal</a></div>
       <h1>{{ title or message }}</h1>
       <p>{{ detail or message }}</p>
+      {% if why %}<p class="error-why"><strong>For the Office — what went wrong:</strong> <code>{{ why }}</code><br>
+        <span class="small muted">Full details: <code>sudo journalctl -u jain-bos-portal -n 80</code></span></p>{% endif %}
     </div>
   </div>
 </div>

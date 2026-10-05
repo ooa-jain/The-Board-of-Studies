@@ -1106,12 +1106,16 @@ def keywords_recheck():
 @admin_required
 def demo_department():
     from . import demo_dept
-    user, pw, _ = demo_dept.create(_year(), current_app.config["UPLOAD_ROOT"], actor=_actor())
+    try:
+        user, pw = demo_dept.create(_year(), current_app.config["UPLOAD_ROOT"], actor=_actor())
+    except Exception as e:                       # say why, rather than a bare 500
+        current_app.logger.exception("Could not make the demo department")
+        flash(f"The demo department could not be made — {e.__class__.__name__}: {e}"[:400], "error")
+        return redirect(url_for("admin.departments"))
     audit(_actor(), "demo.created", demo_dept.CODE)
-    session["demo_login"] = {"username": user, "password": pw}
-    flash(f"{demo_dept.NAME} is ready. Sign in as {user} with the password shown on "
-          "this page to see it as a department.", "success")
-    return redirect(url_for("admin.submission_detail", dept_code=demo_dept.CODE))
+    flash(f"{demo_dept.NAME} is ready. Username {user}, password {pw} — sign in as it "
+          "(in a private window) and press “Fill everything with sample data”.", "success")
+    return redirect(url_for("admin.departments"))
 
 
 @bp.post("/demo-department/remove")
@@ -1119,7 +1123,6 @@ def demo_department():
 def demo_department_remove():
     from . import demo_dept
     demo_dept.remove()
-    session.pop("demo_login", None)
     audit(_actor(), "demo.removed", demo_dept.CODE)
     flash(f"{demo_dept.NAME} removed.", "success")
     return redirect(url_for("admin.departments"))

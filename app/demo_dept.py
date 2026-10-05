@@ -292,38 +292,72 @@ def _store(db, upload_root, year, username, stage, field, name, data, t):
     return val
 
 
-def create(year, upload_root, actor="system"):
-    """Make (or remake) the demo department, every stage and every
-    programme part filled in and saved — ready to review and submit, in
-    order. Returns (username, password, {stage: status})."""
-    from .schema import PARTS, STAGE_KEYS
-    from .workflow import batches, save_draft
+USERNAME = "demo.dept"
 
+
+def _files_for(db, year):
+    """The demo's uploaded files, as the form stores them."""
+    files = {}
+    for r in db.files.find({"dept_code": CODE, "academic_year": year}).sort("uploaded_at", 1):
+        v = {"name": r["original_name"], "stored": r["stored_name"], "size": r.get("size"),
+             "url": f"/department/file/{r['stage']}/{r['stored_name']}", "match": r.get("keyword_match")}
+        if r["original_name"].lower().endswith(".pdf"):
+            v["thumb"] = v["url"] + "?thumb=1"
+        if r["field"] in ("geotagged_photos", "external_profiles"):
+            files.setdefault(r["field"], []).append(v)
+        else:
+            files[r["field"]] = v
+    return files
+
+
+def create(year, upload_root, actor="system"):
+    """Make (or remake) the demo department: its login (username demo.dept),
+    and its sample documents uploaded — the forms themselves start empty.
+    Signed in as it, one press of “Fill everything” fills every stage.
+    Returns (username, password)."""
     db = get_db()
     remove(db)
     t = now()
-    db.departments.insert_one({**DEPT, "created_at": t, "updated_at": t})
+    taken = db.users.find_one({"username": USERNAME})
+    db.departments.insert_one({**DEPT, "created_at": t, "updated_at": t,
+                               **({} if taken else {"username": USERNAME})})
     dept = db.departments.find_one({"dept_code": CODE})
     username, password = issue_department_login(db, dept, actor=actor)
-    db.users.update_one({"username": username}, {"$set": {"last_login": t - timedelta(minutes=45)}})
 
-    files = {}
     for name, (stage, field, lines) in DOCS.items():
-        files[field] = _store(db, upload_root, year, username, stage, field, name, _pdf(lines), t)
-    files["geotagged_photos"] = [
+        _store(db, upload_root, year, username, stage, field, name, _pdf(lines), t)
+    for i, n in enumerate(PHOTOS, 1):
         _store(db, upload_root, year, username, "bos_documents", "geotagged_photos", n,
-               (lambda path, i=i: _photo(path, i)), t) for i, n in enumerate(PHOTOS, 1)]
+               (lambda path, i=i: _photo(path, i)), t)
+    return username, password
 
-    results = {}
+
+def fill_all(year):
+    """Every stage and every programme part filled with valid sample answers
+    and saved as a draft — ready to review and submit, in order. Stages
+    already submitted are left alone. Returns how many were filled."""
+    from .schema import PARTS, STAGE_KEYS
+    from .workflow import batches, get_or_create_submission, save_draft
+
+    db = get_db()
+    files = _files_for(db, year)
+    sub = get_or_create_submission(CODE, year)
+    done = 0
     for key in STAGE_KEYS:
         if (STAGE_BY_KEY.get(key) or {}).get("parts"):
             continue
+        if ((sub.get("stages") or {}).get(key) or {}).get("status") == "submitted":
+            continue
         save_draft(CODE, year, key, sample(key, files=files, year=year))
-        results[key] = "draft"
-    part_keys = [p["key"] for p in PARTS]
-    part_keys += [b["key"] for b in batches().get("existing", [])]
+        done += 1
+    part_keys = [p["key"] for p in PARTS] + [b["key"] for b in batches().get("existing", [])]
     for prog in PROGRAMMES:
+        code = prog["programme_code"]
         for key in part_keys:
-            if key in STAGE_BY_KEY:
-                save_draft(CODE, year, key, sample(key, prog, files, year), prog["programme_code"])
-    return username, password, results
+            if key not in STAGE_BY_KEY:
+                continue
+            if (((sub.get("programmes") or {}).get(code) or {}).get(key) or {}).get("status") == "submitted":
+                continue
+            save_draft(CODE, year, key, sample(key, prog, files, year), code)
+            done += 1
+    return done

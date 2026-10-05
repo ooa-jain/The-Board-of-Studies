@@ -30,14 +30,14 @@
 
 {% block content %}
 {% macro kw_tags(m) %}{% for w in m.expected or [] %}{% set hit = w in (m.found or []) %}<span class="kw-tag{{ ' is-hit' if hit }}" title="{{ w }}">{{ (m.seen[(m.found).index(w)] if hit and m.seen else w.split('/')[0]|trim) }}</span> {% endfor %}{% endmacro %}
-{% if dept.demo and session.get('demo_login') %}
+{% if dept.demo %}
 <div class="demo-strip">
   <span class="demo-badge" aria-hidden="true">DEMO</span>
   <div><strong>Sign in as this department</strong>
     <span class="small muted">In a private window, so you stay signed in here:
-      username <code class="mono">{{ session.demo_login.username }}</code>, password
-      <code class="mono">{{ session.demo_login.password }}</code>. Change anything there and watch it
-      arrive under the bell.</span></div>
+      username <code class="mono">{{ dept.username }}</code>{% if dept.initial_password %}, password
+      <code class="mono">{{ dept.initial_password }}</code>{% endif %}. Press “Fill everything with sample data”
+      there, then submit stage by stage and watch it arrive under the bell.</span></div>
 </div>
 {% endif %}
 {% set ndocs = documents|sum(attribute='files', start=[])|length %}

@@ -30,6 +30,19 @@
 {% endblock %}
 
 {% block content %}
+{% if dept.demo %}
+<div class="demo-strip">
+  <span class="demo-badge" aria-hidden="true">DEMO</span>
+  <div>
+    <strong>This is the practice department.</strong>
+    <span class="small muted">One press fills every stage and every programme part with sample answers and
+      documents. Then open each stage in turn, press Submit, review and confirm.</span>
+  </div>
+  <form method="post" action="{{ url_for('dept.demo_fill_all') }}" class="spacer">
+    <button class="btn btn-gold">Fill everything with sample data</button>
+  </form>
+</div>
+{% endif %}
 {% if submission.status == 'sealed' %}
 <div class="alert alert-success">
   <div>

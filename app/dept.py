@@ -307,19 +307,23 @@ def api_sample(stage_key, programme_code=None):
         return bad
     if not dept.get("demo"):
         abort(404)
-    files = {}
-    for r in get_db().files.find({"dept_code": dept["dept_code"], "academic_year": _year()}).sort("uploaded_at", 1):
-        v = {"name": r["original_name"], "stored": r["stored_name"], "size": r.get("size"),
-             "url": url_for("dept.download", stage_key=r["stage"], stored=r["stored_name"]),
-             "match": r.get("keyword_match")}
-        if r["original_name"].lower().endswith(".pdf"):
-            v["thumb"] = v["url"] + "?thumb=1"
-        if r["field"] in ("geotagged_photos", "external_profiles"):
-            files.setdefault(r["field"], []).append(v)
-        else:
-            files[r["field"]] = v
+    files = demo_dept._files_for(get_db(), _year())
     data = demo_dept.sample(stage_key, programme, files, _year())
     return jsonify({"ok": True, "data": _pin_frozen(stage_key, data, dept, sub, programme)})
+
+
+@bp.post("/demo/fill-all")
+@department_required
+def demo_fill_all():
+    """The demo department only: every stage filled with sample answers."""
+    from . import demo_dept
+    dept = _dept()
+    if not dept.get("demo"):
+        abort(404)
+    n = demo_dept.fill_all(_year())
+    flash(f"Filled {n} stage{'s' if n != 1 else ''} and programme parts with sample data. "
+          "Open each in turn, press Submit, review and confirm.", "success")
+    return redirect(url_for("dept.dashboard"))
 
 
 @bp.post("/api/<stage_key>/validate")

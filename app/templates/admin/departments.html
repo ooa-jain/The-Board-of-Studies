@@ -28,9 +28,16 @@
   <span class="demo-badge" aria-hidden="true">DEMO</span>
   <div>
     <strong>Demo department</strong>
-    <span class="small muted">“Department of Demonstration Studies”, filled like a real one — two stages
-      submitted, BoS documents half done, one wrong file the keyword check catches — so you can
-      see the admin side, the updates and the keyword check working.</span>
+    {% if demo %}
+    <span class="demo-login">Login — username <code class="mono">{{ demo.username }}</code>
+      {% if demo.initial_password %}· password <code class="mono">{{ demo.initial_password }}</code>{% endif %}</span>
+    <span class="small muted">Sign in with it in a private window, press <strong>Fill everything with sample
+      data</strong>, then open each stage, press Submit, review and confirm. Everything it does shows up
+      here — under the bell, in Keywords and in its Review.</span>
+    {% else %}
+    <span class="small muted">“Department of Demonstration Studies” — a practice login with sample documents
+      uploaded. Sign in as it, press one button to fill every stage, then submit them one by one.</span>
+    {% endif %}
   </div>
   <div class="spacer flex">
     {% if demo %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code='DEMO') }}">Open it</a>{% endif %}

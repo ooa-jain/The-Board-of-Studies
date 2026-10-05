@@ -101,10 +101,16 @@ def create_app(config_object=Config):
     @app.errorhandler(500)
     def _500(e):
         app.logger.exception("Unhandled error")
+        # the Office sees what actually broke, so it can be reported and fixed;
+        # a department never does
+        why = ""
+        if (session.get("user") or {}).get("role") == "admin":
+            orig = getattr(e, "original_exception", None) or e
+            why = f"{orig.__class__.__name__}: {orig}"[:600]
         return render_template(
             "error.html", code=500, title="Something went wrong at our end",
             detail="Nothing you had saved is lost — drafts are kept as you "
                    "type. Try again, and tell the Office of Academics if it "
-                   "keeps happening."), 500
+                   "keeps happening.", why=why), 500
 
     return app
