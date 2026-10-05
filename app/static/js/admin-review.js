@@ -57,6 +57,35 @@
         f.appendChild(b);
         foot.appendChild(f);
       }
+      // comments: what the Office asked to change, and a box to ask for more
+      (j.comments || []).forEach(c => {
+        const box = el("div", "office-comment" + (c.status === "open" ? "" : " is-done"));
+        box.appendChild(el("div", "oc-head", null));
+        box.firstChild.appendChild(el("strong", null, (c.status === "open" ? "Open comment" : c.status === "done" ? "Done by the department" : "Closed") + " · " + c.at));
+        box.appendChild(el("p", "oc-text", c.text));
+        if (c.reply) box.appendChild(el("p", "small muted", "Reply: " + c.reply));
+        foot.appendChild(box);
+      });
+      const cf = el("form", "rv-admin-acts");
+      cf.method = "post";
+      cf.action = j.comment_url;
+      [["dept", j.dept_code], ["stage", j.stage.key], ["programme", j.programme || ""]].forEach(([n, v]) => {
+        const h = el("input"); h.type = "hidden"; h.name = n; h.value = v; cf.appendChild(h);
+      });
+      const ta2 = el("textarea");
+      ta2.name = "text"; ta2.required = true; ta2.rows = 2;
+      ta2.placeholder = "Comment: what should the department change?";
+      cf.appendChild(ta2);
+      const lab = el("label", "check small");
+      const cb = el("input"); cb.type = "checkbox"; cb.name = "reopen"; cb.checked = j.status === "submitted";
+      lab.appendChild(cb);
+      lab.appendChild(el("span", null, " open it again for them"));
+      cf.appendChild(lab);
+      const cbtn = el("button", "btn", "Send comment");
+      cbtn.type = "submit";
+      cf.appendChild(cbtn);
+      foot.appendChild(cf);
+
       const row = el("div", "rv-actions");
       const copy = el("button", "btn btn-ghost", "Download a copy");
       copy.type = "button";

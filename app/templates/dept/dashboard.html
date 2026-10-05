@@ -18,9 +18,17 @@
       </div>
       <div class="flex mt-1 head-aside-row">
         {# the downloads are the finished record, so they appear once it is #}
-        <div class="dash-all">
+        {% if open_comments %}
+<div class="office-comment">
+  <div class="oc-head"><span class="oc-icon">💬</span><strong>{{ open_comments|length }} comment{{ 's' if open_comments|length != 1 }} from the Office of Academics</strong></div>
+  <ul class="oc-list">
+    {% for c in open_comments %}<li><a href="{{ c.url }}">{{ c.where }}</a> — {{ c.text }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+<div class="dash-all">
   <span class="small muted">Filled in your stages? See every one together and submit them all at once.</span>
-  <button class="btn btn-navy" type="button" id="btn-all">Review &amp; submit all stages</button>
+  <button class="btn btn-all" type="button" id="btn-all">Review &amp; submit all stages</button>
 </div>
 {% if submission.status == 'sealed' %}
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>

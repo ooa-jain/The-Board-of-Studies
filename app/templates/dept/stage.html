@@ -53,6 +53,20 @@
   {{ part_flow(parts, programme.programme_code, stage.key) }}
 </nav>
 {% endif %}
+{% for c in comments %}
+<div class="office-comment {{ 'is-done' if c.status == 'done' else '' }}">
+  <div class="oc-head"><span class="oc-icon">💬</span><strong>Comment from the Office of Academics</strong>
+    <span class="small muted">{{ c.at.strftime('%d %b %Y') }}</span>
+    {% if c.status == 'done' %}<span class="sh-pill is-submitted">Marked done</span>{% endif %}</div>
+  <p class="oc-text">{{ c.text }}</p>
+  {% if c.status == 'open' %}
+  <form method="post" action="{{ url_for('dept.comment_done', cid=c._id) }}" class="oc-form">
+    <input name="reply" placeholder="Optional: what you changed" maxlength="1000">
+    <button class="btn btn-sm">Mark as done</button>
+  </form>
+  {% elif c.reply %}<p class="small muted">Your reply: {{ c.reply }}</p>{% endif %}
+</div>
+{% endfor %}
 {% if state.returned_note %}
 <div class="alert alert-warning">
   <div><strong>Sent back by the Office of Academics:</strong> {{ state.returned_note }}</div>
@@ -260,7 +274,7 @@
          only the last one — the one that completes the record — opens the
          review of everything first #}
       <div class="branch-submit">
-        <button class="btn btn-navy btn-block" type="button" id="btn-all">Review &amp; submit all stages</button>
+        <button class="btn btn-all btn-block" type="button" id="btn-all">Review &amp; submit all stages</button>
         <p class="small muted">Every stage and programme part in one review — open any to see what is in it —
           then one confirmation submits all that are filled.</p>
         {% if readonly %}
@@ -308,6 +322,7 @@
     dept_name: {{ dept.dept_name|tojson }},
     title: {{ stage.title|tojson }},
     final: {{ final|tojson }},
+    syllabi: {{ syllabi|tojson }},
     record: {{ record|tojson }},
     submitted_at: {{ (state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},
     readonly: {{ readonly|tojson }},

@@ -102,9 +102,7 @@ DEPARTMENT_INFORMATION = {
         {
             "key": "programmes_offered",
             "title": "Programmes offered",
-            "help": "The programmes the Office of Academics has on record for your department. "
-                    "Keep the ones you run this year, remove the ones you do not, and add any "
-                    "new programme. This list carries into the Curriculum stage.",
+            "help": "Keep the programmes you run this year, remove the rest, add any new one.",
             "type": "programme_list",
             "degrees": ["UG", "PG", "PG-1Yr", "PGD"],
             # the tabs the list is split into, by the workbook's Degree column
@@ -193,8 +191,7 @@ PRE_BOS = {
         {
             "key": "pre_bos_files",
             "title": "Signed composition documents",
-            "help": "Fill the university templates offline, have them signed, and upload them "
-                    "here as PDF or Word files.",
+            "help": "Fill the templates, sign them and upload them.",
             "type": "fields",
             "fields": [
                 {"name": "diac_signed",
@@ -241,8 +238,7 @@ BOS_DOCUMENTS = {
             "title": "BoS documents",
             # one row per document, opened with a click to upload
             "display": "accordion",
-            "help": "PDF, Word, Excel or images. Where a box takes several files you can pick "
-                    "them all at once.",
+            "help": "Click a document to upload it.",
             "type": "fields",
             "fields": [
                 {"name": "bos_composition", "label": "Composition of BoS Members", "type": "file",
@@ -313,9 +309,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "profile",
             "title": "Regulations — programme profile",
-            "help": "Items 1 to 12 of the Curriculum Matrix template. The university-wide "
-                    "wording is filled in from the sample; change only what differs for this "
-                    "programme.",
+            "help": "Items 1 to 12. The standard wording is filled in — change only what differs.",
             "type": "fields",
             "fields": [
                 {"name": "objective", "label": "1. Objective", "type": "textarea", "required": True,
@@ -370,19 +364,14 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "credit_classification",
             "title": "Classification of Credits and Number of Non-Credit Courses",
-            "help": "Worked out from the programme structure below — credits per semester in "
-                    "each course group, and the mandatory non-credit and audit courses. Nothing "
-                    "to type here.",
+            "help": "Worked out from the programme structure — nothing to type.",
             "type": "credit_distribution",
             "show": "classification",
         },
         {
             "key": "semester_structure",
             "title": "Programme structure — semester scheme",
-            "help": "One row per course, semester by semester, grouped the way the template "
-                    "groups them (Major, Minor, AEC, VAC, SEC …). For a 4-year programme, mark "
-                    "semester 7 and 8 courses as Honours or Honours with Research. A Minor or "
-                    "Multi-disciplinary slot may be left without a code.",
+            "help": "One row per course. In a 4-year programme, mark semester 7 and 8 courses Honours or Honours with Research.",
             "type": "table",
             "min_rows": 1,
             "columns": [
@@ -415,9 +404,8 @@ PROGRAMME_CURRICULUM = {
                  "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "cia"},
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
                  "min": MARKS_TOTAL, "max": MARKS_TOTAL, "fixed_value": MARKS_TOTAL},
-                {"name": "course_file", "label": "Upload", "type": "file",
-                 "accept": ".pdf,.docx,.doc,.xlsx,.xls",
-                 "help": "The syllabus or any document for this course — PDF, Word or Excel. Optional."},
+                {"name": "syllabus", "label": "Syllabus", "type": "syllabus_link",
+                 "help": "Opens this course's syllabus — matched by course code and title."},
             ],
             "rules": [
                 "ltpe_credit_arithmetic",
@@ -429,8 +417,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "credit_distribution",
             "title": "Summary",
-            "help": "Worked out from the programme structure above: continuous-assessment and "
-                    "term-end credits and marks per semester, and the check against UGC Table 2.",
+            "help": "Worked out from the programme structure, checked against UGC Table 2.",
             "type": "credit_distribution",
             "show": "summary",
             "rules": ["ugc_table2_minimums", "ugc_total_credits"],
@@ -438,8 +425,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "minors",
             "title": "Minor / Honours — Annexure I",
-            "help": "One row per minor course: the minor stream, the semester it is taught in, "
-                    "and its code and title. Annexure I differs by department.",
+            "help": "One row per minor course.",
             "type": "table",
             "min_rows": 0,
             "columns": [

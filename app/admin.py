@@ -663,7 +663,12 @@ def submission_review(dept_code, stage_key):
         "timing": stage_timing(state),
         "summary": state.get("summary") or {},
         "returned_note": state.get("returned_note") or "",
-        "dept_name": dept.get("dept_name", dept_code),
+        "dept_name": dept.get("dept_name", dept_code), "dept_code": dept_code,
+        "comment_url": url_for("admin.comment_add"),
+        "comments": [{"text": c["text"], "at": c["at"].strftime("%d %b %Y"), "status": c.get("status"),
+                      "reply": c.get("reply", "")}
+                     for c in db.comments.find({"dept_code": dept_code, "academic_year": _year(),
+                                                "stage": stage_key, "programme_code": prog}).sort("at", -1)],
         "programme": prog, "programme_name": pname,
         "return_url": url_for("admin.submission_return", dept_code=dept_code, stage_key=stage_key),
         "unlock_url": url_for("admin.submission_unlock", dept_code=dept_code, stage_key=stage_key),
@@ -1126,3 +1131,211 @@ def demo_department_remove():
     audit(_actor(), "demo.removed", demo_dept.CODE)
     flash(f"{demo_dept.NAME} removed.", "success")
     return redirect(url_for("admin.departments"))
+
+
+# ---------------------------------------------------------------------------
+# analysis sheets: every department, stage by stage, programme by programme,
+# document by document — and comments asking for a change
+# ---------------------------------------------------------------------------
+
+BOS_DOCS = [("pre_bos", "pre_bos_files", "diac_signed", "DIAC"), ("pre_bos", "pre_bos_files", "dpac_signed", "DPAC"),
+            ("bos_documents", "bos_files", "bos_composition", "BoS composition"),
+            ("bos_documents", "bos_files", "external_profiles", "Expert profiles"),
+            ("bos_documents", "bos_files", "minutes", "MoM"),
+            ("bos_documents", "bos_files", "geotagged_photos", "Photos"),
+            ("bos_documents", "bos_files", "attendance", "Attendance"),
+            ("bos_documents", "bos_files", "vision_mission", "Vision-Mission"),
+            ("bos_documents", "bos_files", "feedback_curriculum", "Feedback"),
+            ("bos_documents", "bos_files", "feedback_new_programme", "Feedback (new)")]
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _doc_state(val):
+    """One upload box, in a word: '' (nothing), ok, warn or bad, and why."""
+    vals = [v for v in (val if isinstance(val, list) else [val]) if isinstance(v, dict) and v.get("name")]
+    if not vals:
+        return "", ""
+    why = []
+    worst = "ok"
+    for v in vals:
+        m = v.get("match") or {}
+        t = m.get("template") or {}
+        if t and (t.get("blank") or t.get("half") or t.get("placeholders")):
+            worst = "bad"
+            why.append("blank: " + ", ".join(t.get("blank") or t.get("half") or ["Words only"]))
+        elif m.get("looks_like"):
+            worst = "bad"
+            why.append("looks like " + m["looks_like"])
+        elif m.get("status") == "miss":
+            worst = "bad" if worst != "bad" else worst
+            why.append("keywords do not match")
+        elif m.get("status") == "weak" and worst == "ok":
+            worst = "warn"
+            why.append("few keywords")
+    return worst, "; ".join(why) or f"{len(vals)} file{'s' if len(vals) != 1 else ''}"
+
+
+def analysis_sheets(year):
+    from .workflow import programme_stage_state, programmes_of, stage_timing
+    db = get_db()
+    depts = list(db.departments.find({"active": True}).sort("dept_name", 1))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
+    open_comments = {}
+    for c in db.comments.find({"academic_year": year, "status": "open"}):
+        open_comments[c["dept_code"]] = open_comments.get(c["dept_code"], 0) + 1
+    stages, progs, docs = [], [], []
+    for d in depts:
+        sub = subs.get(d["dept_code"]) or {"stages": {}, "programmes": {}}
+        row = {"dept": d, "cells": [], "comments": open_comments.get(d["dept_code"], 0)}
+        for s in STAGES:
+            st = (sub.get("stages") or {}).get(s["key"]) or {}
+            row["cells"].append({"key": s["key"], "title": s["title"],
+                                 "status": compute_status(sub, s["key"]) if sub.get("_id") else "open",
+                                 "timing": stage_timing(st)})
+        stages.append(row)
+        for p in programmes_of(sub, d) if sub.get("_id") else []:
+            code = p["programme_code"]
+            part = lambda k: programme_stage_state(sub, code, k)
+            cur = (part("prog_curriculum").get("data") or {})
+            rows = [r for r in (cur.get("semester_structure") or []) if isinstance(r, dict)]
+            syl = (part("prog_syllabus").get("data") or {}).get("courses") or []
+            rev = [r for r in ((part("prog_revision").get("data") or {}).get("courses") or []) if isinstance(r, dict)]
+            changes = [_num(r.get("avg_change")) for r in rev if r.get("avg_change") not in (None, "")]
+            progs.append({"dept": d, "code": code, "name": p.get("programme_name") or code,
+                          "degree": (cur.get("details") or {}).get("degree_level") or p.get("degree", ""),
+                          "courses": len(rows), "credits": int(sum(_num(r.get("credits")) for r in rows)),
+                          "syllabi": len(syl), "revised": len(rev),
+                          "avg_change": round(sum(changes) / len(changes), 1) if changes else None,
+                          "parts": {k: part(k).get("status") or "open"
+                                    for k in ("prog_curriculum", "prog_syllabus", "prog_revision")}})
+        drow = {"dept": d, "cells": []}
+        for stage, sec, field, label in BOS_DOCS:
+            val = (((sub.get("stages") or {}).get(stage) or {}).get("data") or {}).get(sec, {})
+            state, why = _doc_state((val or {}).get(field))
+            drow["cells"].append({"label": label, "state": state, "why": why, "stage": stage})
+        docs.append(drow)
+    comments = list(db.comments.find({"academic_year": year}).sort("at", -1).limit(500))
+    names = {d["dept_code"]: d.get("dept_name", "") for d in depts}
+    return {"stages": stages, "programmes": progs, "documents": docs, "comments": comments,
+            "names": names, "doc_labels": [x[3] for x in BOS_DOCS]}
+
+
+@bp.route("/sheets")
+@admin_required
+def sheets():
+    data = analysis_sheets(_year())
+    return render_template("admin/sheets.html", year=_year(), tab=request.args.get("tab", "stages"),
+                           STAGES=STAGES, STAGE_BY_KEY=STAGE_BY_KEY, **data)
+
+
+@bp.route("/sheets.xlsx")
+@admin_required
+def sheets_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    data = analysis_sheets(_year())
+    wb = Workbook()
+    head = Font(bold=True, color="FFFFFF")
+    fill = PatternFill("solid", fgColor="0E2A5C")
+
+    def sheet(ws, header, rows):
+        ws.append(header)
+        for c in ws[1]:
+            c.font, c.fill = head, fill
+        for r in rows:
+            ws.append(r)
+        for col in ws.columns:
+            ws.column_dimensions[col[0].column_letter].width = max(12, min(48, max(len(str(c.value or "")) for c in col) + 2))
+        ws.freeze_panes = "B2"
+
+    ws = wb.active
+    ws.title = "Stages"
+    sheet(ws, ["Department", "Code", "Campus"] + [f"{s['title']}" for s in STAGES] + ["Open comments"],
+          [[r["dept"].get("dept_name"), r["dept"]["dept_code"], r["dept"].get("campus", "")]
+           + [c["status"] + (f" ({c['timing']['took']})" if c["timing"].get("took") else "") for c in r["cells"]]
+           + [r["comments"]] for r in data["stages"]])
+    sheet(wb.create_sheet("Programmes"),
+          ["Department", "Programme", "Code", "Degree", "Courses", "Credits", "Syllabi", "Revised courses",
+           "Avg % change", "Curriculum", "Current syllabus", "Revision"],
+          [[p["dept"].get("dept_name"), p["name"], p["code"], p["degree"], p["courses"], p["credits"],
+            p["syllabi"], p["revised"], p["avg_change"], p["parts"]["prog_curriculum"],
+            p["parts"]["prog_syllabus"], p["parts"]["prog_revision"]] for p in data["programmes"]])
+    sheet(wb.create_sheet("Documents"), ["Department"] + data["doc_labels"],
+          [[r["dept"].get("dept_name")] + [(c["state"] or "—") + (f": {c['why']}" if c["state"] in ("warn", "bad") else "")
+                                         for c in r["cells"]] for r in data["documents"]])
+    sheet(wb.create_sheet("Comments"), ["When", "Department", "Stage", "Programme", "Comment", "By", "Status", "Reply"],
+          [[c["at"].strftime("%d %b %Y %H:%M"), data["names"].get(c["dept_code"], c["dept_code"]),
+            STAGE_BY_KEY.get(c["stage"], {}).get("title", c["stage"]), c.get("programme_code", ""),
+            c["text"], c.get("by", ""), c.get("status", ""), c.get("reply", "")] for c in data["comments"]])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    audit(_actor(), "export.sheets")
+    return send_file(buf, as_attachment=True, download_name=f"BoS-Analysis-{_year()}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@bp.post("/comments")
+@admin_required
+def comment_add():
+    """A comment asking a department to change something — on a stage or
+    a programme's part. If it is submitted, it can be sent back with it."""
+    db = get_db()
+    f = request.form
+    code, stage = (f.get("dept") or "").strip(), (f.get("stage") or "").strip()
+    text = (f.get("text") or "").strip()
+    dept = db.departments.find_one({"dept_code": code})
+    if not dept or stage not in STAGE_BY_KEY or not text:
+        flash("Choose a department and a stage, and write the comment.", "error")
+        return redirect(request.referrer or url_for("admin.sheets"))
+    prog = (f.get("programme") or "").strip()
+    doc = {"dept_code": code, "academic_year": _year(), "stage": stage, "programme_code": prog,
+           "text": text[:2000], "by": _actor(), "at": now(), "status": "open", "reopened": False}
+    if f.get("reopen") == "on":
+        from .workflow import programme_stage_state
+        sub = get_or_create_submission(code, _year())
+        if prog:
+            if programme_stage_state(sub, prog, stage).get("status") == "submitted":
+                path = f"programmes.{prog}.{stage}"
+                db.submissions.update_one({"_id": sub["_id"]}, {"$set": {
+                    f"{path}.status": "returned", f"{path}.returned_note": text,
+                    f"{path}.returned_by": _actor(), f"{path}.returned_at": now(), "status": "in_progress"}})
+                doc["reopened"] = True
+        elif compute_status(sub, stage) == "submitted":
+            return_stage(code, _year(), stage, text, _actor())
+            doc["reopened"] = True
+    db.comments.insert_one(doc)
+    audit(_actor(), "comment.added", f"{code}/{prog + '/' if prog else ''}{stage}", {"reopened": doc["reopened"]})
+    flash(f"Comment sent to {dept.get('dept_name')}" + (" — the stage is open again for them to change it."
+                                                         if doc["reopened"] else "."), "success")
+    return redirect(request.referrer or url_for("admin.sheets", tab="comments"))
+
+
+@bp.post("/comments/<cid>/close")
+@admin_required
+def comment_close(cid):
+    from bson import ObjectId
+    try:
+        get_db().comments.update_one({"_id": ObjectId(cid)}, {"$set": {"status": "closed", "closed_at": now()}})
+    except Exception:
+        abort(400)
+    return redirect(request.referrer or url_for("admin.sheets", tab="comments"))
+
+
+@bp.route("/comments.json")
+@admin_required
+def comments_json():
+    q = {"academic_year": _year(), "dept_code": request.args.get("dept", "")}
+    if request.args.get("stage"):
+        q["stage"] = request.args["stage"]
+    if request.args.get("programme") is not None:
+        q["programme_code"] = request.args.get("programme", "")
+    return jsonify([{"text": c["text"], "by": c.get("by"), "at": c["at"].strftime("%d %b %Y %H:%M"),
+                     "status": c.get("status"), "reply": c.get("reply", "")}
+                    for c in get_db().comments.find(q).sort("at", -1)])

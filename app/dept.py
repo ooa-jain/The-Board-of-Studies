@@ -52,7 +52,14 @@ def _dept():
 def dashboard():
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
-    return render_template("dept/dashboard.html", dept=dept, submission=sub,
+    open_comments = list(get_db().comments.find({"dept_code": dept["dept_code"], "academic_year": _year(),
+                                                 "status": "open"}).sort("at", -1))
+    for c in open_comments:
+        c["url"] = (url_for("dept.stage", stage_key=c["stage"], programme_code=c["programme_code"])
+                    if c.get("programme_code") else url_for("dept.stage", stage_key=c["stage"]))
+        c["where"] = STAGE_BY_KEY.get(c["stage"], {}).get("title", c["stage"]) + \
+            (f" · {c['programme_code']}" if c.get("programme_code") else "")
+    return render_template("dept/dashboard.html", dept=dept, submission=sub, open_comments=open_comments,
                            board=stage_board(sub), progress=progress(sub),
                            programmes=programmes_of(sub, dept), year=_year(),
                            next_step=next_action(sub))
@@ -147,10 +154,15 @@ def stage(stage_key, programme_code=None):
         elif stage_key == "prog_revision" and programme:
             fill = revision_fill_source(sub, programme["programme_code"])
 
+    syllabi = _syllabus_index(sub, stage_key, programme) if stage_key == "prog_curriculum" else []
+    comments = list(get_db().comments.find({
+        "dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
+        "programme_code": (programme or {}).get("programme_code", ""),
+        "status": {"$in": ["open", "done"]}}).sort("at", -1))
     board = stage_board(sub)
     final, record = _final_step(sub, dept, stage_key, (programme or {}).get("programme_code"))
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
-                           final=final, record=record,
+                           final=final, record=record, syllabi=syllabi, comments=comments,
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,
@@ -257,6 +269,30 @@ def _guard(stage_key, programme_code=None):
     return dept, sub, programme, None
 
 
+def _syllabus_index(sub, stage_key, programme):
+    """For a programme's Curriculum: every syllabus it has — the current
+    batch's and each earlier batch's — with its courses' codes and titles,
+    so each course row can say whether its syllabus is there and open it."""
+    from .workflow import programme_stage_state
+    if not programme:
+        return []
+    code = programme["programme_code"]
+    out = []
+    keys = [k for k in parts_for(STAGE_BY_KEY["curriculum"]) if k.startswith("prog_syllabus")]
+    for k in keys:
+        sd = STAGE_BY_KEY[k]
+        data = programme_stage_state(sub, code, k).get("data") or {}
+        courses = [{"code": str(r.get("course_code") or "").strip(),
+                    "title": str(r.get("course_title") or "").strip()}
+                   for r in (data.get("courses") or []) if isinstance(r, dict) and r.get("course_code")]
+        out.append({"key": k, "current": k == "prog_syllabus",
+                    "label": "Current batch " + batches()["current"] if k == "prog_syllabus"
+                             else "Batch " + (sd.get("batch") or ""),
+                    "url": url_for("dept.stage", stage_key=k, programme_code=code),
+                    "courses": courses})
+    return out
+
+
 def _final_step(sub, dept, stage_key, programme_code=None):
     """Whether submitting this stage completes the whole record — the one
     submit that opens the review — and the record, stage by stage and part
@@ -348,6 +384,26 @@ def api_sample(stage_key, programme_code=None):
     files = demo_dept._files_for(get_db(), _year())
     data = demo_dept.sample(stage_key, programme, files, _year())
     return jsonify({"ok": True, "data": _pin_frozen(stage_key, data, dept, sub, programme)})
+
+
+@bp.post("/comments/<cid>/done")
+@department_required
+def comment_done(cid):
+    """The department marks a comment from the Office as done, with a reply."""
+    from bson import ObjectId
+    dept = _dept()
+    try:
+        c = get_db().comments.find_one({"_id": ObjectId(cid), "dept_code": dept["dept_code"]})
+    except Exception:
+        c = None
+    if not c:
+        abort(404)
+    reply = (request.form.get("reply") or "").strip()[:1000]
+    get_db().comments.update_one({"_id": c["_id"]}, {"$set": {"status": "done", "reply": reply, "done_at": now()}})
+    _tell(dept, "saved", c["stage"], None, changes=[{"section": "Comment from the Office", "field": c["text"][:60],
+                                                     "before": "open", "after": "done" + (f": {reply[:60]}" if reply else "")}])
+    flash("Thank you — the Office of Academics sees it is done.", "success")
+    return redirect(request.referrer or url_for("dept.dashboard"))
 
 
 @bp.post("/demo/fill-all")

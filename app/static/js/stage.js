@@ -1474,6 +1474,49 @@
 
   /* A file for one row of a table: an Upload button, then the file's name
      (opening it, or the viewer for a PDF) and × to take it off. */
+  /* A curriculum row's syllabus: found by course code in the current batch's
+     syllabus (then the earlier batches'), and the title compared. The chip
+     says how well they match and opens that syllabus at that course. */
+  const norm = v => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  function syllabusLink(row) {
+    const code = String(row.course_code || "").trim().toUpperCase();
+    const a = el("a", "syl-chip");
+    const syl = CTX.syllabi || [];
+    const cur = syl.find(x => x.current);
+    if (!code) {
+      a.className = "syl-chip is-none";
+      a.textContent = "—";
+      a.title = "Enter the course code first";
+      return a;
+    }
+    const hits = [];
+    syl.forEach(x => (x.courses || []).forEach(c => {
+      if (c.code.toUpperCase() === code) hits.push({ x, c, same: norm(c.title) === norm(row.course_title) });
+    }));
+    const best = hits.find(h => h.x.current && h.same) || hits.find(h => h.x.current) ||
+                 hits.find(h => h.same) || hits[0];
+    if (!best) {
+      a.className = "syl-chip is-none";
+      a.textContent = "Add syllabus →";
+      a.title = "No syllabus has this course code yet — opens the Current Batch Syllabus";
+      if (cur) a.href = cur.url;
+      return a;
+    }
+    a.href = best.x.url + "#course-" + encodeURIComponent(code);
+    if (best.same && best.x.current) {
+      a.className = "syl-chip is-ok";
+      a.textContent = "✓ Syllabus";
+    } else if (best.x.current) {
+      a.className = "syl-chip is-warn";
+      a.textContent = "Title differs";
+    } else {
+      a.className = "syl-chip is-old";
+      a.textContent = best.x.label.replace("Batch ", "");
+    }
+    a.title = hits.map(h => `${h.x.label}: ${h.c.code} — ${h.c.title}${h.same ? " ✓ same title" : " (title differs)"}`).join("\n");
+    return a;
+  }
+
   function rowFile(def, row, changed) {
     const box = el("div", "row-file");
     const input = el("input");
@@ -1653,6 +1696,14 @@
           }
           const holder = el("div");
           holder.dataset.field = c.name;
+          if (c.type === "syllabus_link") {
+            holder.appendChild(syllabusLink(row));
+            refreshers.push(() => { holder.textContent = ""; holder.appendChild(syllabusLink(row)); });
+            td.className = "rt-syl";
+            td.appendChild(holder);
+            tr.appendChild(td);
+            return;
+          }
           if (c.type === "file") {
             holder.appendChild(rowFile(c, row, () => { touch(); }));
             td.className = "rt-file";
@@ -1738,7 +1789,7 @@
       showTotals();
       const min = section.min_rows || 0;
       count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}` +
-                          (min ? ` · minimum ${min}` : "");
+                          "";
       count.style.color = data.length < min ? "var(--err)" : "";
     }
     draw();
@@ -3139,6 +3190,7 @@
     function sheet(row, i) {
       const wrap = el("section", "sheet-wrap");
       wrap.dataset.row = i;
+      if (row.course_code) wrap.id = "course-" + String(row.course_code).trim().toUpperCase();
       const cap = el("div", "sheet-cap");
       cap.appendChild(el("span", null, `Course ${i + 1}${row.course_code ? " · " + row.course_code : ""}`));
       if (!CTX.readonly && data.length > 1) {
@@ -3954,6 +4006,13 @@
 
   render();
   refresh();
+  // opened from a curriculum row: go to that course's syllabus
+  if (location.hash.startsWith("#course-")) {
+    setTimeout(() => {
+      const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (target) { target.scrollIntoView({ behavior: "smooth", block: "start" }); target.classList.add("is-flash"); }
+    }, 400);
+  }
   const allBtn = document.getElementById("btn-all");
   if (allBtn) allBtn.addEventListener("click", () => openAll());
 

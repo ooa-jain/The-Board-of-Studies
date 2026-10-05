@@ -4198,3 +4198,75 @@ button.pmap-pill:disabled { cursor: default; opacity: .55; box-shadow: none; }
 .sa-error { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: #fbeae8; border: 1px solid #f1cfc9; color: #7a2a1f; font-size: .86rem; }
 .sa-error ul { margin: 6px 0 8px 18px; padding: 0; }
 .dash-all { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; margin: 0 0 16px; }
+
+/* curriculum row → its syllabus */
+td.rt-syl { white-space: nowrap; }
+.syl-chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: .76rem;
+  font-weight: 600; text-decoration: none !important; border: 1px solid transparent; }
+.syl-chip.is-ok { background: #e2f1e6; color: #1f6b44; border-color: #cfe6d7; }
+.syl-chip.is-warn { background: #fbf1cf; color: #85600a; border-color: #f1e0b8; }
+.syl-chip.is-old { background: #eef3fa; color: #2a3f60; border-color: #d7e2f1; }
+.syl-chip.is-none { background: #fff; color: var(--jain-link); border-color: #d9e2ee; }
+.syl-chip[href]:hover { filter: brightness(.96); text-decoration: underline !important; }
+.sheet-wrap.is-flash { animation: sec-flash 1.8s ease; }
+
+/* ==========================================================================
+   Buttons: dark blue throughout; outlined ones in the same blue. Red only
+   where something is removed or sent back. “Review & submit all” is white
+   and turns red under the pointer.
+   ========================================================================== */
+:root { --btn-blue: #0e2a5c; --btn-blue-hover: #163d80; --btn-red: #c2412f; }
+.btn, .btn-gold, .btn-navy, .btn-primary, a.btn, button.btn {
+  background: var(--btn-blue) !important; color: #fff !important;
+  border: 1px solid var(--btn-blue) !important; box-shadow: none;
+}
+.btn:hover, .btn-gold:hover, .btn-navy:hover, a.btn:hover, button.btn:hover {
+  background: var(--btn-blue-hover) !important; border-color: var(--btn-blue-hover) !important; color: #fff !important;
+}
+.btn-ghost, a.btn-ghost, button.btn-ghost, .btn.btn-ghost {
+  background: #fff !important; color: var(--btn-blue) !important; border: 1px solid #c9d4e6 !important;
+}
+.btn-ghost:hover, .btn.btn-ghost:hover { background: var(--btn-blue) !important; color: #fff !important; border-color: var(--btn-blue) !important; }
+.btn-danger, .btn.btn-danger, .btn.is-danger, .btn-ghost.is-danger {
+  background: #fff !important; color: var(--btn-red) !important; border-color: #efc4bc !important;
+}
+.btn-danger:hover, .btn.btn-danger:hover, .btn.is-danger:hover { background: var(--btn-red) !important; color: #fff !important; border-color: var(--btn-red) !important; }
+.btn:disabled, .btn[disabled] { opacity: .45 !important; cursor: default; }
+.btn:disabled:hover { background: var(--btn-blue) !important; }
+.btn-ghost:disabled:hover { background: #fff !important; color: var(--btn-blue) !important; }
+/* Review & submit all stages */
+.btn.btn-all, #btn-all {
+  background: #fff !important; color: var(--btn-blue) !important; border: 1.5px solid var(--btn-blue) !important;
+  font-weight: 600; transition: background .15s, color .15s, border-color .15s;
+}
+.btn.btn-all:hover, #btn-all:hover, .btn.btn-all:focus-visible {
+  background: var(--btn-red) !important; color: #fff !important; border-color: var(--btn-red) !important;
+}
+
+/* analysis sheets */
+.sheet-card { padding: 0; overflow: hidden; }
+.sheet-table th { white-space: nowrap; }
+.sheet-table td { vertical-align: top; }
+.sh-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .72rem; font-weight: 600; white-space: nowrap; background: #f1f3f6; color: #5f6672; }
+.sh-pill.is-submitted { background: #e2f1e6; color: #1f6b44; }
+.sh-pill.is-draft { background: #fdf0cf; color: #85600a; }
+.sh-pill.is-returned { background: #fbe4df; color: #b23a2a; }
+.sh-pill.is-locked { background: #eceef2; color: #8a919c; }
+.sh-doc { text-align: center; }
+.sh-dot { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: .72rem; font-weight: 700; color: #fff; }
+.sh-dot.is-ok { background: #2f8a55; } .sh-dot.is-warn { background: #d39a16; } .sh-dot.is-bad { background: #c2412f; }
+.sh-gap { font-size: .72rem; color: #b23a2a; font-weight: 600; }
+.sheet-key { padding: 10px 16px; margin: 0; border-top: 1px solid var(--line); }
+.sheet-key .sh-dot { width: 16px; height: 16px; font-size: .6rem; }
+.comment-dialog { border: 0; border-radius: 16px; padding: 22px 24px; width: min(520px, calc(100vw - 32px)); box-shadow: 0 30px 80px rgba(9,19,36,.35); }
+.comment-dialog::backdrop { background: rgba(9,19,36,.5); }
+.comment-dialog h3 { margin: 0 0 14px; font-size: 1.15rem; }
+.comment-dialog textarea, .comment-dialog select { width: 100%; }
+.office-comment { background: #fff8ec; border: 1px solid #f1dcb4; border-left: 4px solid var(--jain-orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; }
+.office-comment.is-done { background: #f2f8f4; border-color: #cfe6d7; border-left-color: #2f8a55; }
+.oc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.oc-head strong { color: var(--jain-blue); }
+.oc-text { margin: 6px 0 8px; white-space: pre-wrap; }
+.oc-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.oc-form input { flex: 1 1 260px; padding: 7px 10px; border: 1px solid #e3d6bb; border-radius: 8px; }
+.oc-list { margin: 6px 0 0 18px; padding: 0; }
