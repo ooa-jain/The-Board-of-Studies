@@ -399,7 +399,9 @@ def save_draft(dept_code, academic_year, stage_key, data, programme_code=None):
                   f"{path}.status": "draft",
                   f"{path}.updated_at": now(),
                   "updated_at": now(),
-                  "status": "in_progress"}},
+                  "status": "in_progress"},
+         # the first time anything was saved here: the start of "time taken"
+         "$min": {f"{path}.started_at": now()}},
         upsert=True,
     )
 
@@ -465,7 +467,8 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
         update[f"{path}.submitted_at"] = now()
         update[f"{path}.submitted_by"] = actor
     db.submissions.update_one({"dept_code": dept_code, "academic_year": academic_year},
-                              {"$set": update, "$unset": {f"{path}.returned_note": ""}})
+                              {"$set": update, "$unset": {f"{path}.returned_note": ""},
+                               "$min": {f"{path}.started_at": now()}})
 
     fresh = db.submissions.find_one({"dept_code": dept_code, "academic_year": academic_year})
     top = (STAGE_BY_KEY.get(stage_key) or {}).get("parent") or stage_key
@@ -757,3 +760,24 @@ def revision_fill_source(submission, programme_code):
             row["prev_title"] = prev.get("course_title", "")
         out.append(row)
     return out
+
+
+def stage_timing(state):
+    """When a stage was started, submitted, and how long it took, in words."""
+    started, done = state.get("started_at"), state.get("submitted_at")
+    took = ""
+    if started and done and done >= started:
+        secs = int((done - started).total_seconds())
+        days, rest = divmod(secs, 86400)
+        hours, rest = divmod(rest, 3600)
+        mins = rest // 60
+        parts = [f"{days} day{'s' if days != 1 else ''}"] if days else []
+        if hours:
+            parts.append(f"{hours} hr")
+        if mins and not days:
+            parts.append(f"{mins} min")
+        took = " ".join(parts) or "under a minute"
+    fmt = lambda d: d.strftime("%d %b %Y, %H:%M") if d else ""
+    return {"started": fmt(started), "submitted": fmt(done), "took": took,
+            "returned": fmt(state.get("returned_at")), "updated": fmt(state.get("updated_at"))}
+

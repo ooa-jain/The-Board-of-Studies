@@ -19,17 +19,25 @@ from pathlib import Path
 # per upload box: the words a right document carries; any one is a match,
 # more is better
 KEYWORDS = {
-    "diac_signed": ["DIAC", "industry", "academia", "cell", "composition", "member", "chairperson"],
-    "dpac_signed": ["DPAC", "programme assessment", "program assessment", "committee", "composition", "member"],
-    "bos_composition": ["board of studies", "BoS", "composition", "member", "chairperson", "external"],
-    "vision_mission": ["vision", "mission", "programme overview", "program overview", "objectives", "outcomes"],
-    "minutes": ["minutes", "meeting", "resolved", "agenda", "proceedings", "approved", "members present"],
-    "external_profiles": ["profile", "experience", "qualification", "designation", "curriculum vitae", "publications"],
-    "attendance": ["attendance", "signature", "present", "name", "designation"],
-    "feedback_curriculum": ["feedback", "stakeholder", "curriculum", "survey", "response", "rating"],
-    "feedback_new_programme": ["feedback", "stakeholder", "new programme", "new program", "survey", "response"],
-    "course_file": ["syllabus", "course", "module", "credits", "outcomes", "hours"],
-    "document": ["curriculum", "semester", "credits", "course code", "course title", "programme structure"],
+    "diac_signed": ["DIAC / industry-academia", "industry", "cell", "composition", "member", "chairperson / chairman / chair"],
+    "dpac_signed": ["DPAC / programme assessment / program assessment", "committee", "composition", "member",
+                    "chairperson / chairman / chair"],
+    "bos_composition": ["board of studies / BoS", "composition", "member", "chairperson / chairman / chair",
+                        "external"],
+    "vision_mission": ["vision", "mission", "programme overview / program overview / overview",
+                       "objectives / outcomes / PEO / PSO"],
+    "minutes": ["minutes / proceedings", "meeting", "resolved / approved / decided", "agenda",
+                "members present / present / attendance"],
+    "external_profiles": ["profile / curriculum vitae / CV / resume", "experience", "qualification / Ph.D / degree",
+                          "designation", "publications"],
+    "attendance": ["attendance", "signature / signed", "present", "name", "designation"],
+    "feedback_curriculum": ["feedback", "stakeholder / students / alumni / employer / faculty", "curriculum",
+                            "survey / questionnaire / response", "rating / scale"],
+    "feedback_new_programme": ["feedback", "stakeholder / students / alumni / employer / industry",
+                               "new programme / new program / proposed", "survey / questionnaire / response"],
+    "course_file": ["syllabus", "course", "module / unit", "credits", "outcomes / CO", "hours"],
+    "document": ["curriculum", "semester", "credits", "course code", "course title / course name",
+                 "programme structure / program structure / scheme"],
 }
 
 STOP = {"the", "and", "for", "with", "from", "this", "that", "upload", "file", "files",
@@ -128,23 +136,39 @@ def read_text(path: Path, limit: int = 60000) -> str | None:
     return text if len(text.strip()) >= 20 else None
 
 
+def alternatives(keyword: str) -> list[str]:
+    """“programme assessment / program assessment” is one keyword with two
+    spellings: either one found counts."""
+    return [w.strip() for w in keyword.split("/") if w.strip()] or [keyword]
+
+
 def _found(word: str, text: str) -> bool:
+    return any(_found_one(w, text) for w in alternatives(word))
+
+
+def _found_one(word: str, text: str) -> bool:
     # short words (BoS, DIAC) must match as a whole word and in capitals
-    if len(word) <= 4 and word.isupper() or word in ("BoS",):
+    if (len(word) <= 4 and word.isupper()) or word in ("BoS",):
         return re.search(rf"\b{re.escape(word)}\b", text) is not None
     return re.search(rf"\b{re.escape(word)}", text, re.I) is not None
 
 
 def check(path: Path, field: str, label: str) -> dict:
-    """{status, found, expected, label}: status is "match", "weak", "miss"
-    or "unread" (no text to check)."""
+    """{status, found, seen, expected, label}: status is "match", "weak",
+    "miss" or "unread" (no text to check). `found` holds the keywords that
+    were met (as written in the list), `seen` the spelling actually in the file."""
     words = keywords_for(field, label)
-    base = {"label": label, "expected": words, "found": []}
+    base = {"label": label, "expected": words, "found": [], "seen": []}
     if not words:
         return {**base, "status": "unread"}
     text = read_text(path)
     if text is None:
         return {**base, "status": "unread"}
-    found = [w for w in words if _found(w, text)]
+    found, seen = [], []
+    for w in words:
+        hit = next((a for a in alternatives(w) if _found_one(a, text)), None)
+        if hit:
+            found.append(w)
+            seen.append(hit)
     status = "match" if len(found) >= 2 or (found and len(words) <= 2) else "weak" if found else "miss"
-    return {**base, "status": status, "found": found}
+    return {**base, "status": status, "found": found, "seen": seen}

@@ -26,7 +26,9 @@ def test_minutes_carry_the_words_minutes_carry(app, client):
     assert j["ok"]
     m = j["match"]
     assert m["status"] == "match", m
-    assert "minutes" in m["found"] and "resolved" in m["found"]
+    assert "minutes" in m["seen"] and "resolved" in [w.lower() for w in m["seen"]]
+    # one keyword, two spellings: found once, not crossed out as a miss
+    assert "minutes / proceedings" in m["found"]
 
 
 def test_the_wrong_file_in_a_box_is_called_out(app, client):

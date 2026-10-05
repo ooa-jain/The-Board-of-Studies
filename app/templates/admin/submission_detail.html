@@ -29,6 +29,7 @@
 {% endblock %}
 
 {% block content %}
+{% macro kw_tags(m) %}{% for w in m.expected or [] %}{% set hit = w in (m.found or []) %}<span class="kw-tag{{ ' is-hit' if hit }}" title="{{ w }}">{{ (m.seen[(m.found).index(w)] if hit and m.seen else w.split('/')[0]|trim) }}</span> {% endfor %}{% endmacro %}
 {% if dept.demo and session.get('demo_login') %}
 <div class="demo-strip">
   <span class="demo-badge" aria-hidden="true">DEMO</span>
@@ -82,7 +83,7 @@
               <span class="kw-icon">{{ '✓' if m.status == 'match' else '–' if m.status == 'unread' else '!' }}</span>
               <strong>{{ {'match': 'Keywords match', 'weak': 'Few keywords match', 'miss': 'No expected keywords found', 'unread': 'Keywords not checked'}[m.status] }}</strong>
               {% if m.status == 'unread' %}<span class="kw-sub">no text to read (a scan, image or zip) — open it to check</span>
-              {% else %}<span class="kw-tags">{% for w in m.expected %}<span class="kw-tag{{ ' is-hit' if w in m.found }}">{{ w }}</span>{% endfor %}</span>{% endif %}
+              {% else %}<span class="kw-tags">{{ kw_tags(m) }}</span>{% endif %}
             </div>
             {% endif %}
           </div>
@@ -147,38 +148,8 @@
       </div>
 
       {% if state.data %}
-      <details class="mt-1">
-        <summary class="small" style="cursor:pointer;color:var(--ink-600)">View what was submitted</summary>
-        <div class="mt-1" style="max-height:420px;overflow:auto">
-          {% for section in STAGE_BY_KEY[s.key].sections %}
-            {% set payload = state.data.get(section.key) %}
-            {% if payload %}
-            <h4 class="small" style="margin:14px 0 6px">{{ section.title }}</h4>
-            {% if payload is mapping %}
-              <table class="data">
-                {% for k, v in payload.items() %}
-                <tr><td class="small" style="width:240px;color:var(--ink-soft)">{{ k }}</td>
-                    <td class="small">{{ v if v is not mapping else v.get('name', v) }}</td></tr>
-                {% endfor %}
-              </table>
-            {% elif payload is iterable %}
-              <div class="table-wrap">
-                <table class="data">
-                  <thead><tr>{% for c in section.columns %}<th scope="col">{{ c.label }}</th>{% endfor %}</tr></thead>
-                  <tbody>
-                    {% for row in payload %}
-                    <tr>{% for c in section.columns %}
-                      <td class="small">{{ row.get(c.name) if row.get(c.name) is not mapping else row.get(c.name).get('name','') }}</td>
-                    {% endfor %}</tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% endif %}
-            {% endif %}
-          {% endfor %}
-        </div>
-      </details>
+      <button class="btn btn-sm mt-1" type="button"
+              data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=s.key) }}">Review what was entered</button>
       {% endif %}
 
       {% if state.issues %}
@@ -199,23 +170,34 @@
 {% endfor %}
 
 {% if submission.programmes %}
-<div class="group-label">Per-programme records</div>
+<div class="group-label">Programmes — click a step to review it</div>
+{% set words = {'submitted': 'Submitted', 'returned': 'Sent back', 'draft': 'In progress'} %}
 {% for code, stages in submission.programmes.items() %}
 <div class="card mb-1">
-  <div class="card-head"><h3 style="font-size:1rem">{{ code }}</h3>
-    <span class="spacer small muted">{{ stages|length }} stage record(s)</span></div>
+  <div class="card-head"><h3 style="font-size:1rem">{{ prog_names.get(code, code) }}</h3>
+    <span class="spacer small muted mono">{{ code }}</span></div>
   <div class="card-body tight">
-    {% for skey, st in stages.items() %}
-    <div class="flex small" style="padding:6px 0;border-bottom:1px solid var(--line)">
+    <ol class="pmap">
+      {% set keys = stages.keys()|list %}
+      {% set ordered = [] %}
+      {% for k in ['prog_curriculum', 'prog_syllabus'] if k in keys %}{% set _ = ordered.append(k) %}{% endfor %}
+      {% for k in keys|sort if k.startswith('prog_syllabus_b') %}{% set _ = ordered.append(k) %}{% endfor %}
+      {% for k in ['prog_revision'] if k in keys %}{% set _ = ordered.append(k) %}{% endfor %}
+      {% for skey in ordered %}
+      {% set st = stages[skey] %}
       {% set sd = STAGE_BY_KEY.get(skey, {}) %}
-      <span>{{ sd.title or skey }}
-        {% if sd.batch == 'current' %}<span class="part-tag">Current batch {{ batches.current }}</span>
-        {% elif sd.existing_batch %}<span class="part-tag is-old">Existing batch</span>{% endif %}</span>
-      <span class="spacer"></span>
-      {% if st.summary and st.summary.errors %}<span class="pill pill-err">{{ st.summary.errors }} errors</span>{% endif %}
-      <span class="pill {{ 'pill-ok' if st.status == 'submitted' else 'pill-err' if st.status == 'returned' else 'pill-warn' }}">{{ {'submitted': 'Submitted', 'returned': 'Returned', 'draft': 'In progress'}.get(st.status, (st.status or 'Not started')|capitalize) }}</span>
-    </div>
-    {% endfor %}
+      {% set c = 1 if skey == 'prog_curriculum' else 2 if skey == 'prog_syllabus' else 4 if skey == 'prog_revision' else 3 %}
+      <li class="pmap-node pmap-c{{ c }} is-{{ st.status or 'open' }}">
+        <button type="button" class="pmap-pill" {% if st.data %}data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=skey, programme=code) }}"{% else %}disabled{% endif %}
+                title="{{ words.get(st.status, 'Not started') }}{% if st.summary and st.summary.errors %} · {{ st.summary.errors }} errors{% endif %}">
+          <span class="pmap-n">{{ loop.index }}</span>
+          <span class="pmap-title">{% if skey == 'prog_syllabus' %}Current Batch{% elif sd.existing_batch %}Batch {{ sd.batch }}{% elif skey == 'prog_revision' %}Revision{% else %}{{ sd.title or skey }}{% endif %}</span>
+          <i class="pmap-dot" aria-hidden="true"></i>
+          <span class="pmap-tag">{{ words.get(st.status, 'Not started') }}</span>
+        </button>
+      </li>
+      {% endfor %}
+    </ol>
   </div>
 </div>
 {% endfor %}
@@ -224,6 +206,8 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-review.js') }}"></script>
 <script>
   document.addEventListener("click", function (e) {
     var b = e.target.closest("[data-summary]");

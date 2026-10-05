@@ -296,6 +296,32 @@ def _tell(dept, event, stage_key=None, programme=None, **kw):
         current_app.logger.exception("Could not record an update")
 
 
+@bp.post("/api/<stage_key>/sample")
+@bp.post("/api/<stage_key>/<programme_code>/sample")
+@department_required
+def api_sample(stage_key, programme_code=None):
+    """The demo department only: the sample answers for this stage."""
+    from . import demo_dept
+    dept, sub, programme, bad = _guard(stage_key, programme_code)
+    if bad:
+        return bad
+    if not dept.get("demo"):
+        abort(404)
+    files = {}
+    for r in get_db().files.find({"dept_code": dept["dept_code"], "academic_year": _year()}).sort("uploaded_at", 1):
+        v = {"name": r["original_name"], "stored": r["stored_name"], "size": r.get("size"),
+             "url": url_for("dept.download", stage_key=r["stage"], stored=r["stored_name"]),
+             "match": r.get("keyword_match")}
+        if r["original_name"].lower().endswith(".pdf"):
+            v["thumb"] = v["url"] + "?thumb=1"
+        if r["field"] in ("geotagged_photos", "external_profiles"):
+            files.setdefault(r["field"], []).append(v)
+        else:
+            files[r["field"]] = v
+    data = demo_dept.sample(stage_key, programme, files, _year())
+    return jsonify({"ok": True, "data": _pin_frozen(stage_key, data, dept, sub, programme)})
+
+
 @bp.post("/api/<stage_key>/validate")
 @bp.post("/api/<stage_key>/<programme_code>/validate")
 @department_required
@@ -393,7 +419,7 @@ def api_upload():
              "miss": "no expected keywords found", "unread": "no text to check"}[match["status"]]
     _tell(dept, "keyword_miss" if match["status"] == "miss" else "uploaded", stage_key,
           text=f"“{f.filename}” for {match['label']} — {words}"
-               + (f" ({', '.join(match['found'])})" if match["found"] else ""))
+               + (f" ({', '.join(match.get('seen') or match['found'])})" if match["found"] else ""))
 
     url = url_for("dept.download", stage_key=stage_key, stored=stored)
     return jsonify({

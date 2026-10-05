@@ -494,7 +494,11 @@ def submission_detail(dept_code):
     year = _year()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     sub = get_or_create_submission(dept_code, year)
+    prog_names = {p.get("programme_code"): p.get("programme_name") or p.get("programme_code")
+                  for p in (((sub.get("stages") or {}).get("dept_info") or {}).get("data") or {})
+                  .get("programmes_offered", []) if p.get("programme_code")}
     return render_template("admin/submission_detail.html", dept=dept, submission=sub,
+                           prog_names=prog_names,
                            board=stage_board(sub), progress=progress(sub),
                            year=year, STAGE_BY_KEY=STAGE_BY_KEY,
                            documents=_documents(dept_code, sub, year),
@@ -597,10 +601,73 @@ def submission_return(dept_code, stage_key):
     if not note:
         flash("Say what needs correcting before you send a stage back.", "error")
         return redirect(url_for("admin.submission_detail", dept_code=dept_code))
-    return_stage(dept_code, _year(), stage_key, note, _actor())
-    audit(_actor(), "stage.returned", f"{dept_code}/{stage_key}", {"note": note})
-    flash(f"“{STAGE_BY_KEY[stage_key]['title']}” has been sent back for correction.", "info")
+    prog = (request.form.get("programme") or "").strip()
+    stage = STAGE_BY_KEY.get(stage_key) or abort(404)
+    if stage.get("parent") and prog:
+        # one programme's part, on its own
+        path = f"programmes.{prog}.{stage_key}"
+        get_db().submissions.update_one(
+            {"dept_code": dept_code, "academic_year": _year()},
+            {"$set": {f"{path}.status": "returned", f"{path}.returned_note": note,
+                      f"{path}.returned_by": _actor(), f"{path}.returned_at": now(),
+                      "status": "in_progress", "updated_at": now()}})
+        target = f"{dept_code}/{prog}/{stage_key}"
+    else:
+        return_stage(dept_code, _year(), stage_key, note, _actor())
+        target = f"{dept_code}/{stage_key}"
+    audit(_actor(), "stage.returned", target, {"note": note})
+    flash(f"“{stage['title']}”{' (' + prog + ')' if prog else ''} has been sent back for correction.", "info")
     return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+
+
+@bp.route("/submissions/<dept_code>/review/<stage_key>")
+@admin_required
+def submission_review(dept_code, stage_key):
+    """Everything a department entered in one stage (or one programme's
+    part), for the review pop-up: the form's own layout, files pointed at
+    the Office's copies, how much is filled and how long it took."""
+    from .workflow import stage_timing
+    stage = STAGE_BY_KEY.get(stage_key) or abort(404)
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    sub = get_or_create_submission(dept_code, _year())
+    prog = request.args.get("programme") or ""
+    if prog:
+        state = (((sub.get("programmes") or {}).get(prog) or {}).get(stage_key) or {})
+        status = state.get("status") or "open"
+    else:
+        state = (sub.get("stages") or {}).get(stage_key) or {}
+        status = compute_status(sub, stage_key)
+
+    def point(node):
+        # a file's link becomes the admin's link to the same file
+        if isinstance(node, dict):
+            if node.get("stored") and node.get("name"):
+                node = dict(node)
+                node["url"] = url_for("admin.document", dept_code=dept_code, stored=node["stored"])
+                return node
+            return {k: point(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [point(v) for v in node]
+        return node
+
+    pname = ""
+    if prog:
+        pname = next((p.get("programme_name", "") for p in
+                      ((sub.get("stages") or {}).get("dept_info", {}).get("data", {}) or {}).get("programmes_offered", [])
+                      if p.get("programme_code") == prog), "") or prog
+    return jsonify({
+        "stage": {"key": stage_key, "title": stage.get("title"), "sections": stage.get("sections", [])},
+        "data": point(state.get("data") or {}),
+        "status": status,
+        "timing": stage_timing(state),
+        "summary": state.get("summary") or {},
+        "returned_note": state.get("returned_note") or "",
+        "dept_name": dept.get("dept_name", dept_code),
+        "programme": prog, "programme_name": pname,
+        "return_url": url_for("admin.submission_return", dept_code=dept_code, stage_key=stage_key),
+        "unlock_url": url_for("admin.submission_unlock", dept_code=dept_code, stage_key=stage_key),
+    })
 
 
 @bp.route("/submissions/<dept_code>/<stage_key>/unlock", methods=["POST"])

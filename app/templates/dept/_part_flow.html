@@ -17,6 +17,9 @@
 {%- endmacro %}
 
 {% macro part_flow(parts, code, here=None, show_status=False, zigzag=False) %}
+{# One line, like a mind map: a small node per part joined by a thin line,
+   the earlier batches as twigs under Existing Batch. Each node is a link;
+   its dot says how far that part has got. #}
 {% set older = parts|selectattr('existing')|list %}
 {% set older_keys = older|map(attribute='key')|list %}
 {% set words = {'submitted': 'Submitted', 'returned': 'Returned', 'draft': 'In progress',
@@ -26,39 +29,41 @@
   {% set _ = steps.append(part) %}
   {% if part.key == 'prog_syllabus' and older %}{% set _ = steps.append({'key': '__existing__'}) %}{% endif %}
 {% endfor %}
-<ol class="pflow{{ ' pflow-zig' if zigzag }}" aria-label="Parts of this programme, in order">
+{% macro short(tag) %}{{ (tag[2:4] ~ '–' ~ tag[-2:]) if zigzag and tag and tag|length >= 9 else tag }}{% endmacro %}
+<ol class="pmap{{ ' is-compact' if zigzag }}" aria-label="Parts of this programme, in order">
   {% for part in steps %}
   {% set n = loop.index %}
   {% if part.key == '__existing__' %}
-  <li class="pflow-step pflow-c3 pflow-existing{{ ' is-here' if here in older_keys }}">
-    <span class="pflow-badge">{{ icon('existing') }}</span>
-    <div class="pflow-card">
-      <span class="pflow-no">Step {{ '%02d'|format(n) }}</span>
-      <span class="pflow-title">Syllabus · Existing Batch</span>
-      <span class="pflow-years">
+  {% set any_here = here in older_keys %}
+  <li class="pmap-node pmap-c3{{ ' is-here' if any_here }}">
+    <span class="pmap-pill">
+      <span class="pmap-ico">{{ icon('existing') }}</span>
+      <span class="pmap-n">{{ n }}</span>
+      <span class="pmap-title">{{ 'Existing' if zigzag else 'Existing Batch' }}</span>
+      <span class="pmap-twigs">
         {% for ob in older %}
-        <a class="pflow-year is-{{ ob.status }}{{ ' is-here' if ob.key == here }}"
+        <a class="pmap-twig is-{{ ob.status }}{{ ' is-here' if ob.key == here }}"
            href="{{ url_for('dept.stage', stage_key=ob.key, programme_code=code) }}"
            {% if ob.key == here %}aria-current="page"{% endif %}
-           title="Syllabus {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}">{{ ob.tag }}</a>
+           title="Syllabus {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}"><i class="pmap-dot"></i>{{ short(ob.tag) }}</a>
         {% endfor %}
       </span>
-    </div>
-    {% if not loop.last %}{{ arrow() }}{% endif %}
+    </span>
   </li>
   {% else %}
   {% set kind = 'curriculum' if part.key == 'prog_curriculum' else 'current' if part.key == 'prog_syllabus' else 'revision' %}
   {% set is_here = part.key == here %}
-  <li class="pflow-step pflow-c{{ {'curriculum': 1, 'current': 2, 'revision': 4}[kind] }} is-{{ part.status }}{{ ' is-here' if is_here }}">
-    <span class="pflow-badge">{{ icon(kind) }}</span>
-    <a class="pflow-card" href="{{ url_for('dept.stage', stage_key=part.key, programme_code=code) }}"
-       {% if is_here %}aria-current="page"{% endif %}>
-      <span class="pflow-no">Step {{ '%02d'|format(n) }}</span>
-      <span class="pflow-title">{% if kind == 'current' %}Syllabus · Current Batch{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
-      {% if part.tag %}<span class="pflow-tag">{{ part.tag }}</span>{% endif %}
-      {% if show_status %}<span class="pflow-status">{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}</span>{% endif %}
+  <li class="pmap-node pmap-c{{ {'curriculum': 1, 'current': 2, 'revision': 4}[kind] }} is-{{ part.status }}{{ ' is-here' if is_here }}">
+    <a class="pmap-pill" href="{{ url_for('dept.stage', stage_key=part.key, programme_code=code) }}"
+       {% if is_here %}aria-current="page"{% endif %}
+       title="{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}">
+      <span class="pmap-ico">{{ icon(kind) }}</span>
+      <span class="pmap-n">{{ n }}</span>
+      <span class="pmap-title">{% if kind == 'current' %}{{ 'Current' if zigzag else 'Current Batch' }}{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
+      {% if part.tag %}<span class="pmap-tag">{{ short(part.tag) }}</span>{% endif %}
+      <i class="pmap-dot" aria-hidden="true"></i>
+      {% if show_status %}<span class="sr-only">{{ words.get(part.status, part.status) }}</span>{% endif %}
     </a>
-    {% if not loop.last %}{{ arrow() }}{% endif %}
   </li>
   {% endif %}
   {% endfor %}

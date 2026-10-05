@@ -1016,9 +1016,10 @@
     } else {
       const tags = el("span", "kw-tags");
       (m.expected || []).forEach(w => {
-        const hit = (m.found || []).includes(w);
-        const t = el("span", "kw-tag" + (hit ? " is-hit" : ""), w);
-        t.title = hit ? "Found in the file" : "Not found in the file";
+        const at = (m.found || []).indexOf(w), hit = at >= 0;
+        const shown = hit && m.seen && m.seen[at] ? m.seen[at] : w.split("/")[0].trim();
+        const t = el("span", "kw-tag" + (hit ? " is-hit" : ""), shown);
+        t.title = (hit ? "Found in the file" : "Not found in the file") + (w.includes("/") ? " — any of: " + w : "");
         tags.appendChild(t);
       });
       line.appendChild(tags);
@@ -1033,7 +1034,7 @@
       window.Toast.warning(`None of the words a “${m.label}” carries (${(m.expected || []).slice(0, 4).join(", ")}…) are in ${v.name}. Check it is the right file.`,
                            { title: "Keywords do not match" });
     } else if (m.status === "match") {
-      window.Toast.success(`${v.name} carries ${m.found.slice(0, 4).join(", ")}.`, { title: "Keywords match" });
+      window.Toast.success(`${v.name} carries ${(m.seen || m.found).slice(0, 4).join(", ")}.`, { title: "Keywords match" });
     }
   }
 
@@ -3610,10 +3611,149 @@
     countsBox.textContent = "";
   }
 
+  /* Submitting is two steps. First the checks run; if anything must be
+     fixed, it is listed as before. If all is well, the review opens:
+     everything entered, files as links (open, or remove), a Change link per
+     section, and a confirmation to tick — once submitted the stage is
+     locked until the Office sends it back. After it goes through, the same
+     review can be downloaded as a copy. */
+  function submitLabel(btn, text) {
+    btn.disabled = false;
+    btn.textContent = text || "Submit this stage";
+  }
+
   function submit() {
     const btn = document.getElementById("btn-submit");
     btn.disabled = true;
     btn.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Checking…';
+    save();
+    fetch(CTX.urls.validate, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state)
+    }).then(r => r.json()).then(j => {
+      const errs = (j.issues || []).filter(i => i.level === "error");
+      if (!j.ok || errs.length) { notSubmitted(btn, j); return; }
+      paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
+      submitLabel(btn);
+      openReview(j.issues || []);
+    }).catch(() => unreachable(btn));
+  }
+
+  function notSubmitted(btn, j) {
+    paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
+    submitLabel(btn);
+    saveNote.textContent = "Not submitted — there are answers still to fix";
+    saveNote.className = "save-note save-note-bad";
+    alertIssues(j.issues || [], j.summary || {}, j.error);
+    const first = (j.issues || []).find(i => i.level === "error");
+    if (first) focusIssue(first);
+    else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function unreachable(btn) {
+    submitLabel(btn);
+    saveNote.textContent = "Could not reach the server — nothing was submitted. Try again in a moment.";
+    saveNote.className = "save-note save-note-bad";
+    if (window.Toast) window.Toast.error("Could not reach the server — nothing was submitted. Try again in a moment.",
+                                         { title: "Not submitted" });
+  }
+
+  function reviewTitle() {
+    return (CTX.programme_name ? CTX.programme_name + " · " : "") + (CTX.title || STAGE.title || "This stage");
+  }
+
+  function removeAt(path) {
+    // path: [section, field] or [section, field, i] or [section, row, column] …
+    let node = state;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (node == null) return;
+      node = node[path[i]];
+    }
+    const last = path[path.length - 1];
+    if (Array.isArray(node) && typeof last === "number") node.splice(last, 1);
+    else if (node) node[last] = "";
+    render();
+    refresh();
+    dirty = true;
+    save();
+  }
+
+  function statsBar(st, warnings) {
+    const bar = el("div", "rv-stats");
+    const ring = el("div", "rv-ring");
+    ring.style.setProperty("--p", st.percent);
+    ring.appendChild(el("strong", null, st.percent + "%"));
+    bar.appendChild(ring);
+    const words = el("div", "rv-stats-words");
+    words.appendChild(el("strong", null, `${st.filled} of ${st.total} filled`));
+    words.appendChild(el("span", null, st.missing.length
+      ? "Empty: " + st.missing.slice(0, 4).join(", ") + (st.missing.length > 4 ? "…" : "")
+      : "Everything asked for is filled in."));
+    if (warnings) words.appendChild(el("span", "rv-warn", `${warnings} thing${warnings === 1 ? "" : "s"} to double-check — see the Checks panel.`));
+    bar.appendChild(words);
+    return bar;
+  }
+
+  function openReview(issues) {
+    const warnings = (issues || []).filter(i => i.level !== "error").length;
+    let ctl = null;
+    const draw = () => Review.build(STAGE, state, {
+      viewFile: v => openViewer(v),
+      removeFile: path => {
+        if (!window.confirm("Remove this file? You will need to upload it again to submit.")) return;
+        removeAt(path);
+        ctl.body.textContent = "";
+        ctl.body.appendChild(draw());
+        ctl.panel.querySelector(".rv-stats").replaceWith(statsBar(Review.stats(STAGE, state), warnings));
+      },
+      edit: key => {
+        ctl.close();
+        const sec = document.getElementById("sec-" + key);
+        if (sec) { sec.scrollIntoView({ behavior: "smooth", block: "start" }); sec.classList.add("is-flash"); setTimeout(() => sec.classList.remove("is-flash"), 1600); }
+      }
+    });
+
+    const foot = el("div", "rv-foot-in");
+    const terms = el("label", "rv-terms");
+    const tick = el("input");
+    tick.type = "checkbox";
+    terms.appendChild(tick);
+    terms.appendChild(el("span", null,
+      "I have checked everything above. I understand that once submitted, this stage is locked and " +
+      "cannot be changed — only the Office of Academics can send it back for correction."));
+    foot.appendChild(terms);
+    const row = el("div", "rv-actions");
+    const copy = el("button", "btn btn-ghost", "Download a copy");
+    copy.type = "button";
+    const backBtn = el("button", "btn btn-ghost", "Back to editing");
+    backBtn.type = "button";
+    const go = el("button", "btn btn-gold", "Submit now");
+    go.type = "button";
+    go.disabled = true;
+    row.appendChild(copy);
+    row.appendChild(el("span", "spacer"));
+    row.appendChild(backBtn);
+    row.appendChild(go);
+    foot.appendChild(row);
+    tick.addEventListener("change", () => { go.disabled = !tick.checked; });
+
+    ctl = Review.modal({
+      title: "Review before you submit",
+      sub: reviewTitle() + " — " + CTX.dept_name,
+      top: statsBar(Review.stats(STAGE, state), warnings),
+      body: draw(),
+      foot
+    });
+    copy.addEventListener("click", () => Review.print(reviewTitle(), CTX.dept_name + " · copy before submitting", ctl.body.firstChild));
+    backBtn.addEventListener("click", () => ctl.close());
+    go.addEventListener("click", () => reallySubmit(ctl, go));
+  }
+
+  function reallySubmit(ctl, go) {
+    const btn = document.getElementById("btn-submit");
+    go.disabled = true;
+    go.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Submitting…';
     save();
     fetch(CTX.urls.submit, {
       method: "POST",
@@ -3621,30 +3761,38 @@
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
       if (j.ok) {
-        // The dashboard flashes the confirmation, so keep the button busy
-        // through the navigation rather than flicking it back to "Submit".
-        btn.textContent = "Submitted";
         dirty = false;
-        window.location = j.redirect || CTX.urls.dashboard;
+        btn.disabled = true;
+        btn.textContent = "Submitted";
+        const reviewed = ctl.body.firstChild;
+        // the review becomes the receipt: the copy to keep, then onward
+        ctl.panel.querySelector(".rv-head h3").textContent = "Submitted";
+        ctl.panel.querySelector(".rv-sub").textContent = reviewTitle() + " — " + CTX.dept_name + " · " + new Date().toLocaleString();
+        ctl.panel.querySelectorAll(".rv-edit, .rv-file-rm").forEach(b => b.remove());
+        const done = el("div", "rv-done");
+        done.appendChild(el("span", "rv-done-tick", "✓"));
+        const w = el("div");
+        w.appendChild(el("strong", null, "Submitted to the Office of Academics."));
+        w.appendChild(el("span", null, j.next ? `Next: ${j.next.title}. Keep a copy of what you sent first.` : "Keep a copy of what you sent."));
+        done.appendChild(w);
+        ctl.panel.querySelector(".rv-stats").replaceWith(done);
+        const foot = ctl.panel.querySelector(".rv-foot");
+        foot.textContent = "";
+        const row = el("div", "rv-actions");
+        const copy = el("button", "btn btn-ghost", "Download a copy");
+        copy.type = "button";
+        copy.addEventListener("click", () => Review.print(reviewTitle(), CTX.dept_name + " · submitted " + new Date().toLocaleString(), reviewed));
+        const on = el("a", "btn btn-gold", j.next ? "Continue to " + j.next.title : "Done");
+        on.href = j.redirect || CTX.urls.dashboard;
+        row.appendChild(copy);
+        row.appendChild(el("span", "spacer"));
+        row.appendChild(on);
+        foot.appendChild(row);
         return;
       }
-      paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
-      btn.disabled = false;
-      btn.textContent = "Submit this stage";
-      saveNote.textContent = "Not submitted — there are answers still to fix";
-      saveNote.className = "save-note save-note-bad";
-      alertIssues(j.issues || [], j.summary || {}, j.error);
-      const first = (j.issues || []).find(i => i.level === "error");
-      if (first) focusIssue(first);
-      else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }).catch(() => {
-      btn.disabled = false;
-      btn.textContent = "Submit this stage";
-      saveNote.textContent = "Could not reach the server — nothing was submitted. Try again in a moment.";
-      saveNote.className = "save-note save-note-bad";
-      if (window.Toast) window.Toast.error("Could not reach the server — nothing was submitted. Try again in a moment.",
-                                           { title: "Not submitted" });
-    });
+      ctl.close();
+      notSubmitted(btn, j);
+    }).catch(() => { ctl.close(); unreachable(btn); });
   }
 
   /* A submission that did not go through: one alert saying so, then one per
@@ -3669,11 +3817,36 @@
 
   if (!CTX.readonly) {
     document.getElementById("btn-submit").addEventListener("click", submit);
+    const sampleBtn = document.getElementById("btn-sample");
+    if (sampleBtn) sampleBtn.addEventListener("click", () => {
+      sampleBtn.disabled = true;
+      fetch(CTX.urls.sample, { method: "POST" }).then(r => r.json()).then(j => {
+        sampleBtn.disabled = false;
+        if (!j.ok) return;
+        Object.keys(state).forEach(k => delete state[k]);
+        Object.assign(state, j.data);
+        render();
+        refresh();
+        dirty = true;
+        save();
+        if (window.Toast) window.Toast.success("Every box is filled with sample data. Press Submit to review it.", { title: "Filled" });
+      }).catch(() => { sampleBtn.disabled = false; });
+    });
     window.addEventListener("beforeunload", (e) => {
       if (dirty) { e.preventDefault(); e.returnValue = ""; }
     });
     setInterval(() => { if (dirty) save(); }, 25000);
   } else {
     check();
+    const show = () => Review.build(STAGE, state, { viewFile: v => openViewer(v) });
+    const rv = document.getElementById("btn-review");
+    if (rv) rv.addEventListener("click", () => {
+      Review.modal({ title: "What was submitted", sub: reviewTitle() + " — " + CTX.dept_name +
+                     (CTX.submitted_at ? " · submitted " + CTX.submitted_at : ""),
+                     top: statsBar(Review.stats(STAGE, state), 0), body: show() });
+    });
+    const cp = document.getElementById("btn-copy");
+    if (cp) cp.addEventListener("click", () => Review.print(reviewTitle(),
+      CTX.dept_name + (CTX.submitted_at ? " · submitted " + CTX.submitted_at : ""), show()));
   }
 })();

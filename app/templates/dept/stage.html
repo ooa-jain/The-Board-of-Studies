@@ -265,6 +265,7 @@
   <div class="wrap">
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
+    {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
     <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
     <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage</button>
   </div>
@@ -275,6 +276,8 @@
     <span class="save-note">Submitted on
       {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
     <span class="spacer"></span>
+    <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
+    <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
     <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
   </div>
 </div>
@@ -291,6 +294,8 @@
     programme: {{ (programme.programme_code if programme else None)|tojson }},
     programme_name: {{ (programme.programme_name if programme else '')|tojson }},
     dept_name: {{ dept.dept_name|tojson }},
+    title: {{ stage.title|tojson }},
+    submitted_at: {{ (state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},
     readonly: {{ readonly|tojson }},
     synced: {{ synced|tojson }},
     calc: {{ calc|tojson }},
@@ -301,6 +306,7 @@
       validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},
       submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
       upload:   {{ url_for('dept.api_upload')|tojson }},
+      sample:   {{ (url_for('dept.api_sample', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_sample', stage_key=stage.key))|tojson }},
       dashboard:{{ url_for('dept.dashboard')|tojson }},
       dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }},
       stage:    {{ url_for('dept.stage', stage_key='__stage__')|tojson }}
@@ -309,6 +315,7 @@
 </script>
 <script src="{{ url_for('static', filename='js/magic-bento.js') }}"></script>
 <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
 <script src="{{ url_for('static', filename='js/branch.js') }}"></script>
 {% endblock %}

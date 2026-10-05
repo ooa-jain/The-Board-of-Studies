@@ -1,5 +1,5 @@
-"""The demo department: made from the admin side, filled like a real one,
-signed in to, and taken away again."""
+"""The demo department: every stage filled in and saved, so signing in as it
+you only review and submit — and every stage does go through."""
 
 from test_workflow import login
 
@@ -8,33 +8,47 @@ def _admin(app, client):
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
 
 
-def test_the_demo_department_is_filled_and_can_sign_in(app, client):
+def test_every_demo_stage_and_part_submits_as_filled(app, client):
     from app import demo_dept
     from app.db import get_db
+    from app.schema import STAGE_BY_KEY, STAGE_KEYS
     with app.app_context():
         user, pw, results = demo_dept.create("2027-28", app.config["UPLOAD_ROOT"])
-        assert results == {"dept_info": "submitted", "pre_bos": "submitted"}, results
         db = get_db()
-        assert db.files.count_documents({"dept_code": "DEMO"}) == 5
-        miss = db.files.find_one({"dept_code": "DEMO", "field": "vision_mission"})
-        assert miss["keyword_match"]["status"] == "miss"
-        ok = db.files.find_one({"dept_code": "DEMO", "field": "minutes"})
-        assert ok["keyword_match"]["status"] == "match"
-        assert db.notifications.count_documents({"dept_code": "DEMO"}) == 5
+        assert db.files.count_documents({"dept_code": "DEMO"}) == 10
+        bad = [r["original_name"] for r in db.files.find({"dept_code": "DEMO"})
+               if r["keyword_match"]["status"] not in ("match", "unread")]
+        assert not bad, f"demo files that fail the keyword check: {bad}"
+        sub = db.submissions.find_one({"dept_code": "DEMO"})
+        stored = {k: v["data"] for k, v in sub["stages"].items()}
+        parts = {code: {k: v["data"] for k, v in p.items()} for code, p in sub["programmes"].items()}
 
     login(client, user, pw)
-    body = client.get("/department/").get_data(as_text=True)
-    assert "Demonstration Studies" in body
+    assert "Demonstration Studies" in client.get("/department/").get_data(as_text=True)
+    for key in STAGE_KEYS:
+        if STAGE_BY_KEY[key].get("parts"):
+            for code, by_part in parts.items():
+                for part, data in by_part.items():
+                    j = client.post(f"/department/api/{part}/{code}/submit", json=data).get_json()
+                    errs = [i["message"] for i in j.get("issues", []) if i["level"] == "error"]
+                    assert j["ok"], (code, part, errs[:5])
+            continue
+        j = client.post(f"/department/api/{key}/submit", json=stored[key]).get_json()
+        errs = [i["message"] for i in j.get("issues", []) if i["level"] == "error"]
+        assert j["ok"], (key, errs[:5])
 
 
-def test_the_admin_makes_and_removes_the_demo(app, client):
+def test_the_admin_makes_reviews_and_removes_the_demo(app, client):
     from app.db import get_db
     _admin(app, client)
     r = client.post("/admin/demo-department", follow_redirects=True)
     body = r.get_data(as_text=True)
-    assert "Demonstration Studies" in body
-    with app.app_context():
-        assert get_db().departments.find_one({"dept_code": "DEMO"})
+    assert "Demonstration Studies" in body and "data-review" in body
+    j = client.get("/admin/submissions/DEMO/review/dept_info").get_json()
+    assert j["stage"]["title"] == "Department Information" and j["data"]["programmes_offered"]
+    j = client.get("/admin/submissions/DEMO/review/prog_curriculum?programme=DEMOBBA").get_json()
+    assert len(j["data"]["semester_structure"]) == 38 and j["programme_name"].startswith("BBA")
+    assert j["timing"]["started"]
     client.post("/admin/demo-department/remove")
     with app.app_context():
         assert not get_db().departments.find_one({"dept_code": "DEMO"})
