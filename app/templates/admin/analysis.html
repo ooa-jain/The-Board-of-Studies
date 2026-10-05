@@ -1,26 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Analysis{% endblock %}
+{% block title %}Overview · Analysis{% endblock %}
 
-{% block header %}
-<div class="page-head">
-  <div class="wrap">
-    <div>
-      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Analysis</div>
-      <h1>Every department, {{ year }}</h1>
-      <p>
-        Who has finished, who is part-way, who has never signed in, and what is
-        failing validation — in one reading rather than department by department.
-      </p>
-    </div>
-    <div class="spacer head-aside">
-      <div class="flex head-aside-row">
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submissions') }}">Submissions</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.departments') }}">Departments</a>
-      </div>
-    </div>
-  </div>
-</div>
-{% endblock %}
+{% block header %}{% set ov_tab = 'analysis' %}{% include "admin/_overview_head.html" %}{% endblock %}
 
 {% block content %}
 

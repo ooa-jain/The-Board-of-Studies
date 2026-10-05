@@ -18,9 +18,12 @@ def _demo_filled_and_submitted(app, client):
 def test_sheets_show_every_department_and_download(app, client):
     _demo_filled_and_submitted(app, client)
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
-    for tab in ("stages", "programmes", "documents", "comments"):
-        r = client.get(f"/admin/sheets?tab={tab}")
-        assert r.status_code == 200, tab
+    for url in ("/admin/submissions", "/admin/analysis", "/admin/sheets?tab=programmes",
+                "/admin/sheets?tab=documents", "/admin/sheets?tab=comments"):
+        r = client.get(url)
+        assert r.status_code == 200, url
+        assert 'class="ov-tabs"' in r.get_data(as_text=True), "one Overview, one row of tabs"
+    assert "Department of Demonstration Studies" in client.get("/admin/submissions").get_data(as_text=True)
     body = client.get("/admin/sheets?tab=programmes").get_data(as_text=True)
     assert "BBA in Demonstration Management" in body and ">38<" in body
     r = client.get("/admin/sheets.xlsx")

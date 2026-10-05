@@ -1,0 +1,28 @@
+{# One page for following the departments: Monitor, Analysis, Programmes,
+   Documents, Comments — one header, one row of tabs, one Excel download. #}
+{% set ov_tabs = [
+  ('monitor', 'Monitor', url_for('admin.submissions')),
+  ('analysis', 'Analysis', url_for('admin.analysis')),
+  ('programmes', 'Programmes', url_for('admin.sheets', tab='programmes')),
+  ('documents', 'Documents', url_for('admin.sheets', tab='documents')),
+  ('comments', 'Comments', url_for('admin.sheets', tab='comments')),
+] %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Overview</div>
+      <h1>Overview — {{ year }}</h1>
+      <p>Every department: where it stands, what it filed, what is wrong, and what you asked to change.</p>
+    </div>
+    <div class="spacer head-aside">
+      <a class="btn" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>
+    </div>
+  </div>
+  <div class="wrap">
+    <nav class="ov-tabs" aria-label="Overview">
+      {% for k, label, href in ov_tabs %}
+      <a href="{{ href }}" {% if ov_tab == k %}class="is-on" aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</div>

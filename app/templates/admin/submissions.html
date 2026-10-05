@@ -1,71 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Submissions{% endblock %}
-
-{% block header %}
-<div class="page-head">
-  <div class="wrap">
-    <div>
-      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Submissions</div>
-      <h1>Submission monitor — {{ year }}</h1>
-      <p>Every department against every stage. Green is submitted, amber is in progress, red came back
-         for correction, grey is still locked.</p>
-    </div>
-    <div class="spacer">
-      <a class="btn btn-ghost" href="{{ url_for('admin.export_institution') }}">Export Excel</a>
-    </div>
-  </div>
-</div>
-{% endblock %}
+{% block title %}Overview · Monitor{% endblock %}
+{% block header %}{% set ov_tab = 'monitor' %}{% include "admin/_overview_head.html" %}{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-body" style="padding:0">
-    <div class="table-wrap">
-      <table class="data">
-        <thead>
-          <tr>
-            <th scope="col" class="col-frozen">Department</th>
-            <th scope="col">Progress</th>
-            {% for s in stages %}<th scope="col" class="col-vertical" title="{{ s.title }}">{{ s.title }}</th>{% endfor %}
-            <th scope="col"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rows %}
-          <tr>
-            <td class="col-frozen">
-              <strong>{{ r.dept.dept_name }}</strong>
-              <div class="small muted">{{ r.dept.campus }} · {{ r.dept.dept_code }}</div>
-            </td>
-            <td class="col-progress">
-              <div class="flex">
-                <div class="bar" role="progressbar" aria-valuenow="{{ r.progress.done }}"
-                     aria-valuemin="0" aria-valuemax="{{ r.progress.total }}"
-                     aria-label="Stages submitted by {{ r.dept.dept_name }}"
-                     style="flex:1"><i style="width:{{ r.progress.percent }}%"></i></div>
-                <span class="bar-label nowrap">{{ r.progress.done }}/{{ r.progress.total }}</span>
-              </div>
-            </td>
-            {% for b in r.board %}
-            {# A glyph as well as a hue: the grid has to be readable without colour. #}
-            {% set glyph = {'submitted': '✓', 'draft': '·', 'returned': '!', 'open': '○', 'locked': '–'}[b.status] %}
-            <td class="mx-cell">
-              <span class="mx-dot mx-{{ b.status }}" title="{{ b.title }} — {{ b.status }}">
-                <span aria-hidden="true">{{ glyph }}</span>
-                <span class="sr-only">{{ b.title }}: {{ b.status }}</span>
-              </span>
-            </td>
-            {% endfor %}
-            <td class="right">
-              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="{{ stages|length + 3 }}" class="empty">No submissions started yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+{% set words = {'submitted': 'Submitted', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started', 'locked': 'Locked'} %}
+<div class="card sheet-card">
+  <div class="table-wrap">
+    <table class="data sheet-table">
+      <thead><tr><th scope="col">Department</th><th scope="col">Progress</th>
+        {% for s in STAGES %}<th scope="col">{{ s.title }}</th>{% endfor %}
+        <th scope="col">Comments</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      {% set done = r.cells|selectattr('status', 'equalto', 'submitted')|list|length %}
+      <tr>
+        <td><a href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}"><strong>{{ r.dept.dept_name }}</strong></a>
+          <div class="small muted">{{ r.dept.dept_code }} · {{ r.dept.campus }}</div></td>
+        <td class="col-progress"><div class="flex">
+          <div class="bar" role="progressbar" aria-valuenow="{{ done }}" aria-valuemin="0" aria-valuemax="{{ r.cells|length }}"
+               aria-label="Stages submitted" style="flex:1"><i style="width:{{ (done * 100 / r.cells|length)|round|int }}%"></i></div>
+          <span class="bar-label nowrap">{{ done }}/{{ r.cells|length }}</span></div></td>
+        {% for c in r.cells %}
+        <td><span class="sh-pill is-{{ c.status }}">{{ words.get(c.status, c.status) }}</span>
+          {% if c.timing.took %}<div class="small muted">{{ c.timing.took }}</div>{% endif %}</td>
+        {% endfor %}
+        <td>{% if r.comments %}<span class="sh-pill is-returned">{{ r.comments }} open</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="nowrap">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a>
+          <button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ r.dept.dept_code }}" data-name="{{ r.dept.dept_name }}">Comment</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="{{ STAGES|length + 4 }}" class="empty">No departments yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
+{% include "admin/_comment_dialog.html" %}
 {% endblock %}

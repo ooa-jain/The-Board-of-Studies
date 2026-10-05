@@ -67,10 +67,9 @@
         {% endif %}
         {% if current_user and current_user.role == 'admin' %}
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
-          {{ nav_link(url_for('admin.analysis'), 'Analysis', request.endpoint == 'admin.analysis') }}
-          {{ nav_link(url_for('admin.sheets'), 'Sheets', request.endpoint == 'admin.sheets') }}
+          {{ nav_link(url_for('admin.submissions'), 'Overview', request.endpoint in ('admin.submissions', 'admin.analysis', 'admin.sheets', 'admin.submission_detail')) }}
           {{ nav_link(url_for('admin.flow'), 'Flow 3D', request.endpoint == 'admin.flow') }}
-          {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
+
         {% elif current_user and current_user.role == 'department' %}
         {% else %}
           {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}

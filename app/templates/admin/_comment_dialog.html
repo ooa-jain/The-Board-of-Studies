@@ -1,0 +1,47 @@
+<dialog class="comment-dialog" id="comment-dialog">
+  <form method="post" action="{{ url_for('admin.comment_add') }}">
+    <h3>Comment to <span data-who></span></h3>
+    <input type="hidden" name="dept">
+    <input type="hidden" name="programme">
+    <div class="field">
+      <label for="c-stage">On</label>
+      <select id="c-stage" name="stage" required>
+        {% for s in STAGES %}{% if not s.parts %}<option value="{{ s.key }}">{{ s.title }}</option>{% endif %}{% endfor %}
+        <option value="prog_curriculum">Curriculum (programme)</option>
+        <option value="prog_syllabus">Current Batch Syllabus (programme)</option>
+        <option value="prog_revision">Course Revision (programme)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="c-text">What should change?</label>
+      <textarea id="c-text" name="text" rows="4" required placeholder="e.g. The minutes are unsigned — upload the signed copy."></textarea>
+    </div>
+    <label class="check"><input type="checkbox" name="reopen" checked> <span>If it is already submitted, open it again so they can change it</span></label>
+    <div class="rv-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn" type="submit">Send comment</button>
+    </div>
+  </form>
+</dialog>
+<script>
+(function () {
+  var dlg = document.getElementById("comment-dialog"), f = dlg.querySelector("form");
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-comment]");
+    if (b) {
+      f.dept.value = b.dataset.dept;
+      f.programme.value = b.dataset.programme || "";
+      dlg.querySelector("[data-who]").textContent = b.dataset.name + (b.dataset.pname ? " · " + b.dataset.pname : "");
+      f.stage.value = b.dataset.stage || (b.dataset.programme ? "prog_curriculum" : "dept_info");
+      Array.prototype.forEach.call(f.stage.options, function (o) {
+        o.hidden = b.dataset.programme ? o.value.indexOf("prog_") !== 0 : o.value.indexOf("prog_") === 0;
+      });
+      f.text.value = "";
+      dlg.showModal();
+      f.text.focus();
+    }
+    if (e.target.closest("[data-close]")) dlg.close();
+  });
+})();
+</script>

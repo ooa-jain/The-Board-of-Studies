@@ -1,34 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Analysis sheets{% endblock %}
+{% block title %}Overview{% endblock %}
 
-{% block header %}
-<div class="page-head">
-  <div class="wrap">
-    <div>
-      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Analysis sheets</div>
-      <h1>Analysis sheets — {{ year }}</h1>
-      <p>Every department in four sheets. Not happy with something? Comment on it — the department sees
-         it on that stage, and you can open the stage again for them to change it.</p>
-    </div>
-    <div class="spacer head-aside">
-      <a class="btn" href="{{ url_for('admin.sheets_excel') }}">Download all sheets (Excel)</a>
-    </div>
-  </div>
-</div>
-{% endblock %}
+{% block header %}{% set ov_tab = tab %}{% include "admin/_overview_head.html" %}{% endblock %}
 
 {% block content %}
 {% set words = {'submitted': 'Submitted', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started', 'locked': 'Locked'} %}
 {% set open_comments = comments|selectattr('status', 'equalto', 'open')|list|length %}
-<nav class="admin-tabs" aria-label="Sheets">
-  {% for k, label in [('stages', 'Stages'), ('programmes', 'Programmes'), ('documents', 'Documents'), ('comments', 'Comments · ' ~ open_comments ~ ' open')] %}
-  <a href="{{ url_for('admin.sheets', tab=k) }}" {% if tab == k %}class="is-on" aria-current="page"{% endif %}>{{ label }}</a>
-  {% endfor %}
-</nav>
+
 
 <div class="card sheet-card">
   <div class="table-wrap">
-  {% if tab == 'stages' %}
+  {% if tab == 'stages_unused' %}
   <table class="data sheet-table">
     <thead><tr><th scope="col">Department</th>
       {% for s in STAGES %}<th scope="col">{{ s.title }}</th>{% endfor %}
@@ -118,51 +100,5 @@
   </div>
 </div>
 
-<dialog class="comment-dialog" id="comment-dialog">
-  <form method="post" action="{{ url_for('admin.comment_add') }}">
-    <h3>Comment to <span data-who></span></h3>
-    <input type="hidden" name="dept">
-    <input type="hidden" name="programme">
-    <div class="field">
-      <label for="c-stage">On</label>
-      <select id="c-stage" name="stage" required>
-        {% for s in STAGES %}{% if not s.parts %}<option value="{{ s.key }}">{{ s.title }}</option>{% endif %}{% endfor %}
-        <option value="prog_curriculum">Curriculum (programme)</option>
-        <option value="prog_syllabus">Current Batch Syllabus (programme)</option>
-        <option value="prog_revision">Course Revision (programme)</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="c-text">What should change?</label>
-      <textarea id="c-text" name="text" rows="4" required placeholder="e.g. The minutes are unsigned — upload the signed copy."></textarea>
-    </div>
-    <label class="check"><input type="checkbox" name="reopen" checked> <span>If it is already submitted, open it again so they can change it</span></label>
-    <div class="rv-actions" style="margin-top:14px">
-      <button class="btn btn-ghost" type="button" data-close>Cancel</button>
-      <span class="spacer"></span>
-      <button class="btn" type="submit">Send comment</button>
-    </div>
-  </form>
-</dialog>
-<script>
-(function () {
-  var dlg = document.getElementById("comment-dialog"), f = dlg.querySelector("form");
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest("[data-comment]");
-    if (b) {
-      f.dept.value = b.dataset.dept;
-      f.programme.value = b.dataset.programme || "";
-      dlg.querySelector("[data-who]").textContent = b.dataset.name + (b.dataset.pname ? " · " + b.dataset.pname : "");
-      f.stage.value = b.dataset.stage || (b.dataset.programme ? "prog_curriculum" : "dept_info");
-      Array.prototype.forEach.call(f.stage.options, function (o) {
-        o.hidden = b.dataset.programme ? o.value.indexOf("prog_") !== 0 : o.value.indexOf("prog_") === 0;
-      });
-      f.text.value = "";
-      dlg.showModal();
-      f.text.focus();
-    }
-    if (e.target.closest("[data-close]")) dlg.close();
-  });
-})();
-</script>
+{% include "admin/_comment_dialog.html" %}
 {% endblock %}

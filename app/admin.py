@@ -72,9 +72,40 @@ def dashboard():
         stage_counts.append({"title": s["title"], "key": s["key"], "done": done,
                              "total": len(departments)})
 
+    # activity over the last fortnight, for the chart: every update a day
+    from datetime import timedelta
+    today = now().replace(hour=0, minute=0, second=0, microsecond=0)
+    days = [today - timedelta(days=i) for i in range(13, -1, -1)]
+    per_day = {d.date(): {"all": 0, "submitted": 0} for d in days}
+    for n in db.notifications.find({"at": {"$gte": days[0]}}, {"at": 1, "event": 1}):
+        k = n["at"].date()
+        if k in per_day:
+            per_day[k]["all"] += 1
+            if n.get("event") == "submitted":
+                per_day[k]["submitted"] += 1
+    series = [{"label": d.strftime("%d %b"), "day": d.strftime("%a")[:2], **per_day[d.date()]} for d in days]
+    peak = max([x["all"] for x in series] + [1])
+    w, h = 560, 150
+    pts = [(round(i * w / (len(series) - 1), 1), round(h - 12 - (x["all"] / peak) * (h - 34), 1))
+           for i, x in enumerate(series)]
+    line = "M" + " L".join(f"{x},{y}" for x, y in pts)
+    area = line + f" L{w},{h} L0,{h} Z"
+    best = max(range(len(series)), key=lambda i: series[i]["all"])
+    chart = {"series": series, "line": line, "area": area, "w": w, "h": h,
+             "best": {"x": pts[best][0], "y": pts[best][1], **series[best]},
+             "total": sum(x["all"] for x in series),
+             "submitted": sum(x["submitted"] for x in series)}
+
+    attention = {"comments": db.comments.count_documents({"academic_year": year, "status": "open"}),
+                 "returned": sum(1 for sub in subs.values() for s in STAGES
+                                 if compute_status(sub, s["key"]) == "returned"),
+                 "bad_files": db.files.count_documents({"academic_year": year, "$or": [
+                     {"keyword_match.status": "miss"}, {"keyword_match.looks_like": {"$exists": True}}]})}
+
     return render_template("admin/dashboard.html", rows=rows, counts=counts,
                            by_campus=by_campus, stage_counts=stage_counts,
-                           year=year, total=len(departments),
+                           year=year, total=len(departments), chart=chart, attention=attention,
+                           stages_done=sum(x["done"] for x in stage_counts),
                            latest=list(db.notifications.find().sort("at", -1).limit(8)))
 
 
@@ -472,19 +503,11 @@ def import_commit():
 @bp.route("/submissions")
 @admin_required
 def submissions():
-    db = get_db()
-    year = _year()
-    depts = {d["dept_code"]: d for d in db.departments.find({"active": True})}
-    subs = list(db.submissions.find({"academic_year": year}))
-    rows = []
-    for s in subs:
-        d = depts.get(s["dept_code"])
-        if not d:
-            continue
-        rows.append({"dept": d, "submission": s, "progress": progress(s),
-                     "board": stage_board(s)})
-    rows.sort(key=lambda r: -r["progress"]["percent"])
-    return render_template("admin/submissions.html", rows=rows, year=year, stages=STAGES)
+    """Overview → Monitor: every department, stage by stage."""
+    data = analysis_sheets(_year())
+    rows = sorted(data["stages"], key=lambda r: (-sum(c["status"] == "submitted" for c in r["cells"]),
+                                                 r["dept"].get("dept_name", "")))
+    return render_template("admin/submissions.html", rows=rows, year=_year(), STAGES=STAGES)
 
 
 @bp.route("/submissions/<dept_code>")
@@ -1229,8 +1252,11 @@ def analysis_sheets(year):
 @bp.route("/sheets")
 @admin_required
 def sheets():
+    tab = request.args.get("tab", "programmes")
+    if tab not in ("programmes", "documents", "comments"):
+        return redirect(url_for("admin.submissions"))
     data = analysis_sheets(_year())
-    return render_template("admin/sheets.html", year=_year(), tab=request.args.get("tab", "stages"),
+    return render_template("admin/sheets.html", year=_year(), tab=tab,
                            STAGES=STAGES, STAGE_BY_KEY=STAGE_BY_KEY, **data)
 
 
