@@ -22,6 +22,14 @@ def app(monkeypatch):
     from app import db as database
     monkeypatch.setattr(database, "MongoClient",
                         lambda *a, **kw: mongomock.MongoClient())
+
+    # Real pymongo refuses `if db:` / `db or …` on a database or a collection;
+    # mongomock allows it. Refuse it here too, so the tests catch it.
+    def _no_bool(self):
+        raise NotImplementedError(f"{type(self).__name__} objects do not implement truth "
+                                  "value testing or bool(). Compare with None instead.")
+    monkeypatch.setattr(mongomock.database.Database, "__bool__", _no_bool, raising=False)
+    monkeypatch.setattr(mongomock.collection.Collection, "__bool__", _no_bool, raising=False)
     from app import create_app
     application = create_app()
     application.config.update(TESTING=True, SESSION_COOKIE_SECURE=False)

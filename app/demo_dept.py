@@ -114,7 +114,7 @@ def _pdf(lines):
 
 
 def remove(db=None):
-    db = db or get_db()
+    db = get_db() if db is None else db
     user = db.users.find_one({"dept_code": CODE, "role": "department"})
     for col in ("submissions", "files", "notifications"):
         db[col].delete_many({"dept_code": CODE})
