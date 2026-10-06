@@ -18,7 +18,7 @@ from .schema import STAGES
 from .workflow import compute_status, programmes_of, progress
 
 NAVY = "0F2A4A"
-GOLD = "C8A44B"
+HEAD = "DCE6F1"      # column heads: a quiet blue-grey
 LIGHT = "F3F6FA"
 
 _thin = Side(style="thin", color="D5DEE8")
@@ -112,7 +112,7 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
     r += 1
     _section_title(ws, r, "Stages")
     r += 1
-    _head(ws, r, ["", "Stage", "Status", "Submitted on", "Filled", "", ""], fill=GOLD, color="1A1A1A")
+    _head(ws, r, ["", "Stage", "Status", "Submitted on", "Filled", "", ""], fill=HEAD, color=NAVY)
     r += 1
     for st in rep["stages"]:
         done = st["status"] == "submitted"
@@ -164,7 +164,7 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
             r += 1
             continue
         _head(ws, r, ["", "Programme", "Code · degree", "Curriculum", "Syllabus", "Course Revision",
-                      "Report"], fill=GOLD, color="1A1A1A")
+                      "Report"], fill=HEAD, color=NAVY)
         r += 1
         for p in progs:
             all_done = all(x["status"] == "submitted" for x in p["parts"])
@@ -178,6 +178,16 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
                 c.fill = OK_FILL if part["status"] == "submitted" else PatternFill()
             _link(ws.cell(row=r, column=7), "Open report →" if p["report"] else "", p["report"])
             r += 1
+            # the programme's Curriculum and Syllabus, generated in the
+            # Office's own templates, right after the programme
+            for label, url in (("Curriculum (JAIN template)", p.get("curriculum_doc")),
+                                ("Syllabus (JAIN template)", p.get("syllabus_doc"))):
+                if not url:
+                    continue
+                ws.cell(row=r, column=2, value=f"   {label}").font = Font(size=9, bold=True,
+                                                                         color=NAVY)
+                _link(ws.cell(row=r, column=3), "⬇ Download Word document", url)
+                r += 1
             for where, name, url in p["documents"]:
                 ws.cell(row=r, column=2, value=f"   {where} document").font = Font(size=9, color="53627A")
                 _link(ws.cell(row=r, column=3), name, url)
@@ -375,6 +385,13 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
                          + (f", {p['degree_level']}" if p.get("degree_level") else "") + ")")
             para.add_run("\n" + " · ".join(f"{x['title']}: {status_word(x['status'])}"
                                             for x in p["parts"])).font.size = Pt(9)
+            for label, url in (("Curriculum (JAIN template)", p.get("curriculum_doc")),
+                                ("Syllabus (JAIN template)", p.get("syllabus_doc"))):
+                if url:
+                    d = doc.add_paragraph()
+                    d.paragraph_format.left_indent = Pt(24)
+                    d.add_run(f"{label}: ").font.size = Pt(9)
+                    _hyperlink(d, "Download Word document", url)
             for where, name, url in p["documents"]:
                 d = doc.add_paragraph()
                 d.paragraph_format.left_indent = Pt(24)

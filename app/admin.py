@@ -889,6 +889,17 @@ def programme_report(dept_code, programme_code):
     return render_template("admin/programme_report.html", **ctx)
 
 
+@bp.route("/report/<dept_code>/<programme_code>/<kind>.docx")
+@admin_required
+def programme_docx(dept_code, programme_code, kind):
+    """The programme's Curriculum ("c") or Syllabus ("s") in the Office's templates."""
+    from .share import DOCX, generated_docx
+    if kind not in ("c", "s"):
+        abort(404)
+    out = generated_docx(kind, dept_code, programme_code, _year()) or abort(404)
+    return send_file(out[0], as_attachment=True, download_name=out[1], mimetype=DOCX)
+
+
 @bp.route("/export/<dept_code>.docx")
 @admin_required
 def export_department_word(dept_code):

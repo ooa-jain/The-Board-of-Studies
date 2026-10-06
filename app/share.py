@@ -12,6 +12,9 @@ every link at once.
                             turned into a readable page, with Download
     /share/d/<token>/file   the file itself
     /share/r/<token>        a programme's report
+    /share/c/<token>        a programme's Curriculum, as a Word document in
+                            the Office's curriculum template (app/docgen.py)
+    /share/s/<token>        its Syllabus, in the syllabus template
 """
 
 from __future__ import annotations
@@ -38,6 +41,11 @@ def doc_token(dept_code, stored):
 
 def report_token(dept_code, programme_code, year):
     return _signer().dumps(["r", dept_code, programme_code, year])
+
+
+def generated_token(kind, dept_code, programme_code, year):
+    """kind "c" (curriculum) or "s" (syllabus)."""
+    return _signer().dumps([kind, dept_code, programme_code, year])
 
 
 def _read(token, kind):
@@ -96,6 +104,28 @@ def report(token):
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     ctx = programme_context(db, dept, year, programme_code, ShareLinks(dept_code, year)) or abort(404)
     return render_template("admin/programme_report.html", shared=True, **ctx)
+
+
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def generated_docx(kind, dept_code, programme_code, year):
+    """(buffer, file name) for a programme's generated Curriculum or Syllabus, or None."""
+    from .docgen import curriculum_docx, syllabus_docx
+    make = curriculum_docx if kind == "c" else syllabus_docx
+    buf = make(get_db(), dept_code, year, programme_code)
+    if buf is None:
+        return None
+    name = "Curriculum" if kind == "c" else "Syllabus"
+    return buf, f"{programme_code}-{name}-{year}.docx"
+
+
+@bp.route("/c/<token>", endpoint="curriculum", defaults={"kind": "c"})
+@bp.route("/s/<token>", endpoint="syllabus", defaults={"kind": "s"})
+def generated(token, kind):
+    dept_code, programme_code, year = _read(token, kind)
+    out = generated_docx(kind, dept_code, programme_code, year) or abort(404)
+    return send_file(out[0], as_attachment=True, download_name=out[1], mimetype=DOCX)
 
 
 # ---------------------------------------------------------------------------

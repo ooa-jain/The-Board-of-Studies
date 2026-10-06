@@ -31,6 +31,9 @@ class NoLinks:
     def programme(self, code):
         return None
 
+    def generated(self, kind, code):
+        return None
+
 
 _VIEWABLE = (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif")
 
@@ -55,6 +58,11 @@ class AdminLinks:
         from flask import url_for
         return url_for("admin.programme_report", dept_code=self.dept_code,
                        programme_code=code, _external=True)
+
+    def generated(self, kind, code):
+        from flask import url_for
+        return url_for("admin.programme_docx", dept_code=self.dept_code, programme_code=code,
+                       kind=kind, _external=True)
 
 
 def _blank(v):
@@ -181,18 +189,23 @@ def build(db, dept_code, year, links=None):
         parts = []
         docs = []
         courses = 0
+        has = {}
         for k in PARTS:
             state = (((sub.get("programmes") or {}).get(code) or {}).get(k)) or {}
             data = state.get("data") or {}
             if k == "prog_curriculum":
                 courses = len(data.get("semester_structure") or [])
+            has[k] = bool(data.get("semester_structure") or data.get("courses"))
             parts.append({"key": k, "title": STAGE_BY_KEY[k]["title"],
                           "status": part_status(sub, code, k),
                           "errors": (state.get("summary") or {}).get("errors", 0)})
             docs += [(STAGE_BY_KEY[k]["title"], n, u) for n, u in _documents(k, data, links)]
         level = "PG" if prog.get("level") in ("PG", "PGD") else "UG"
         programmes[level].append({**prog, "parts": parts, "documents": docs, "courses": courses,
-                                  "report": links.programme(code)})
+                                  "report": links.programme(code),
+                                  # generated documents only once there is something in them
+                                  "curriculum_doc": has["prog_curriculum"] and links.generated("c", code),
+                                  "syllabus_doc": has["prog_syllabus"] and links.generated("s", code)})
 
     return {"dept": dept, "submission": sub, "year": year, "info": info,
             "stages": stages, "programmes": programmes}
@@ -227,6 +240,9 @@ def programme_context(db, dept, year, programme_code, links):
     for r in cur.get("semester_structure") or []:
         semesters.setdefault(r.get("semester") or "—", []).append(r)
     return {"dept": dept, "programme": programme, "year": year, "parts": parts,
+            "curriculum_doc": bool(cur.get("semester_structure")) and links.generated("c", code),
+            "syllabus_doc": bool(((stored.get("prog_syllabus") or {}).get("data") or {}).get("courses"))
+            and links.generated("s", code),
             "profile": profile,
             "semesters": sorted(semesters.items(), key=lambda kv: str(kv[0])),
             "minors": cur.get("minors") or [],
@@ -254,6 +270,15 @@ class ShareLinks:
 
         from .share import report_token
         return url_for("share.report", token=report_token(self.dept_code, code, self.year),
+                       _external=True)
+
+    def generated(self, kind, code):
+        """kind "c": the Curriculum in the Office's template; "s": the Syllabus."""
+        from flask import url_for
+
+        from .share import generated_token
+        return url_for("share.curriculum" if kind == "c" else "share.syllabus",
+                       token=generated_token(kind, self.dept_code, code, self.year),
                        _external=True)
 
 

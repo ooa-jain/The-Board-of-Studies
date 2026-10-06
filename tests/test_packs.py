@@ -357,3 +357,80 @@ def test_a_changed_share_link_does_not_open(app):
     c = app.test_client()
     assert c.get("/share/d/not-a-real-code").status_code == 404
     assert c.get("/share/r/WyJyIiwiWCJd.tampered").status_code == 404
+
+
+# ---------------------------------------------------------------- Curriculum and Syllabus in the Office's templates
+
+def _generated_links(app, client, code):
+    import io
+
+    from openpyxl import load_workbook
+    _admin(app, client)
+    ws = load_workbook(io.BytesIO(client.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    return [c.hyperlink.target for row in ws.iter_rows() for c in row
+            if c.hyperlink and ("/share/c/" in c.hyperlink.target or "/share/s/" in c.hyperlink.target)]
+
+
+def test_the_excel_offers_each_programmes_curriculum_and_syllabus_without_gold(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    code = _load(app)["dept"]["dept_code"]
+    links = _generated_links(app, client, code)
+    # the five MCAs have a course matrix and all six a syllabus; programmes
+    # not started have nothing to print
+    assert sum("/share/c/" in u for u in links) == 5 and sum("/share/s/" in u for u in links) == 6
+    ws = load_workbook(io.BytesIO(client.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    fills = {c.fill.fgColor.rgb for row in ws.iter_rows() for c in row if c.fill and c.fill.fgColor}
+    assert not any(str(f).endswith("C8A44B") for f in fills)
+
+
+def test_the_curriculum_is_the_template_with_logo_and_every_course(app, client):
+    import io
+    from urllib.parse import urlparse
+
+    from docx import Document
+    code = _load(app)["dept"]["dept_code"]
+    url = next(u for u in _generated_links(app, client, code) if "/share/c/" in u)
+    r = app.test_client().get(urlparse(url).path)                  # no sign-in
+    assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment")
+    doc = Document(io.BytesIO(r.data))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    assert "JAIN (Deemed-to-be University), Bangalore" in text and "Programme Structure" in text
+    cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+    assert "Classification of Credits" in cells and "SEMESTER 1" in cells and "25MCAC101" in cells
+    assert "SUMMARY" in cells and "Objective" in cells
+    sec = doc.sections[0]
+    assert sec.page_width > sec.page_height                         # landscape, as the template
+    assert "Master of Computer Applications" in sec.header.paragraphs[0].text
+    assert any("image" in rel.reltype for rel in sec.header.part.rels.values())   # the logo
+    assert "Prepared and Approved by Office of Academics" in \
+        " ".join(p.text for p in sec.footer.paragraphs)
+
+
+def test_the_syllabus_is_one_template_sheet_per_course(app, client):
+    import io
+    from urllib.parse import urlparse
+
+    from docx import Document
+    code = _load(app)["dept"]["dept_code"]
+    url = next(u for u in _generated_links(app, client, code) if "/share/s/" in u)
+    doc = Document(io.BytesIO(app.test_client().get(urlparse(url).path).data))
+    cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+    for words in ("Name of the Program:", "Course Credits", "No. of Hours per Week",
+                  "Course Outcomes", "Module No. 1:", "Books for reference:",
+                  "Note: Latest edition of books may be used."):
+        assert words in cells
+    assert len(doc.tables) > 10                                     # one sheet per course
+    sec = doc.sections[0]
+    assert sec.page_height > sec.page_width                         # portrait
+
+
+def test_the_programme_report_page_offers_the_word_documents(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG").get_data(as_text=True)
+    assert "Curriculum (Word)" in page and "/MCAREG/c.docx" in page
+    r = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/s.docx")
+    assert r.status_code == 200 and len(r.data) > 10000
+    assert client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/x.docx").status_code == 404
