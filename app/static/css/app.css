@@ -4626,3 +4626,19 @@ body.has-side .dev-banner, body.has-side .site-banner { margin: 0; }
   .side-nav[data-open="true"] { display: flex; }
 }
 @media print { body.has-side { padding-left: 0; } .admin-side { display: none; } }
+
+/* a generated Curriculum or Syllabus, on the page as the Word document lays it out */
+.gen-doc { background: #fff; color: #111; max-width: 860px; margin: 0 auto; padding: 28px 36px 24px;
+  box-shadow: 0 20px 50px -30px rgba(14,42,92,.4), 0 0 0 1px #e6ebf2; border-radius: 6px;
+  font-family: Calibri, Carlito, "Segoe UI", Roboto, sans-serif; }
+.gen-doc.is-landscape { max-width: 1180px; }
+.gen-letterhead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  color: #666; font-size: 13px; padding-bottom: 8px; border-bottom: 3px solid #c0504d; margin-bottom: 18px; }
+.gen-p { margin: 2px 0; line-height: 1.35; }
+.gen-break { height: 0; border-top: 1px dashed #d5dce6; margin: 22px 0; }
+.gen-table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 12.5px; }
+.gen-table td { border: 1px solid #222; padding: 4px 7px; vertical-align: top; }
+.gen-table td div { line-height: 1.35; }
+.gen-foot { margin-top: 22px; padding-top: 8px; border-top: 3px solid #e8b4b0; color: #666; font-size: 12.5px; }
+@media print { .share-bar .btn { display: none; } .gen-doc { box-shadow: none; max-width: none; padding: 0; }
+  .gen-break { border: 0; page-break-after: always; } }

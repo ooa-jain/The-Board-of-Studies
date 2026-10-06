@@ -639,3 +639,64 @@ def syllabus_docx(db, dept_code, year, programme_code):
         _course_sheet(doc, name, copy.deepcopy(c), width)
     doc.core_properties.title = f"{name} — Syllabus {batch}".strip()
     return _save(doc)
+
+
+# ---------------------------------------------------------------------------
+# the same document as a web page (the share viewer)
+# ---------------------------------------------------------------------------
+
+def _cell_view(tc, doc):
+    from docx.table import _Cell
+    cell = _Cell(tc, doc)
+    pr = tc.tcPr
+    span, fill = 1, None
+    if pr is not None:
+        gs = pr.find(qn("w:gridSpan"))
+        span = int(gs.get(qn("w:val"))) if gs is not None else 1
+        shd = pr.find(qn("w:shd"))
+        fill = shd.get(qn("w:fill")) if shd is not None else None
+    lines = []
+    for p in cell.paragraphs:
+        runs = [r for r in p.runs if r.text]
+        if not runs and not p.text:
+            continue
+        lines.append({"text": p.text, "bold": bool(runs) and all(r.bold for r in runs),
+                      "color": next((str(r.font.color.rgb) for r in runs
+                                     if r.font.color is not None and r.font.color.type is not None), None),
+                      "align": {1: "center", 2: "right", 3: "justify"}.get(
+                          int(p.alignment) if p.alignment is not None else 0)})
+    return {"span": span, "fill": fill if fill and fill.lower() not in ("auto", "ffffff") else None,
+            "lines": lines}
+
+
+def to_view(buf):
+    """A generated document as blocks a page can show in order:
+    ("p", {text, bold, size, color, align}), ("break", None) and
+    ("table", [[cell, …], …]) with each cell's span, fill and lines."""
+    from docx.text.paragraph import Paragraph
+    doc = Document(buf)
+    out = []
+    for child in doc.element.body.iterchildren():
+        tag = child.tag.rsplit("}", 1)[-1]
+        if tag == "p":
+            if child.xpath(".//w:br[@w:type='page']"):
+                out.append(("break", None))
+                continue
+            p = Paragraph(child, doc)
+            runs = [r for r in p.runs if r.text]
+            if not runs:
+                continue
+            r = runs[0]
+            out.append(("p", {"text": p.text, "bold": bool(r.bold),
+                              "size": r.font.size.pt if r.font.size else 10,
+                              "color": str(r.font.color.rgb) if r.font.color is not None
+                              and r.font.color.type is not None else None,
+                              "align": "center" if p.alignment == WD_ALIGN_PARAGRAPH.CENTER else "left"}))
+        elif tag == "tbl":
+            rows = []
+            for tr in child.iterchildren(qn("w:tr")):
+                rows.append([_cell_view(tc, doc) for tc in tr.iterchildren(qn("w:tc"))])
+            out.append(("table", rows))
+    header = " ".join(p.text for p in doc.sections[0].header.paragraphs if p.text).strip()
+    return {"header": header, "blocks": out,
+            "landscape": doc.sections[0].page_width > doc.sections[0].page_height}

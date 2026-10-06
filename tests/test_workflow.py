@@ -1,3 +1,4 @@
+import re
 """End-to-end: login, the sequential lock, submitting Pre-BoS, exports."""
 
 import json
@@ -225,14 +226,24 @@ def test_a_department_record_holds_no_personal_details(app, client):
         assert field not in form
 
 
-def test_stages_after_the_first_are_locked(app, client):
+def test_every_stage_opens_from_the_start(app, client):
+    """No locks: any stage can be opened and filled in any order."""
+    from app.schema import STAGE_KEYS
     u, p = make_department(app)
     login(client, u, p)
+    for key in STAGE_KEYS:
+        r = client.get("/department/stage/" + key, follow_redirects=True)
+        assert r.status_code == 200
+        assert "opens once you have submitted" not in r.get_data(as_text=True), key
 
-    assert client.get("/department/stage/dept_info").status_code == 200
 
-    r = client.get("/department/stage/pre_bos", follow_redirects=True)
-    assert "opens once you have submitted" in r.get_data(as_text=True)
+def test_a_stage_submits_only_once_everything_is_filled(app):
+    """Opening is free; submitting still needs every required item."""
+    from app.workflow import submit_stage
+    make_department(app)
+    with app.app_context():
+        _, summary, status = submit_stage("COM", app.config["ACADEMIC_YEAR"], "pre_bos", {})
+    assert summary["errors"] > 0 and status == "draft"
 
 
 def test_submitting_department_information_unlocks_pre_bos(app, client):
@@ -635,12 +646,13 @@ def test_the_stage_side_menu_branches_by_group(app, client):
         assert escape(s["title"]) in body, s["title"]
 
     # the group you are in is the open one, and the rest are folded
-    assert body.count('data-open="true"') == 1
-    assert body.count('data-open="false"') == len(groups) - 1
+    tops = re.findall(r'id="branch-g\d+"\s+data-open="(\w+)"', body)
+    assert len(tops) == len(groups)
+    assert tops.count("true") == 1
 
-    # the stage being filled is marked, and a locked stage is not a link
+    # the stage being filled is marked, and nothing is locked
     assert 'class="branch-row is-open is-here"' in body
-    assert 'class="branch-row is-locked"' in body
+    assert 'class="branch-row is-locked"' not in body
 
 
 def test_grouped_board_counts_each_group(app):
@@ -940,27 +952,6 @@ def set_dev_mode(app, on):
     with app.app_context():
         get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": on}},
                                      upsert=True)
-
-
-def test_developer_mode_opens_a_stage_the_lock_would_have_held(app, client):
-    """The point of the switch: reach stage thirteen without filing twelve."""
-    u, p = make_department(app)
-    login(client, u, p)
-
-    # the lock holds, as it does for a department in the ordinary way
-    r = client.get("/department/stage/pre_bos", follow_redirects=True)
-    assert "opens once you have submitted" in r.get_data(as_text=True)
-
-    set_dev_mode(app, True)
-    assert client.get("/department/stage/pre_bos").status_code == 200
-    # not merely the next one along — the last stage of all opens too
-    from app.schema import STAGE_KEYS
-    assert client.get("/department/stage/" + STAGE_KEYS[-1]).status_code == 200
-
-    # and turning it off puts the lock back
-    set_dev_mode(app, False)
-    r = client.get("/department/stage/pre_bos", follow_redirects=True)
-    assert "opens once you have submitted" in r.get_data(as_text=True)
 
 
 def test_developer_mode_does_not_rewrite_what_is_already_filed(app):

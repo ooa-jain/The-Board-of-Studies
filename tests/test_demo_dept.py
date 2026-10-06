@@ -17,7 +17,7 @@ def test_every_demo_stage_and_part_submits_as_filled(app, client):
         assert user == "demo.dept"
         db = get_db()
         assert not db.submissions.find_one({"dept_code": "DEMO"}), "the forms start empty"
-        assert db.files.count_documents({"dept_code": "DEMO"}) == 10
+        assert db.files.count_documents({"dept_code": "DEMO"}) == 13   # one in every upload box
         for r in db.files.find({"dept_code": "DEMO", "field": {"$in": ["diac_signed", "dpac_signed"]}}):
             assert r["keyword_match"]["template"]["ok"], r["keyword_match"]["template"]
         bad = [r["original_name"] for r in db.files.find({"dept_code": "DEMO"})
@@ -122,3 +122,29 @@ def test_review_and_submit_all_stages_at_once(app, client):
         assert get_db().submissions.find_one({"dept_code": "DEMO"})["status"] == "sealed"
     page = client.get("/department/").get_data(as_text=True)
     assert "Review &amp; submit all stages" in page
+
+
+def test_a_removed_sample_file_comes_back_on_the_next_fill(app, client):
+    from app import demo_dept
+    from app.db import get_db
+    with app.app_context():
+        user, pw = demo_dept.create(app.config["ACADEMIC_YEAR"], app.config["UPLOAD_ROOT"])
+        db = get_db()
+        gone = db.files.find_one({"dept_code": "DEMO", "field": "minutes"})
+        db.files.delete_one({"_id": gone["_id"]})                     # removed
+        other = db.files.find_one({"dept_code": "DEMO", "field": "attendance"})
+        (app.config["UPLOAD_ROOT"] / app.config["ACADEMIC_YEAR"] / "DEMO" / other["stage"]
+         / other["stored_name"]).unlink()                             # its file deleted from disk
+    login(client, user, pw)
+    j = client.post("/department/api/bos_documents/sample").get_json()
+    box = j["data"]["bos_files"]
+    for field in ("minutes", "attendance", "vision_mission", "feedback_new_programme"):
+        assert box.get(field, {}).get("stored"), field
+    client.post("/department/demo/fill-all")
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "DEMO"})
+        files = sub["stages"]["bos_documents"]["data"]["bos_files"]
+        assert files["minutes"]["stored"] and files["attendance"]["stored"]
+        prog = next(iter(sub["programmes"].values()))
+        assert prog["prog_curriculum"]["data"]["curriculum_file"]["document"]["stored"]
+        assert prog["prog_syllabus"]["data"]["syllabus_file"]["document"]["stored"]

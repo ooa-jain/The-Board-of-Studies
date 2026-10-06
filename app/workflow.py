@@ -132,21 +132,10 @@ def compute_status(submission: dict, stage_key: str, dev: bool | None = None) ->
 
 
 def _gate(submission, stage_key, dev=None):
-    """open when the stage before is submitted, or the Office forced it open."""
-    if stage_state(submission, stage_key).get("status") == "open":
-        return "open"
-    idx = stage_index(stage_key)
-    if idx <= 0:
-        return "open"
-
-    # Developer mode lifts the lock and nothing else. A stage that has been
-    # submitted or sent back kept that status above and never reaches here.
-    if dev_mode() if dev is None else dev:
-        return "open"
-
-    prev_key = STAGE_KEYS[idx - 1]
-    prev = compute_status(submission, prev_key, dev)
-    return "open" if prev in DONE else "locked"
+    """Every stage is open from the start: a department can fill them in any
+    order. What holds a stage back is its own content — submit_stage keeps it
+    a draft until every required item is filled in and passes its checks."""
+    return "open"
 
 
 def parts_status(submission: dict, stage: dict) -> str:

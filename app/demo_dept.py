@@ -66,6 +66,19 @@ DOCS = {
         "Rating scale 1 to 5; average rating 4.2",
         "Feedback: more case studies and analytics in the curriculum."]),
 }
+# the optional ones too: a demo shows every box with a document in it
+DOCS["feedback_new_programme.pdf"] = ("bos_documents", "feedback_new_programme", [
+    "Stakeholder Feedback for the New Programme",
+    "Survey of employers and alumni on the proposed BBA (Business Analytics)",
+    "86 responses; 91% in favour of the new programme."])
+DOCS["curriculum_matrix.pdf"] = ("prog_curriculum", "document", [
+    "Curriculum Matrix — Department of Demonstration Studies",
+    "Semester-wise course matrix with L-T-P-E, credits and marks.",
+    "Semester 1 — Course code 27BBA1C01, Course title: Principles of Management, Credits 4."])
+DOCS["syllabus.pdf"] = ("prog_syllabus", "document", [
+    "Syllabus — Department of Demonstration Studies",
+    "Course-wise syllabus of the curriculum: outcomes, modules, activities and books.",
+    "Semester 1 — Course code 27BBA1C01, Course title: Principles of Management, Credits 4."])
 PHOTOS = ["meeting_photo_1.jpg", "meeting_photo_2.jpg"]
 
 # who sits on the demo's DIAC and PAC — made up, one per category
@@ -233,8 +246,8 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
     if stage_key == "pre_bos":
         return {"pre_bos_files": {k: files[k] for k in ("diac_signed", "dpac_signed") if k in files}}
     if stage_key == "bos_documents":
-        box = {k: files[k] for k in ("bos_composition", "vision_mission", "minutes", "attendance")
-               if k in files}
+        box = {k: files[k] for k in ("bos_composition", "vision_mission", "minutes", "attendance",
+                                     "feedback_new_programme") if k in files}
         for k in ("external_profiles", "geotagged_photos", "feedback_curriculum"):
             if k in files:
                 box[k] = files[k] if isinstance(files[k], list) else [files[k]]
@@ -258,11 +271,16 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                 "course_specialisation": programme["programme_name"],
             },
             "semester_structure": courses,
+            **({"curriculum_file": {"document": files["prog_curriculum.document"]}}
+               if "prog_curriculum.document" in files else {}),
         }
     batch = (STAGE_BY_KEY.get(stage_key) or {}).get("batch") or ""
     if stage_key == "prog_syllabus" or stage_key.startswith("prog_syllabus_b"):
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
-        return {"courses": [_syllabus_row(c, y) for c in courses]}
+        out = {"courses": [_syllabus_row(c, y) for c in courses]}
+        if stage_key == "prog_syllabus" and "prog_syllabus.document" in files:
+            out["syllabus_file"] = {"document": files["prog_syllabus.document"]}
+        return out
     if stage_key == "prog_revision":
         rows = []
         for c in courses:
@@ -312,6 +330,8 @@ def _files_for(db, year):
             v["thumb"] = v["url"] + "?thumb=1"
         if r["field"] in ("geotagged_photos", "external_profiles", "feedback_curriculum"):
             files.setdefault(r["field"], []).append(v)
+        elif r["field"] == "document":
+            files[f"{r['stage']}.document"] = v
         else:
             files[r["field"]] = v
     return files
@@ -331,24 +351,55 @@ def create(year, upload_root, actor="system"):
     dept = db.departments.find_one({"dept_code": CODE})
     username, password = issue_department_login(db, dept, actor=actor)
 
-    for name, (stage, field, lines) in DOCS.items():
-        _store(db, upload_root, year, username, stage, field, name, _pdf(lines), t)
-    # the signed composition forms: the university's own templates, filled in
+    upload_samples(year, upload_root, username, db)
+    return username, password
+
+
+def _have(db, upload_root, year):
+    """The sample files still in place, by name: a record, and the file on disk."""
+    out = set()
+    for r in db.files.find({"dept_code": CODE, "academic_year": year}):
+        if (upload_root / year / CODE / r["stage"] / r["stored_name"]).is_file():
+            out.add(r["original_name"])
+        else:                                   # its file has gone: forget the record too
+            db.files.delete_many({"_id": r["_id"]})
+    return out
+
+
+def upload_samples(year, upload_root=None, username=USERNAME, db=None):
+    """Upload every sample document that is not there already — so a file
+    removed from a form, or from the disk, comes back on the next fill.
+    Returns how many were added."""
     from pathlib import Path
-    from .template_check import TEMPLATES, fill
+
+    from flask import current_app
+
+    from .template_check import TEMPLATES, fill, make_bos_composition
+    db = get_db() if db is None else db
+    upload_root = Path(upload_root or current_app.config["UPLOAD_ROOT"])
+    have = _have(db, upload_root, year)
+    t = now()
+    added = 0
+
+    def put(stage, field, name, data):
+        nonlocal added
+        if name not in have:
+            _store(db, upload_root, year, username, stage, field, name, data, t)
+            added += 1
+
+    for name, (stage, field, lines) in DOCS.items():
+        put(stage, field, name, _pdf(lines))
+    # the signed composition forms: the university's own templates, filled in
     static = Path(__file__).resolve().parent / "static"
     for field, name in (("diac_signed", "Composition_of_DIAC_signed.docx"),
                         ("dpac_signed", "Composition_of_PAC_signed.docx")):
         src = static / TEMPLATES[field]["file"]
-        _store(db, upload_root, year, username, "pre_bos", field, name,
-               (lambda path, src=src, field=field: fill(src, path, field, people=PEOPLE)), t)
-    from .template_check import make_bos_composition
-    _store(db, upload_root, year, username, "bos_documents", "bos_composition",
-           "Composition_of_BoS_Members.docx", (lambda path: make_bos_composition(path, PEOPLE)), t)
+        put("pre_bos", field, name, (lambda path, src=src, field=field: fill(src, path, field, people=PEOPLE)))
+    put("bos_documents", "bos_composition", "Composition_of_BoS_Members.docx",
+        (lambda path: make_bos_composition(path, PEOPLE)))
     for i, n in enumerate(PHOTOS, 1):
-        _store(db, upload_root, year, username, "bos_documents", "geotagged_photos", n,
-               (lambda path, i=i: _photo(path, i)), t)
-    return username, password
+        put("bos_documents", "geotagged_photos", n, (lambda path, i=i: _photo(path, i)))
+    return added
 
 
 def fill_all(year):
@@ -359,6 +410,7 @@ def fill_all(year):
     from .workflow import batches, get_or_create_submission, save_draft
 
     db = get_db()
+    upload_samples(year, db=db)
     files = _files_for(db, year)
     sub = get_or_create_submission(CODE, year)
     done = 0

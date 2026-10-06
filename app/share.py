@@ -12,9 +12,10 @@ every link at once.
                             turned into a readable page, with Download
     /share/d/<token>/file   the file itself
     /share/r/<token>        a programme's report
-    /share/c/<token>        a programme's Curriculum, as a Word document in
-                            the Office's curriculum template (app/docgen.py)
-    /share/s/<token>        its Syllabus, in the syllabus template
+    /share/c/<token>        a programme's Curriculum in the Office's
+                            curriculum template (app/docgen.py), shown on
+                            the page; /file downloads the Word document
+    /share/s/<token>        its Syllabus, in the syllabus template, the same way
 """
 
 from __future__ import annotations
@@ -123,6 +124,22 @@ def generated_docx(kind, dept_code, programme_code, year):
 @bp.route("/c/<token>", endpoint="curriculum", defaults={"kind": "c"})
 @bp.route("/s/<token>", endpoint="syllabus", defaults={"kind": "s"})
 def generated(token, kind):
+    """The generated Curriculum or Syllabus, shown on the page as the Word
+    document lays it out, with a Download button."""
+    from .docgen import to_view
+    dept_code, programme_code, year = _read(token, kind)
+    out = generated_docx(kind, dept_code, programme_code, year) or abort(404)
+    dept = get_db().departments.find_one({"dept_code": dept_code}) or {}
+    return render_template("share/generated.html", view=to_view(out[0]), dept=dept, year=year,
+                           title=("Curriculum" if kind == "c" else "Syllabus"),
+                           programme_code=programme_code, file_name=out[1],
+                           download_url=url_for(request.endpoint, token=token) + "/file",
+                           hide_chrome=True)
+
+
+@bp.route("/c/<token>/file", endpoint="curriculum_file", defaults={"kind": "c"})
+@bp.route("/s/<token>/file", endpoint="syllabus_file", defaults={"kind": "s"})
+def generated_file(token, kind):
     dept_code, programme_code, year = _read(token, kind)
     out = generated_docx(kind, dept_code, programme_code, year) or abort(404)
     return send_file(out[0], as_attachment=True, download_name=out[1], mimetype=DOCX)

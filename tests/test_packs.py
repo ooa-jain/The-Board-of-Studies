@@ -392,7 +392,11 @@ def test_the_curriculum_is_the_template_with_logo_and_every_course(app, client):
     from docx import Document
     code = _load(app)["dept"]["dept_code"]
     url = next(u for u in _generated_links(app, client, code) if "/share/c/" in u)
-    r = app.test_client().get(urlparse(url).path)                  # no sign-in
+    page = app.test_client().get(urlparse(url).path)               # no sign-in: shown on the page
+    body = page.get_data(as_text=True)
+    assert page.status_code == 200 and "Download Word" in body
+    assert "Classification of Credits" in body and "25MCAC101" in body
+    r = app.test_client().get(urlparse(url).path + "/file")        # and the Word document
     assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment")
     doc = Document(io.BytesIO(r.data))
     text = "\n".join(p.text for p in doc.paragraphs)
@@ -415,7 +419,8 @@ def test_the_syllabus_is_one_template_sheet_per_course(app, client):
     from docx import Document
     code = _load(app)["dept"]["dept_code"]
     url = next(u for u in _generated_links(app, client, code) if "/share/s/" in u)
-    doc = Document(io.BytesIO(app.test_client().get(urlparse(url).path).data))
+    assert "Module No. 1:" in app.test_client().get(urlparse(url).path).get_data(as_text=True)
+    doc = Document(io.BytesIO(app.test_client().get(urlparse(url).path + "/file").data))
     cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
     for words in ("Name of the Program:", "Course Credits", "No. of Hours per Week",
                   "Course Outcomes", "Module No. 1:", "Books for reference:",
@@ -430,7 +435,7 @@ def test_the_programme_report_page_offers_the_word_documents(app, client):
     report = _load(app)
     _admin(app, client)
     page = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG").get_data(as_text=True)
-    assert "Curriculum (Word)" in page and "/MCAREG/c.docx" in page
+    assert "Curriculum →" in page and "/share/c/" in page
     r = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/s.docx")
     assert r.status_code == 200 and len(r.data) > 10000
     assert client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/x.docx").status_code == 404

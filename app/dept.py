@@ -550,6 +550,7 @@ def api_sample(stage_key, programme_code=None):
         return bad
     if not dept.get("demo"):
         abort(404)
+    demo_dept.upload_samples(_year())          # anything removed comes back
     files = demo_dept._files_for(get_db(), _year())
     data = demo_dept.sample(stage_key, programme, files, _year())
     return jsonify({"ok": True, "data": _pin_frozen(stage_key, data, dept, sub, programme)})

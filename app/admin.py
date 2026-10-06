@@ -885,7 +885,7 @@ def programme_report(dept_code, programme_code):
     from .report import programme_context
     db = get_db()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
-    ctx = programme_context(db, dept, _year(), programme_code, AdminLinks(dept_code)) or abort(404)
+    ctx = programme_context(db, dept, _year(), programme_code, AdminLinks(dept_code, _year())) or abort(404)
     return render_template("admin/programme_report.html", **ctx)
 
 

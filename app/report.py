@@ -46,8 +46,8 @@ def _inline(value):
 class AdminLinks:
     """Links for the Office's downloads: documents and programme reports on the admin side."""
 
-    def __init__(self, dept_code):
-        self.dept_code = dept_code
+    def __init__(self, dept_code, year=None):
+        self.dept_code, self.year = dept_code, year
 
     def file(self, stage, value):
         from flask import url_for
@@ -60,6 +60,9 @@ class AdminLinks:
                        programme_code=code, _external=True)
 
     def generated(self, kind, code):
+        # shown on the page with a Download button, as in the downloads
+        if self.year:
+            return ShareLinks(self.dept_code, self.year).generated(kind, code)
         from flask import url_for
         return url_for("admin.programme_docx", dept_code=self.dept_code, programme_code=code,
                        kind=kind, _external=True)

@@ -186,7 +186,7 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
                     continue
                 ws.cell(row=r, column=2, value=f"   {label}").font = Font(size=9, bold=True,
                                                                          color=NAVY)
-                _link(ws.cell(row=r, column=3), "⬇ Download Word document", url)
+                _link(ws.cell(row=r, column=3), "Open →", url)
                 r += 1
             for where, name, url in p["documents"]:
                 ws.cell(row=r, column=2, value=f"   {where} document").font = Font(size=9, color="53627A")
@@ -391,7 +391,7 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
                     d = doc.add_paragraph()
                     d.paragraph_format.left_indent = Pt(24)
                     d.add_run(f"{label}: ").font.size = Pt(9)
-                    _hyperlink(d, "Download Word document", url)
+                    _hyperlink(d, "Open", url)
             for where, name, url in p["documents"]:
                 d = doc.add_paragraph()
                 d.paragraph_format.left_indent = Pt(24)

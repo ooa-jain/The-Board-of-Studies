@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ programme_code }} — {{ title }}{% endblock %}
+
+{% block body %}
+<main id="main-content" class="share-page">
+  <header class="share-bar">
+    <img class="share-logo" alt="JAIN" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="110">
+    <div class="share-title">
+      <strong>{{ title }} · {{ programme_code }}</strong>
+      <span>{{ dept.dept_name or '' }} · {{ year }}</span>
+    </div>
+    <button class="btn btn-ghost btn-sm no-print" type="button" data-print>Print</button>
+    <a class="btn btn-sm no-print" href="{{ download_url }}">Download Word</a>
+  </header>
+
+  <div class="share-body">
+    <article class="gen-doc{{ ' is-landscape' if view.landscape }}">
+      <div class="gen-letterhead">
+        <span>{{ view.header }}</span>
+        <img alt="JAIN" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="90">
+      </div>
+      {% for k, v in view.blocks %}
+        {% if k == 'p' %}
+          <p class="gen-p" style="text-align:{{ v.align }};font-size:{{ (v.size * 1.25)|round(1) }}px;{% if v.bold %}font-weight:700;{% endif %}{% if v.color %}color:#{{ v.color }};{% endif %}">{{ v.text }}</p>
+        {% elif k == 'break' %}
+          <div class="gen-break"></div>
+        {% else %}
+          <div class="share-tablewrap"><table class="gen-table">
+            {% for row in v %}<tr>
+              {% for c in row %}<td{% if c.span > 1 %} colspan="{{ c.span }}"{% endif %}{% if c.fill %} style="background:#{{ c.fill }}"{% endif %}>
+                {% for l in c.lines %}<div style="{% if l.align %}text-align:{{ l.align }};{% endif %}{% if l.bold %}font-weight:700;{% endif %}{% if l.color %}color:#{{ l.color }};{% endif %}">{{ l.text }}</div>{% endfor %}
+              </td>{% endfor %}
+            </tr>{% endfor %}
+          </table></div>
+        {% endif %}
+      {% endfor %}
+      <div class="gen-foot">Prepared and Approved by Office of Academics</div>
+    </article>
+  </div>
+</main>
+{% endblock %}
