@@ -1479,7 +1479,10 @@
      says how well they match and opens that syllabus at that course. */
   const norm = v => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   function syllabusLink(row) {
-    const code = String(row.course_code || "").trim().toUpperCase();
+    // an elective pair "A1 / A2" has a syllabus for each option
+    const codes = String(row.course_code || "").split("/").map(x => x.trim().toUpperCase()).filter(Boolean);
+    const titles = String(row.course_title || "").split(" / ");
+    const code = codes[0] || "";
     const a = el("a", "syl-chip");
     const syl = CTX.syllabi || [];
     const cur = syl.find(x => x.current);
@@ -1491,21 +1494,24 @@
     }
     const hits = [];
     syl.filter(x => x.current).forEach(x => (x.courses || []).forEach(c => {
-      if (c.code.toUpperCase() === code) hits.push({ x, c, same: norm(c.title) === norm(row.course_title) });
+      const k = codes.indexOf(c.code.toUpperCase());
+      if (k < 0) return;
+      const title = titles.length === codes.length ? titles[k] : row.course_title;
+      hits.push({ x, c, same: norm(c.title) === norm(title) });
     }));
     const best = hits.find(h => h.x.current && h.same) || hits.find(h => h.x.current) ||
                  hits.find(h => h.same) || hits[0];
     if (!best) {
       a.className = "syl-chip is-none";
-      a.textContent = "Add syllabus →";
+      a.textContent = "+ Add";
       a.title = "No syllabus has this course code yet — opens the Current Batch Syllabus";
       if (cur) a.href = cur.url;
       return a;
     }
-    a.href = best.x.url + "#course-" + encodeURIComponent(code);
+    a.href = best.x.url + "#course-" + encodeURIComponent(best.c.code.toUpperCase());
     if (best.same && best.x.current) {
       a.className = "syl-chip is-ok";
-      a.textContent = "✓ Syllabus";
+      a.textContent = codes.length > 1 ? `✓ ${new Set(hits.map(h => h.c.code)).size}/${codes.length}` : "✓";
     } else if (best.x.current) {
       a.className = "syl-chip is-warn";
       a.textContent = "Title differs";
@@ -1605,6 +1611,21 @@
     htr.appendChild(el("th", null, "#"));
     section.columns.forEach(c => {
       const th = el("th", null, c.label + (c.required ? " *" : ""));
+      if (c.type === "syllabus_link") {
+        // one way into the syllabi for the whole table; each row only says
+        // whether its syllabus is there, and opens that course
+        const cur = (CTX.syllabi || []).find(x => x.current);
+        th.textContent = "";
+        th.className = "rt-syl-head";
+        if (cur) {
+          const all = el("a", "syl-all", "All syllabi →");
+          all.href = cur.url;
+          all.title = "Open the syllabus page — pick a semester, a course group or search";
+          th.appendChild(all);
+        } else th.textContent = c.label;
+        htr.appendChild(th);
+        return;
+      }
       if (c.type === "integer") th.className = "num-col";
       else if (c.width) th.style.width = c.width;
       if (c.help) th.title = c.help;
@@ -3283,7 +3304,9 @@
     if (hit >= 0) pick = { sem: info(data[hit]).sem, group: info(data[hit]).group, idx: hit };
     else if (data.length) pick = { sem: info(data[0]).sem, group: "", idx: 0 };
 
-    const inPick = (r) => (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group);
+    let query = "";
+    const inPick = (r) => (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group) &&
+      (!query || `${r.course_code || ""} ${r.course_title || ""}`.toLowerCase().includes(query));
     function paintNav() {
       nav.textContent = "";
       if (!USE_NAV || data.length < 2) { nav.hidden = true; return; }
@@ -3304,6 +3327,12 @@
       const lab = (t, sel) => { const w = el("label", "syl-nav-field"); w.appendChild(el("span", null, t)); w.appendChild(sel); return w; };
       row1.appendChild(lab("Semester", semSel));
       row1.appendChild(lab("Course group", grpSel));
+      const find = el("input", "syl-nav-search");
+      find.type = "search";
+      find.placeholder = "Search code or title";
+      find.value = query;
+      find.setAttribute("aria-label", "Search courses by code or title");
+      row1.appendChild(lab("Search", find));
       const done = data.filter(isFilled).length;
       row1.appendChild(el("span", "syl-nav-count", `${done} of ${data.length} courses filled`));
       const structure = document.querySelector(".back-link");
@@ -3319,6 +3348,15 @@
         draw();
       };
       semSel.addEventListener("change", () => { pick.sem = semSel.value; pick.group = ""; choose(); });
+      find.addEventListener("input", () => {
+        query = find.value.trim().toLowerCase();
+        if (query) { pick.sem = ""; pick.group = ""; }
+        const first = data.findIndex(inPick);
+        pick.idx = first;
+        draw();
+        const again = nav.querySelector(".syl-nav-search");
+        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      });
       grpSel.addEventListener("change", () => { pick.group = grpSel.value; choose(); });
 
       const chips = el("div", "syl-courses");
@@ -3360,6 +3398,8 @@
     }
     host.showRow = () => draw();
     draw();
+    // arriving from a course in the programme structure: start at the
+    // filter, with that course chosen
   }
 
   // -------------------------------------------------------- revision tables
@@ -4105,11 +4145,16 @@
 
   render();
   refresh();
-  // opened from a curriculum row: go to that course's syllabus
+  // opened from a curriculum row: that course is already chosen — start at
+  // the semester / course group / search bar above it, where the department
+  // can move on to any other course
   if (location.hash.startsWith("#course-")) {
     setTimeout(() => {
       const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-      if (target) { target.scrollIntoView({ behavior: "smooth", block: "start" }); target.classList.add("is-flash"); }
+      const nav = document.querySelector(".syl-nav:not([hidden])");
+      if (nav) window.scrollTo({ top: nav.getBoundingClientRect().top + window.scrollY - 110 });
+      else if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (target) target.classList.add("is-flash");
     }, 400);
   }
   const allBtn = document.getElementById("btn-all");

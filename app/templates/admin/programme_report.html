@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{{ programme.programme_code }} — report{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">
+        <a href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">{{ dept.dept_name }}</a>
+        <span>›</span> {{ programme.programme_code }}
+      </div>
+      <h1>{{ programme.programme_name }}</h1>
+      <p>{{ programme.programme_code }}{% if programme.degree_level %} · {{ programme.degree_level }}{% endif %}
+         {% if programme.specialisation %} · {{ programme.specialisation }}{% endif %} · {{ year }}</p>
+    </div>
+    <div class="spacer head-aside no-print">
+      <button class="btn btn-ghost btn-sm" type="button" data-print>Print</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% macro mark(status) -%}
+  <span class="pill {{ 'pill-ok' if status == 'submitted' else 'pill-err' if status == 'returned' else 'pill-warn' if status == 'draft' else '' }}">
+    {{ {'submitted': '✓ Submitted', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Not started', 'locked': 'Locked'}.get(status, status) }}</span>
+{%- endmacro %}
+
+<section class="card mb-2">
+  <div class="card-head"><h3>Parts</h3></div>
+  <div class="card-body tight">
+    <table class="data">
+      <thead><tr><th>Part</th><th>Status</th><th>Submitted on</th><th>Documents</th></tr></thead>
+      <tbody>
+      {% for p in parts %}
+        <tr>
+          <td><strong>{{ p.title }}</strong>
+            {% if p.note %}<div class="small note-err">Returned: {{ p.note }}</div>{% endif %}
+            {% if p.errors and p.status != 'submitted' %}<div class="small muted">{{ p.errors }} item(s) still to complete</div>{% endif %}</td>
+          <td>{{ mark(p.status) }}</td>
+          <td class="small">{{ p.submitted_at.strftime('%d %b %Y, %H:%M') if p.submitted_at else '—' }}</td>
+          <td class="small">{% for name, url in p.documents %}<a href="{{ url }}" target="_blank" rel="noopener">{{ name }}</a>{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card mb-2">
+  <div class="card-head"><h3>Programme details and regulations</h3></div>
+  <div class="card-body">
+    {% if profile %}
+    <dl class="rep-fields">
+      {% for label, v in profile %}<dt>{{ label }}</dt><dd>{{ v }}</dd>{% endfor %}
+    </dl>
+    {% else %}<p class="small muted">Not filled yet.</p>{% endif %}
+  </div>
+</section>
+
+<section class="card mb-2">
+  <div class="card-head"><h3>Programme structure</h3>
+    <span class="spacer small muted">{{ semesters|map(attribute=1)|map('length')|sum }} courses</span></div>
+  <div class="card-body tight">
+    {% for sem, rows in semesters %}
+    <h4 class="rep-sem">Semester {{ sem }} <span class="muted small">· {{ rows|sum(attribute='credits') }} credits</span></h4>
+    <div class="table-wrap">
+    <table class="data rep-table">
+      <thead><tr><th>Course group</th><th>Code</th><th>Title</th><th class="num">L</th><th class="num">T</th><th class="num">P</th><th class="num">E</th><th class="num">Credits</th><th class="num">CA</th><th class="num">ESE</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr><td class="small">{{ r.nep_category }}</td><td class="mono small">{{ r.course_code }}</td><td>{{ r.course_title }}</td>
+          <td class="num">{{ r.l }}</td><td class="num">{{ r.t }}</td><td class="num">{{ r.p }}</td><td class="num">{{ r.e }}</td>
+          <td class="num"><strong>{{ r.credits }}</strong></td><td class="num">{{ r.cia }}</td><td class="num">{{ r.ese }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<p class="small muted">No courses entered yet.</p>{% endfor %}
+    {% if semesters %}<p class="small"><strong>Total: {{ semesters|map(attribute=1)|sum(start=[])|sum(attribute='credits') }} credits</strong></p>{% endif %}
+  </div>
+</section>
+
+{% if minors %}
+<section class="card mb-2">
+  <div class="card-head"><h3>Minor / Honours — Annexure I</h3><span class="spacer small muted">{{ minors|length }} courses</span></div>
+  <div class="card-body tight">
+    <table class="data rep-table">
+      <thead><tr><th>Minor</th><th class="num">Sem</th><th>Code</th><th>Title</th><th class="num">Credits</th></tr></thead>
+      <tbody>{% for m in minors %}<tr><td class="small">{{ m.minor_title }}</td><td class="num">{{ m.semester }}</td><td class="mono small">{{ m.course_code }}</td><td>{{ m.course_title }}</td><td class="num">{{ m.credits }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="card mb-2">
+  <div class="card-head"><h3>Syllabus</h3><span class="spacer small muted">{{ syllabus|length }} courses</span></div>
+  <div class="card-body tight">
+    {% for c in syllabus %}
+    <details class="rep-course">
+      <summary><span class="mono">{{ c.course_code or '—' }}</span> <strong>{{ c.course_title }}</strong>
+        <span class="small muted">· {{ c.credits }} credits · {{ c.teaching_hours or '—' }} hours</span>
+        {% if c.outcomes and c.modules %}<span class="pill pill-ok">✓</span>{% endif %}</summary>
+      {% if c.pedagogy %}<p class="small"><strong>Pedagogy:</strong> {{ c.pedagogy }}</p>{% endif %}
+      {% if c.outcomes %}<p class="small"><strong>Course outcomes</strong></p>
+      <ol class="small">{% for o in c.outcomes.splitlines() if o.strip() %}<li>{{ o }}</li>{% endfor %}</ol>{% endif %}
+      {% if c.modules %}<p class="small"><strong>Syllabus</strong></p>
+      <ol class="small">{% for m in c.modules %}<li><strong>{{ m.title }}</strong>{% if m.hours %} ({{ m.hours }} hours){% endif %}{% if m.revised %} — <span class="pre">{{ m.revised }}</span>{% endif %}</li>{% endfor %}</ol>{% endif %}
+      {% if c.skill_activities %}<p class="small"><strong>Skill development activities:</strong> <span class="pre">{{ c.skill_activities }}</span></p>{% endif %}
+      {% if c.books %}<p class="small"><strong>Books for reference</strong></p>
+      <ul class="small">{% for b in c.books.splitlines() if b.strip() %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+    </details>
+    {% else %}<p class="small muted">No syllabus entered yet.</p>{% endfor %}
+  </div>
+</section>
+
+<section class="card mb-2">
+  <div class="card-head"><h3>Course Revision</h3><span class="spacer small muted">{{ revision|length }} courses revised</span></div>
+  <div class="card-body tight">
+    {% for c in revision %}
+      <div class="small"><span class="mono">{{ c.course_code }}</span> {{ c.course_title }}</div>
+    {% else %}<p class="small muted">No revisions entered yet.</p>{% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -15,6 +15,10 @@ from . import db as database
 def create_app(config_object=Config):
     app = Flask(__name__, static_folder="static", template_folder="templates")
     app.config.from_object(config_object)
+    # nginx passes the scheme and host on; links written into downloads
+    # (Excel, Word) must be the site's https address, not 127.0.0.1
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     logging.basicConfig(
         level=logging.DEBUG if app.config["DEBUG"] else logging.INFO,

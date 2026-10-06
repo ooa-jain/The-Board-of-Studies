@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 
 from . import ugc_rules as U
 from .db import get_db
-from .schema import STAGE_BY_KEY, STAGES
+from .schema import STAGES
 from .workflow import compute_status, programmes_of, progress
 
 NAVY = "0F2A4A"
@@ -59,132 +59,129 @@ def _flat(value):
 
 
 # ---------------------------------------------------------------------------
-# Excel — one department
+# Excel — one department, on one sheet
 # ---------------------------------------------------------------------------
 
-def department_excel(dept_code: str, year: str) -> io.BytesIO:
-    db = get_db()
-    dept = db.departments.find_one({"dept_code": dept_code}) or {}
-    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+OK_FILL = PatternFill("solid", fgColor="DFF3E4")
+NO_FILL = PatternFill("solid", fgColor="FDE7E7")
+LINK_FONT = Font(color="0B4A9E", underline="single", size=10)
+
+
+def _link(cell, text, url):
+    cell.value = text
+    if url:
+        cell.hyperlink = url
+        cell.font = LINK_FONT
+
+
+def _section_title(ws, row, text, width=7):
+    c = ws.cell(row=row, column=1, value=text)
+    c.font = Font(bold=True, size=12, color="FFFFFF")
+    for col in range(1, width + 1):
+        ws.cell(row=row, column=col).fill = PatternFill("solid", fgColor=NAVY)
+    ws.row_dimensions[row].height = 22
+
+
+def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
+    """The whole record on one sheet: department, stages with ticks and
+    document links, then the UG and PG programmes with a link to each
+    programme's report."""
+    from .report import build, status_word
+    rep = build(get_db(), dept_code, year, links)
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Summary"
+    ws.title = "Report"
+    ws.sheet_view.showGridLines = False
+    for col, w in zip("ABCDEFG", (6, 34, 46, 18, 18, 18, 20)):
+        ws.column_dimensions[col].width = w
 
     ws["A1"] = "JAIN (Deemed-to-be University) — Office of Academics"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
-    ws["A2"] = f"Office of Academics Data Portal · {year}"
+    ws["A2"] = f"Board of Studies record · {rep['dept'].get('dept_name', dept_code)} · {year}"
     ws["A2"].font = Font(size=11, color="53627A")
-
-    meta = [
-        ("Department", dept.get("dept_name")),
-        ("Department code", dept.get("dept_code")),
-        ("Faculty", dept.get("faculty")),
-        ("School", dept.get("school")),
-        ("Campus", dept.get("campus")),
-        ("Place", dept.get("place")),
-        ("Overall progress", f"{progress(sub)['done']} of {progress(sub)['total']} stages"),
-        ("Generated on", datetime.now().strftime("%d %b %Y, %H:%M")),
-    ]
     r = 4
-    for k, v in meta:
-        ws.cell(row=r, column=1, value=k).font = Font(bold=True, size=10)
-        ws.cell(row=r, column=2, value=_flat(v))
+
+    _section_title(ws, r, "Department information")
+    r += 1
+    for k, v in rep["info"]:
+        ws.cell(row=r, column=2, value=k).font = Font(bold=True, size=10)
+        ws.cell(row=r, column=3, value=_flat(v))
         r += 1
 
     r += 1
-    _head(ws, r, ["Stage", "Group", "Status", "Errors", "Warnings", "Submitted on"])
+    _section_title(ws, r, "Stages")
     r += 1
-    for s in STAGES:
-        st = compute_status(sub, s["key"])
-        state = (sub.get("stages") or {}).get(s["key"], {})
-        summary = state.get("summary") or {}
-        for i, v in enumerate([s["title"], s["group"], st.title(),
-                               summary.get("errors", 0), summary.get("warnings", 0),
-                               _flat(state.get("submitted_at"))], start=1):
-            c = ws.cell(row=r, column=i, value=v)
-            c.border = BORDER
-            if i == 3:
-                c.fill = PatternFill("solid", fgColor={"submitted": "DFF3E4",
-                                                       "returned": "FDE7E7",
-                                                       "locked": "EFEFEF"}.get(st, "FFF7E0"))
+    _head(ws, r, ["", "Stage", "Status", "Submitted on", "Filled", "", ""], fill=GOLD, color="1A1A1A")
+    r += 1
+    for st in rep["stages"]:
+        done = st["status"] == "submitted"
+        ws.cell(row=r, column=1, value="✓" if done else "·").fill = OK_FILL if done else NO_FILL
+        ws.cell(row=r, column=2, value=st["title"]).font = Font(bold=True, size=10)
+        ws.cell(row=r, column=3, value=status_word(st["status"]))
+        ws.cell(row=r, column=4, value=_flat(st["submitted_at"]))
+        ws.cell(row=r, column=5, value=f"{st['filled']} of {st['total']}"
+                + (f" {st['unit']}" if st.get("unit") else " filled"))
         r += 1
-    _autosize(ws)
 
-    # one sheet per stage
-    for s in STAGES:
-        state = (sub.get("stages") or {}).get(s["key"], {})
-        data = state.get("data") or {}
-        if not data:
+    for st in rep["stages"]:
+        if st.get("container"):
             continue
-        title = s["title"][:28]
-        sheet = wb.create_sheet(title)
-        row = 1
-        sheet.cell(row=row, column=1, value=s["title"]).font = Font(bold=True, size=13, color=NAVY)
-        row += 2
-        for section in s["sections"]:
-            sk = section["key"]
-            payload = data.get(sk)
-            if not payload:
-                continue
-            sheet.cell(row=row, column=1, value=section["title"]).font = Font(bold=True, size=11)
-            row += 1
-            if section.get("type") in ("table", "programme_list") and isinstance(payload, list):
-                cols = section.get("columns", [])
-                _head(sheet, row, [c["label"] for c in cols], fill=GOLD, color="1A1A1A")
-                row += 1
-                for item in payload:
-                    for i, c in enumerate(cols, start=1):
-                        cell = sheet.cell(row=row, column=i, value=_flat(item.get(c["name"])))
-                        cell.border = BORDER
-                        cell.alignment = Alignment(wrap_text=True, vertical="top")
-                    row += 1
-            elif isinstance(payload, dict):
-                for k, v in payload.items():
-                    sheet.cell(row=row, column=1, value=k).font = Font(bold=True, size=10)
-                    sheet.cell(row=row, column=2, value=_flat(v)).alignment = \
-                        Alignment(wrap_text=True, vertical="top")
-                    row += 1
-            row += 1
-        _autosize(sheet)
+        r += 1
+        _section_title(ws, r, f"{st['group']} — {st['title']}  ·  {status_word(st['status'])}")
+        r += 1
+        if st.get("returned_note"):
+            ws.cell(row=r, column=2, value="Returned: " + st["returned_note"]).font = \
+                Font(italic=True, color="B42318")
+            r += 1
+        if not st["items"]:
+            ws.cell(row=r, column=2, value="Nothing entered yet.").font = Font(italic=True, color="7A8699")
+            r += 1
+        for filled, label, text, docs in st["items"]:
+            tick = ws.cell(row=r, column=1, value="✓" if filled else "✗")
+            tick.fill = OK_FILL if filled else NO_FILL
+            tick.alignment = Alignment(horizontal="center")
+            ws.cell(row=r, column=2, value=label).alignment = Alignment(wrap_text=True, vertical="top")
+            if docs:
+                for k, (name, url) in enumerate(docs):
+                    if k:
+                        r += 1
+                    _link(ws.cell(row=r, column=3), name, url)
+            else:
+                c = ws.cell(row=r, column=3, value=text or "Not filled")
+                c.alignment = Alignment(wrap_text=True, vertical="top")
+                if not text:
+                    c.font = Font(italic=True, color="7A8699")
+            r += 1
 
-    # per-programme sheets
-    for code, stages in (sub.get("programmes") or {}).items():
-        for skey, state in stages.items():
-            data = state.get("data") or {}
-            if not data:
-                continue
-            sdef = STAGE_BY_KEY.get(skey, {})
-            sheet = wb.create_sheet(f"{code}-{skey}"[:31])
-            row = 1
-            sheet.cell(row=row, column=1,
-                       value=f"{code} — {sdef.get('title', skey)}").font = \
-                Font(bold=True, size=13, color=NAVY)
-            row += 2
-            for section in sdef.get("sections", []):
-                payload = data.get(section["key"])
-                if not payload:
-                    continue
-                sheet.cell(row=row, column=1, value=section["title"]).font = Font(bold=True, size=11)
-                row += 1
-                if section.get("type") in ("table", "programme_list") and isinstance(payload, list):
-                    cols = section.get("columns", [])
-                    _head(sheet, row, [c["label"] for c in cols], fill=GOLD, color="1A1A1A")
-                    row += 1
-                    for item in payload:
-                        for i, c in enumerate(cols, start=1):
-                            cell = sheet.cell(row=row, column=i, value=_flat(item.get(c["name"])))
-                            cell.border = BORDER
-                            cell.alignment = Alignment(wrap_text=True, vertical="top")
-                        row += 1
-                elif isinstance(payload, dict):
-                    for k, v in payload.items():
-                        label = next((r["label"] for r in U.DEFAULT_TABLE_2 if r["key"] == k), k)
-                        sheet.cell(row=row, column=1, value=label).font = Font(bold=True, size=10)
-                        sheet.cell(row=row, column=2, value=_flat(v))
-                        row += 1
-                row += 1
-            _autosize(sheet)
+    for level in ("UG", "PG"):
+        progs = rep["programmes"][level]
+        r += 1
+        _section_title(ws, r, f"{level} programmes ({len(progs)})")
+        r += 1
+        if not progs:
+            ws.cell(row=r, column=2, value="None.").font = Font(italic=True, color="7A8699")
+            r += 1
+            continue
+        _head(ws, r, ["", "Programme", "Code · degree", "Curriculum", "Syllabus", "Course Revision",
+                      "Report"], fill=GOLD, color="1A1A1A")
+        r += 1
+        for p in progs:
+            all_done = all(x["status"] == "submitted" for x in p["parts"])
+            ws.cell(row=r, column=1, value="✓" if all_done else "·").fill = OK_FILL if all_done else NO_FILL
+            _link(ws.cell(row=r, column=2), p["programme_name"], p["report"])
+            ws.cell(row=r, column=2).alignment = Alignment(wrap_text=True, vertical="top")
+            ws.cell(row=r, column=3, value=" · ".join(x for x in (p["programme_code"],
+                                                               p.get("degree_level")) if x))
+            for i, part in enumerate(p["parts"]):
+                c = ws.cell(row=r, column=4 + i, value=status_word(part["status"]))
+                c.fill = OK_FILL if part["status"] == "submitted" else PatternFill()
+            _link(ws.cell(row=r, column=7), "Open report →" if p["report"] else "", p["report"])
+            r += 1
+            for where, name, url in p["documents"]:
+                ws.cell(row=r, column=2, value=f"   {where} document").font = Font(size=9, color="53627A")
+                _link(ws.cell(row=r, column=3), name, url)
+                r += 1
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -274,10 +271,38 @@ def institution_excel(year: str) -> io.BytesIO:
 # Word report
 # ---------------------------------------------------------------------------
 
-def submission_word(dept_code: str, year: str) -> io.BytesIO:
-    db = get_db()
-    dept = db.departments.find_one({"dept_code": dept_code}) or {}
-    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+def _hyperlink(paragraph, text, url):
+    """A clickable link in a Word paragraph (python-docx has no helper for it)."""
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    if not url:
+        return paragraph.add_run(text)
+    rid = paragraph.part.relate_to(url, RT.HYPERLINK, is_external=True)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), rid)
+    run = OxmlElement("w:r")
+    props = OxmlElement("w:rPr")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "0B4A9E")
+    under = OxmlElement("w:u")
+    under.set(qn("w:val"), "single")
+    props.append(color)
+    props.append(under)
+    run.append(props)
+    t = OxmlElement("w:t")
+    t.text = text
+    t.set(qn("xml:space"), "preserve")
+    run.append(t)
+    link.append(run)
+    paragraph._p.append(link)
+    return link
+
+
+def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
+    """The same single report as the Excel download, as a Word document."""
+    from .report import build, status_word
+    rep = build(get_db(), dept_code, year, links)
 
     doc = Document()
     style = doc.styles["Normal"]
@@ -286,99 +311,75 @@ def submission_word(dept_code: str, year: str) -> io.BytesIO:
 
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("JAIN (Deemed-to-be University)")
+    run = title.add_run("JAIN (Deemed-to-be University) — Office of Academics")
     run.bold = True
-    run.font.size = Pt(18)
+    run.font.size = Pt(16)
     run.font.color.rgb = RGBColor(0x0F, 0x2A, 0x4A)
-
     sub_t = doc.add_paragraph()
     sub_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r2 = sub_t.add_run("JAIN (Deemed-to-be University) · Office of Academics Data Portal")
+    r2 = sub_t.add_run(f"Board of Studies record · {rep['dept'].get('dept_name', dept_code)} · {year}")
     r2.font.size = Pt(11)
     r2.font.color.rgb = RGBColor(0x53, 0x62, 0x7A)
 
-    doc.add_paragraph()
+    doc.add_heading("Department information", level=1)
     t = doc.add_table(rows=0, cols=2)
     t.style = "Light Grid Accent 1"
-    for k, v in [("Department", dept.get("dept_name")),
-                 ("Department code", dept.get("dept_code")),
-                 ("School / Faculty", dept.get("school")),
-                 ("Campus", dept.get("campus")),
-                 ("Academic year", year),
-                 ("Report generated", datetime.now().strftime("%d %B %Y, %H:%M"))]:
-        row = t.add_row().cells
-        row[0].text = k
-        row[1].text = _flat(v)
+    for k, v in rep["info"]:
+        cells = t.add_row().cells
+        cells[0].text = k
+        cells[1].text = _flat(v)
 
-    for s in STAGES:
-        state = (sub.get("stages") or {}).get(s["key"], {})
-        data = state.get("data") or {}
-        if not data:
+    doc.add_heading("Stages", level=1)
+    t = doc.add_table(rows=1, cols=4)
+    t.style = "Light Grid Accent 1"
+    for i, h in enumerate(("Stage", "Status", "Submitted on", "Filled")):
+        t.rows[0].cells[i].text = h
+    for st in rep["stages"]:
+        cells = t.add_row().cells
+        cells[0].text = st["title"]
+        cells[1].text = status_word(st["status"])
+        cells[2].text = _flat(st["submitted_at"])
+        cells[3].text = f"{st['filled']} of {st['total']}" + (f" {st['unit']}" if st.get("unit") else " filled")
+
+    for st in rep["stages"]:
+        if st.get("container"):
             continue
-        doc.add_heading(s["title"], level=1)
-        status = compute_status(sub, s["key"])
-        p = doc.add_paragraph()
-        pr = p.add_run(f"Status: {status.title()}")
-        pr.italic = True
-        pr.font.size = Pt(9)
+        doc.add_heading(f"{st['title']} — {status_word(st['status'])}", level=2)
+        if st.get("returned_note"):
+            doc.add_paragraph().add_run("Returned: " + st["returned_note"]).italic = True
+        if not st["items"]:
+            doc.add_paragraph().add_run("Nothing entered yet.").italic = True
+        for filled, label, text, docs in st["items"]:
+            para = doc.add_paragraph()
+            mark = para.add_run("✓  " if filled else "✗  ")
+            mark.bold = True
+            mark.font.color.rgb = RGBColor(0x1F, 0x6B, 0x44) if filled else RGBColor(0xB4, 0x23, 0x18)
+            para.add_run(f"{label}: ").bold = True
+            if docs:
+                for k, (name, url) in enumerate(docs):
+                    if k:
+                        para.add_run(" · ")
+                    _hyperlink(para, name, url)
+            else:
+                para.add_run(text or "Not filled").italic = not text
 
-        for section in s["sections"]:
-            payload = data.get(section["key"])
-            if not payload:
-                continue
-            doc.add_heading(section["title"], level=2)
-            if section.get("type") in ("table", "programme_list") and isinstance(payload, list):
-                cols = section.get("columns", [])
-                keep = [c for c in cols if c.get("type") != "file"][:8]
-                tbl = doc.add_table(rows=1, cols=len(keep))
-                tbl.style = "Light Grid Accent 1"
-                for i, c in enumerate(keep):
-                    cell = tbl.rows[0].cells[i]
-                    cell.text = c["label"]
-                    for para in cell.paragraphs:
-                        for run in para.runs:
-                            run.bold = True
-                for item in payload:
-                    cells = tbl.add_row().cells
-                    for i, c in enumerate(keep):
-                        cells[i].text = _flat(item.get(c["name"]))[:300]
-            elif isinstance(payload, dict):
-                for k, v in payload.items():
-                    para = doc.add_paragraph()
-                    label = next((r["label"] for r in U.DEFAULT_TABLE_2 if r["key"] == k), k)
-                    para.add_run(f"{label}: ").bold = True
-                    para.add_run(_flat(v))
-
-    for code, stages in (sub.get("programmes") or {}).items():
-        doc.add_page_break()
-        doc.add_heading(f"Programme {code}", level=1)
-        for skey, state in stages.items():
-            data = state.get("data") or {}
-            if not data:
-                continue
-            sdef = STAGE_BY_KEY.get(skey, {})
-            doc.add_heading(sdef.get("title", skey), level=2)
-            for section in sdef.get("sections", []):
-                payload = data.get(section["key"])
-                if not payload:
-                    continue
-                doc.add_heading(section["title"], level=3)
-                if isinstance(payload, list):
-                    cols = [c for c in section.get("columns", []) if c.get("type") != "file"][:8]
-                    tbl = doc.add_table(rows=1, cols=len(cols))
-                    tbl.style = "Light Grid Accent 1"
-                    for i, c in enumerate(cols):
-                        tbl.rows[0].cells[i].text = c["label"]
-                    for item in payload:
-                        cells = tbl.add_row().cells
-                        for i, c in enumerate(cols):
-                            cells[i].text = _flat(item.get(c["name"]))[:300]
-                elif isinstance(payload, dict):
-                    for k, v in payload.items():
-                        label = next((r["label"] for r in U.DEFAULT_TABLE_2 if r["key"] == k), k)
-                        para = doc.add_paragraph()
-                        para.add_run(f"{label}: ").bold = True
-                        para.add_run(_flat(v))
+    for level in ("UG", "PG"):
+        progs = rep["programmes"][level]
+        doc.add_heading(f"{level} programmes ({len(progs)})", level=1)
+        if not progs:
+            doc.add_paragraph().add_run("None.").italic = True
+        for p in progs:
+            para = doc.add_paragraph(style="List Bullet")
+            _hyperlink(para, p["programme_name"], p["report"])
+            para.add_run(f"  ({p['programme_code']}"
+                         + (f", {p['degree_level']}" if p.get("degree_level") else "") + ")")
+            para.add_run("\n" + " · ".join(f"{x['title']}: {status_word(x['status'])}"
+                                            for x in p["parts"])).font.size = Pt(9)
+            for where, name, url in p["documents"]:
+                d = doc.add_paragraph()
+                d.paragraph_format.left_indent = Pt(24)
+                d.add_run(f"{where} document: ").font.size = Pt(9)
+                _hyperlink(d, name, url)
 
     buf = io.BytesIO()
     doc.save(buf)

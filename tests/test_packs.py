@@ -255,3 +255,61 @@ def test_the_drive_strip_shows_the_departments_login(app, client):
     page = client.get("/admin/departments").get_data(as_text=True)
     assert report["dept"]["username"] in page
     assert report["password"] in page and "Load again" in page
+
+
+# ---------------------------------------------------------------- the single-sheet report
+
+def test_department_excel_is_one_sheet_with_ticks_and_links(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    _admin(app, client)
+    r = client.get(f"/admin/export/{code}.xlsx")
+    wb = load_workbook(io.BytesIO(r.data))
+    assert wb.sheetnames == ["Report"]
+    ws = wb["Report"]
+    cells = [c for row in ws.iter_rows() for c in row if c.value is not None]
+    text = " ".join(str(c.value) for c in cells)
+    assert "Department information" in text and "Pre-BoS" in text
+    assert "PG programmes" in text and "✗" in text
+    links = [c.hyperlink.target for c in cells if c.hyperlink]
+    assert any(f"/admin/report/{code}/MCAREG" in u for u in links)
+    assert any("/admin/documents/" in u for u in links)          # the attached Drive files
+
+
+def test_department_word_is_one_report_with_links(app, client):
+    import io
+
+    from docx import Document
+    report = _load(app)
+    _admin(app, client)
+    r = client.get(f"/admin/export/{report['dept']['dept_code']}.docx")
+    doc = Document(io.BytesIO(r.data))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    assert "UG programmes" in text and "PG programmes" in text
+    rels = [rel.target_ref for rel in doc.part.rels.values() if "hyperlink" in rel.reltype]
+    assert any("/admin/report/" in u for u in rels)
+
+
+def test_the_programme_report_opens_in_the_browser(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG").get_data(as_text=True)
+    assert "Programme structure" in page and "25MCAC101" in page
+    assert "Data Structures" in page and "Total: 90 credits" in page
+
+
+def test_a_departments_own_download_links_to_its_own_pages(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    from app.db import get_db
+    code = _signed_in_department(app, client)
+    with app.app_context():          # the download is the finished record
+        get_db().submissions.update_one({"dept_code": code}, {"$set": {"status": "sealed"}})
+    r = client.get("/department/export.xlsx")
+    ws = load_workbook(io.BytesIO(r.data))["Report"]
+    links = [c.hyperlink.target for row in ws.iter_rows() for c in row if c.hyperlink]
+    assert links and all("/admin/" not in u for u in links)

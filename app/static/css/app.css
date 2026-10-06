@@ -4508,3 +4508,23 @@ td.rt-syl { white-space: nowrap; }
 .pack-login code { font-size: .86rem; }
 .pack-login .linklike { background: none; border: 0; padding: 0; color: var(--blue, #0b4a9e); cursor: pointer; text-decoration: underline; font: inherit; }
 .import-files { margin: 6px 0 10px; padding-left: 18px; display: grid; gap: 3px; }
+
+/* programme structure: one link into the syllabi, a mark per row */
+th.rt-syl-head { white-space: nowrap; }
+.syl-all { color: var(--jain-link, #0b4a9e); font-weight: 700; text-decoration: none; text-transform: none; letter-spacing: 0; }
+.syl-all:hover { text-decoration: underline; }
+td.rt-syl .syl-chip { min-width: 30px; justify-content: center; padding: 3px 8px; }
+.syl-nav-search { min-width: 200px; }
+.syl-nav { scroll-margin-top: 90px; }
+
+/* ---------------------------------------------------- a programme's report page */
+.rep-fields { display: grid; grid-template-columns: minmax(160px, 260px) 1fr; gap: 6px 16px; margin: 0; font-size: .9rem; }
+.rep-fields dt { color: var(--ink-soft, #5a6475); }
+.rep-fields dd { margin: 0; white-space: pre-line; }
+.rep-sem { margin: 14px 0 6px; font-size: .95rem; }
+.rep-table td.num, .rep-table th.num { text-align: right; }
+.rep-course { border: 1px solid var(--line, #e3ded0); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
+.rep-course > summary { cursor: pointer; }
+.rep-course .pre { white-space: pre-line; }
+@media print { .rep-course { break-inside: avoid; } .rep-course[open] summary ~ * { display: block; } }
+@media (max-width: 720px) { .rep-fields { grid-template-columns: 1fr; } }
