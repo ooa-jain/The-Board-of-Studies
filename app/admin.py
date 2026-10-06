@@ -1365,3 +1365,54 @@ def comments_json():
     return jsonify([{"text": c["text"], "by": c.get("by"), "at": c["at"].strftime("%d %b %Y %H:%M"),
                      "status": c.get("status"), "reply": c.get("reply", "")}
                     for c in get_db().comments.find(q).sort("at", -1)])
+
+
+# ---------------------------------------------------------------------------
+# calendar: what happened on which day
+# ---------------------------------------------------------------------------
+
+@bp.route("/calendar")
+@admin_required
+def calendar():
+    """A month of activity: a dot on each day something happened, coloured by
+    what; click a day for everything done on it."""
+    import calendar as cal
+    from datetime import date, timedelta
+    from .notify import EVENTS
+    db = get_db()
+    today = now().date()
+    try:
+        y, m = (int(x) for x in (request.args.get("month") or today.strftime("%Y-%m")).split("-"))
+        first = date(y, m, 1)
+    except (ValueError, TypeError):
+        first = today.replace(day=1)
+    last = first.replace(day=cal.monthrange(first.year, first.month)[1])
+    start = datetime(first.year, first.month, 1)
+    end = datetime(last.year, last.month, last.day) + timedelta(days=1)
+
+    days = {}
+    for n in db.notifications.find({"at": {"$gte": start, "$lt": end}}, {"at": 1, "event": 1}):
+        d = days.setdefault(n["at"].date(), {"total": 0, "events": {}})
+        d["total"] += 1
+        d["events"][n["event"]] = d["events"].get(n["event"], 0) + 1
+    for c in db.comments.find({"at": {"$gte": start, "$lt": end}}, {"at": 1}):
+        d = days.setdefault(c["at"].date(), {"total": 0, "events": {}})
+        d["total"] += 1
+        d["events"]["comment"] = d["events"].get("comment", 0) + 1
+
+    weeks = cal.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month)
+    try:
+        chosen = date.fromisoformat(request.args.get("day") or "")
+    except ValueError:
+        chosen = today if first <= today <= last else None
+    items, comments = [], []
+    if chosen:
+        a = datetime(chosen.year, chosen.month, chosen.day)
+        items = list(db.notifications.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}}).sort("at", -1))
+        comments = list(db.comments.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}}).sort("at", -1))
+    prev_m = (first - timedelta(days=1)).strftime("%Y-%m")
+    next_m = (last + timedelta(days=1)).strftime("%Y-%m")
+    names = {d["dept_code"]: d.get("dept_name", "") for d in db.departments.find({}, {"dept_code": 1, "dept_name": 1})}
+    return render_template("admin/calendar.html", weeks=weeks, first=first, days=days, today=today,
+                           chosen=chosen, items=items, comments=comments, prev_m=prev_m, next_m=next_m,
+                           events=EVENTS, names=names, STAGE_BY_KEY=STAGE_BY_KEY)

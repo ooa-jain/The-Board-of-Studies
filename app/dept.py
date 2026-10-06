@@ -15,6 +15,7 @@ from .db import audit, get_db, now, rules_doc, settings
 from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
 from .schema import STAGE_BY_KEY, STAGE_KEYS
+from . import people
 from .notify import describe_changes
 from .notify import record as notify_record
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
@@ -41,6 +42,125 @@ def _dept():
     if not d or not d.get("active", True):
         abort(403)
     return d
+
+
+# ---------------------------------------------------------------------------
+# who is working on the shared login
+# ---------------------------------------------------------------------------
+
+_NO_ASK = {"dept.who", "dept.versions", "dept.version_restore"}
+
+
+@bp.before_request
+def _ask_who():
+    """A department's login is shared, so each person says who they are once
+    a session; their saves are kept under their name."""
+    u = session.get("user") or {}
+    if u.get("role") != "department":
+        return None
+    p = u.get("person")
+    if p:
+        people.seen(u["dept_code"], p)
+        return None
+    if (not current_app.config.get("ASK_PERSON", True) or request.endpoint in _NO_ASK
+            or request.method != "GET" or "/api/" in request.path):
+        return None
+    return redirect(url_for("dept.who", next=request.full_path.rstrip("?")))
+
+
+@bp.route("/who", methods=["GET", "POST"])
+@department_required
+def who():
+    dept = _dept()
+    me = _me()
+    nxt = request.values.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("dept.dashboard")
+    error = None
+    if request.method == "POST":
+        name = " ".join((request.form.get("name") or "").split())[:80]
+        email = (request.form.get("email") or "").strip().lower()[:120]
+        if len(name) < 2:
+            error = "Please give your name."
+        elif "@" not in email or "." not in email.split("@")[-1] or " " in email:
+            error = "Please give a working e-mail address."
+        else:
+            person = {"name": name, "email": email}
+            me["person"] = person
+            session["user"] = me
+            session.modified = True
+            people.seen(dept["dept_code"], person)
+            audit(me["username"], "person.set", f"{name} <{email}>")
+            return redirect(nxt)
+    return render_template("dept/who.html", dept=dept, nxt=nxt, error=error,
+                           person=me.get("person"),
+                           others=people.others_active(dept["dept_code"], me.get("person")),
+                           known=people.known(dept["dept_code"]))
+
+
+@bp.route("/versions")
+@department_required
+def versions():
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    rows = people.history(dept["dept_code"], _year())
+    # what each version changed, against the one before it on the same stage
+    by_part = {}
+    for v in reversed(rows):
+        k = (v["stage"], v["programme_code"])
+        v["changes"] = describe_changes(v["stage"], by_part.get(k), v.get("data"))
+        by_part[k] = v.get("data")
+        v["title"] = STAGE_BY_KEY.get(v["stage"], {}).get("title", v["stage"])
+        v["url"] = (url_for("dept.stage", stage_key=v["stage"], programme_code=v["programme_code"])
+                    if v["programme_code"] else url_for("dept.stage", stage_key=v["stage"]))
+        st = _part(sub, v["stage"], v["programme_code"]).get("status")
+        v["locked"] = st in ("submitted", "approved")
+        v["latest"] = False
+    for k in by_part:
+        newest = next(v for v in rows if (v["stage"], v["programme_code"]) == k)
+        newest["latest"] = True
+    return render_template("dept/versions.html", dept=dept, rows=rows, keep_days=people.KEEP_DAYS,
+                           person=_person(), stage=request.args.get("stage"))
+
+
+@bp.post("/versions/<vid>/restore")
+@department_required
+def version_restore(vid):
+    from bson import ObjectId
+    from bson.errors import InvalidId
+    dept = _dept()
+    try:
+        v = get_db().versions.find_one({"_id": ObjectId(vid), "dept_code": dept["dept_code"],
+                                        "academic_year": _year()})
+    except InvalidId:
+        v = None
+    if not v:
+        abort(404)
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    code = v["programme_code"] or None
+    if _part(sub, v["stage"], code).get("status") in ("submitted", "approved"):
+        flash("That stage is submitted, so it cannot be changed. Ask the Office of Academics "
+              "to send it back first.", "error")
+        return redirect(url_for("dept.versions"))
+    programme = None
+    if code:
+        programme = next((p for p in programmes_of(sub, dept) if p.get("programme_code") == code), None)
+    before = _stored_data(sub, v["stage"], code)
+    save_draft(dept["dept_code"], _year(), v["stage"], v.get("data") or {}, code)
+    who_was = v.get("name") or "someone"
+    people.keep(dept["dept_code"], _year(), v["stage"], code, v.get("data") or {}, _person(), kind="restore")
+    _tell(dept, "saved", v["stage"], programme,
+          changes=describe_changes(v["stage"], before, v.get("data") or {}))
+    audit(_me()["username"], "version.restore", f"{v['stage']} {code or ''} from {v['at']}")
+    flash(f"Restored the version {who_was} saved on {v['at'].strftime('%d %b, %H:%M')}.", "success")
+    return redirect(url_for("dept.stage", stage_key=v["stage"], programme_code=code) if code
+                    else url_for("dept.stage", stage_key=v["stage"]))
+
+
+def _part(sub, stage_key, programme_code=None):
+    if programme_code:
+        return ((sub.get("programmes") or {}).get(programme_code) or {}).get(stage_key) or {}
+    return (sub.get("stages") or {}).get(stage_key) or {}
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +276,7 @@ def stage(stage_key, programme_code=None):
 
     syllabi = _syllabus_index(sub, stage_key, programme) if stage_key == "prog_curriculum" else []
     course_map, back = {}, None
-    if programme and (stage_key.startswith("prog_syllabus") or stage_key == "prog_revision"):
+    if programme and stage_key in ("prog_syllabus", "prog_revision"):
         # each course's semester and course group, from the programme structure
         cur = programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {}
         for r in cur.get("semester_structure") or []:
@@ -363,6 +483,7 @@ def api_save(stage_key, programme_code=None):
     data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
     before = _stored_data(sub, stage_key, programme_code)
     save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
+    people.keep(dept["dept_code"], _year(), stage_key, programme_code, data, _person())
     _tell(dept, "saved", stage_key, programme, changes=describe_changes(stage_key, before, data))
     return jsonify({"ok": True, "saved_at": now().isoformat()})
 
@@ -373,11 +494,16 @@ def _stored_data(sub, stage_key, programme_code=None):
     return ((sub.get("stages") or {}).get(stage_key) or {}).get("data") or {}
 
 
+def _person():
+    return (session.get("user") or {}).get("person")
+
+
 def _tell(dept, event, stage_key=None, programme=None, **kw):
     """An update for the Office; never in the way of the department's work."""
+    p = _person()
     try:
         notify_record(dept, event, stage_key=stage_key, programme=programme,
-                      actor=_me()["username"], **kw)
+                      actor=_me()["username"], person=(p or {}).get("name", ""), **kw)
     except Exception:
         current_app.logger.exception("Could not record an update")
 
@@ -427,6 +553,14 @@ def demo_fill_all():
     if not dept.get("demo"):
         abort(404)
     n = demo_dept.fill_all(_year())
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for key, part in (sub.get("stages") or {}).items():
+        if part.get("data"):
+            people.keep(dept["dept_code"], _year(), key, None, part["data"], _person())
+    for code, parts in (sub.get("programmes") or {}).items():
+        for key, part in (parts or {}).items():
+            if isinstance(part, dict) and part.get("data"):
+                people.keep(dept["dept_code"], _year(), key, code, part["data"], _person())
     flash(f"Filled {n} stage{'s' if n != 1 else ''} and programme parts with sample data. "
           "Open each in turn, press Submit, review and confirm.", "success")
     return redirect(url_for("dept.dashboard"))
@@ -518,6 +652,8 @@ def _submit_one(dept, sub, stage_key, programme, data):
         return {"ok": False, "status": status, "issues": issues, "summary": summary}
     _tell(dept, "submitted", stage_key, programme,
           changes=describe_changes(stage_key, before, apply_defaults(stage_key, data)))
+    people.keep(dept["dept_code"], _year(), stage_key, programme_code, apply_defaults(stage_key, data),
+                _person(), kind="submit")
     audit(_me()["username"], "stage.submitted",
           f"{dept['dept_code']}/{programme_code + '/' if programme_code else ''}{stage_key}")
     return {"ok": True, "status": status, "issues": issues, "summary": summary}

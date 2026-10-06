@@ -13,6 +13,13 @@
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Overview</div>
       <h1>Overview — {{ year }}</h1>
       <p>Every department: where it stands, what it filed, what is wrong, and what you asked to change.</p>
+{% if batch_info %}
+<div class="batch-strip">
+  <span class="bs-label">Current batch</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
+  {% if batch_info.existing %}<span class="bs-label">Existing batches</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
+  <a class="bs-change" href="{{ url_for('admin.app_settings') }}#current_batch">Change</a>
+</div>
+{% endif %}
     </div>
     <div class="spacer head-aside">
       <a class="btn" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>

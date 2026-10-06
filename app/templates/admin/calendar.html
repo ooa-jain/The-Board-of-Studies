@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Calendar</div>
+      <h1>Calendar</h1>
+      <p>A dot on every day something happened. Click a day to see what each department did.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set icons = {'submitted': '✓', 'saved': '✎', 'uploaded': '⇪', 'keyword_miss': '!', 'programme': '≡', 'password': '⚿'} %}
+<div class="cal-layout">
+  <section class="cal card">
+    <div class="cal-head">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.calendar', month=prev_m) }}" aria-label="Previous month">‹</a>
+      <h2>{{ first.strftime('%B %Y') }}</h2>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.calendar', month=next_m) }}" aria-label="Next month">›</a>
+      <a class="btn btn-ghost btn-sm cal-today" href="{{ url_for('admin.calendar') }}">Today</a>
+    </div>
+    <div class="cal-grid" role="grid">
+      {% for d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}<div class="cal-dow" role="columnheader">{{ d }}</div>{% endfor %}
+      {% for week in weeks %}{% for d in week %}
+      {% set info = days.get(d) %}
+      <a role="gridcell" href="{{ url_for('admin.calendar', month=first.strftime('%Y-%m'), day=d.isoformat()) }}"
+         class="cal-day{{ ' is-out' if d.month != first.month }}{{ ' is-today' if d == today }}{{ ' is-chosen' if d == chosen }}{{ ' has-activity' if info }}">
+        <span class="cal-n">{{ d.day }}</span>
+        {% if info %}
+        <span class="cal-dots">{% for ev, n in info.events.items() %}<i class="cd-{{ ev }}" title="{{ n }} × {{ events[ev][0] if ev in events else 'Comment' }}"></i>{% endfor %}</span>
+        <span class="cal-count">{{ info.total }}</span>
+        {% endif %}
+      </a>
+      {% endfor %}{% endfor %}
+    </div>
+    <div class="cal-key small muted">
+      <span><i class="cd-submitted"></i> submitted</span><span><i class="cd-uploaded"></i> uploaded</span>
+      <span><i class="cd-saved"></i> changed</span><span><i class="cd-keyword_miss"></i> wrong file</span>
+      <span><i class="cd-comment"></i> comment</span>
+    </div>
+  </section>
+
+  <section class="cal-day-panel">
+    {% if chosen %}
+    <h3>{{ chosen.strftime('%A, %d %B %Y') }}</h3>
+    {% for c in comments %}
+    <div class="office-comment"><div class="oc-head"><strong>Comment to {{ names.get(c.dept_code, c.dept_code) }}</strong>
+      <span class="small muted">{{ c.at.strftime('%H:%M') }} · {{ STAGE_BY_KEY.get(c.stage, {}).get('title', c.stage) }}</span></div>
+      <p class="oc-text">{{ c.text }}</p></div>
+    {% endfor %}
+    <ol class="upd-list">
+      {% for n in items %}
+      <li class="upd-item ev-{{ n.event }}">
+        <span class="upd-dot" aria-hidden="true">{{ icons.get(n.event, '•') }}</span>
+        <div class="upd-body">
+          <div class="upd-head">
+            <a class="upd-dept" href="{{ url_for('admin.submission_detail', dept_code=n.dept_code) }}">{{ n.dept_name or n.dept_code }}</a>
+            <span class="upd-kind">{{ events[n.event][0] if n.event in events else n.event }}</span>
+            {% if n.stage_title %}<span class="upd-tag">{{ n.stage_title }}</span>{% endif %}
+            {% if n.person %}<span class="upd-tag is-person">by {{ n.person }}</span>{% endif %}
+            <time class="upd-time">{{ n.at.strftime('%H:%M') }}</time>
+          </div>
+          {% if n.changes %}<p class="small muted" style="margin:4px 0 0">{{ n.changes|length }} field{{ 's' if n.changes|length != 1 }}: {{ n.changes[:3]|map(attribute='field')|join(', ') }}{% if n.changes|length > 3 %}…{% endif %}</p>{% endif %}
+        </div>
+      </li>
+      {% else %}
+      {% if not comments %}<li class="empty card">Nothing happened on this day.</li>{% endif %}
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="muted">Pick a day.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

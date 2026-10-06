@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Who is working{% endblock %}
+{% block content %}
+<div class="who-page">
+  <div class="card who-card">
+    <span class="dash-kicker">{{ dept.dept_name }}</span>
+    <h1>Who is working on this login?</h1>
+    <p class="muted">Your department shares one login, so tell us who you are. What you save is kept under your
+      name, and anyone on this login can see who changed what and go back to an earlier version for 5 days.</p>
+
+    {% if others %}
+    <div class="who-alert" role="status">
+      <strong>Already signed in on this login{{ ' now' }}:</strong>
+      <ul>{% for p in others %}<li>{{ p.name }} <span class="muted">({{ p.email }}) · active {{ p.last_seen.strftime('%H:%M') }}</span></li>{% endfor %}</ul>
+      <span class="small">You can both work — but not on the same stage at the same time, or one will overwrite the other. Add your name and e-mail to carry on.</span>
+    </div>
+    {% endif %}
+
+    {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+    <form method="post" class="who-form">
+      <input type="hidden" name="next" value="{{ nxt }}">
+      <label>Your name<input name="name" required maxlength="80" value="{{ request.form.name or (person.name if person else '') }}" autocomplete="name" list="who-known-names"></label>
+      <label>Your e-mail<input name="email" type="email" required maxlength="120" value="{{ request.form.email or (person.email if person else '') }}" autocomplete="email"></label>
+      <datalist id="who-known-names">{% for p in known %}<option value="{{ p.name }}">{% endfor %}</datalist>
+      <button class="btn btn-gold" type="submit">Continue</button>
+    </form>
+
+    {% if known %}
+    <div class="who-known">
+      <span class="small muted">People who have used this login:</span>
+      {% for p in known %}<button type="button" class="who-chip" data-name="{{ p.name }}" data-email="{{ p.email }}">{{ p.name }}</button>{% endfor %}
+    </div>
+    <script>
+      document.querySelectorAll(".who-chip").forEach(b => b.addEventListener("click", () => {
+        document.querySelector(".who-form [name=name]").value = b.dataset.name;
+        document.querySelector(".who-form [name=email]").value = b.dataset.email;
+      }));
+    </script>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

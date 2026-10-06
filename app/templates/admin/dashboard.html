@@ -20,6 +20,7 @@
     <a href="{{ url_for('admin.departments') }}" title="Departments"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5"/></svg></a>
     <a href="{{ url_for('admin.sheets', tab='documents') }}" title="Documents"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM14 3v5h5"/></svg></a>
     <a href="{{ url_for('admin.sheets', tab='comments') }}" title="Comments"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></a>
+    <a href="{{ url_for('admin.calendar') }}" title="Calendar"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></a>
     <a href="{{ url_for('admin.flow') }}" title="Flow 3D"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M10 9l5 3-5 3z"/></svg></a>
     <span class="spacer"></span>
     <a href="{{ url_for('admin.app_settings') }}" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></a>
@@ -27,7 +28,14 @@
 
   <div class="dash-main">
     <div class="dash-top">
-      <div><span class="dash-kicker">Office of Academics</span><h1>Board of Studies — {{ year }}</h1></div>
+      <div><span class="dash-kicker">Office of Academics</span><h1>Board of Studies — {{ year }}</h1>
+{% if batch_info %}
+<div class="batch-strip">
+  <span class="bs-label">Current batch</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
+  {% if batch_info.existing %}<span class="bs-label">Existing batches</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
+  <a class="bs-change" href="{{ url_for('admin.app_settings') }}#current_batch">Change</a>
+</div>
+{% endif %}</div>
       <form class="dash-search" method="get" action="{{ url_for('admin.departments') }}" role="search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
         <input name="q" placeholder="Find a department" aria-label="Find a department">

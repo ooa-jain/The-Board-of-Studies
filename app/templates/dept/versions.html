@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Versions — who changed what{% endblock %}
+{% block content %}
+<div class="ver-page">
+  <div class="ver-head">
+    <div>
+      <a class="back-link" href="{{ url_for('dept.dashboard') }}">← Back to the stages</a>
+      <h1>Versions — who changed what</h1>
+      <p class="muted">Every save on this login, by who made it, for the last {{ keep_days }} days. A person's saves
+        on one stage within a quarter of an hour are one version. Restore puts an earlier version back as the
+        draft — you can restore any stage that is not yet submitted.</p>
+    </div>
+    {% if person %}<span class="ver-me">You are <b>{{ person.name }}</b> · <a href="{{ url_for('dept.who', next=request.path) }}">not you?</a></span>{% endif %}
+  </div>
+
+  {% set ns = namespace(day=None) %}
+  {% for v in rows if not stage or v.stage == stage %}
+    {% if v.at.strftime('%Y-%m-%d') != ns.day %}{% set ns.day = v.at.strftime('%Y-%m-%d') %}
+      <h2 class="ver-day">{{ v.at.strftime('%A %d %B') }}</h2>
+    {% endif %}
+    <details class="ver-row{{ ' is-latest' if v.latest }}">
+      <summary>
+        <span class="ver-av" aria-hidden="true">{{ (v.name or '?')[:1]|upper }}</span>
+        <span class="ver-words">
+          <b>{{ v.name or 'Unknown' }}</b> <span class="muted small">{{ v.email }}</span><br>
+          <span class="ver-kind ver-{{ v.kind }}">{{ {'save': 'Saved', 'submit': 'Submitted', 'restore': 'Restored an older version of'}.get(v.kind, v.kind) }}</span>
+          <a href="{{ v.url }}">{{ v.title }}{{ ' · ' ~ v.programme_code if v.programme_code }}</a>
+          <span class="muted small">· {{ v.changes|length }} change{{ 's' if v.changes|length != 1 }}{{ ' · ' ~ v.saves ~ ' saves' if v.saves > 1 }}</span>
+        </span>
+        <span class="ver-time">{{ v.at.strftime('%H:%M') }}</span>
+        {% if v.latest %}<span class="ver-badge">Current</span>
+        {% elif v.locked %}<span class="ver-badge is-locked" title="Submitted — ask the Office to send it back to change it">Submitted</span>
+        {% else %}
+        <form method="post" action="{{ url_for('dept.version_restore', vid=v._id|string) }}"
+              onsubmit="return confirm('Put this version back as the draft of {{ v.title|e }}? What is there now stays in the list, so you can come back to it.')">
+          <button class="btn btn-sm btn-ghost" type="submit">Restore</button>
+        </form>
+        {% endif %}
+      </summary>
+      {% if v.changes %}
+      <table class="ver-changes">
+        <thead><tr><th>Where</th><th>Before</th><th>After</th></tr></thead>
+        <tbody>{% for c in v.changes %}<tr><td>{{ c.section }} › {{ c.field }}</td><td>{{ c.before }}</td><td>{{ c.after }}</td></tr>{% endfor %}</tbody>
+      </table>
+      {% else %}<p class="small muted ver-none">No change from the version before.</p>{% endif %}
+    </details>
+  {% else %}
+    <div class="card"><p class="muted">Nothing saved in the last {{ keep_days }} days yet. Versions appear here as people on this login save their work.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

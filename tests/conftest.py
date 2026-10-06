@@ -32,7 +32,7 @@ def app(monkeypatch):
     monkeypatch.setattr(mongomock.collection.Collection, "__bool__", _no_bool, raising=False)
     from app import create_app
     application = create_app()
-    application.config.update(TESTING=True, SESSION_COOKIE_SECURE=False)
+    application.config.update(TESTING=True, SESSION_COOKIE_SECURE=False, ASK_PERSON=False)
     yield application
 
 

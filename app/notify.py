@@ -137,7 +137,7 @@ def stage_title(stage_key):
     return (STAGE_BY_KEY.get(stage_key) or {}).get("title", stage_key or "")
 
 
-def record(dept, event, *, stage_key=None, programme=None, changes=None, text="", actor=""):
+def record(dept, event, *, stage_key=None, programme=None, changes=None, text="", actor="", person=""):
     """Write one update (or add to the open one) and tell the connectors."""
     if event not in EVENTS:
         raise ValueError(event)
@@ -148,14 +148,15 @@ def record(dept, event, *, stage_key=None, programme=None, changes=None, text=""
             "campus": dept.get("campus", ""), "event": event, "stage": stage_key or "",
             "stage_title": stage_title(stage_key) if stage_key else "",
             "programme_code": prog_code or "",
-            "programme_name": (programme or {}).get("programme_name", "")}
+            "programme_name": (programme or {}).get("programme_name", ""),
+            "person": person or ""}
 
     if event == "saved":
         if not changes:
             return None
         open_one = db.notifications.find_one({
             "dept_code": base["dept_code"], "event": "saved", "stage": base["stage"],
-            "programme_code": base["programme_code"], "read": False,
+            "programme_code": base["programme_code"], "read": False, "person": base["person"],
             "at": {"$gte": at - timedelta(minutes=FOLD_MINUTES)}})
         if open_one:
             merged = _merge(open_one.get("changes", []), changes)

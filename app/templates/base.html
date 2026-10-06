@@ -68,6 +68,7 @@
         {% if current_user and current_user.role == 'admin' %}
           {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
           {{ nav_link(url_for('admin.submissions'), 'Overview', request.endpoint in ('admin.submissions', 'admin.analysis', 'admin.sheets', 'admin.submission_detail')) }}
+          {{ nav_link(url_for('admin.calendar'), 'Calendar', request.endpoint == 'admin.calendar') }}
           {{ nav_link(url_for('admin.flow'), 'Flow 3D', request.endpoint == 'admin.flow') }}
 
         {% elif current_user and current_user.role == 'department' %}
@@ -99,6 +100,21 @@
                again only takes room off the bar #}
             {% if current_user.role != 'admin' %}<span>{{ current_user.dept_code }}</span>{% endif %}
           </span>
+          {% if current_user.role == 'department' %}
+          <details class="who-profile">
+            <summary title="Who is working on this login">
+              <span class="who-person">{{ current_user.person.name if current_user.person else 'Add your name' }}</span>
+            </summary>
+            <div class="who-menu">
+              {% if current_user.person %}
+              <b>{{ current_user.person.name }}</b><span class="small muted">{{ current_user.person.email }}</span>
+              {% endif %}
+              <a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Change name' if current_user.person else 'Add your name and e-mail' }}</a>
+              <a href="{{ url_for('dept.versions') }}">Versions — who changed what</a>
+              <a href="{{ url_for('auth.change_password') }}">Password</a>
+            </div>
+          </details>
+          {% endif %}
           <a href="{{ url_for('auth.logout') }}">Sign out</a>
         </div>
         {% else %}

@@ -1490,7 +1490,7 @@
       return a;
     }
     const hits = [];
-    syl.forEach(x => (x.courses || []).forEach(c => {
+    syl.filter(x => x.current).forEach(x => (x.courses || []).forEach(c => {
       if (c.code.toUpperCase() === code) hits.push({ x, c, same: norm(c.title) === norm(row.course_title) });
     }));
     const best = hits.find(h => h.x.current && h.same) || hits.find(h => h.x.current) ||
@@ -3256,6 +3256,7 @@
 
     /* Semester → course group → course: pick one and only its sheet shows. */
     const MAP = CTX.course_map || {};
+    const USE_NAV = CTX.key === "prog_syllabus";
     const nav = el("div", "syl-nav");
     host.insertBefore(nav, list);
     const info = r => {
@@ -3272,7 +3273,7 @@
     const inPick = (r) => (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group);
     function paintNav() {
       nav.textContent = "";
-      if (data.length < 2) { nav.hidden = true; return; }
+      if (!USE_NAV || data.length < 2) { nav.hidden = true; return; }
       nav.hidden = false;
       const row1 = el("div", "syl-nav-row");
       const sems = [...new Set(data.map(r => info(r).sem).filter(Boolean))].sort((a, b) => +a - +b);
@@ -3292,6 +3293,12 @@
       row1.appendChild(lab("Course group", grpSel));
       const done = data.filter(isFilled).length;
       row1.appendChild(el("span", "syl-nav-count", `${done} of ${data.length} courses filled`));
+      const structure = document.querySelector(".back-link");
+      if (structure) {
+        const go = el("a", "btn btn-ghost btn-sm", "Check / add in the Programme structure →");
+        go.href = structure.href;
+        row1.appendChild(go);
+      }
       nav.appendChild(row1);
       const choose = () => {
         const first = data.findIndex(inPick);
@@ -3323,7 +3330,7 @@
       paintNav();
       data.forEach((row, i) => {
         // with the picker, only the chosen course's sheet shows
-        if (data.length >= 2 && i !== pick.idx) return;
+        if (USE_NAV && data.length >= 2 && i !== pick.idx) return;
         list.appendChild(sheet(row, i));
       });
       if (!CTX.readonly) {

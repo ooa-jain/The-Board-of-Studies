@@ -58,14 +58,17 @@ def create_app(config_object=Config):
     def _inject():
         from .schema import GROUP_ORDER, STAGES
         user = session.get("user") or {}
-        unread = 0
+        unread, batch_info = 0, None
         if user.get("role") == "admin":
             try:
                 unread = database.get_db().notifications.count_documents({"read": False})
+                from .workflow import batches
+                batch_info = batches()
             except Exception:
                 unread = 0
         return {
             "updates_unread": unread,
+            "batch_info": batch_info,
             "current_user": session.get("user"),
             "app_settings": database.settings(),
             "STAGES": STAGES,
