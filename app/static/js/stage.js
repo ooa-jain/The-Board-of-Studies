@@ -2940,7 +2940,7 @@
         panel.appendChild(add);
       }
       cols.appendChild(panel);
-      panels[t.key] = { tab: t, title: title, list: list };
+      panels[t.key] = { tab: t, title: title, list: list, panel: panel };
     });
 
     // every row is on screen now; kept for focusIssue
@@ -3065,6 +3065,16 @@
     search.addEventListener("input", filter);
 
     draw();
+
+    // arriving from Curriculum's "add a new UG / PG programme": start the row
+    if (CTX.add_level && !CTX.readonly) {
+      const want = tabs.find(t => t.key === CTX.add_level) ||
+                   tabs.find(t => t.degrees && t.degrees.includes(CTX.add_level));
+      const target = want && panels[want.key];
+      if (target && !data.some(r => r.source === "new" && !r.programme_code && !r.programme_name)) {
+        target.panel.querySelector(".pl-panel-add")?.click();
+      }
+    }
   }
 
   // ------------------------------------------------------------- template sheets
@@ -3695,6 +3705,15 @@
       saveNote.textContent = "Could not reach the server — your work is still in this tab";
     });
   }
+
+  // "Back to Curriculum" keeps what was typed: save, then go
+  document.querySelectorAll(".js-back-save").forEach(a => {
+    a.addEventListener("click", e => {
+      if (!dirty) return;
+      e.preventDefault();
+      save().then(() => { window.location = a.href; });
+    });
+  });
 
   const checksCard = document.getElementById("checks-card");
   const checksClose = document.getElementById("checks-close");

@@ -50,9 +50,15 @@
 </div>
 {% endfor %}
 
-<p class="small muted">
-  A programme missing here? It comes from the Programmes offered list in
-  <a href="{{ url_for('dept.stage', stage_key='dept_info') }}">Department Information</a> — ask the
-  Office of Academics to reopen that stage if it is already submitted.
-</p>
+<div class="add-prog-strip">
+  <div>
+    <strong>Need to add a new programme?</strong>
+    <span class="small muted">It takes you to Department Information, where the programme list is kept.
+      Add the programme there and you come straight back here.</span>
+  </div>
+  <div class="spacer flex">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.add_programme', level='UG') }}">+ Add a UG programme</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.add_programme', level='PG') }}">+ Add a PG programme</a>
+  </div>
+</div>
 {% endblock %}

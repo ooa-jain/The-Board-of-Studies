@@ -4493,3 +4493,12 @@ td.rt-syl { white-space: nowrap; }
 .import-card > summary::-webkit-details-marker { display: none; }
 .import-card > summary h3::after { content: " ▾"; color: var(--ink-faint); font-size: .8em; }
 .import-notes { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-700); }
+
+/* ---------------------------------------------------- add a programme from Curriculum */
+.add-prog-strip {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 18px; margin-top: 8px; border: 1px dashed var(--line, #d9d4c8);
+  border-radius: var(--radius); background: var(--surface, #fff);
+}
+.add-prog-strip > div:first-child { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 2px; }
+.add-prog-bar { flex-wrap: wrap; }

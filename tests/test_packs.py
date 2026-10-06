@@ -161,3 +161,45 @@ def test_admin_loads_the_pack_from_the_departments_page(app, client):
     assert "Load again" in client.get("/admin/departments").get_data(as_text=True)
     page = client.get("/admin/submissions/CSI-JYN").get_data(as_text=True)
     assert "Filled from the department" in page and "TBA-" in page
+
+
+# ---------------------------------------------------------------- add a programme from Curriculum
+
+def _signed_in_department(app, client):
+    report = _load(app)
+    login(client, report["dept"]["username"], report["password"])
+    client.post("/department/who", data={"name": "Test Faculty", "email": "t@example.edu",
+                                         "next": "/department/"})
+    return report["dept"]["dept_code"]
+
+
+def test_curriculum_offers_to_add_a_ug_or_pg_programme(app, client):
+    _signed_in_department(app, client)
+    page = client.get("/department/stage/curriculum").get_data(as_text=True)
+    assert "Add a UG programme" in page and "Add a PG programme" in page
+    assert "/department/programmes/add?level=PG" in page
+
+
+def test_adding_a_programme_reopens_department_information_and_comes_back(app, client):
+    from app.db import get_db
+    code = _signed_in_department(app, client)
+    with app.app_context():                      # as if Department Information were submitted
+        get_db().submissions.update_one({"dept_code": code},
+                                        {"$set": {"stages.dept_info.status": "submitted"}})
+    r = client.get("/department/programmes/add?level=UG")
+    assert r.status_code == 302
+    assert r.headers["Location"].endswith("/department/stage/dept_info?add=UG&back=curriculum")
+    assert _sub(app, code)["stages"]["dept_info"]["status"] == "draft"
+
+    page = client.get(r.headers["Location"]).get_data(as_text=True)
+    assert "Back to Curriculum" in page and "Adding a new" in page
+    assert "back=curriculum" in page             # submitting returns to Curriculum
+
+
+def test_a_sealed_record_cannot_be_reopened_from_curriculum(app, client):
+    from app.db import get_db
+    code = _signed_in_department(app, client)
+    with app.app_context():
+        get_db().submissions.update_one({"dept_code": code}, {"$set": {"status": "sealed"}})
+    r = client.get("/department/programmes/add?level=PG")
+    assert r.headers["Location"].endswith("/department/stage/curriculum")

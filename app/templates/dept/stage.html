@@ -48,6 +48,16 @@
 {% endblock %}
 
 {% block content %}
+{% if back_to %}
+<div class="back-bar add-prog-bar">
+  <a class="back-link js-back-save" href="{{ back_to }}">← Back to Curriculum</a>
+  <span class="back-prog">
+    {% if add_level %}Adding a new <strong>{{ add_level }}</strong> programme — fill in its code, degree and name below,
+    then <strong>Submit this stage</strong> and you go straight back to Curriculum.
+    {% else %}Add the new programme below, then <strong>Submit this stage</strong> and you go back to Curriculum.{% endif %}
+  </span>
+</div>
+{% endif %}
 {% if parts %}
 {% from "dept/_part_flow.html" import part_flow %}
 {% if back_to_structure %}
@@ -303,7 +313,7 @@
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
     {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
-    <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage &amp; go to next →</button>
+    <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
   </div>
 </div>
 {% else %}
@@ -339,10 +349,12 @@
     calc: {{ calc|tojson }},
     fill: {{ fill|tojson }},
     summaries: true,
+    add_level: {{ add_level|tojson }},
+    back_to: {{ back_to|tojson }},
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
       validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},
-      submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
+      submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key, back=('curriculum' if back_to else None)))|tojson }},
       upload:   {{ url_for('dept.api_upload')|tojson }},
       static:   {{ url_for('static', filename='')|tojson }},
       record:   {{ url_for('dept.api_record')|tojson }},

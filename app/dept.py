@@ -297,6 +297,11 @@ def stage(stage_key, programme_code=None):
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
                            final=final, record=record, syllabi=syllabi, comments=comments,
                            course_map=course_map, back_to_structure=back,
+                           add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
+                                      and stage_key == "dept_info" else ""),
+                           back_to=(url_for("dept.stage", stage_key="curriculum")
+                                    if request.args.get("back") == "curriculum"
+                                    and stage_key == "dept_info" else ""),
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
                            readonly=(status == "submitted"), synced=synced,
@@ -305,6 +310,29 @@ def stage(stage_key, programme_code=None):
                            parts=_parts_nav(sub, stage_def, programme),
                            prog_tree=_programme_tree(sub, dept, programme),
                            board=board, groups=grouped_board(board))
+
+
+@bp.route("/programmes/add")
+@department_required
+def add_programme():
+    """From Curriculum: "add a new UG / PG programme". Department Information
+    holds the programme list, so go there — reopened if it was already
+    submitted — with a new row started, and come back to Curriculum after."""
+    level = "PG" if request.args.get("level") == "PG" else "UG"
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    if sub.get("status") == "sealed":
+        flash("This record is complete and sealed. Ask the Office of Academics to reopen "
+              "Department Information before adding a programme.", "error")
+        return redirect(url_for("dept.stage", stage_key="curriculum"))
+    if stage_state(sub, "dept_info").get("status") == "submitted":
+        get_db().submissions.update_one(
+            {"dept_code": dept["dept_code"], "academic_year": _year()},
+            {"$set": {"stages.dept_info.status": "draft", "updated_at": now()},
+             "$unset": {"stages.dept_info.returned_note": ""}})
+        audit(_me()["username"], "stage.reopened", f"{dept['dept_code']}/dept_info",
+              {"why": f"add a new {level} programme"})
+    return redirect(url_for("dept.stage", stage_key="dept_info", add=level, back="curriculum"))
 
 
 def _part_item(sub, code, k, s=None):
@@ -625,6 +653,10 @@ def api_submit(stage_key, programme_code=None):
                         "redirect": nxt["url"] if nxt else
                         url_for("dept.stage", stage_key=STAGE_BY_KEY[stage_key]["parent"])})
     stage_title = STAGE_BY_KEY[stage_key]["title"]
+    if stage_key == "dept_info" and request.args.get("back") == "curriculum":
+        flash(f"“{stage_title}” is submitted. The programme list is updated — "
+              "your new programme is in Curriculum.", "success")
+        return jsonify({**res, "next": None, "redirect": url_for("dept.stage", stage_key="curriculum")})
     nxt = next_action(get_or_create_submission(dept["dept_code"], _year()))
     if nxt:
         flash(f"“{stage_title}” is submitted. Next: “{nxt['title']}”.", "success")
