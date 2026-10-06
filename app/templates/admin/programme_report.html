@@ -6,7 +6,8 @@
   <div class="wrap">
     <div>
       <div class="crumbs">
-        <a href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">{{ dept.dept_name }}</a>
+        {% if shared %}{{ dept.dept_name }}
+        {% else %}<a href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">{{ dept.dept_name }}</a>{% endif %}
         <span>›</span> {{ programme.programme_code }}
       </div>
       <h1>{{ programme.programme_name }}</h1>

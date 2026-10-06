@@ -38,6 +38,8 @@ def create_app(config_object=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(dept_bp, url_prefix="/department")
+    from .share import bp as share_bp
+    app.register_blueprint(share_bp, url_prefix="/share")
 
     # Static files are cached for 30 days (deploy/nginx.conf). Stamp every
     # static URL with the file's mtime so a deploy changes the URL and

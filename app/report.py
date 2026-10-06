@@ -7,9 +7,9 @@ downloads print, top to bottom on one sheet:
     then the UG and PG programmes, each with its parts and a link to the
     programme's own report page.
 
-`links` turns a file or a programme into a URL. The admin downloads link to
-the admin pages, a department's own download to its pages, and with no
-links (a script) the names are printed without them.
+`links` turns a file or a programme into a URL. The downloads use share
+links (app/share.py), which open without signing in; AdminLinks point at the
+admin pages; with no links (a script) the names are printed without them.
 """
 
 from __future__ import annotations
@@ -55,20 +55,6 @@ class AdminLinks:
         from flask import url_for
         return url_for("admin.programme_report", dept_code=self.dept_code,
                        programme_code=code, _external=True)
-
-
-class DeptLinks:
-    """Links for a department's own download: its files and its programme pages."""
-
-    def file(self, stage, value):
-        from flask import url_for
-        return url_for("dept.download", stage_key=stage, stored=value["stored"],
-                       inline=_inline(value), _external=True)
-
-    def programme(self, code):
-        from flask import url_for
-        return url_for("dept.stage", stage_key="prog_curriculum", programme_code=code,
-                       _external=True)
 
 
 def _blank(v):
@@ -210,6 +196,65 @@ def build(db, dept_code, year, links=None):
 
     return {"dept": dept, "submission": sub, "year": year, "info": info,
             "stages": stages, "programmes": programmes}
+
+
+def programme_context(db, dept, year, programme_code, links):
+    """Everything the programme report page shows; None if there is no such programme."""
+    sub = db.submissions.find_one({"dept_code": dept["dept_code"], "academic_year": year}) or {}
+    programme = next((p for p in programmes_of(sub, dept)
+                      if p["programme_code"].upper() == str(programme_code).upper()), None)
+    if not programme:
+        return None
+    code = programme["programme_code"]
+    stored = (sub.get("programmes") or {}).get(code) or {}
+    parts = []
+    for k in PARTS:
+        st = stored.get(k) or {}
+        status = part_status(sub, code, k)
+        parts.append({"key": k, "title": STAGE_BY_KEY[k]["title"], "status": status,
+                      "status_word": status_word(status), "submitted_at": st.get("submitted_at"),
+                      "note": st.get("returned_note"),
+                      "errors": (st.get("summary") or {}).get("errors", 0),
+                      "documents": _documents(k, st.get("data") or {}, links)})
+    cur = (stored.get("prog_curriculum") or {}).get("data") or {}
+    # in the template's own order, items 1 to 12
+    profile = [(f["label"], (cur.get(sec["key"]) or {}).get(f["name"]))
+               for sec in STAGE_BY_KEY["prog_curriculum"]["sections"]
+               if sec["key"] in ("details", "profile") for f in sec["fields"]
+               if not f.get("hidden") and f.get("type") != "fixed"
+               and (cur.get(sec["key"]) or {}).get(f["name"]) not in (None, "")]
+    semesters = {}
+    for r in cur.get("semester_structure") or []:
+        semesters.setdefault(r.get("semester") or "—", []).append(r)
+    return {"dept": dept, "programme": programme, "year": year, "parts": parts,
+            "profile": profile,
+            "semesters": sorted(semesters.items(), key=lambda kv: str(kv[0])),
+            "minors": cur.get("minors") or [],
+            "syllabus": ((stored.get("prog_syllabus") or {}).get("data") or {}).get("courses") or [],
+            "revision": ((stored.get("prog_revision") or {}).get("data") or {}).get("courses") or []}
+
+
+class ShareLinks:
+    """Links that open without signing in, like a Drive "anyone with the link"
+    share: each carries a signed code naming exactly one file or one programme
+    report, so it cannot be changed to reach anything else."""
+
+    def __init__(self, dept_code, year):
+        self.dept_code, self.year = dept_code, year
+
+    def file(self, stage, value):
+        from flask import url_for
+
+        from .share import doc_token
+        return url_for("share.doc", token=doc_token(self.dept_code, value["stored"]),
+                       _external=True)
+
+    def programme(self, code):
+        from flask import url_for
+
+        from .share import report_token
+        return url_for("share.report", token=report_token(self.dept_code, code, self.year),
+                       _external=True)
 
 
 def status_word(status):

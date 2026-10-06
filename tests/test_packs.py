@@ -275,8 +275,8 @@ def test_department_excel_is_one_sheet_with_ticks_and_links(app, client):
     assert "Department information" in text and "Pre-BoS" in text
     assert "PG programmes" in text and "✗" in text
     links = [c.hyperlink.target for c in cells if c.hyperlink]
-    assert any(f"/admin/report/{code}/MCAREG" in u for u in links)
-    assert any("/admin/documents/" in u for u in links)          # the attached Drive files
+    assert any("/share/r/" in u for u in links)                  # programme reports
+    assert any("/share/d/" in u for u in links)                  # the attached Drive files
 
 
 def test_department_word_is_one_report_with_links(app, client):
@@ -290,7 +290,7 @@ def test_department_word_is_one_report_with_links(app, client):
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "UG programmes" in text and "PG programmes" in text
     rels = [rel.target_ref for rel in doc.part.rels.values() if "hyperlink" in rel.reltype]
-    assert any("/admin/report/" in u for u in rels)
+    assert any("/share/r/" in u for u in rels)
 
 
 def test_the_programme_report_opens_in_the_browser(app, client):
@@ -312,4 +312,48 @@ def test_a_departments_own_download_links_to_its_own_pages(app, client):
     r = client.get("/department/export.xlsx")
     ws = load_workbook(io.BytesIO(r.data))["Report"]
     links = [c.hyperlink.target for row in ws.iter_rows() for c in row if c.hyperlink]
-    assert links and all("/admin/" not in u for u in links)
+    assert links and all("/share/" in u for u in links)
+
+
+
+# ---------------------------------------------------------------- share links (no sign-in)
+
+def _download_links(app, client, code):
+    import io
+
+    from openpyxl import load_workbook
+    _admin(app, client)
+    ws = load_workbook(io.BytesIO(client.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    return {c.value: c.hyperlink.target for row in ws.iter_rows() for c in row if c.hyperlink}
+
+
+def test_a_document_link_opens_without_signing_in(app, client):
+    from urllib.parse import urlparse
+    code = _load(app)["dept"]["dept_code"]
+    links = _download_links(app, client, code)
+    stranger = app.test_client()                         # not signed in
+    docx = urlparse(links["MCA_ISMS_SYLLABUS_2026_28.docx"]).path
+    page = stranger.get(docx)
+    assert page.status_code == 200
+    body = page.get_data(as_text=True)
+    assert "MCA_ISMS_SYLLABUS_2026_28.docx" in body and "DATA STRUCTURES" in body.upper()
+    raw = stranger.get(docx + "/file?download=1")
+    assert raw.status_code == 200 and len(raw.data) == 3582763
+    sheet = stranger.get(urlparse(links["2026-2028_MCA GEN_Course MAtrix.xlsx"]).path)
+    assert "25MCAC101" in sheet.get_data(as_text=True)
+
+
+def test_a_programme_report_link_opens_without_signing_in(app, client):
+    from urllib.parse import urlparse
+    code = _load(app)["dept"]["dept_code"]
+    links = _download_links(app, client, code)
+    report = next(u for name, u in links.items() if name == "Master of Computer Applications")
+    page = app.test_client().get(urlparse(report).path).get_data(as_text=True)
+    assert "Programme structure" in page and "25MCAC101" in page
+    assert "/admin/" not in page                         # its document links are share links too
+
+
+def test_a_changed_share_link_does_not_open(app):
+    c = app.test_client()
+    assert c.get("/share/d/not-a-real-code").status_code == 404
+    assert c.get("/share/r/WyJyIiwiWCJd.tampered").status_code == 404

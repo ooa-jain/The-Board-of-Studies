@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ rec.original_name }}{% endblock %}
+
+{% block body %}
+<main id="main-content" class="share-page">
+  <header class="share-bar">
+    <img class="share-logo" alt="JAIN" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="110">
+    <div class="share-title">
+      <strong>{{ rec.original_name }}</strong>
+      <span>{{ dept.dept_name or rec.dept_code }} · {{ rec.academic_year }} · {{ ((rec.size or 0) / 1024)|round|int }} KB</span>
+    </div>
+    <a class="btn btn-sm" href="{{ download_url }}">Download</a>
+  </header>
+
+  <div class="share-body">
+  {% if kind == 'pdf' %}
+    <iframe class="share-frame" src="{{ file_url }}" title="{{ rec.original_name }}"></iframe>
+  {% elif kind == 'image' %}
+    <img class="share-image" src="{{ file_url }}" alt="{{ rec.original_name }}">
+  {% elif kind == 'docx' and body %}
+    <article class="share-doc">
+      {% for k, v in body %}
+        {% if k == 'h' %}<h3>{{ v }}</h3>
+        {% elif k == 'p' %}<p>{{ v }}</p>
+        {% else %}
+        <div class="share-tablewrap"><table class="share-table">
+          {% for row in v %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}
+        </table></div>
+        {% endif %}
+      {% endfor %}
+    </article>
+  {% elif kind == 'xlsx' and body %}
+    {% if body|length > 1 %}
+    <nav class="share-tabs">{% for s in body %}<a href="#sheet-{{ loop.index }}">{{ s.name }}</a>{% endfor %}</nav>
+    {% endif %}
+    {% for s in body %}
+    <section class="share-sheet" id="sheet-{{ loop.index }}">
+      <h3>{{ s.name }}</h3>
+      <div class="share-tablewrap"><table class="share-table">
+        {% for row in s.rows %}<tr>{% for c in row %}<td>{{ c }}</td>{% endfor %}</tr>{% else %}<tr><td class="muted">Empty sheet</td></tr>{% endfor %}
+      </table></div>
+    </section>
+    {% endfor %}
+  {% else %}
+    <div class="share-none">
+      <p>This file cannot be shown in the browser.</p>
+      <a class="btn" href="{{ download_url }}">Download {{ rec.original_name }}</a>
+    </div>
+  {% endif %}
+  </div>
+</main>
+{% endblock %}

@@ -15,10 +15,10 @@ from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
 from .packs import available_packs, load_pack
-from .report import AdminLinks
+from .report import AdminLinks, ShareLinks
 from .schema import STAGE_BY_KEY, STAGES
 from .workflow import (compute_status, department_analysis, get_or_create_submission,
-                       institution_analysis, part_status, programmes_of, progress,
+                       institution_analysis, programmes_of, progress,
                        stage_analysis, return_stage, stage_board, unlock_stage, batches)
 
 bp = Blueprint("admin", __name__)
@@ -871,7 +871,7 @@ def export_institution():
 @bp.route("/export/<dept_code>.xlsx")
 @admin_required
 def export_department(dept_code):
-    buf = department_excel(dept_code, _year(), AdminLinks(dept_code))
+    buf = department_excel(dept_code, _year(), ShareLinks(dept_code, _year()))
     audit(_actor(), "export.department", dept_code)
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-{dept_code}-{_year()}.xlsx",
@@ -881,52 +881,18 @@ def export_department(dept_code):
 @bp.route("/report/<dept_code>/<programme_code>")
 @admin_required
 def programme_report(dept_code, programme_code):
-    """One programme's whole record as a page to read or print — what the
-    programme links in the Excel and Word downloads open."""
-    from .report import _documents, status_word
+    """One programme's whole record as a page to read or print."""
+    from .report import programme_context
     db = get_db()
-    year = _year()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
-    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
-    programme = next((p for p in programmes_of(sub, dept)
-                      if p["programme_code"].upper() == programme_code.upper()), None) or abort(404)
-    code = programme["programme_code"]
-    links = AdminLinks(dept_code)
-    stored = (sub.get("programmes") or {}).get(code) or {}
-
-    parts = []
-    for k in ("prog_curriculum", "prog_syllabus", "prog_revision"):
-        st = stored.get(k) or {}
-        parts.append({"key": k, "title": STAGE_BY_KEY[k]["title"],
-                      "status": part_status(sub, code, k),
-                      "status_word": status_word(part_status(sub, code, k)),
-                      "submitted_at": st.get("submitted_at"), "note": st.get("returned_note"),
-                      "errors": (st.get("summary") or {}).get("errors", 0),
-                      "documents": _documents(k, st.get("data") or {}, links)})
-
-    cur = (stored.get("prog_curriculum") or {}).get("data") or {}
-    # in the template's own order, items 1 to 12
-    profile = [(f["label"], (cur.get(sec["key"]) or {}).get(f["name"]))
-               for sec in STAGE_BY_KEY["prog_curriculum"]["sections"]
-               if sec["key"] in ("details", "profile") for f in sec["fields"]
-               if not f.get("hidden") and f.get("type") != "fixed"
-               and (cur.get(sec["key"]) or {}).get(f["name"]) not in (None, "")]
-    semesters = {}
-    for r in cur.get("semester_structure") or []:
-        semesters.setdefault(r.get("semester") or "—", []).append(r)
-    syllabus = ((stored.get("prog_syllabus") or {}).get("data") or {}).get("courses") or []
-    revision = ((stored.get("prog_revision") or {}).get("data") or {}).get("courses") or []
-    return render_template("admin/programme_report.html", dept=dept, programme=programme,
-                           year=year, parts=parts, profile=profile,
-                           semesters=sorted(semesters.items(), key=lambda kv: str(kv[0])),
-                           minors=cur.get("minors") or [], syllabus=syllabus,
-                           revision=revision)
+    ctx = programme_context(db, dept, _year(), programme_code, AdminLinks(dept_code)) or abort(404)
+    return render_template("admin/programme_report.html", **ctx)
 
 
 @bp.route("/export/<dept_code>.docx")
 @admin_required
 def export_department_word(dept_code):
-    buf = submission_word(dept_code, _year(), AdminLinks(dept_code))
+    buf = submission_word(dept_code, _year(), ShareLinks(dept_code, _year()))
     audit(_actor(), "export.word", dept_code)
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Report-{dept_code}-{_year()}.docx",

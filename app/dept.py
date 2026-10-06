@@ -14,7 +14,7 @@ from .auth import department_required
 from .db import audit, get_db, now, rules_doc, settings
 from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
-from .report import DeptLinks
+from .report import ShareLinks
 from .schema import STAGE_BY_KEY, STAGE_KEYS
 from . import people
 from .notify import describe_changes
@@ -938,7 +938,7 @@ def export_excel():
     dept = _dept()
     if (back := _not_finished(dept)):
         return back
-    buf = department_excel(dept["dept_code"], _year(), DeptLinks())
+    buf = department_excel(dept["dept_code"], _year(), ShareLinks(dept["dept_code"], _year()))
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-{dept['dept_code']}-{_year()}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -950,7 +950,7 @@ def export_word():
     dept = _dept()
     if (back := _not_finished(dept)):
         return back
-    buf = submission_word(dept["dept_code"], _year(), DeptLinks())
+    buf = submission_word(dept["dept_code"], _year(), ShareLinks(dept["dept_code"], _year()))
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Report-{dept['dept_code']}-{_year()}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument."
