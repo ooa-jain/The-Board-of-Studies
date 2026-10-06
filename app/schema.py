@@ -43,6 +43,7 @@ SEMESTERS = list(range(1, 9))
 
 NEP_CATEGORIES = [
     "Major (Core)",
+    "Discipline Specific Elective (DSE)",
     "Minor Stream",
     "Multidisciplinary",
     "Ability Enhancement Courses (AEC)",

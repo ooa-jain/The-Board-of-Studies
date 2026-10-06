@@ -103,6 +103,8 @@ IN_LIEU_RULE = {
 # UGC Table 2 category keys.
 NEP_CATEGORY_TO_KEY = {
     "Major (Core)": "major_core",
+    # a discipline elective is part of the major in the UGC tally
+    "Discipline Specific Elective (DSE)": "major_core",
     "Minor Stream": "minor_stream",
     "Multidisciplinary": "multidisciplinary",
     "Ability Enhancement Courses (AEC)": "aec",
@@ -119,9 +121,11 @@ NEP_CATEGORY_TO_KEY = {
 DEFAULT_OTHER_RULES = {
     # 1 credit carries 25 marks of assessment weight.
     "marks_per_credit": 25,
-    # Credit arithmetic from contact hours: 1 credit per lecture or tutorial hour,
-    # 1 credit per 2 practical or experiential hours.
-    "credit_from_hours": {"lecture": 1.0, "tutorial": 1.0, "practical": 0.5, "experiential": 0.5},
+    # Credit arithmetic from contact hours, as the course matrix template prints
+    # it ("multiples of L, T, P, E are 1, 1, 2, 3"): 1 credit per lecture or
+    # tutorial hour, per 2 practical hours, per 3 experiential hours.
+    "credit_from_hours": {"lecture": 1.0, "tutorial": 1.0, "practical": 1 / 2,
+                          "experiential": 1 / 3},
     "credit_arithmetic_tolerance": 0.5,
     # A course may not exceed this many credits.
     "max_credits_per_course": 8,

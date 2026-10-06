@@ -14,9 +14,10 @@ from .auth import admin_required
 from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
+from .packs import available_packs, load_pack
 from .schema import STAGE_BY_KEY, STAGES
 from .workflow import (compute_status, department_analysis, get_or_create_submission,
-                       institution_analysis, progress, stage_analysis, stage_board,
+                       institution_analysis, programmes_of, progress, stage_analysis, stage_board,
                        return_stage, stage_board, unlock_stage, batches)
 
 bp = Blueprint("admin", __name__)
@@ -235,6 +236,7 @@ def departments():
                     {"place": place, "campus": c})]
     return render_template("admin/departments.html", departments=depts,
                            demo=db.departments.find_one({"dept_code": "DEMO"}),
+                           packs=available_packs(),
                            schools=sorted(x for x in db.departments.distinct("school") if x),
                            campuses=campuses,
                            places=current_app.config["PLACES"],
@@ -500,6 +502,25 @@ def import_commit():
 # submission monitor
 # ---------------------------------------------------------------------------
 
+@bp.route("/packs/<key>/load", methods=["POST"])
+@admin_required
+def pack_load(key):
+    """Fill a department from its Drive documents, already turned into portal data."""
+    try:
+        report = load_pack(key, _year(), _actor(), replace=request.form.get("replace") == "on")
+    except KeyError:
+        abort(404)
+    dept, s = report["dept"], report["summary"]
+    flash(f"{dept['dept_name']}: {len(report['written'])} programme part(s) filled from the Drive "
+          f"folder — {s['submitted']} submitted, {s['draft']} saved as drafts listing what is "
+          f"still to complete."
+          + (f" {len(report['skipped'])} left as they were." if report["skipped"] else ""),
+          "success")
+    if report["password"]:
+        return redirect(url_for("admin.credential_slip", dept_code=dept["dept_code"]))
+    return redirect(url_for("admin.submission_detail", dept_code=dept["dept_code"]))
+
+
 @bp.route("/submissions")
 @admin_required
 def submissions():
@@ -517,9 +538,9 @@ def submission_detail(dept_code):
     year = _year()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     sub = get_or_create_submission(dept_code, year)
-    prog_names = {p.get("programme_code"): p.get("programme_name") or p.get("programme_code")
-                  for p in (((sub.get("stages") or {}).get("dept_info") or {}).get("data") or {})
-                  .get("programmes_offered", []) if p.get("programme_code")}
+    # from Department Information once saved, else the catalogue it starts from
+    prog_names = {p["programme_code"]: p.get("programme_name") or p["programme_code"]
+                  for p in programmes_of(sub, dept)}
     return render_template("admin/submission_detail.html", dept=dept, submission=sub,
                            prog_names=prog_names,
                            board=stage_board(sub), progress=progress(sub),

@@ -2216,6 +2216,9 @@
     ["Summer Internship", "Summer Internship / INTERNSHIP"],
     ["Research Project / Dissertation", "Research Project / Dissertation / PROJECT"],
   ];
+  // a discipline elective sits in the Major column, as UGC Table 2 counts it
+  const inGroup = (r, cat) => r.nep_category === cat ||
+    (cat === "Major (Core)" && r.nep_category === "Discipline Specific Elective (DSE)");
   const NC_COURSE = "Mandatory Non-Credit Course";
   const NC_AUDIT = "Mandatory Non-Credit Audit Course";
 
@@ -2277,7 +2280,7 @@
           const tr = el("tr");
           tr.appendChild(el("td", null, String(sem)));
           DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
-            fmt(sumBy(rows.filter(r => r.nep_category === cat), r => num(r.credits))))));
+            fmt(sumBy(rows.filter(r => inGroup(r, cat)), r => num(r.credits))))));
           tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
           tr.appendChild(el("td", "num", String(nc(rows))));
           tr.appendChild(el("td", "num", String(audit(rows))));
@@ -2288,7 +2291,7 @@
         const tot = el("tr", "total");
         tot.appendChild(el("td", null, "Total"));
         DIST_GROUPS.forEach(([cat]) => tot.appendChild(el("td", "num",
-          fmt(sumBy(counted.filter(r => r.nep_category === cat), r => num(r.credits))))));
+          fmt(sumBy(counted.filter(r => inGroup(r, cat)), r => num(r.credits))))));
         tot.appendChild(el("td", "num", fmt(sumBy(counted, r => num(r.credits)))));
         tot.appendChild(el("td", "num", String(nc(counted))));
         tot.appendChild(el("td", "num", String(audit(counted))));

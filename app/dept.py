@@ -20,7 +20,7 @@ from .notify import describe_changes
 from .notify import record as notify_record
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        grouped_board, next_action,
-                       course_fill_source, form_data, part_status, prefill_for,
+                       course_fill_source, course_options, form_data, part_status, prefill_for,
                        programme_fill_source, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only, batches, parts_for, revision_fill_source,
@@ -280,10 +280,12 @@ def stage(stage_key, programme_code=None):
         # each course's semester and course group, from the programme structure
         cur = programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {}
         for r in cur.get("semester_structure") or []:
-            code = str((r or {}).get("course_code") or "").strip().upper()
-            if code and code not in course_map:
-                course_map[code] = {"semester": r.get("semester"), "group": r.get("nep_category") or "",
-                                    "title": r.get("course_title") or ""}
+            r = r or {}
+            for code, title in course_options(r.get("course_code"), r.get("course_title")):
+                if code.upper() not in course_map:
+                    course_map[code.upper()] = {"semester": r.get("semester"),
+                                                "group": r.get("nep_category") or "",
+                                                "title": title}
         back = url_for("dept.stage", stage_key="prog_curriculum",
                        programme_code=programme["programme_code"]) + "#sec-semester_structure"
     comments = list(get_db().comments.find({

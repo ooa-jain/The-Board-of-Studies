@@ -40,6 +40,21 @@
       there, then submit stage by stage and watch it arrive under the bell.</span></div>
 </div>
 {% endif %}
+{% set imp = submission.imported_from %}
+{% if imp %}
+<details class="card mb-2 import-card">
+  <summary class="card-head">
+    <h3 style="margin:0;font-size:1rem">Filled from the department's Drive folder</h3>
+    <span class="spacer small muted">{{ imp.at.strftime('%d %b %Y, %H:%M') }} · {{ imp.by }} ·
+      {{ imp.notes|length }} note{{ '' if imp.notes|length == 1 else 's' }}</span>
+  </summary>
+  <div class="card-body">
+    <p class="small">Source: <a href="{{ imp.source.folder }}" target="_blank" rel="noopener">{{ imp.source.folder_name }}</a>
+      — {{ imp.source.files|join(' · ') }}</p>
+    <ul class="small import-notes">{% for n in imp.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+  </div>
+</details>
+{% endif %}
 {% set ndocs = documents|sum(attribute='files', start=[])|length %}
 <section class="card mb-2 docs-card" id="documents">
   <div class="card-head">

@@ -6,6 +6,8 @@ Seed the department master from the Office of Academics workbook.
                               # has none, and print the list
     python seed.py --wipe     # clear departments, users (except admin) and
                               # submissions first, then seed
+    python seed.py --pack csit  # fill a department from its Drive documents
+                                # (app/pack_data/csit.json), as drafts
 
 Faculty, school, department, place and campus come from the Office of
 Academics workbook. Nothing about a person does: the portal holds no
@@ -256,10 +258,33 @@ SEED_DEPARTMENTS = [
 ]
 
 
+def load_pack_cli(key):
+    from app.db import settings
+    from app.packs import load_pack
+    year = settings().get("academic_year")
+    report = load_pack(key, year, "seed")
+    dept = report["dept"]
+    print(f"{dept['dept_name']} ({dept['dept_code']}, {dept.get('campus', '')}) — {year}")
+    if report["created"]:
+        print("  added to the department master")
+    if report["password"]:
+        print(f"  login     {dept['username']}  {report['password']}")
+    else:
+        print(f"  login     {dept.get('username')}  (unchanged)")
+    print(f"  filled    {len(report['written'])} programme part(s): "
+          f"{report['summary']['submitted']} submitted, {report['summary']['draft']} draft")
+    for s in report["skipped"]:
+        print(f"  left      {s}")
+
+
 def main():
     app = create_app()
     with app.app_context():
         db = get_db()
+
+        if "--pack" in sys.argv:
+            load_pack_cli(sys.argv[sys.argv.index("--pack") + 1])
+            return
 
         if "--wipe" in sys.argv:
             db.departments.delete_many({})

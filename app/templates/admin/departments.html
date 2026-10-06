@@ -51,6 +51,27 @@
   </div>
 </div>
 
+{% for p in packs %}
+<div class="demo-strip pack-strip">
+  <span class="demo-badge" aria-hidden="true">DRIVE</span>
+  <div>
+    <strong>{{ p.department.dept_name }}</strong>
+    <span class="small muted">
+      {% if p.loaded %}Filled from its <a href="{{ p.source.folder }}" target="_blank" rel="noopener">Drive
+        folder</a>. Loading again fills only the parts that are still empty.
+      {% else %}Its <a href="{{ p.source.folder }}" target="_blank" rel="noopener">Drive folder</a> is ready:
+        {{ p.programmes }} programmes with their course matrices and syllabi. Loading fills them in as
+        drafts{{ '' if p.exists else ', adds the department' }} and issues a login if it has none.{% endif %}
+    </span>
+  </div>
+  <div class="spacer flex">
+    {% if p.exists %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=p.department.dept_code) }}">Open it</a>{% endif %}
+    <form method="post" action="{{ url_for('admin.pack_load', key=p.key) }}">
+      <button class="btn btn-sm">{{ 'Load again' if p.loaded else 'Load from Drive' }}</button></form>
+  </div>
+</div>
+{% endfor %}
+
 {# Two levels: the city first, because most of the time that is the whole
    question, and then the campus within it. Choosing a city narrows the
    campus row to the campuses that city actually has. #}

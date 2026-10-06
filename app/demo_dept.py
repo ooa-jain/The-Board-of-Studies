@@ -158,7 +158,7 @@ _PLAN = [
     ("Ability Enhancement Courses (AEC)", 2, 2, 0, 4),
     ("Skill Enhancement Courses (SEC)", 3, 3, 0, 3),
     ("Value Added Courses (VAC)", 2, 2, 0, 4),
-    ("Summer Internship", 2, 0, 4, 1),
+    ("Summer Internship", 2, 0, 6, 1),   # 3 experiential hours a credit
 ]
 _TOPICS = {
     "Major (Core)": ["Principles of Management", "Financial Accounting", "Business Economics",

@@ -4486,3 +4486,10 @@ td.rt-syl { white-space: nowrap; }
 .ver-changes td:nth-child(2) { color: #9b1c1c; } .ver-changes td:nth-child(3) { color: #157347; }
 .ver-none { margin: 0 14px 12px; }
 @media (max-width: 640px) { .ver-row summary { flex-wrap: wrap; } .ver-changes { font-size: .78rem; } }
+
+/* ---------------------------------------------------- a department filled from Drive */
+.pack-strip .demo-badge { background: var(--ink-800); }
+.import-card > summary { cursor: pointer; list-style: none; }
+.import-card > summary::-webkit-details-marker { display: none; }
+.import-card > summary h3::after { content: " ▾"; color: var(--ink-faint); font-size: .8em; }
+.import-notes { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-700); }

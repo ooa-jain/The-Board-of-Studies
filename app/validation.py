@@ -490,15 +490,17 @@ def r_unique_course_codes(data, ctx, sk):
     Honours with Research often share courses."""
     seen, out = {}, []
     for i, r in enumerate(_rows(data, sk)):
-        c = str(r.get("course_code", "")).strip().upper()
-        if not c:
-            continue
-        key = (c, str(r.get("track") or "All semesters"))
-        if key in seen:
-            out.append(err(f"Course code “{c}” is used twice, in rows {seen[key] + 1} and {i + 1}.",
-                           section=sk, row=i, field="course_code"))
-        else:
-            seen[key] = i
+        # an elective pair "A1 / A2" is two courses; each code counts
+        for c in str(r.get("course_code") or "").upper().split("/"):
+            c = c.strip()
+            if not c:
+                continue
+            key = (c, str(r.get("track") or "All semesters"))
+            if key in seen:
+                out.append(err(f"Course code “{c}” is used twice, in rows {seen[key] + 1} and "
+                               f"{i + 1}.", section=sk, row=i, field="course_code"))
+            else:
+                seen[key] = i
     return out
 
 
@@ -763,9 +765,11 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
         curric = ((submission.get("programmes") or {})
                   .get(programme.get("programme_code"), {})
                   .get("prog_curriculum", {}).get("data", {}))
+        # an elective pair "A1 / A2" in the structure is two courses
         ctx["known_course_codes"] = {
-            str(r.get("course_code", "")).strip().upper()
+            code.strip().upper()
             for r in (curric.get("semester_structure") or [])
-            if r.get("course_code")
+            for code in str(r.get("course_code") or "").split("/")
+            if code.strip()
         }
     return ctx

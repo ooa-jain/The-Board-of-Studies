@@ -633,28 +633,37 @@ def course_fill_source(submission, programme_code):
     year = bos[:4] if bos[:4].isdigit() else ""
     out, seen = [], set()
     for r in data.get("semester_structure") or []:
-        code = str(r.get("course_code") or "").strip()
-        if not code or code.upper() in seen:
-            continue
-        seen.add(code.upper())
-        row = {"course_code": code, "course_title": r.get("course_title", "")}
-        if r.get("semester") not in (None, ""):
-            row["semester"] = r["semester"]
-        if r.get("credits") not in (None, ""):
-            row["credits"] = r["credits"]
-        if year:
-            row["year_latest"] = year
         hours = 0
         for k in ("l", "t", "p", "e"):
             try:
                 hours += int(float(r.get(k) or 0))
             except (TypeError, ValueError):
                 pass
-        if hours:
-            row["hours_per_week"] = hours
-            row["teaching_hours"] = hours * 15
-        out.append(row)
+        for code, title in course_options(r.get("course_code"), r.get("course_title")):
+            if code.upper() in seen:
+                continue
+            seen.add(code.upper())
+            row = {"course_code": code, "course_title": title}
+            if r.get("semester") not in (None, ""):
+                row["semester"] = r["semester"]
+            if r.get("credits") not in (None, ""):
+                row["credits"] = r["credits"]
+            if year:
+                row["year_latest"] = year
+            if hours:
+                row["hours_per_week"] = hours
+                row["teaching_hours"] = hours * 15
+            out.append(row)
     return out
+
+
+def course_options(code, title):
+    """An elective pair "A1 / A2" titled "X / Y" is two courses, each with its own syllabus."""
+    codes = [c.strip() for c in str(code or "").split("/") if c.strip()]
+    titles = [t.strip() for t in str(title or "").split(" / ")]
+    if len(titles) != len(codes):
+        titles = [str(title or "").strip()] * len(codes)
+    return list(zip(codes, titles))
 
 
 def programme_fill_source(submission, department):
