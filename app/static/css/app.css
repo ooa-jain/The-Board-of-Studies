@@ -4502,3 +4502,9 @@ td.rt-syl { white-space: nowrap; }
 }
 .add-prog-strip > div:first-child { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 2px; }
 .add-prog-bar { flex-wrap: wrap; }
+.pack-login { display: flex; flex-direction: column; gap: 4px; padding: 0 14px; border-left: 1px solid var(--line, #e3ded0); }
+.pack-login-row { display: flex; align-items: center; gap: 8px; }
+.pack-login-row .small:first-child { min-width: 64px; }
+.pack-login code { font-size: .86rem; }
+.pack-login .linklike { background: none; border: 0; padding: 0; color: var(--blue, #0b4a9e); cursor: pointer; text-decoration: underline; font: inherit; }
+.import-files { margin: 6px 0 10px; padding-left: 18px; display: grid; gap: 3px; }

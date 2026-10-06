@@ -9783,6 +9783,93 @@
    }
   }
  },
+ "attachments": [
+  {
+   "file": "2026-2028_MCA GEN_Course MAtrix.xlsx",
+   "programme": "MCAREG",
+   "stage": "prog_curriculum",
+   "section": "curriculum_file",
+   "field": "document"
+  },
+  {
+   "file": "2026-2028_MCA_CS_Course Matrix.xlsx",
+   "programme": "MCACYS",
+   "stage": "prog_curriculum",
+   "section": "curriculum_file",
+   "field": "document"
+  },
+  {
+   "file": "2026-2028_MCA SCT_Course Matrix.xlsx",
+   "programme": "MCASCT",
+   "stage": "prog_curriculum",
+   "section": "curriculum_file",
+   "field": "document"
+  },
+  {
+   "file": "2026-2028_MCA ISMS_Course Matrix.xlsx",
+   "programme": "MCAISM",
+   "stage": "prog_curriculum",
+   "section": "curriculum_file",
+   "field": "document"
+  },
+  {
+   "file": "2026-2028_MCA AIML_Course Matrix.xlsx",
+   "programme": "MCAIML",
+   "stage": "prog_curriculum",
+   "section": "curriculum_file",
+   "field": "document"
+  },
+  {
+   "file": "2026 Minor Buckets-Course Matrix.xlsx",
+   "programme": "BCAGAI",
+   "stage": "prog_curriculum",
+   "section": "curriculum_file",
+   "field": "document"
+  },
+  {
+   "file": "MCA_GEN_SYLLABUS_2026_28.docx",
+   "programme": "MCAREG",
+   "stage": "prog_syllabus",
+   "section": "syllabus_file",
+   "field": "document"
+  },
+  {
+   "file": "MCA CS_SYLLABUS_2026_28.doc",
+   "programme": "MCACYS",
+   "stage": "prog_syllabus",
+   "section": "syllabus_file",
+   "field": "document"
+  },
+  {
+   "file": "MCA_SCT_SYLLABUS_2026_28.docx",
+   "programme": "MCASCT",
+   "stage": "prog_syllabus",
+   "section": "syllabus_file",
+   "field": "document"
+  },
+  {
+   "file": "MCA_ISMS_SYLLABUS_2026_28.docx",
+   "programme": "MCAISM",
+   "stage": "prog_syllabus",
+   "section": "syllabus_file",
+   "field": "document"
+  },
+  {
+   "file": "GEN AI SYLLABUS 2026-2027.docx",
+   "programme": "BCAGAI",
+   "stage": "prog_syllabus",
+   "section": "syllabus_file",
+   "field": "document"
+  }
+ ],
+ "extra_files": [
+  "Checklist for Document Submission_Department of Computer Science and IT.xlsx",
+  "2026-2028_MCA-General-Articulation.xlsx",
+  "2026-2028_MCA_CS-Articulation.xlsx",
+  "2026-2028_MCA-SCT-Articulation.xlsx",
+  "2026-2028_MCA-ISMS-Articulation.xlsx",
+  "2026-2028_MCA AIML-Articulation.xlsx"
+ ],
  "open_stages": [
   "curriculum"
  ],
@@ -9798,6 +9885,7 @@
   "MCAIML (AIML): there is no AIML syllabus in the Drive folder. The courses AIML shares with MCA General (same code and title) take their syllabus from MCA_GEN_SYLLABUS_2026_28.docx; the AIML specialisation courses still need a syllabus.",
   "BCAGAI (BCA Generative AI): the folder has the minor buckets and the Generative AI syllabus, but no BCA course matrix. The minors are imported into Annexure I and the syllabi are imported without course codes; the programme structure still has to be entered. The degree level is set to UG - 4 Year (Honours with Research) from the eight-semester folder — change it if needed.",
   "BCA minors: 26BCAIH6MR01 (Edge Computing, IoT minor) and 26BCAIH4MR02L (Software Architecture lab) repeat Healthcare-minor codes in the source workbook. Imported as written.",
+  "The Drive files are attached as the department would upload them: each course matrix in its programme's Curriculum (the BCA minor buckets for BCAGAI), each syllabus document in its programme's Syllabus, and the checklist and articulation sheets kept on this page. A file that is not in app/pack_data/files/csit/ is listed as missing on loading; add it there and press Load again.",
   "Course objectives are not part of the syllabus template, so they are not imported. Web references are added after the books, marked “Web:”.",
   "Not in the Drive folder, so not filled: which catalogue programmes the department runs this year (Department Information); the signed DIAC/DPAC documents; the BoS date and BoS documents; intake and eligibility for each programme; pedagogy and skill development activities in the syllabi; the Course Revision. The standard university wording fills selection procedure, medium, pattern, assessment, passing and award."
  ]

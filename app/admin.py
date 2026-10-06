@@ -513,8 +513,9 @@ def pack_load(key):
     dept, s = report["dept"], report["summary"]
     flash(f"{dept['dept_name']}: {len(report['written'])} programme part(s) filled from the Drive "
           f"folder — {s['submitted']} submitted, {s['draft']} saved as drafts listing what is "
-          f"still to complete."
-          + (f" {len(report['skipped'])} left as they were." if report["skipped"] else ""),
+          f"still to complete. {len(report['attached'])} file(s) attached"
+          + (f", {len(report['missing'])} not in the pack." if report["missing"] else ".")
+          + (f" {len(report['skipped'])} part(s) left as they were." if report["skipped"] else ""),
           "success")
     if report["password"]:
         return redirect(url_for("admin.credential_slip", dept_code=dept["dept_code"]))

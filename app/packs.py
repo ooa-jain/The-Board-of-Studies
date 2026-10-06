@@ -9,6 +9,9 @@ A pack is a JSON file in app/pack_data/ (built by a script in tools/packs/):
       source:      {folder, folder_name, files[]},
       department:  {dept_code, dept_name, school, faculty, campus},
       programmes:  {<programme_code>: {programme_name, <part_key>: data}},
+      attachments: [{file, programme, stage, section, field}]  files from
+                   app/pack_data/files/<key>/ placed in a programme part's file box
+      extra_files: [file]               files kept with the record, not in a box
       open_stages: [<stage_key>],      opened ahead of the sequential lock
       notes:       [str]               where the import departs from the source
     }
@@ -26,8 +29,13 @@ programmes run this year is the department's call.
 from __future__ import annotations
 
 import json
+import shutil
+import uuid
 from functools import lru_cache
 from pathlib import Path
+
+from flask import current_app
+from werkzeug.utils import secure_filename
 
 from . import catalogue
 from .db import audit, get_db, issue_department_login, now
@@ -37,6 +45,7 @@ from .workflow import (compute_status, get_or_create_submission, part_status,
                        submit_stage, unlock_stage)
 
 PACK_DIR = Path(__file__).resolve().parent / "pack_data"
+FILES_DIR = PACK_DIR / "files"
 PARTS = ("prog_curriculum", "prog_syllabus", "prog_revision")
 
 
@@ -100,6 +109,68 @@ def _with_degree(programme, data):
             "semesters": years * 2 if years else None, "level": programme_level(level)}
 
 
+def _place(db, dept_code, academic_year, stage, field, src, actor):
+    """Copy a pack file into the department's uploads, as if it had been uploaded."""
+    folder = current_app.config["UPLOAD_ROOT"] / academic_year / dept_code / stage
+    folder.mkdir(parents=True, exist_ok=True)
+    stored = f"{uuid.uuid4().hex[:12]}-{secure_filename(src.name)}"
+    shutil.copyfile(src, folder / stored)
+    size = (folder / stored).stat().st_size
+    db.files.insert_one({
+        "dept_code": dept_code, "academic_year": academic_year, "stage": stage, "field": field,
+        "original_name": src.name, "stored_name": stored, "size": size,
+        "uploaded_by": actor, "uploaded_at": now(),
+        # a file from the department's own folder, not a form to check
+        "keyword_match": {"status": "unread", "label": field, "found": [], "expected": []},
+    })
+    return {"name": src.name, "stored": stored, "size": size,
+            "url": f"/department/file/{stage}/{stored}", "thumb": None}
+
+
+def _attach(db, pack, dept, academic_year, actor, sub_fn):
+    """Put the pack's files where the department would have uploaded them.
+    A box that already holds a file is left alone, so loading twice is safe."""
+    code, folder = dept["dept_code"], FILES_DIR / pack["key"]
+    attached, missing = [], []
+    for att in pack.get("attachments") or []:
+        src = folder / att["file"]
+        if not src.is_file():
+            missing.append(att["file"])
+            continue
+        sub = sub_fn()
+        programme = next((p for p in programmes_of(sub, dept)
+                          if p["programme_code"].upper() == att["programme"].upper()), None)
+        if not programme:
+            continue
+        pcode = programme["programme_code"]
+        state = programme_stage_state(sub, pcode, att["stage"])
+        if state.get("status") == "submitted" or not state.get("data"):
+            continue
+        have = ((state["data"].get(att["section"]) or {}).get(att["field"]) or {})
+        if isinstance(have, dict) and have.get("stored"):
+            continue
+        value = _place(db, code, academic_year, att["stage"], att["field"], src, actor)
+        db.submissions.update_one(
+            {"_id": sub["_id"]},
+            {"$set": {f"programmes.{pcode}.{att['stage']}.data.{att['section']}.{att['field']}": value,
+                      "updated_at": now()}})
+        attached.append(att["file"])
+
+    # files kept with the record as a whole (the checklist, the articulation sheets)
+    sub = sub_fn()
+    kept = {f["name"]: f for f in ((sub.get("imported_from") or {}).get("files") or [])}
+    for name in pack.get("extra_files") or []:
+        src = folder / name
+        if name in kept:
+            continue
+        if not src.is_file():
+            missing.append(name)
+            continue
+        kept[name] = _place(db, code, academic_year, "imported", "imported_file", src, actor)
+        attached.append(name)
+    return attached, missing, [kept[n] for n in kept]
+
+
 def load_pack(key: str, academic_year: str, actor: str, replace: bool = False):
     """Load a pack. Returns what was created and where each part stands."""
     pack = get_pack(key)
@@ -151,15 +222,20 @@ def load_pack(key: str, academic_year: str, actor: str, replace: bool = False):
             submit_stage(code, academic_year, part_key, data, programme=programme, actor=actor)
             written.append(label)
 
+    attached, missing, kept = _attach(db, pack, dept, academic_year, actor, fresh)
+
     sub = fresh()
     db.submissions.update_one({"_id": sub["_id"]}, {"$set": {"imported_from": {
         "pack": key, "title": pack["title"], "source": pack.get("source") or {},
         "notes": pack.get("notes") or [], "by": actor, "at": now(),
+        "files": kept, "files_missing": sorted(set(missing)),
     }}})
     audit(actor, "pack.loaded", code, {"pack": key, "written": len(written),
-                                       "skipped": len(skipped), "created": created})
+                                       "skipped": len(skipped), "created": created,
+                                       "files": len(attached), "files_missing": len(set(missing))})
     return {"dept": dept, "created": created, "password": password,
-            "written": written, "skipped": skipped, "summary": status_summary(fresh(), dept)}
+            "written": written, "skipped": skipped, "attached": attached,
+            "missing": sorted(set(missing)), "summary": status_summary(fresh(), dept)}
 
 
 def status_summary(sub, dept):

@@ -51,6 +51,19 @@
   <div class="card-body">
     <p class="small">Source: <a href="{{ imp.source.folder }}" target="_blank" rel="noopener">{{ imp.source.folder_name }}</a>
       — {{ imp.source.files|join(' · ') }}</p>
+    {% if imp.files %}
+    <p class="small mt-1"><strong>Files kept with this record</strong> — the rest are in each programme's
+      Curriculum and Syllabus, and under Uploaded documents below.</p>
+    <ul class="small import-files">
+      {% for f in imp.files %}<li><a href="{{ url_for('admin.document', dept_code=dept.dept_code, stored=f.stored) }}">{{ f.name }}</a>
+        <span class="muted">{{ (f.size / 1024)|round|int }} KB</span></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if imp.files_missing %}
+    <p class="small note-err">Not attached — these were not in the pack: {{ imp.files_missing|join(' · ') }}.
+      Add them to <code>app/pack_data/files/csit/</code> and press Load again, or upload them in the
+      programme's own page.</p>
+    {% endif %}
     <ul class="small import-notes">{% for n in imp.notes %}<li>{{ n }}</li>{% endfor %}</ul>
   </div>
 </details>

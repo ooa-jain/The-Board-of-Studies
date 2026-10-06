@@ -505,6 +505,17 @@ PROGRAMME_SYLLABUS = {
             ],
             "rules": ["course_codes_known", "bloom_verbs_present"],
         },
+        {
+            # the syllabus as the department keeps it, beside the sheets above
+            "key": "syllabus_file",
+            "title": "Syllabus document",
+            "type": "fields",
+            "fields": [
+                {"name": "document", "label": "Syllabus document (Word or PDF)", "type": "file",
+                 "wide": True, "accept": ".pdf,.docx,.doc",
+                 "help": "Optional. The whole syllabus as one file."},
+            ],
+        },
     ],
 }
 

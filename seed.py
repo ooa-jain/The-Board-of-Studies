@@ -273,6 +273,9 @@ def load_pack_cli(key):
         print(f"  login     {dept.get('username')}  (unchanged)")
     print(f"  filled    {len(report['written'])} programme part(s): "
           f"{report['summary']['submitted']} submitted, {report['summary']['draft']} draft")
+    print(f"  files     {len(report['attached'])} attached"
+          + (f", {len(report['missing'])} missing: {'; '.join(report['missing'])}"
+             if report["missing"] else ""))
     for s in report["skipped"]:
         print(f"  left      {s}")
 

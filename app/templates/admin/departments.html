@@ -58,12 +58,36 @@
     <strong>{{ p.department.dept_name }}</strong>
     <span class="small muted">
       {% if p.loaded %}Filled from its <a href="{{ p.source.folder }}" target="_blank" rel="noopener">Drive
-        folder</a>. Loading again fills only the parts that are still empty.
+        folder</a>, with the folder's files attached. Loading again fills only what is still empty.
       {% else %}Its <a href="{{ p.source.folder }}" target="_blank" rel="noopener">Drive folder</a> is ready:
         {{ p.programmes }} programmes with their course matrices and syllabi. Loading fills them in as
         drafts{{ '' if p.exists else ', adds the department' }} and issues a login if it has none.{% endif %}
     </span>
   </div>
+  {# the department's login, right here: shown until it signs in for the first time #}
+  {% if p.exists %}
+  <div class="pack-login">
+    {% if p.department.username %}
+      <span class="pack-login-row"><span class="small muted">Username</span>
+        <code class="mono">{{ p.department.username }}</code></span>
+      {% if p.department.initial_password %}
+      <span class="pack-login-row"><span class="small muted">Password</span>
+        <code class="mono">{{ p.department.initial_password }}</code>
+        <button class="copy-btn" type="button"
+                data-copy="{{ p.department.username }}&#9;{{ p.department.initial_password }}"
+                data-copy-label="Copied">Copy</button></span>
+      {% else %}
+      <span class="pack-login-row small muted">Password in use —
+        <form method="post" style="display:inline"
+              action="{{ url_for('admin.generate_credentials', dept_code=p.department.dept_code) }}">
+          <button class="linklike" type="submit">issue a new one</button></form></span>
+      {% endif %}
+    {% else %}
+      <form method="post" action="{{ url_for('admin.generate_credentials', dept_code=p.department.dept_code) }}">
+        <button class="btn btn-gold btn-sm" type="submit">Issue its login</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
   <div class="spacer flex">
     {% if p.exists %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=p.department.dept_code) }}">Open it</a>{% endif %}
     <form method="post" action="{{ url_for('admin.pack_load', key=p.key) }}">
@@ -207,3 +231,5 @@
   </div>
 </details>
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/copy.js') }}"></script>{% endblock %}

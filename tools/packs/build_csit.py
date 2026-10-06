@@ -380,6 +380,11 @@ NOTES = [
     "UG - 4 Year (Honours with Research) from the eight-semester folder — change it if needed.",
     "BCA minors: 26BCAIH6MR01 (Edge Computing, IoT minor) and 26BCAIH4MR02L (Software "
     "Architecture lab) repeat Healthcare-minor codes in the source workbook. Imported as written.",
+    "The Drive files are attached as the department would upload them: each course matrix in its "
+    "programme's Curriculum (the BCA minor buckets for BCAGAI), each syllabus document in its "
+    "programme's Syllabus, and the checklist and articulation sheets kept on this page. A file "
+    "that is not in app/pack_data/files/csit/ is listed as missing on loading; add it there and "
+    "press Load again.",
     "Course objectives are not part of the syllabus template, so they are not imported. Web "
     "references are added after the books, marked “Web:”.",
     "Not in the Drive folder, so not filled: which catalogue programmes the department runs this "
@@ -388,6 +393,44 @@ NOTES = [
     "activities in the syllabi; the Course Revision. The standard university wording fills "
     "selection procedure, medium, pattern, assessment, passing and award.",
 ]
+
+
+# The files in the Drive folder and where each goes. A file that is not in
+# app/pack_data/files/csit/ is skipped on loading (and listed as missing).
+MATRIX_FILE = {
+    "MCAREG": "2026-2028_MCA GEN_Course MAtrix.xlsx",
+    "MCACYS": "2026-2028_MCA_CS_Course Matrix.xlsx",
+    "MCASCT": "2026-2028_MCA SCT_Course Matrix.xlsx",
+    "MCAISM": "2026-2028_MCA ISMS_Course Matrix.xlsx",
+    "MCAIML": "2026-2028_MCA AIML_Course Matrix.xlsx",
+    "BCAGAI": "2026 Minor Buckets-Course Matrix.xlsx",
+}
+SYLLABUS_FILE = {
+    "MCAREG": "MCA_GEN_SYLLABUS_2026_28.docx",
+    "MCACYS": "MCA CS_SYLLABUS_2026_28.doc",
+    "MCASCT": "MCA_SCT_SYLLABUS_2026_28.docx",
+    "MCAISM": "MCA_ISMS_SYLLABUS_2026_28.docx",
+    "BCAGAI": "GEN AI SYLLABUS 2026-2027.docx",
+}
+EXTRA_FILES = [
+    "Checklist for Document Submission_Department of Computer Science and IT.xlsx",
+    "2026-2028_MCA-General-Articulation.xlsx",
+    "2026-2028_MCA_CS-Articulation.xlsx",
+    "2026-2028_MCA-SCT-Articulation.xlsx",
+    "2026-2028_MCA-ISMS-Articulation.xlsx",
+    "2026-2028_MCA AIML-Articulation.xlsx",
+]
+
+
+def attachments():
+    out = []
+    for code, name in MATRIX_FILE.items():
+        out.append({"file": name, "programme": code, "stage": "prog_curriculum",
+                    "section": "curriculum_file", "field": "document"})
+    for code, name in SYLLABUS_FILE.items():
+        out.append({"file": name, "programme": code, "stage": "prog_syllabus",
+                    "section": "syllabus_file", "field": "document"})
+    return out
 
 
 def norm(s):
@@ -529,6 +572,8 @@ def main(src):
                        "school": "School of Computer Science and IT",
                        "faculty": "Faculty of Applied Computing", "campus": "Jayanagar Campus"},
         "programmes": packs,
+        "attachments": attachments(),
+        "extra_files": EXTRA_FILES,
         "open_stages": ["curriculum"],
         "notes": NOTES,
     }

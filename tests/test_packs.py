@@ -203,3 +203,55 @@ def test_a_sealed_record_cannot_be_reopened_from_curriculum(app, client):
         get_db().submissions.update_one({"dept_code": code}, {"$set": {"status": "sealed"}})
     r = client.get("/department/programmes/add?level=PG")
     assert r.headers["Location"].endswith("/department/stage/curriculum")
+
+
+# ---------------------------------------------------------------- the Drive files
+
+def test_loading_attaches_the_drive_files_where_the_department_would_upload_them(app):
+    from pathlib import Path
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    sub = _sub(app, code)
+    assert {"MCAREG": "2026-2028_MCA GEN_Course MAtrix.xlsx"}["MCAREG"] == \
+        sub["programmes"]["MCAREG"]["prog_curriculum"]["data"]["curriculum_file"]["document"]["name"]
+    syl = sub["programmes"]["MCASCT"]["prog_syllabus"]["data"]["syllabus_file"]["document"]
+    assert syl["name"] == "MCA_SCT_SYLLABUS_2026_28.docx"
+    stored = Path(app.config["UPLOAD_ROOT"]) / app.config["ACADEMIC_YEAR"] / code / \
+        "prog_syllabus" / syl["stored"]
+    assert stored.stat().st_size == syl["size"] == 619194
+    # kept with the record: the checklist and the articulation sheets
+    names = [f["name"] for f in sub["imported_from"]["files"]]
+    assert any(n.startswith("Checklist for Document Submission") for n in names)
+    assert "2026-2028_MCA-ISMS-Articulation.xlsx" in names
+
+
+def test_loading_again_does_not_attach_the_files_twice(app):
+    from app.db import get_db
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    with app.app_context():
+        before = get_db().files.count_documents({"dept_code": code})
+    again = _load(app)
+    assert not again["attached"]
+    with app.app_context():
+        assert get_db().files.count_documents({"dept_code": code}) == before
+
+
+def test_attached_files_show_in_the_admins_uploaded_documents(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get(f"/admin/submissions/{report['dept']['dept_code']}").get_data(as_text=True)
+    assert "MCA_ISMS_SYLLABUS_2026_28.docx" in page
+    from app.db import get_db
+    with app.app_context():
+        rec = get_db().files.find_one({"original_name": "MCA_ISMS_SYLLABUS_2026_28.docx"})
+    r = client.get(f"/admin/documents/{rec['dept_code']}/{rec['stored_name']}")
+    assert r.status_code == 200 and len(r.data) == 3582763
+
+
+def test_the_drive_strip_shows_the_departments_login(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get("/admin/departments").get_data(as_text=True)
+    assert report["dept"]["username"] in page
+    assert report["password"] in page and "Load again" in page
