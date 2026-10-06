@@ -8,23 +8,6 @@
                       'M4 6h16v13H4zM4 10h16M9 3v4M15 3v4',
                       'M4 19V9l8-5 8 5v10M9 19v-6h6v6'] %}
 <div class="dash">
-  {# the rail: where the Office goes, at a glance #}
-  <nav class="dash-rail" aria-label="Admin">
-    <a href="{{ url_for('admin.updates') }}" class="dash-rail-bell" title="Updates">
-      <svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg>
-      {% if updates_unread %}<b>{{ updates_unread if updates_unread < 100 else '99+' }}</b>{% endif %}
-    </a>
-    <span class="dash-rail-sep"></span>
-    <a href="{{ url_for('admin.dashboard') }}" class="is-on" title="Home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></a>
-    <a href="{{ url_for('admin.submissions') }}" title="Overview"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></a>
-    <a href="{{ url_for('admin.departments') }}" title="Departments"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5"/></svg></a>
-    <a href="{{ url_for('admin.sheets', tab='documents') }}" title="Documents"><svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7zM14 3v5h5"/></svg></a>
-    <a href="{{ url_for('admin.sheets', tab='comments') }}" title="Comments"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg></a>
-    <a href="{{ url_for('admin.calendar') }}" title="Calendar"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></a>
-    <a href="{{ url_for('admin.flow') }}" title="Flow 3D"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M10 9l5 3-5 3z"/></svg></a>
-    <span class="spacer"></span>
-    <a href="{{ url_for('admin.app_settings') }}" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg></a>
-  </nav>
 
   <div class="dash-main">
     <div class="dash-top">

@@ -21,7 +21,8 @@
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
   {% block head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}">
+{% set admin_shell = current_user and current_user.role == 'admin' and not hide_chrome %}
+<body class="{% block body_class %}{% endblock %}{{ ' has-side' if admin_shell }}">
 
 {# A page may put a loading curtain here. It is display:none unless the page's
    own head script reveals it, so it can never cover the site by accident. #}
@@ -29,7 +30,48 @@
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
-{% if not hide_chrome %}
+{% if admin_shell %}
+{# The Office's pages: one sidebar on the left, and nothing across the top. #}
+{% set ep = request.endpoint or '' %}
+{% set tab = request.args.get('tab') %}
+{% macro side_link(href, label, icon, is_active=false, extra='') -%}
+  <a href="{{ href }}" class="side-link{{ ' is-on' if is_active }}"{% if is_active %} aria-current="page"{% endif %} {{ extra|safe }}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{ icon }}"/></svg><span>{{ label }}</span>{{ caller() if caller }}</a>
+{%- endmacro %}
+<aside class="admin-side">
+  <div class="side-head">
+    <a class="side-brand" href="{{ url_for('admin.dashboard') }}">
+      <img alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
+      <span>BoS Academic Portal<small>Office of Academics</small></span>
+    </a>
+    <button class="side-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="topnav">
+      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span class="sr-only">Menu</span>
+    </button>
+  </div>
+  <nav class="side-nav" id="topnav" aria-label="Admin">
+    {{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}
+    {{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep) }}
+    {{ side_link(url_for('admin.submissions'), 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.analysis', 'admin.submission_detail', 'admin.programme_report') or (ep == 'admin.sheets' and tab not in ('documents', 'comments'))) }}
+    {{ side_link(url_for('admin.sheets', tab='documents'), 'Documents', 'M7 3h8l4 4v14H7zM14 3v5h5', ep == 'admin.sheets' and tab == 'documents') }}
+    {{ side_link(url_for('admin.sheets', tab='comments'), 'Comments', 'M4 5h16v11H9l-5 4z', ep == 'admin.sheets' and tab == 'comments') }}
+    {{ side_link(url_for('admin.calendar'), 'Calendar', 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 3v4M16 3v4', ep == 'admin.calendar') }}
+    {{ side_link(url_for('admin.flow'), 'Flow 3D', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM10 9l5 3-5 3z', ep == 'admin.flow') }}
+    <span class="side-sep"></span>
+    <a class="side-link nav-bell{{ ' is-on' if ep == 'admin.updates' }}" href="{{ url_for('admin.updates') }}"
+       data-updates-url="{{ url_for('admin.updates_json') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span>Updates</span>
+      <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
+    </a>
+    {{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log')) }}
+    <div class="side-foot">
+      <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
+      <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year if app_settings else '' }}</small></span>
+      <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
+    </div>
+  </nav>
+</aside>
+{% elif not hide_chrome %}
 {% macro nav_link(href, label, is_active=false) -%}
   <a href="{{ href }}"{% if is_active %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
 {%- endmacro %}
@@ -180,7 +222,7 @@
 </main>
 {% endblock %}
 
-{% if not hide_chrome %}
+{% if not hide_chrome and not admin_shell %}
 <footer class="site">
   <div class="wrap">
     <img class="brand-logo" alt=""
