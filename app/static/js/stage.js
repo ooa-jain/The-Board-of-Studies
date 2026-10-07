@@ -1290,6 +1290,9 @@
   const num = v => (v === null || v === undefined || String(v).trim() === "" ||
                     Number.isNaN(Number(v))) ? null : Number(v);
   const fmt = n => String(Math.round(n * 100) / 100);
+  // a weight as people write it: ½ and ⅓ rather than 0.5 and 0.3333…
+  const frac = n => ({ 0.5: "½", 0.25: "¼", 0.75: "¾" })[n] ||
+    (Math.abs(n - 1 / 3) < 1e-9 ? "⅓" : Math.abs(n - 2 / 3) < 1e-9 ? "⅔" : fmt(n));
 
   // Fields a table can work out for itself, from the columns it has.
   function derivedRules(section) {
@@ -1328,8 +1331,8 @@
           return l * w.lecture + t * w.tutorial + p * w.practical + e * w.experiential;
         },
         explain: r => [
-          `L ${r.l ?? "–"} × ${w.lecture} + T ${r.t ?? "–"} × ${w.tutorial} + ` +
-          `P ${r.p ?? "–"} × ${w.practical} + E ${r.e ?? "–"} × ${w.experiential}`,
+          `L ${r.l ?? "–"} × ${frac(w.lecture)} + T ${r.t ?? "–"} × ${frac(w.tutorial)} + ` +
+          `P ${r.p ?? "–"} × ${frac(w.practical)} + E ${r.e ?? "–"} × ${frac(w.experiential)}`,
           `A course may carry at most ${C.max_per_course} credits.`,
         ],
         empty: "Fill L, T, P and E and the credits fill themselves.",

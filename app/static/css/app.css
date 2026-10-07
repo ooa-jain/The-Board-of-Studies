@@ -2171,13 +2171,15 @@ html.is-preloading .preload.is-done { opacity: 0; pointer-events: none; }
 input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
 .hint-pop {
   position: absolute; z-index: 60; max-width: 300px; padding: 12px 14px;
-  display: grid; gap: 4px; background: var(--ink-900); color: #fff;
-  border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); font-size: .8rem; line-height: 1.4;
+  display: grid; gap: 4px; background: #fff; color: #1a2b45; border: 1px solid #dfe5ee;
+  border-radius: var(--radius-sm); box-shadow: 0 14px 34px -14px rgba(14, 42, 92, .35);
+  font-size: .8rem; line-height: 1.4;
 }
 .hint-pop[hidden] { display: none; }
-.hint-title { color: var(--gold-300); font-size: .78rem; }
-.hint-line { color: rgba(255, 255, 255, .88); }
-.hint-ok { color: #9be3b4; font-weight: 600; }
+.hint-title { color: #0e2a5c; font-size: .8rem; }
+.hint-line { color: #44536b; }
+.hint-ok { justify-self: start; margin-top: 2px; padding: 3px 10px; border-radius: 999px;
+  background: #dff3e4; color: #1f6b44; font-weight: 700; }
 .hint-use {
   justify-self: start; margin-top: 4px; padding: 5px 12px; border: 0; border-radius: 999px;
   background: var(--gold-400); color: var(--ink-900); font: 700 .78rem var(--font); cursor: pointer;
