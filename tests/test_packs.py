@@ -589,7 +589,8 @@ def test_each_step_says_where_it_goes_and_the_last_reviews_the_programme(app, cl
         older = [b["key"] for b in batches()["existing"]]
     if older:
         last_old = client.get(f"/department/stage/{older[-1]}/MCAREG").get_data(as_text=True)
-        assert "go to Course Revision" in last_old and "Skip to Course Revision" in last_old
+        # earlier batches are required: no Skip
+        assert "go to Course Revision" in last_old and "Skip to Course Revision" not in last_old
     rev = client.get("/department/stage/prog_revision/MCAREG").get_data(as_text=True)
     assert "Review &amp; submit this programme" in rev and '"programme_review": true' in rev.replace("programme_review: true", '"programme_review": true')
 
