@@ -154,3 +154,9 @@ html.side-ready body.has-side .page-skeleton { transition: opacity .18s ease, le
   .sk-shell .sk-row2 { grid-template-columns: 1fr; }
 }
 @media print { .admin-side, .erp-bar { display: none !important; } body.has-side { padding-left: 0 !important; } }
+
+/* "In progress" is blue — the pills carry pill-progress beside pill-warn, and
+   win over it here (loaded last, more specific) */
+.pill.pill-progress, .page-head .pill.pill-progress { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+/* the selected tab of a row card reads in navy (its colour variable had become a hairline) */
+.rc-tab[aria-selected=true] { color: #0e2a5c; }

@@ -26,7 +26,7 @@
 
 {% block content %}
 {% macro mark(status) -%}
-  <span class="pill {{ 'pill-ok' if status == 'submitted' else 'pill-err' if status == 'returned' else 'pill-warn' if status == 'draft' else '' }}">
+  <span class="pill {{ 'pill-ok' if status == 'submitted' else 'pill-err' if status == 'returned' else 'pill-warn pill-progress' if status == 'draft' else '' }}">
     {{ {'submitted': '✓ Submitted', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Not started', 'locked': 'Locked'}.get(status, status) }}</span>
 {%- endmacro %}
 

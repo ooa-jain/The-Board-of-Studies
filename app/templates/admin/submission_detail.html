@@ -162,7 +162,7 @@
         {% if s.warnings %}<span class="pill pill-warn">{{ s.warnings }} warnings</span>{% endif %}
         {% if s.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
         {% elif s.status == 'returned' %}<span class="pill pill-err">Returned</span>
-        {% elif s.status == 'draft' %}<span class="pill pill-warn">In progress</span>
+        {% elif s.status == 'draft' %}<span class="pill pill-warn pill-progress">In progress</span>
         {% elif s.status == 'locked' %}<span class="pill pill-lock">Locked</span>
         {% else %}<span class="pill pill-gold">Open</span>{% endif %}
       </span>

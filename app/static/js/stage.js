@@ -2715,10 +2715,10 @@
     pic.innerHTML =
       '<svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice">' +
       '<defs><pattern id="pcard-dots" width="18" height="18" patternUnits="userSpaceOnUse">' +
-      '<circle cx="2" cy="2" r="1.6" fill="#c79c10" opacity=".35"/></pattern></defs>' +
-      '<rect width="400" height="240" fill="#fbf1cf"/><rect width="400" height="240" fill="url(#pcard-dots)"/>' +
-      '<circle cx="330" cy="40" r="70" fill="#f6dd8f" opacity=".7"/>' +
-      '<circle cx="60" cy="210" r="56" fill="#f3c9a4" opacity=".55"/></svg>';
+      '<circle cx="2" cy="2" r="1.6" fill="#6b7280" opacity=".35"/></pattern></defs>' +
+      '<rect width="400" height="240" fill="#f4f5f7"/><rect width="400" height="240" fill="url(#pcard-dots)"/>' +
+      '<circle cx="330" cy="40" r="70" fill="#d0d5dd" opacity=".7"/>' +
+      '<circle cx="60" cy="210" r="56" fill="#e4e7ec" opacity=".55"/></svg>';
     pic.appendChild(el("span", "pcard-mono", mono));
     card.appendChild(pic);
 

@@ -6,7 +6,7 @@
    checks. For the department chosen in the side panel, every piece of data
    the portal carries forward is an arc from where it is entered to each place
    it is used again, with light running along it and its name at the top.
-   Colour says how it is carried: navy copied, gold worked out, orange offered
+   Colour says how it is carried: navy copied, slate worked out, blue offered
    to fill in one click. Nothing is drawn until a department is chosen.
    ========================================================================== */
 (function () {
@@ -29,25 +29,25 @@
 
   const HOW = {
     copied: { colour: 0x0f2440, css: "#0f2440", word: "Copied" },
-    "worked out": { colour: 0xc79c10, css: "#c79c10", word: "Worked out" },
-    offered: { colour: 0xe8620f, css: "#e8620f", word: "Offered" },
+    "worked out": { colour: 0x6b7280, css: "#6b7280", word: "Worked out" },
+    offered: { colour: 0x2563eb, css: "#2563eb", word: "Offered" },
   };
 
   // where each place stands: a loose arc from Level 0 to the checks
   const PLACE = {
     dept_info:       { pos: [-16, 0, 2],  colour: 0x0f2440 },
-    pre_bos:         { pos: [-9, 0, 6],   colour: 0xe8620f },
+    pre_bos:         { pos: [-9, 0, 6],   colour: 0x2563eb },
     bos_documents:   { pos: [-4, 0, -3],  colour: 0x0f2440 },
-    prog_curriculum: { pos: [4, 0, 4],    colour: 0xe8620f },
-    prog_syllabus:   { pos: [11, 0, -3],  colour: 0xe8620f },
-    prog_revision:   { pos: [16, 0, 5],   colour: 0xe8620f },
+    prog_curriculum: { pos: [4, 0, 4],    colour: 0x2563eb },
+    prog_syllabus:   { pos: [11, 0, -3],  colour: 0x2563eb },
+    prog_revision:   { pos: [16, 0, 5],   colour: 0x2563eb },
     checks:          { pos: [6, 0, -10],  colour: 0x1d6b3e },
   };
 
   // ------------------------------------------------------------------ scene
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf7f3ec);
-  scene.fog = new THREE.Fog(0xf7f3ec, 60, 120);
+  scene.background = new THREE.Color(0xf4f5f7);
+  scene.fog = new THREE.Fog(0xf4f5f7, 60, 120);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 250);
   const HOME = new THREE.Vector3(0, 27, 35);
@@ -70,7 +70,7 @@
   controls.autoRotate = false;
   controls.autoRotateSpeed = 0.4;
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xe9dfcf, 0.9));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xe4e7ec, 0.9));
   const sun = new THREE.DirectionalLight(0xffffff, 0.7);
   sun.position.set(10, 30, 16);
   sun.castShadow = true;
@@ -79,11 +79,11 @@
   scene.add(sun);
 
   const ground = new THREE.Mesh(new THREE.CircleGeometry(70, 64),
-    new THREE.MeshStandardMaterial({ color: 0xf1ebe0, roughness: 1 }));
+    new THREE.MeshStandardMaterial({ color: 0xeef1f6, roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
-  const grid = new THREE.GridHelper(90, 45, 0xe2d8c8, 0xebe3d6);
+  const grid = new THREE.GridHelper(90, 45, 0xd0d5dd, 0xe4e7ec);
   grid.position.y = 0.01;
   scene.add(grid);
 
@@ -131,10 +131,10 @@
       base.position.set(v.x, 0.4, v.z);
       base.castShadow = true; base.receiveShadow = true;
       scene.add(base);
-      const top = new THREE.Mesh(new THREE.CylinderGeometry(2.45, 2.45, 0.1, 6), mat(0xfdfbf7));
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(2.45, 2.45, 0.1, 6), mat(0xffffff));
       top.position.set(v.x, 0.86, v.z);
       scene.add(top);
-      const g = label(n.group.toUpperCase(), { size: 26, color: "#c79c10", scale: 0.02 });
+      const g = label(n.group.toUpperCase(), { size: 26, color: "#6b7280", scale: 0.02 });
       g.position.set(v.x, 4.4, v.z);
       scene.add(g);
       const t = label(n.title, { size: 38, color: "#fff", bg: "#" + p.colour.toString(16).padStart(6, "0"), scale: 0.022 });
@@ -200,7 +200,7 @@
         const dots = [];
         const dg = new THREE.SphereGeometry(0.2, 12, 12);
         for (let k = 0; k < 4; k++) {
-          const d = new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ color: 0xfff1b8 }));
+          const d = new THREE.Mesh(dg, new THREE.MeshBasicMaterial({ color: 0xffffff }));
           d.userData.t = (k / 4 + fi * 0.13) % 1;
           flowGroup.add(d);
           dots.push(d);

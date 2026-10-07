@@ -31,9 +31,9 @@
         <div class="dov-chart">
           <svg viewBox="0 0 {{ chart.w }} {{ chart.h }}" preserveAspectRatio="none" aria-label="Activity from departments, last 14 days">
             <defs><linearGradient id="dovfill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0" stop-color="#f2a900" stop-opacity=".45"/><stop offset="1" stop-color="#f2a900" stop-opacity="0"/></linearGradient></defs>
+              <stop offset="0" stop-color="#ffffff" stop-opacity=".45"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient></defs>
             <path d="{{ chart.area }}" fill="url(#dovfill)"/>
-            <path d="{{ chart.line }}" fill="none" stroke="#f5c542" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+            <path d="{{ chart.line }}" fill="none" stroke="#ffffff" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
           </svg>
           {% if chart.total %}
           <span class="dov-mark" style="left:{{ (chart.best.x * 100 / chart.w)|round(1) }}%;top:{{ (chart.best.y * 100 / chart.h)|round(1) }}%"></span>

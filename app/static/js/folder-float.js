@@ -10,7 +10,7 @@
    width, height, radius, spread, lift, tilt, flapAngle, restAngle,
    openDuration, stagger, bounce, drift, trigger, closeOnSelect. The greys in
    the specification are for a dark page; here the folder takes the JAIN navy
-   and the papers the warm ivory.
+   and the papers a soft white.
 
    It opens on hover, on focus and on click — hover alone would leave it shut
    for anybody on a touchscreen or a keyboard.
