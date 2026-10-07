@@ -26,15 +26,15 @@
   </ul>
 </div>
 {% endif %}
+{% if all_revisions_done %}
 <div class="dash-all">
   <button class="btn btn-all" type="button" id="btn-all">Review &amp; submit all stages</button>
 </div>
+{% endif %}
 {% if submission.status == 'sealed' %}
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
         {% endif %}
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.versions') }}">Versions</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.change_password') }}">Password</a>
       </div>
     </div>
   </div>
@@ -90,6 +90,16 @@
 
 {% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned',
                 'open': 'Yet to start', 'locked': 'Locked', 'optional': 'Optional'} %}
+{% if resume %}
+{# where you left off, in one big button #}
+<a class="resume-card" href="{{ resume.url }}">
+  <span class="resume-kicker">{{ 'Continue ' ~ resume.where if resume.where != 'next to do' else 'Next to do' }}</span>
+  <span class="resume-title">{{ resume.title }}</span>
+  {% if resume.at %}<span class="resume-meta">Last opened {{ resume.at.strftime('%d %b, %H:%M') }}{% if resume.name %} by {{ resume.name }}{% endif %}</span>{% endif %}
+  <span class="resume-go">Continue <span aria-hidden="true">→</span></span>
+</a>
+{% endif %}
+
 <div class="erp-tiles">
   <div class="erp-tile t-navy"><b>{{ progress.done }}/{{ progress.total }}</b><span>Stages submitted</span></div>
   <div class="erp-tile t-teal"><b>{{ programmes|length }}</b><span>Programmes</span></div>
@@ -99,7 +109,7 @@
 
 <section class="panel">
   <div class="panel-head"><h3>Stages</h3>
-    {% if next_step %}<a class="btn btn-sm btn-gold spacer-left" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
+    {% if next_step and not resume %}<a class="btn btn-sm btn-gold spacer-left" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
       {{ 'Continue' if next_step.status == 'draft' else 'Correct' if next_step.status == 'returned' else 'Next Stage' }}: {{ next_step.title }} →</a>{% endif %}</div>
   <table class="erp-table stages-table">
     <thead><tr><th class="num">#</th><th>Stage</th><th>Group</th><th>Status</th><th class="num">Errors</th><th></th></tr></thead>
@@ -122,6 +132,17 @@
 {% if prog_rows %}
 <section class="panel">
   <div class="panel-head"><h3>Programmes</h3>
+    {% if level_counts|length > 1 %}
+    <div class="lv-tabs" role="tablist" aria-label="Show programmes">
+      <button type="button" role="tab" class="lv-tab" aria-selected="true" data-lv="">All
+        <b>{{ prog_rows|selectattr('done')|list|length }}/{{ prog_rows|length }}</b></button>
+      {% for c in level_counts %}
+      <button type="button" role="tab" class="lv-tab" aria-selected="false" data-lv="{{ c.level }}">{{ c.level }}
+        <b>{{ c.done }}/{{ c.total }}</b>
+        <i class="lv-bar"><i style="width:{{ (c.done * 100 / c.total)|round|int }}%"></i></i></button>
+      {% endfor %}
+    </div>
+    {% endif %}
     <span class="erp-legend"><i class="dot st-submitted"></i>Completed <i class="dot st-draft"></i>In progress
       <i class="dot st-open"></i>Yet to start <i class="dot st-optional"></i>Optional</span></div>
   <table class="erp-table erp-dots">
@@ -129,7 +150,7 @@
       {% for h in prog_heads %}<th class="c">{{ h }}</th>{% endfor %}<th></th></tr></thead>
     <tbody>
     {% for p in prog_rows %}
-      <tr>
+      <tr data-lv="{{ (p.level or '')|upper|truncate(2, true, '') }}">
         <td class="mono">{{ p.code }}</td>
         <td class="clip">{{ p.name }}</td>
         <td>{{ p.level }}</td>
@@ -147,7 +168,24 @@
 <script src="{{ url_for('static', filename='js/review.js') }}"></script>
 <script src="{{ url_for('static', filename='js/submit-all.js') }}"></script>
 <script>
-  document.getElementById("btn-all").addEventListener("click", () => window.SubmitAll.open({
-    record: {{ url_for('dept.api_record')|tojson }}, submit: {{ url_for('dept.api_submit_all')|tojson }} }));
+  (function () {
+    // Review & submit all: the button here, or arriving with ?review=1 (the
+    // Developer preview item in the menu)
+    var open = function () { window.SubmitAll.open({
+      record: {{ url_for('dept.api_record')|tojson }}, submit: {{ url_for('dept.api_submit_all')|tojson }} }); };
+    var b = document.getElementById("btn-all");
+    if (b) b.addEventListener("click", open);
+    if (/[?&]review=1/.test(location.search)) open();
+    // UG / PG: show one level's programmes
+    document.querySelectorAll(".lv-tab").forEach(function (t) {
+      t.addEventListener("click", function () {
+        document.querySelectorAll(".lv-tab").forEach(function (x) { x.setAttribute("aria-selected", x === t ? "true" : "false"); });
+        var lv = t.dataset.lv;
+        document.querySelectorAll(".erp-dots tbody tr").forEach(function (r) {
+          r.hidden = !!lv && r.dataset.lv !== lv;
+        });
+      });
+    });
+  })();
 </script>
 {% endblock %}

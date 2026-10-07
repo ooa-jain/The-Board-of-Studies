@@ -239,7 +239,9 @@ def dashboard():
                                             "done": bool(sub.get("autofilled"))},
                            board=stage_board(sub), progress=progress(sub),
                            programmes=programmes_of(sub, dept), year=_year(),
-                           next_step=next_action(sub))
+                           next_step=next_action(sub), resume=_resume(sub, dept),
+                           all_revisions_done=_all_revisions_done(sub, dept),
+                           level_counts=_level_counts(prog_rows))
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +367,7 @@ def stage(stage_key, programme_code=None):
             if last_step:
                 np_ = _next_programme(sub, dept, programme["programme_code"])
                 next_step = np_ and {**np_, "label": "the next programme"}
+    _note_place(dept, stage_key, (programme or {}).get("programme_code"))
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
                            final=final, record=record, syllabi=syllabi, comments=comments,
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
@@ -797,6 +800,53 @@ def _submit_one(dept, sub, stage_key, programme, data):
     audit(_me()["username"], "stage.submitted",
           f"{dept['dept_code']}/{programme_code + '/' if programme_code else ''}{stage_key}")
     return {"ok": True, "status": status, "issues": issues, "summary": summary}
+
+
+def _level_counts(rows):
+    """UG and PG: how many programmes, how many complete."""
+    out = []
+    for lv in ("UG", "PG"):
+        mine = [r for r in rows if (r["level"] or "").upper().startswith(lv)]
+        if mine:
+            out.append({"level": lv, "total": len(mine), "done": sum(1 for r in mine if r["done"])})
+    return out
+
+
+def _note_place(dept, stage_key, programme_code=None):
+    """Where the department was last working, so its home can take it back
+    there."""
+    get_db().departments.update_one({"dept_code": dept["dept_code"]}, {"$set": {"last_place": {
+        "year": _year(), "stage": stage_key, "programme_code": programme_code or "",
+        "at": now(), "name": (_person() or {}).get("name", "")}}})
+
+
+def _resume(sub, dept):
+    """The place to continue from: where the department last was, or, if
+    that is submitted, the next thing after it; with nowhere recorded, the
+    next stage that needs work."""
+    place = dept.get("last_place") or {}
+    if place.get("year") == _year() and place.get("stage") in STAGE_BY_KEY:
+        key, code = place["stage"], place.get("programme_code") or ""
+        d = STAGE_BY_KEY[key]
+        if code and d.get("parent"):
+            label = f"{STAGE_BY_KEY[d['parent']]['title']} · {code} · {_step_label(key)}"
+            if part_status(sub, code, key) == "submitted":
+                nxt = _next_part(dept, key, code)
+                if nxt:
+                    return {"url": nxt["url"], "title": nxt["title"], "where": "next after " + label,
+                            "at": place.get("at"), "name": place.get("name")}
+            else:
+                return {"url": url_for("dept.stage", stage_key=key, programme_code=code),
+                        "title": label, "where": "where you left off",
+                        "at": place.get("at"), "name": place.get("name")}
+        elif not code and compute_status(sub, key) != "submitted":
+            return {"url": url_for("dept.stage", stage_key=key), "title": d["title"],
+                    "where": "where you left off", "at": place.get("at"), "name": place.get("name")}
+    nxt = next_action(sub)
+    if nxt:
+        return {"url": url_for("dept.stage", stage_key=nxt["key"]), "title": nxt["title"],
+                "where": "next to do", "at": None, "name": ""}
+    return None
 
 
 def _all_revisions_done(sub, dept):

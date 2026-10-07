@@ -479,12 +479,25 @@ def test_the_dashboard_names_the_next_step(app, client):
     u, p = make_department(app)
     login(client, u, p)
     body = client.get("/department/").get_data(as_text=True)
-    assert "Next Stage" in body
+    assert "Next to do" in body and 'class="resume-card"' in body
     assert "Department Information" in body
 
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
     body = client.get("/department/").get_data(as_text=True)
     assert "Pre-BoS" in body
+
+
+def test_the_dashboard_continues_where_you_left_off(app, client):
+    """The big Continue goes back to the last stage opened — not the first."""
+    u, p = make_department(app)
+    login(client, u, p)
+    client.get("/department/stage/bos_documents")
+    body = client.get("/department/").get_data(as_text=True)
+    card = body.split('class="resume-card"')[1].split("</a>")[0]
+    assert "/department/stage/bos_documents" in card and "where you left off" in card
+    # Versions and Password live in the menu only
+    head = body.split('class="page-head"')[1].split("</div>\n</div>")[0]
+    assert ">Versions</a>" not in head and ">Password</a>" not in head
 
 
 def test_next_action_prefers_a_returned_stage(app):

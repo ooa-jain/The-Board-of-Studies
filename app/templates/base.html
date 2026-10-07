@@ -47,7 +47,9 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9H5zM2.5 18h19M9 18l.5-1.5h5L15 18"/></svg>
     <span class="side-text">Developer preview</span><i class="side-dot st-draft"></i></summary>
   <div class="side-dev-body">All stages are open for testing. Checks and saving work as usual.
-    {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}</div>
+    {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}
+    {% if current_user and current_user.role == 'department' %}
+    <a class="side-dev-btn" href="{{ url_for('dept.dashboard', review=1) }}">Review &amp; submit all stages →</a>{% endif %}</div>
 </details>
 {% endif %}
 {%- endmacro %}

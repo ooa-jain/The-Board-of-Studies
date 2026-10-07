@@ -242,3 +242,32 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
 .sheet-wrap { max-width: none !important; }
 .sh-line .sh-in { max-width: 640px; }
 body.has-side .wrap { max-width: none !important; }
+.side-dev-body a.side-dev-btn { display: block; margin-top: 10px; padding: 8px 10px; border-radius: 6px; text-align: center;
+  background: var(--sh-navy); color: #fff; text-decoration: none; }
+.side-dev-body a.side-dev-btn:hover { background: #163a7a; }
+
+/* the department home: continue where you left off, big */
+.resume-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "k go" "t go" "m go";
+  align-items: center; column-gap: 24px; row-gap: 2px; margin: 0 0 16px; padding: 20px 24px; border-radius: 6px;
+  background: linear-gradient(120deg, #0e2a5c, #1d4ed8); color: #fff !important; text-decoration: none !important;
+  box-shadow: 0 16px 30px -20px rgba(14, 42, 92, .7); transition: transform .15s, box-shadow .15s; }
+.resume-card:hover { transform: translateY(-1px); box-shadow: 0 20px 34px -18px rgba(14, 42, 92, .75); }
+.resume-kicker { grid-area: k; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #c7d2fe; }
+.resume-title { grid-area: t; font-size: 22px; font-weight: 700; line-height: 1.25; }
+.resume-meta { grid-area: m; font-size: 12.5px; color: #c7d2fe; }
+.resume-go { grid-area: go; display: inline-flex; align-items: center; gap: 10px; padding: 14px 26px; border-radius: 8px;
+  background: #fff; color: #0e2a5c; font-size: 16px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 700px) { .resume-card { grid-template-columns: 1fr; grid-template-areas: "k" "t" "m" "go"; }
+  .resume-go { justify-content: center; margin-top: 12px; } }
+
+/* UG / PG tabs on the programmes panel */
+.lv-tabs { display: flex; gap: 6px; margin-left: 12px; }
+.lv-tab { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--sh-line); background: #fff; color: var(--sh-text); font: inherit; font-size: 12.5px; font-weight: 600; }
+.lv-tab b { color: var(--sh-navy); }
+.lv-tab[aria-selected="true"] { background: var(--sh-navy); border-color: var(--sh-navy); color: #fff; }
+.lv-tab[aria-selected="true"] b { color: #fff; }
+.lv-bar { display: inline-block; width: 46px; height: 5px; border-radius: 5px; background: #e4e7ec; overflow: hidden; }
+.lv-bar > i { display: block; height: 100%; background: #16a34a; }
+.lv-tab[aria-selected="true"] .lv-bar { background: rgba(255, 255, 255, .3); }
+.erp-dots tbody tr[hidden] { display: none; }
