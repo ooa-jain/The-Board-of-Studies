@@ -14,6 +14,85 @@
   const STAGE = JSON.parse(document.getElementById("stage-def").textContent);
   const CREDIT = JSON.parse(document.getElementById("credit-def").textContent || "{}");
   const CTX = window.STAGE_CTX;
+
+  // A new programme's name in proper form, and a code made from it the way
+  // the catalogue's codes are: the degree (MSC, BCA, MBA…) then the initials
+  // of the specialisation (FSD for Full Stack Development), or REG.
+  const ProgName = (() => {
+    const SMALL = new Set(["of", "in", "and", "with", "for", "the", "a", "an", "on", "to", "&"]);
+    // misspellings and short forms at the start of a name
+    const LEAD = [
+      [/^(masters?|mastr|mster|maste)\b/i, "Master"],
+      [/^(bachelors?|bachlors?|bacholors?|bachelor|bachelr|bachalor)\b/i, "Bachelor"],
+      [/^m\.?\s?sc\b/i, "Master of Science"], [/^b\.?\s?sc\b/i, "Bachelor of Science"],
+      [/^m\.?\s?c\.?\s?a\b/i, "Master of Computer Applications"],
+      [/^b\.?\s?c\.?\s?a\b/i, "Bachelor of Computer Applications"],
+      [/^m\.?\s?b\.?\s?a\b/i, "Master of Business Administration"],
+      [/^b\.?\s?b\.?\s?a\b/i, "Bachelor of Business Administration"],
+      [/^m\.?\s?com\b/i, "Master of Commerce"], [/^b\.?\s?com\b/i, "Bachelor of Commerce"],
+      [/^m\.?\s?tech\b/i, "Master of Technology"], [/^b\.?\s?tech\b/i, "Bachelor of Technology"],
+      [/^m\.?\s?a\b/i, "Master of Arts"], [/^b\.?\s?a\b/i, "Bachelor of Arts"],
+    ];
+    const KEEP_UPPER = /^(AI|ML|IT|IOT|AR|VR|UI|UX|HR|CA|ACCA|CMA|CS|ERP|SAP|AWS|BFSI|ESG|II|III|IV)$/i;
+    const DEGREE = [
+      [/^master of science\b/i, "MSC"], [/^bachelor of science\b/i, "BSC"],
+      [/^master of computer applications\b/i, "MCA"], [/^bachelor of computer applications\b/i, "BCA"],
+      [/^master of business administration\b/i, "MBA"], [/^bachelor of business administration\b/i, "BBA"],
+      [/^master of commerce\b/i, "MCM"], [/^bachelor of commerce\b/i, "BCM"],
+      [/^master of technology\b/i, "MTE"], [/^bachelor of technology\b/i, "BTE"],
+      [/^master of arts\b/i, "MA"], [/^bachelor of arts\b/i, "BA"],
+      [/^master of ([a-z]+)/i, null], [/^bachelor of ([a-z]+)/i, null],
+    ];
+    function tidy(raw) {
+      let t = String(raw || "").replace(/\s+/g, " ").trim();
+      if (!t) return t;
+      for (const [re, word] of LEAD) {
+        if (!re.test(t)) continue;
+        t = t.replace(re, word);
+        // a short form (MSc Data Science) gets its "in"
+        if (/ of /.test(word)) {
+          const rest = t.slice(word.length).trim();
+          if (rest && !/^(in|with|\(|honours|hons)\b/i.test(rest)) t = word + " in " + rest;
+        }
+        break;
+      }
+      return t.split(" ").map((w, i) => {
+        const bare = w.replace(/[^A-Za-z&]/g, "");
+        if (KEEP_UPPER.test(bare)) return w.toUpperCase();
+        if (i > 0 && SMALL.has(w.toLowerCase())) return w.toLowerCase();
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      }).join(" ").replace(/\(([a-z])/g, (m, c) => "(" + c.toUpperCase());
+    }
+    function level(name) {
+      if (/^master\b/i.test(name)) return "PG";
+      if (/^bachelor\b/i.test(name)) return "UG";
+      return "";
+    }
+    function code(name, taken) {
+      if (!name) return "";
+      let deg = "";
+      for (const [re, c] of DEGREE) {
+        const m = name.match(re);
+        if (m) { deg = c || ((name[0] === "M" ? "M" : "B") + m[1].slice(0, 2)).toUpperCase(); break; }
+      }
+      if (!deg) deg = name.split(" ").filter(w => !SMALL.has(w.toLowerCase())).slice(0, 3)
+                          .map(w => w[0]).join("").toUpperCase();
+      const spec = (name.match(/\b(?:specialisation|specialization)\s+in\s+(.+)$/i) ||
+                    name.match(/\s(?:in|with)\s+(.+)$/i) || [])[1] || "";
+      let tail = spec ? spec.replace(/\(.*?\)/g, " ").split(/\s+/)
+                           .filter(w => w && !SMALL.has(w.toLowerCase()))
+                           .map(w => KEEP_UPPER.test(w) ? w.toUpperCase() : w[0].toUpperCase()).join("").slice(0, 4)
+                      : "REG";
+      let out = (deg + tail).replace(/[^A-Z0-9]/g, "");
+      if (taken && taken.has(out)) {
+        let n = 2;
+        while (taken.has(out + n)) n++;
+        out = out + n;
+      }
+      return out;
+    }
+    return { tidy, code, level };
+  })();
   // run after every change: counts that follow a table, and the like
   const refreshers = [];
   // course groups that carry no credits
@@ -2973,7 +3052,10 @@
     function input(row, name, def) {
       const holder = el("div", "pl-in pl-in-" + name);
       holder.dataset.field = name;
-      const i = makeInput(def, row[name], v => { row[name] = v; touch(); if (name === "degree") draw(); });
+      const i = makeInput(def, row[name], v => {
+        row[name] = v; touch();
+        if (name === "degree") { row._degreeByHand = true; draw(); }
+      });
       i.setAttribute("aria-label", def.label);
       holder.appendChild(i);
       attachLiveCheck(i, def, holder);
@@ -2989,15 +3071,43 @@
 
       if (row.source === "new") {
         const grid = el("div", "pl-new");
-        grid.appendChild(input(row, "programme_code",
+        if (!row.year_introduced) row.year_introduced = String(Math.min(2027, Math.max(2024, new Date().getFullYear())));
+        const codeBox = input(row, "programme_code",
           { name: "programme_code", label: "Programme code", type: "text", required: true,
-            placeholder: "Code" }));
+            placeholder: "e.g. MSCDS" });
+        grid.appendChild(codeBox);
         grid.appendChild(input(row, "degree",
           { name: "degree", label: "Degree", type: "select", required: true,
             options: section.degrees || [] }));
-        grid.appendChild(input(row, "programme_name",
+        grid.appendChild(input(row, "year_introduced",
+          { name: "year_introduced", label: "Since (year introduced)", type: "select", required: true,
+            options: ["2024", "2025", "2026", "2027"] }));
+        const nameBox = input(row, "programme_name",
           { name: "programme_name", label: "Programme name", type: "text", required: true,
-            placeholder: "Full programme name" }));
+            placeholder: "Full programme name — e.g. Master of Science in Data Science" });
+        grid.appendChild(nameBox);
+        // the name, once typed, is put in proper form ("master of science in
+        // data science" -> "Master of Science in Data Science"), and the code is
+        // made from it the way the others are (MSCDS) unless typed by hand
+        const nameIn = nameBox.querySelector("input");
+        const codeIn = codeBox.querySelector("input");
+        if (codeIn) codeIn.addEventListener("input", () => { row._codeByHand = !!codeIn.value.trim(); });
+        if (nameIn) nameIn.addEventListener("change", () => {
+          const tidy = ProgName.tidy(nameIn.value);
+          if (tidy !== nameIn.value) { nameIn.value = tidy; row.programme_name = tidy; }
+          if (!row._codeByHand && codeIn) {
+            const taken = new Set(data.filter(r => r !== row).map(r => String(r.programme_code || "").toUpperCase()));
+            const code = ProgName.code(tidy, taken);
+            if (code) { codeIn.value = code; row.programme_code = code; }
+          }
+          const lv = ProgName.level(tidy);
+          if (lv && (section.degrees || []).includes(lv) && row.degree !== lv && !row._degreeByHand) {
+            row.degree = lv;
+            const sel = grid.querySelector(".pl-in-degree select");
+            if (sel) sel.value = lv;
+          }
+          touch();
+        });
         const body = el("div", "pl-body");
         body.appendChild(el("span", "pl-tag", "New"));
         body.appendChild(grid);

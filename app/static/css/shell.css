@@ -278,3 +278,14 @@ body.has-side .wrap { max-width: none !important; }
   background: var(--sh-navy); color: #fff; text-decoration: none; border: 1px solid var(--sh-navy); font: inherit; font-weight: 600; cursor: pointer; }
 .side-dev-body .side-dev-btn.is-ghost { background: #fff; color: var(--sh-navy); margin-top: 4px; }
 .side-dev-body .side-dev-btn:hover { background: #163a7a; color: #fff; }
+
+/* a new programme: code, degree and "since" on one line, the name below */
+.pl-panel .pl-new { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) !important; }
+.pl-panel .pl-new .pl-in-programme_name { grid-column: 1 / -1; order: -1; }
+.pl-new .pl-in-year_introduced select { min-width: 0; }
+@media (max-width: 700px) { .pl-panel .pl-new { grid-template-columns: minmax(0, 1fr) !important; } }
+.pl-panel .pl-new .pl-in-programme_code::before, .pl-panel .pl-new .pl-in-degree::before,
+.pl-panel .pl-new .pl-in-year_introduced::before { display: block; margin: 0 0 3px; font-size: 11px; font-weight: 600; color: #6b7280; }
+.pl-panel .pl-new .pl-in-programme_code::before { content: "Code (auto)"; }
+.pl-panel .pl-new .pl-in-degree::before { content: "Level"; }
+.pl-panel .pl-new .pl-in-year_introduced::before { content: "Since (year)"; }
