@@ -205,3 +205,25 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
 .side-sub-link small { color: #9aa3b2; font-weight: 500; }
 .side-sub-link .side-text { overflow: hidden; text-overflow: ellipsis; }
 @media (min-width: 901px) { html.side-collapsed .side-sub { display: none; } }
+
+/* ---- the stage page: the form takes the whole width ---- */
+.stage-layout { grid-template-columns: minmax(0, 1fr) !important; }
+.ugc-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-bottom: 14px; padding: 10px 16px;
+  background: #fff; border: 1px solid var(--sh-line); border-left: 3px solid var(--sh-navy); border-radius: 4px; font-size: 13px; }
+.ugc-strip-title { font-weight: 700; color: var(--sh-navy); }
+.ugc-strip-rule { color: var(--sh-muted); }
+.ugc-strip-rule strong { color: var(--sh-navy); }
+.ugc-strip-tally { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.ugc-strip-tally > * { margin: 0 !important; }
+/* the checks float above the save bar, beside the form */
+.checks-float { position: fixed; right: 20px; bottom: 76px; z-index: 60; width: min(360px, calc(100vw - 32px));
+  max-height: 55vh; display: flex; flex-direction: column; margin: 0;
+  box-shadow: 0 18px 40px -16px rgba(16, 24, 40, .35) !important; }
+.checks-float[hidden] { display: none; }
+.checks-float .card-body { overflow-y: auto; }
+/* the whole record, once every Course Revision is in */
+.submit-all-panel { margin-top: 18px; border-left: 3px solid #16a34a !important; }
+.submit-all-body { display: flex; align-items: center; gap: 16px; padding: 16px 18px; flex-wrap: wrap; }
+.submit-all-body > div { flex: 1; min-width: 220px; }
+.submit-all-body strong { color: var(--sh-navy); }
+.submit-all-body p { margin: 4px 0 0; }

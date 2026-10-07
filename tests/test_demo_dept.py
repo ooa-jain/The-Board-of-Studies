@@ -122,6 +122,9 @@ def test_review_and_submit_all_stages_at_once(app, client):
         assert get_db().submissions.find_one({"dept_code": "DEMO"})["status"] == "sealed"
     page = client.get("/department/").get_data(as_text=True)
     assert "Review &amp; submit all stages" in page
+    # with every Course Revision in, a stage page offers it at the bottom
+    stage = client.get("/department/stage/dept_info").get_data(as_text=True)
+    assert 'id="btn-all"' in stage and "Every Course Revision is submitted." in stage
 
 
 def test_a_removed_sample_file_comes_back_on_the_next_fill(app, client):

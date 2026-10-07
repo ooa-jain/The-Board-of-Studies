@@ -93,6 +93,30 @@
 
 <div class="stage-layout">
   <div>
+    {% if credit_matrix and credit_matrix.track %}
+    {# UGC Table 2, as a slim strip above the form #}
+    <div class="ugc-strip">
+      <span class="ugc-strip-title">UGC Table 2</span>
+      <span class="ugc-strip-rule">{{ credit_matrix.track_label }} column · <strong>{{ credit_matrix.total }}</strong> credits required</span>
+      <span id="credit-tally" class="ugc-strip-tally small"></span>
+    </div>
+    {% endif %}
+
+    {# shown once Submit has run the checks: a panel that floats above the
+       save bar, so the form keeps the whole width #}
+    <div class="card checks-float" id="checks-card" hidden>
+      <div class="card-head">
+        <h3 class="card-title-sm">Checks</h3>
+        <span class="spacer issue-counts" id="issue-counts"></span>
+        <button type="button" class="checks-close" id="checks-close"
+                aria-label="Hide the checks">×</button>
+      </div>
+      <div class="card-body tight">
+        <div id="issues" class="issues" role="status" aria-live="polite" aria-atomic="true">
+          <p class="small muted issue-note">Fill the form — problems appear here when you check or submit.</p>
+        </div>
+      </div>
+    </div>
     <noscript>
       <div class="alert alert-error">
         <span class="alert-icon" aria-hidden="true">!</span>
@@ -125,57 +149,21 @@
         </div>
       </div>
     </form>
+
+    {% if all_revisions_done %}
+    {# every programme's Course Revision is in: the whole record can go #}
+    <section class="panel submit-all-panel">
+      <div class="submit-all-body">
+        <div>
+          <strong>Every Course Revision is submitted.</strong>
+          <p class="small muted">Review every stage and programme part in one place, then submit the whole record.</p>
+        </div>
+        <button class="btn btn-gold" type="button" id="btn-all">Review &amp; submit all stages →</button>
+      </div>
+    </section>
+    {% endif %}
   </div>
 
-  <aside class="stage-side">
-    {# shown once Submit has run the checks #}
-    <div class="card" id="checks-card" hidden>
-      <div class="card-head">
-        <h3 class="card-title-sm">Checks</h3>
-        <span class="spacer issue-counts" id="issue-counts"></span>
-        <button type="button" class="checks-close" id="checks-close"
-                aria-label="Hide the checks">×</button>
-      </div>
-      <div class="card-body tight">
-        <div id="issues" class="issues" role="status" aria-live="polite" aria-atomic="true">
-          <p class="small muted issue-note">Fill the form — problems appear here when you check or submit.</p>
-        </div>
-      </div>
-    </div>
-
-    {% if credit_matrix and credit_matrix.track %}
-    <div class="card">
-      <div class="card-head"><h3 class="card-title-sm">UGC Table 2</h3></div>
-      <div class="card-body tight">
-        <p class="small muted mb-half">
-          Applying the <strong>{{ credit_matrix.track_label }}</strong> column.
-          Total required: <strong>{{ credit_matrix.total }}</strong> credits.
-        </p>
-        <div id="credit-tally" class="small"></div>
-      </div>
-    </div>
-    {% endif %}
-
-    {# the stages and the programme's steps live in the left menu; here only
-       the way to submit everything at once #}
-    <div class="card branch-card">
-      {# submitting lives with the stages: this one, then on to the next;
-         only the last one — the one that completes the record — opens the
-         review of everything first #}
-      <div class="branch-submit">
-        <button class="btn btn-all btn-block" type="button" id="btn-all">Review &amp; submit all stages</button>
-        <p class="small muted">Every stage and programme part in one review — open any to see what is in it —
-          then one confirmation submits all that are filled.</p>
-        {% if readonly %}
-        <p class="small branch-done">✓ This one was submitted {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '' }}</p>
-        <div class="flex">
-          <button class="btn btn-ghost btn-sm" type="button" id="btn-review">Review</button>
-          <button class="btn btn-ghost btn-sm" type="button" id="btn-copy">Download a copy</button>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-  </aside>
 </div>
 
 {% if not readonly %}
@@ -197,6 +185,8 @@
     <span class="save-note">Submitted on
       {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
     <span class="spacer"></span>
+    <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
+    <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
     <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
     {% if step and next_step %}<a class="btn btn-gold" href="{{ next_step.url }}">Go to {{ next_step.label }} →</a>{% endif %}
   </div>
@@ -249,5 +239,4 @@
 <script src="{{ url_for('static', filename='js/review.js') }}"></script>
 <script src="{{ url_for('static', filename='js/submit-all.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
-<script src="{{ url_for('static', filename='js/branch.js') }}"></script>
 {% endblock %}

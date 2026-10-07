@@ -343,6 +343,7 @@ def stage(stage_key, programme_code=None):
                                       else stage_def.get("batch") or ""),
                            parts=_parts_nav(sub, stage_def, programme),
                            prog_tree=_programme_tree(sub, dept, programme),
+                           all_revisions_done=_all_revisions_done(sub, dept),
                            board=board, groups=grouped_board(board))
 
 
@@ -758,6 +759,14 @@ def _submit_one(dept, sub, stage_key, programme, data):
     audit(_me()["username"], "stage.submitted",
           f"{dept['dept_code']}/{programme_code + '/' if programme_code else ''}{stage_key}")
     return {"ok": True, "status": status, "issues": issues, "summary": summary}
+
+
+def _all_revisions_done(sub, dept):
+    """Every programme's Course Revision submitted — the point at which the
+    whole record can be reviewed and submitted."""
+    progs = programmes_of(sub, dept)
+    return bool(progs) and all(part_status(sub, p["programme_code"], "prog_revision") == "submitted"
+                               for p in progs)
 
 
 def _step_label(key, cfg=None):

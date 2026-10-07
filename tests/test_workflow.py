@@ -641,7 +641,10 @@ def test_the_stages_are_in_the_left_menu_only(app, client):
             assert escape(s["title"]) in body, s["title"]
     assert "data-branch" not in body and 'class="branch-label"' not in body
     assert re.search(r'class="side-link is-on" href="/department/stage/dept_info"', body)
-    assert "Review &amp; submit all stages" in body
+    # the page has no right-hand column; the whole-record submit waits at
+    # the bottom until every Course Revision is in
+    assert 'class="stage-side"' not in body
+    assert 'id="btn-all"' not in body
 
 
 def test_grouped_board_counts_each_group(app):
