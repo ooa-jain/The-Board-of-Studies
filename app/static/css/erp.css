@@ -15,7 +15,7 @@
   --erp-text: #1d2a3d;
   --erp-muted: #66748a;
   --erp-green: #2e9e4f;
-  --erp-amber: #f0a500;
+  --erp-amber: #2563eb;      /* "In progress" — blue, not yellow */
   --erp-red: #d9433a;
   --erp-grey: #b8c0cc;
 }
@@ -33,7 +33,7 @@ body.erp .wrap { max-width: 1400px; padding: 0 20px; }
   box-shadow: 0 1px 0 rgba(255,255,255,.08), 0 2px 6px rgba(0,0,0,.12); }
 .erp-bar-name { color: #c9d6ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .erp-bar-mid { margin: 0 auto; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 12px; }
-.erp-bar-year { color: #f5c542; font-weight: 700; white-space: nowrap; }
+.erp-bar-year { font-weight: 700; white-space: nowrap; }
 @media (max-width: 900px) { .erp-bar { top: 64px; height: 36px; } .erp-bar-name { display: none; } }
 
 /* ---- page heading: a title and one line, nothing more ---- */
@@ -74,10 +74,10 @@ body.erp table.data tbody tr:hover, .erp-table tbody tr:hover { background: #eef
 .erp-table .muted { color: var(--erp-muted); }
 .erp-dots td.c { width: 1%; padding-left: 14px; padding-right: 14px; }
 
-/* status words and dots: Completed green, In progress amber, Yet to start red */
+/* status words and dots: Completed green, In progress blue, Yet to start red */
 .st { font-weight: 700; font-size: 12px; }
 .st-submitted { color: var(--erp-green); }
-.st-draft { color: #c98600; }
+.st-draft { color: #1d4ed8; }
 .st-open, .st-locked { color: var(--erp-red); }
 .st-returned { color: #b42318; }
 .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle;
@@ -91,11 +91,12 @@ body.erp table.data tbody tr:hover, .erp-table tbody tr:hover { background: #eef
 
 /* number tiles, like the seat-matrix tiles */
 .erp-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-.erp-tile { padding: 12px 14px; border-radius: 4px; color: #fff; display: flex; flex-direction: column; gap: 2px; }
-.erp-tile b { font-size: 1.45rem; line-height: 1.1; }
-.erp-tile span { font-size: 12px; opacity: .92; }
-.t-navy { background: #5a6474; } .t-teal { background: #17a2b8; } .t-green { background: #28a745; }
-.t-amber { background: #f0b400; color: #1d2a3d; }
+.erp-tile { padding: 12px 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 2px;
+  background: #fff; border: 1px solid var(--erp-line); border-top: 3px solid var(--tile, var(--erp-navy)); color: var(--erp-text); }
+.erp-tile b { font-size: 1.45rem; line-height: 1.1; color: var(--tile, var(--erp-navy)); }
+.erp-tile span { font-size: 12px; color: var(--erp-muted); }
+.t-navy { --tile: #0e2a5c; } .t-teal { --tile: #0e7490; } .t-green { --tile: #15803d; }
+.t-amber { --tile: #b42318; }
 @media (max-width: 760px) { .erp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---- buttons: small and square ---- */
@@ -133,18 +134,17 @@ body.erp .demo-strip { border-radius: 4px; padding: 10px 14px; border-style: sol
 }
 
 /* ---- the left menu, ERP style: square, a label for the stages ---- */
-body.erp .admin-side { background: #1d2733; }
+/* the menu's colours are in shell.css */
 body.erp .side-link { border-radius: 4px; padding: 8px 12px; font-size: 13px; }
-body.erp .side-link.is-on { background: var(--erp-blue); color: #fff; box-shadow: none; }
+
 .side-label { display: block; margin: 12px 12px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: #8796ad; }
 .side-num { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 3px; flex: 0 0 20px;
   background: rgba(255,255,255,.1); font-size: 11px; font-weight: 700; }
 .side-link.is-on .side-num { background: rgba(255,255,255,.22); }
 .side-dot { margin-left: auto; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; background: var(--erp-grey); }
-.side-dot.st-submitted { background: #3cc26a; } .side-dot.st-draft { background: var(--erp-amber); }
-.side-dot.st-open, .side-dot.st-locked { background: #ef6a5f; } .side-dot.st-returned { background: #ff8a80; }
-.side-who small a { color: #a9bcdc; text-decoration: underline; }
+
+.side-who small a { text-decoration: underline; }
 
 /* ---- the dashboard's big decorative pieces give way to the panels ---- */
 body.erp .dash { border-radius: 6px; box-shadow: 0 1px 2px rgba(16, 32, 64, .06); border: 1px solid var(--erp-line);
@@ -169,9 +169,11 @@ body.erp .prog-row { border-radius: 4px; padding: 10px 14px; }
 /* the Office's home: flat tiles rather than glossy cards */
 body.erp .dash-overview { background: var(--erp-navy); border-radius: 4px; box-shadow: none; }
 body.erp .dash-card { border-radius: 4px; box-shadow: none; }
-body.erp .dash-card.dc-blue { background: #17a2b8; }
-body.erp .dash-card.dc-orange { background: #f0b400; color: #1d2a3d; }
-body.erp .dash-card.dc-orange * { color: #1d2a3d; }
+body.erp .dash-card.dc-blue, body.erp .dash-card.dc-orange { background: #fff; color: var(--erp-text);
+  border: 1px solid var(--erp-line); }
+body.erp .dash-card.dc-blue *, body.erp .dash-card.dc-orange * { color: var(--erp-text); }
+body.erp .dash-card .dc-ico { background: #eef1f6; color: var(--erp-navy); }
+body.erp .dash-card .dc-big { color: var(--erp-navy); }
 body.erp .dash-stage { border-radius: 4px; box-shadow: none; border: 1px solid var(--erp-line); }
 body.erp .dash-stage .ds-ico { border-radius: 4px; }
 body.erp .dash-top h1 { font-size: 1.32rem; }

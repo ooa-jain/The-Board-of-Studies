@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/erp.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shell.css') }}">
 
   {# the JGI roundel, the only square part of the lockup #}
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
@@ -20,6 +21,10 @@
         href="{{ url_for('static', filename='img/favicon-512.png') }}">
   <link rel="apple-touch-icon" sizes="180x180"
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
+  <script>
+    /* the sidebar's last state, before the first paint, so it never jumps */
+    try { if (localStorage.getItem("bos.side") === "collapsed") document.documentElement.classList.add("side-collapsed"); } catch (e) {}
+  </script>
   {% block head %}{% endblock %}
 </head>
 {% set admin_shell = current_user and current_user.role == 'admin' and not hide_chrome %}
@@ -41,20 +46,27 @@
 {% set ep = request.endpoint or '' %}
 {% set tab = request.args.get('tab') %}
 {% macro side_link(href, label, icon, is_active=false, extra='') -%}
-  <a href="{{ href }}" class="side-link{{ ' is-on' if is_active }}"{% if is_active %} aria-current="page"{% endif %} {{ extra|safe }}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{ icon }}"/></svg><span>{{ label }}</span>{{ caller() if caller }}</a>
+  <a href="{{ href }}" class="side-link{{ ' is-on' if is_active }}" title="{{ label }}"{% if is_active %} aria-current="page"{% endif %} {{ extra|safe }}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{ icon }}"/></svg><span class="side-text">{{ label }}</span>{{ caller() if caller }}</a>
 {%- endmacro %}
 <aside class="admin-side">
   <div class="side-head">
-    <a class="side-brand" href="{{ url_for('admin.dashboard') }}">
-      <img alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
-      <span>BoS Academic Portal<small>Office of Academics</small></span>
+    <a class="side-brand" href="{{ url_for('admin.dashboard') }}" title="BoS Academic Portal">
+      <img class="side-logo" alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+      <img class="side-roundel" alt="" src="{{ url_for('static', filename='img/favicon-180.png') }}" width="180" height="180">
+      <span class="side-brand-text">BoS Academic Portal<small>Office of Academics</small></span>
     </a>
+    <button class="side-collapse" type="button" id="side-collapse" aria-expanded="true" aria-controls="topnav" title="Collapse the menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2 2 2"/></svg>
+      <span class="sr-only">Collapse the menu</span>
+    </button>
     <button class="side-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="topnav">
-      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span class="sr-only">Menu</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="sr-only">Menu</span>
     </button>
   </div>
   <nav class="side-nav" id="topnav" aria-label="Admin">
+    <button class="side-close" type="button" aria-label="Close the menu" data-side-close>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     {{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}
     {{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep) }}
     {{ side_link(url_for('admin.submissions'), 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.analysis', 'admin.submission_detail', 'admin.programme_report') or (ep == 'admin.sheets' and tab not in ('documents', 'comments'))) }}
@@ -64,8 +76,8 @@
     {{ side_link(url_for('admin.flow'), 'Flow 3D', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM10 9l5 3-5 3z', ep == 'admin.flow') }}
     <span class="side-sep"></span>
     <a class="side-link nav-bell{{ ' is-on' if ep == 'admin.updates' }}" href="{{ url_for('admin.updates') }}"
-       data-updates-url="{{ url_for('admin.updates_json') }}">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span>Updates</span>
+       data-updates-url="{{ url_for('admin.updates_json') }}" title="Updates">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span class="side-text">Updates</span>
       <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
     </a>
     {{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log')) }}
@@ -85,28 +97,35 @@
 {% set here_top = (STAGE_BY_KEY.get(here_stage) or {}).get('parent') or here_stage %}
 <aside class="admin-side">
   <div class="side-head">
-    <a class="side-brand" href="{{ url_for('dept.dashboard') }}">
-      <img alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
-      <span>BoS Academic Portal<small>{{ current_user.dept_code }}</small></span>
+    <a class="side-brand" href="{{ url_for('dept.dashboard') }}" title="BoS Academic Portal">
+      <img class="side-logo" alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+      <img class="side-roundel" alt="" src="{{ url_for('static', filename='img/favicon-180.png') }}" width="180" height="180">
+      <span class="side-brand-text">BoS Academic Portal<small>{{ current_user.dept_code }}</small></span>
     </a>
+    <button class="side-collapse" type="button" id="side-collapse" aria-expanded="true" aria-controls="topnav" title="Collapse the menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2 2 2"/></svg>
+      <span class="sr-only">Collapse the menu</span>
+    </button>
     <button class="side-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="topnav">
-      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span class="sr-only">Menu</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="sr-only">Menu</span>
     </button>
   </div>
   <nav class="side-nav" id="topnav" aria-label="Department">
-    <a class="side-link{{ ' is-on' if ep == 'dept.dashboard' }}" href="{{ url_for('dept.dashboard') }}">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span>Home</span></a>
+    <button class="side-close" type="button" aria-label="Close the menu" data-side-close>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <a class="side-link{{ ' is-on' if ep == 'dept.dashboard' }}" href="{{ url_for('dept.dashboard') }}" title="Home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="side-text">Home</span></a>
     <span class="side-label">Stages</span>
     {% for st in dept_nav %}
-    <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}">
-      <span class="side-num">{{ loop.index }}</span><span>{{ st.title }}</span>
+    <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}" title="{{ st.title }}">
+      <span class="side-num">{{ loop.index }}</span><span class="side-text">{{ st.title }}</span>
       <i class="side-dot st-{{ st.status }}" title="{{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Yet to start', 'locked': 'Locked'}.get(st.status, st.status) }}"></i></a>
     {% endfor %}
     <span class="side-sep"></span>
-    <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span>Versions</span></a>
-    <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span>Password</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}" title="Versions">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span class="side-text">Versions</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}" title="Password">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span class="side-text">Password</span></a>
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       <span class="side-who"><strong>{{ current_user.person.name if current_user.person else current_user.name }}</strong>
@@ -290,8 +309,15 @@
 {% if not hide_chrome %}
 {# Shown while the next page loads — the shape of a page, not a spinner. #}
 <div class="page-skeleton" id="page-skeleton" hidden aria-hidden="true">
+  {% if side_shell %}
+  {# beside the menu: a white panel, four tiles across and two blocks below #}
+  <div class="sk-shell">
+    <span class="sk sk-head"></span>
+    <div class="sk-row4"><span class="sk"></span><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>
+    <div class="sk-row2"><span class="sk"></span><span class="sk"></span></div>
+  </div>
+  {% else %}
   <div class="wrap">
-    <span class="loader-one is-gold loader-center" aria-hidden="true"><i></i><i></i><i></i></span>
     <span class="sk sk-line w-30"></span>
     <span class="sk sk-heading"></span>
     <span class="sk sk-line w-70"></span>
@@ -309,6 +335,7 @@
       {% endfor %}
     </div>
   </div>
+{% endif %}
 </div>
 <script>
   // Page-to-page skeleton. Only for a click that leaves for another page of
@@ -386,6 +413,7 @@
 </script>
 {% endif %}
 <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+{% if side_shell %}<script src="{{ url_for('static', filename='js/shell.js') }}"></script>{% endif %}
 <script>
   /* The top bar as a resizable navbar (after Aceternity UI): past the top of
      the page it draws in to a floating, rounded, frosted bar, and a soft

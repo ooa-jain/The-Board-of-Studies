@@ -1,0 +1,156 @@
+/* ==========================================================================
+   The shell: the left menu (after Aceternity UI's sidebar), the institution
+   bar, and the skeletons shown while a page or a form is on its way.
+   A light, quiet palette — white surfaces, soft greys, navy for what matters;
+   no gold. Loaded last.
+   ========================================================================== */
+:root {
+  --side-w: 248px;          /* open */
+  --side-rail: 68px;        /* collapsed to icons */
+  --sh-bg: #f4f5f7;         /* the menu and the page ground: neutral-100 */
+  --sh-surface: #ffffff;
+  --sh-line: #e4e7ec;
+  --sh-text: #374151;       /* neutral-700 */
+  --sh-muted: #6b7280;
+  --sh-navy: #0e2a5c;
+  --sh-hover: #e9ebef;      /* neutral-200 */
+  --sh-ease: cubic-bezier(.4, 0, .2, 1);
+}
+html.side-collapsed { --side-w: var(--side-rail); }
+
+/* ---- the menu ---- */
+body.erp .admin-side, body.has-side .admin-side {
+  background: var(--sh-bg); color: var(--sh-text);
+  border-right: 1px solid var(--sh-line); box-shadow: none; overflow: hidden;
+}
+html.side-ready body.has-side { transition: padding-left .3s var(--sh-ease); }
+html.side-ready .admin-side { transition: width .3s var(--sh-ease); }
+
+.side-head { position: relative; display: flex; align-items: center; gap: 8px; min-height: 64px;
+  padding: 14px 12px 10px 16px; }
+.side-brand { flex-direction: row !important; align-items: center; gap: 10px !important; color: var(--sh-navy) !important;
+  min-width: 0; flex: 1; text-decoration: none; }
+.side-brand .side-logo { width: 96px !important; height: auto; display: block; flex: none; }
+.side-brand .side-roundel { display: none; width: 34px; height: 34px; border-radius: 50%; flex: none; }
+.side-brand-text { display: none; }
+.side-collapse { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px;
+  border: 0; background: transparent; color: var(--sh-muted); cursor: pointer;
+  transition: background .15s, color .15s, transform .3s var(--sh-ease); }
+.side-collapse:hover { background: var(--sh-hover); color: var(--sh-navy); }
+.side-collapse:focus-visible, .side-toggle:focus-visible, .side-close:focus-visible { outline: 2px solid var(--sh-navy); outline-offset: 2px; }
+.side-collapse svg, .side-toggle svg, .side-close svg { width: 20px; height: 20px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.side-toggle { display: none; background: transparent !important; color: var(--sh-text) !important; border: 0; }
+.side-close { display: none; }
+
+.side-nav { gap: 2px !important; padding: 4px 10px 12px !important; overflow-x: hidden; }
+body.erp .side-link, .side-link { position: relative; gap: 12px; padding: 9px 12px; border-radius: 8px; font-size: 13.5px;
+  color: var(--sh-text); font-weight: 500; white-space: nowrap; }
+body.erp .side-link:hover, .side-link:hover { background: var(--sh-hover); color: var(--sh-navy); }
+body.erp .side-link.is-on, .side-link.is-on { background: var(--sh-surface); color: var(--sh-navy); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 0 0 1px var(--sh-line); }
+.side-link.is-on::before { content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--sh-navy); }
+.side-link svg { flex: 0 0 20px; color: inherit; }
+/* the Updates link also carries the old top bar's bell class: full width here */
+.side-link.nav-bell { display: flex; width: auto; height: auto; place-items: initial; }
+.side-link .nav-bell-count { position: static; }
+.side-text { display: inline-block; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .2s var(--sh-ease), transform .15s ease; }
+.side-link:hover .side-text { transform: translateX(3px); }     /* group-hover/sidebar:translate-x-1 */
+.side-label { color: #9aa3b2 !important; }
+.side-sep { background: var(--sh-line) !important; }
+.side-num { background: #e7eaf0 !important; color: var(--sh-navy); }
+.side-link.is-on .side-num { background: var(--sh-navy) !important; color: #fff; }
+.side-link .nav-bell-count { background: var(--sh-navy) !important; color: #fff !important; }
+.side-dot.st-submitted { background: #16a34a !important; }
+.side-dot.st-draft { background: #2563eb !important; }
+.side-dot.st-open, .side-dot.st-locked { background: #d1d5db !important; }
+.side-dot.st-returned { background: #dc2626 !important; }
+
+.side-foot { border-top: 1px solid var(--sh-line) !important; padding: 12px 4px 2px !important; }
+.side-foot .who-avatar { background: var(--sh-navy) !important; color: #fff !important; }
+.side-who strong { color: var(--sh-navy) !important; }
+.side-who small, .side-who small a { color: var(--sh-muted) !important; }
+.side-out { color: var(--sh-muted) !important; }
+.side-out:hover { background: var(--sh-hover) !important; color: var(--sh-navy) !important; }
+
+/* collapsed to a rail of icons: the labels fade, the logo becomes the roundel */
+@media (min-width: 901px) {
+  html.side-collapsed .side-head { flex-direction: column; gap: 8px; padding: 14px 0 8px; }
+  html.side-collapsed .side-brand { flex: none; justify-content: center; }
+  html.side-collapsed .side-brand .side-logo { display: none; }
+  html.side-collapsed .side-brand .side-roundel { display: block; }
+  html.side-collapsed .side-collapse { transform: rotate(180deg); }
+  html.side-collapsed .side-nav { padding: 4px 10px 12px !important; }
+  html.side-collapsed .side-link { justify-content: center; padding: 10px 0; gap: 0; }
+  html.side-collapsed .side-text, html.side-collapsed .side-label, html.side-collapsed .side-who,
+  html.side-collapsed .side-link .nav-bell-count { opacity: 0; width: 0; flex: 0 0 0; margin: 0; padding: 0; pointer-events: none; }
+  html.side-collapsed .side-label { height: 6px; }
+  html.side-collapsed .side-dot { position: absolute; top: 6px; right: 9px; width: 8px; height: 8px; margin: 0; }
+  html.side-collapsed .side-foot { flex-direction: column; gap: 6px; }
+  html.side-collapsed .side-out { margin-left: 0; }
+  html.side-collapsed .side-link:hover .side-text { transform: none; }
+}
+
+/* ---- phones: a bar with the menu button; the menu slides in full-screen ---- */
+@media (max-width: 900px) {
+  body.has-side .admin-side { inset: 0 0 auto 0; width: auto; height: 60px; border-right: 0;
+    border-bottom: 1px solid var(--sh-line); overflow: visible; background: var(--sh-surface); }
+  .side-head { min-height: 60px; height: 60px; padding: 8px 14px; }
+  .side-brand .side-logo { width: 84px !important; }
+  .side-collapse { display: none; }
+  .side-toggle { display: grid !important; place-items: center; width: 40px; height: 40px; border-radius: 8px; margin-left: auto; }
+  .side-toggle:hover { background: var(--sh-hover) !important; }
+  .side-nav { display: flex !important; position: fixed; inset: 0; z-index: 100; max-height: none !important;
+    background: var(--sh-surface); padding: 72px 24px 24px !important; gap: 4px !important; overflow-y: auto;
+    transform: translateX(-100%); opacity: 0; visibility: hidden;
+    transition: transform .3s ease-in-out, opacity .3s ease-in-out, visibility 0s linear .3s; }
+  .side-nav[data-open="true"] { transform: translateX(0); opacity: 1; visibility: visible;
+    transition: transform .3s ease-in-out, opacity .3s ease-in-out, visibility 0s; }
+  .side-close { display: grid; place-items: center; position: absolute; top: 18px; right: 18px; width: 40px; height: 40px;
+    border: 0; border-radius: 8px; background: transparent; color: var(--sh-text); cursor: pointer; }
+  .side-close:hover { background: var(--sh-hover); }
+  .side-link { font-size: 15px; padding: 12px 14px; }
+  html:has(.side-nav[data-open="true"]) { overflow: hidden; }
+}
+
+/* ---- the institution bar: white, a hairline below ---- */
+.erp-bar { background: rgba(255, 255, 255, .92) !important; color: var(--sh-navy) !important;
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--sh-line); box-shadow: none !important; }
+.erp-bar-name { color: var(--sh-muted) !important; }
+.erp-bar-mid { color: var(--sh-navy); }
+.erp-bar-year { color: var(--sh-navy) !important; background: #eef1f6; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+@media (max-width: 900px) { .erp-bar { top: 60px !important; } body.erp.has-side { padding-top: 60px !important; } }
+body.erp, body.has-side { background: var(--sh-bg); }
+
+/* ---- skeletons: soft grey blocks that pulse, as the demo's dashboard ---- */
+.sk { background: #eceef2 !important; background-image: none !important; border-radius: 10px;
+  animation: sh-pulse 1.6s cubic-bezier(.4, 0, .6, 1) infinite !important; }
+@keyframes sh-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none !important; } }
+.sk-card { background: var(--sh-surface) !important; border-color: var(--sh-line) !important; }
+.file-thumb:not(.is-drawn) { background: #eceef2 !important; animation: sh-pulse 1.6s cubic-bezier(.4, 0, .6, 1) infinite !important; }
+
+/* the page-to-page skeleton: beside the menu, a white panel with a rounded
+   corner — four tiles across, two blocks below */
+.page-skeleton { background: var(--sh-bg) !important; }
+body.has-side .page-skeleton { left: var(--side-w) !important; padding: 0 !important; z-index: 55; }
+html.side-ready body.has-side .page-skeleton { transition: opacity .18s ease, left .3s var(--sh-ease); }
+.page-skeleton .loader-one { display: none !important; }
+.sk-shell { position: absolute; inset: 56px 0 0 0; display: flex; flex-direction: column; gap: 10px; padding: 22px 24px;
+  background: var(--sh-surface); border: 1px solid var(--sh-line); border-right: 0; border-bottom: 0;
+  border-top-left-radius: 16px; }
+.sk-shell .sk-row4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.sk-shell .sk-row4 .sk { height: 80px; }
+.sk-shell .sk-row2 { flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; min-height: 0; }
+.sk-shell .sk-row2 .sk { height: 100%; }
+.sk-shell .sk-head { height: 22px; width: 32%; }
+@media (max-width: 900px) {
+  body.has-side .page-skeleton { left: 0 !important; }
+  .sk-shell { inset: 100px 0 0 0; padding: 16px; border-radius: 0; border-left: 0; }
+  .sk-shell .sk-row4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sk-shell .sk-row2 { grid-template-columns: 1fr; }
+}
+@media print { .admin-side, .erp-bar { display: none !important; } body.has-side { padding-left: 0 !important; } }
