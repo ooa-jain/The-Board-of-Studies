@@ -680,14 +680,14 @@ def test_grouped_board_counts_each_group(app):
         assert sum(g["total"] for g in groups) == len(stage_board(sub))
 
 
-def test_the_home_page_carries_the_loading_screen(client):
-    """It is inert markup until the page's own script reveals it."""
+def test_the_home_page_is_the_sign_in_scene(client):
+    """The sign-in page is the stage scene with the login beside it — no
+    loading curtain, no hand, no top bar."""
     body = client.get("/").get_data(as_text=True)
-    assert 'id="preload-canvas"' in body
-    assert "is-preloading" in body
-    assert "js/particle-text.js" in body
-    # and it never appears on a page a department is working in
-    assert 'id="preload-canvas"' not in client.get("/login").get_data(as_text=True)
+    assert 'id="login-scene"' in body and 'name="username"' in body and 'name="password"' in body
+    assert "js/login-scene.js" in body
+    assert "preload-canvas" not in body and "intro-hand" not in body
+    assert 'class="topbar' not in body
 
 
 def test_the_portal_is_named_ooa_data_portal(client):
@@ -1207,13 +1207,12 @@ def test_batch_is_worked_out_not_asked(app, client):
     assert _stage_data(page)["details"]["batch"] == "2026-27"
 
 
-def test_a_department_gets_the_welcome_scene_once_after_signing_in(app, client):
+def test_signing_in_goes_straight_to_the_department_home(app, client):
+    """The scene is the sign-in page now; nothing is shown again after it."""
     u, p = make_department(app)
     login(client, u, p)
     first = client.get("/department/", follow_redirects=True).get_data(as_text=True)
-    assert 'id="intro"' in first and "Start filling" in first
-    again = client.get("/department/", follow_redirects=True).get_data(as_text=True)
-    assert 'id="intro"' not in again                      # once a sign-in, not on every page
+    assert 'id="intro"' not in first and 'id="login-scene"' not in first
 
 
 def test_the_office_never_gets_the_welcome_scene(app, client):

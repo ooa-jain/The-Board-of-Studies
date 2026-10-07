@@ -1,226 +1,103 @@
 {% extends "base.html" %}
-{% import "_art.html" as art %}
+{# The sign-in page: the portal's scene — the stages as glass panels taking
+   turns at the front, each card ticking itself off, the gears turning — and
+   the department login beside it. Signed-in users never see it: the route
+   sends them to their own home. #}
 {% block title %}BoS Academic Portal{% endblock %}
-
-{% block body_class %}has-hero{% endblock %}
-
+{% block body_class %}is-login{% endblock %}
 {% block head %}
-<script>
-  /* Set before the first paint so the curtain is up from the very first frame
-     rather than appearing over a page that has already drawn. Every load of
-     the home page gets it, a refresh included. Only ever set by this script:
-     with JavaScript off the curtain stays display:none, so the home page is
-     never covered by something that cannot be lifted. */
-  document.documentElement.className += " is-preloading";
-</script>
-{% endblock %}
-
-{% block curtain %}
-<div class="preload" id="preload">
-  <canvas class="preload-canvas" id="preload-canvas" aria-hidden="true"></canvas>
-  <p class="sr-only" role="status">
-    Loading the BoS Academic Portal — JAIN (Deemed-to-be University), Office of Academics.
-  </p>
-  <div class="preload-foot">
-    {# A real control, not a hint: it takes the focus ring, it answers to
-       Enter and to Space, and a screen reader calls it what it is. Clicking
-       anywhere else on the curtain does the same thing. #}
-    <button class="preload-enter" type="button" tabindex="-1" data-text="Enter the Portal">
-      <span class="pe-actual">&nbsp;Enter the Portal&nbsp;</span>
-      <span class="pe-hover" aria-hidden="true">&nbsp;Enter the Portal&nbsp;</span>
-    </button>
-    <span class="preload-bar" aria-hidden="true"><i></i></span>
-    <p class="preload-note">BoS Academic Portal</p>
-  </div>
-</div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 {% endblock %}
 
 {% block body %}
-<main id="main-content">
+<main id="main-content" class="login">
+  <div class="login-glow" aria-hidden="true"></div>
 
-{# ---------------------------------------------------------------- hero --
-   The reference runs its brightest colour edge to edge, sets the masthead and
-   everything else on it in the brand ink, and splits the space: a solid
-   square call to action and a numbered list on the left, a panel bleeding off
-   the right edge. #}
-<section class="hero">
-  <div class="wrap">
-    <div class="hero-split">
-      <div>
-        <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
-        <h1 class="hero-display erp-title">Board of Studies Portal</h1>
-        <p class="hero-lede">Department submissions for the academic year, in four stages.</p>
-        <table class="erp-table erp-stages">
-          <thead><tr><th>Stage</th><th>What is filed</th></tr></thead>
-          <tbody>
-            <tr><td>Level 0</td><td>Department information and programmes</td></tr>
-            <tr><td>Stage 1</td><td>Pre-BoS — DIAC, DPAC, minutes</td></tr>
-            <tr><td>Stage 2</td><td>BoS documents — composition, minutes, attendance, feedback</td></tr>
-            <tr><td>Stage 3</td><td>Curriculum, syllabus and course revision per programme</td></tr>
-          </tbody>
-        </table>
-      </div>
+  <section class="login-copy">
+    <img class="login-logo" alt="JAIN (Deemed-to-be University)"
+         src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
+    <span class="login-kicker">Board of Studies · {{ app_settings.academic_year if app_settings else '' }}</span>
+    <h1>BoS Academic Portal</h1>
+    <p class="login-lede">Your record, stage by stage — fill each one, tick it off, and it goes to the
+      Office of Academics.</p>
 
-      {% if resume %}
-      {# Already signed in: the thread you dropped, not a second sign-in. #}
-      <aside class="hero-panel hero-resume frame-panel" id="signin">
-        <span class="frame-tab">Active Session</span>
-        <div class="resume-head">
-          <span class="resume-kicker">Academic Session · {{ resume.year|replace('-', '–') }}</span>
-          <h2 class="signin-title">{{ resume.dept.dept_name }}</h2>
-          <p class="resume-where">{{ resume.dept.campus }}{% if resume.dept.place %} · {{ resume.dept.place }}{% endif %}</p>
-        </div>
+    <div class="login-card" id="signin">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="login-alert is-{{ 'error' if category == 'error' else category }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
 
-        <div class="resume-bar">
-          <div class="bar" role="progressbar"
-               aria-valuenow="{{ resume.progress.done }}" aria-valuemin="0"
-               aria-valuemax="{{ resume.progress.total }}"
-               aria-label="Stages submitted"><i style="width:{{ resume.progress.percent }}%"></i></div>
-          <span class="resume-count">
-            {{ resume.progress.done }} of {{ resume.progress.total }} stages completed
+      <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on">
+        {# where to land afterwards, when something sent you here to sign in #}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <label class="login-field">
+          <span>Username</span>
+          <input type="text" id="username" name="username" required autofocus
+                 autocapitalize="none" spellcheck="false" autocomplete="username"
+                 placeholder="e.g. cse.scse.4821">
+        </label>
+        <label class="login-field">
+          <span>Password</span>
+          <span class="login-pw">
+            <input type="password" id="password" name="password" required
+                   autocomplete="current-password" placeholder="As issued to your department">
+            <button class="login-show" type="button" id="pw-toggle" aria-pressed="false"
+                    aria-controls="password">Show</button>
           </span>
-        </div>
-
-        {% if resume.next %}
-        <a class="resume-next" href="{{ url_for('dept.stage', stage_key=resume.next.key) }}">
-          <span class="resume-label">
-            {% if resume.next.status == 'returned' %}Sent back — needs your correction
-            {% elif resume.next.status == 'draft' %}You left off here
-            {% else %}Next Stage{% endif %}
-          </span>
-          <span class="resume-title">{{ resume.next.title }}</span>
-          <span class="resume-go">
-            {% if resume.next.status == 'draft' %}Continue{% else %}Proceed{% endif %}
-            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
-                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-        </a>
-        {% else %}
-        <div class="resume-next is-done">
-          <span class="resume-label">Every stage submitted</span>
-          <span class="resume-title">
-            {% if resume.sealed %}Sealed — the record is complete{% else %}Nothing left to file{% endif %}
-          </span>
-        </div>
-        {% endif %}
-
-        <p class="signin-note">
-          <a href="{{ url_for('dept.dashboard') }}">View All {{ resume.progress.total }} Stages</a>
-          {% if resume.sealed %}
-          · <a href="{{ url_for('dept.export_excel') }}">Excel</a>
-          · <a href="{{ url_for('dept.export_word') }}">Word report</a>
-          {% endif %}
-        </p>
-      </aside>
-
-      {% elif current_user and current_user.role == 'admin' %}
-      {# The Office of Academics, signed in: straight to the console. Guarded
-         on the role, not merely on being signed in — a department must never
-         be pointed at the admin console because a lookup came back empty. #}
-      <aside class="hero-panel hero-resume frame-panel" id="signin">
-        <span class="frame-tab">Active Session</span>
-        <div class="resume-head">
-          <span class="resume-kicker">Active Session</span>
-          <h2 class="signin-title">{{ current_user.name }}</h2>
-          <p class="resume-where">{{ stats.departments }} active departments</p>
-        </div>
-        <a class="resume-next" href="{{ url_for('admin.dashboard') }}">
-          <span class="resume-label">Where you were</span>
-          <span class="resume-title">The admin dashboard</span>
-          <span class="resume-go">
-            Open
-            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
-                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </span>
-        </a>
-        <p class="signin-note">
-          <a href="{{ url_for('admin.departments') }}">Departments</a>
-          · <a href="{{ url_for('admin.submissions') }}">Submissions</a>
-        </p>
-      </aside>
-
-      {% elif current_user %}
-      {# Signed in, but with nothing to resume — a department whose record has
-         been removed, say. Say so plainly rather than offering a sign-in they
-         do not need. #}
-      <aside class="hero-panel hero-resume frame-panel" id="signin">
-        <span class="frame-tab">Active Session</span>
-        <div class="resume-head">
-          <span class="resume-kicker">Active Session</span>
-          <h2 class="signin-title">{{ current_user.name }}</h2>
-        </div>
-        <p class="signin-note">
-          There is no department record against this login. Write to the Office
-          of Academics, or <a href="{{ url_for('auth.logout') }}">sign out</a>.
-        </p>
-      </aside>
-
-      {% else %}
-      {# Signing in is the only thing anybody comes here to do, so it happens
-         here rather than one page further on. The form posts to the same
-         endpoint as the standalone login page, which is where a wrong
-         password lands, error and all. #}
-      <aside class="hero-panel hero-signin frame-panel" id="signin">
-        <span class="frame-tab">Department login</span>
-        <h2 class="signin-title">Sign in</h2>
-        <p class="signin-sub">Use the login issued to your department by the Office of Academics.</p>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% for category, message in messages %}
-            <div class="alert alert-{{ 'error' if category == 'error' else category }}">{{ message }}</div>
-          {% endfor %}
-        {% endwith %}
-
-        <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on">
-          {# where to land afterwards, when something sent you here to sign in #}
-          {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
-          <div class="field">
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" required
-                   autocapitalize="none" spellcheck="false"
-                   placeholder="e.g. cse.scse.4821">
-          </div>
-          <div class="field">
-            <label for="password">Password</label>
-            <div class="pw-wrap">
-              <input type="password" id="password" name="password" required
-                     placeholder="As issued to your department">
-              <button class="pw-toggle" type="button" id="pw-toggle" aria-pressed="false"
-                      aria-controls="password">Show</button>
-            </div>
-          </div>
-          <button class="btn btn-gold btn-lg" type="submit">
-            Sign in
-            <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
-                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </form>
-
-        <p class="signin-note">
-          No login, or it stopped working? Write to the Office of Academics.
-          <a href="{{ url_for('public.about') }}">Help</a>
-        </p>
-      </aside>
-      {% endif %}
+        </label>
+        <button class="login-go" type="submit">Sign in <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="login-note">No login, or it stopped working? Write to the Office of Academics ·
+        <a href="{{ url_for('public.about') }}">Help</a></p>
     </div>
-  </div>
-</section>
+    <span class="login-hint" aria-hidden="true">Move the pointer to turn the scene · click a panel</span>
+  </section>
 
+  <section class="login-stage" aria-hidden="true">
+    <div class="login-scene" id="login-scene">
+      {% set panels = [
+        ('blue', 'Pre-BoS', ['DIAC composition', 'DPAC composition', 'Minutes of the meeting']),
+        ('slate', 'BoS Documents', ['Minutes of meeting', 'Attendance', 'Photos']),
+        ('glass', 'Curriculum', ['Programme structure', 'Syllabus', 'Course revision']),
+      ] %}
+      {% for tone, title, items in panels %}
+      <div class="lp lp-{{ tone }}" data-pos="{{ loop.index0 }}">
+        <span class="lp-dot"></span>
+        <span class="lp-title">{{ title }}</span>
+        {% for it in items %}
+        <span class="lp-card"><b>{{ it }}</b><i></i><i class="short"></i><em class="lp-tick">✓</em></span>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <svg class="login-gear g1" viewBox="0 0 100 100"><use href="#login-gear"/></svg>
+    <svg class="login-gear g2" viewBox="0 0 100 100"><use href="#login-gear"/></svg>
+    <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <linearGradient id="lg-metal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#eef2f8"/><stop offset=".5" stop-color="#8b97ab"/>
+          <stop offset="1" stop-color="#2c3648"/>
+        </linearGradient>
+        <g id="login-gear">
+          <path fill="url(#lg-metal)" stroke="#1d2533" stroke-width="1.5"
+                d="M44 4h12l2 12 9 4 10-7 9 9-7 10 4 9 12 2v12l-12 2-4 9 7 10-9 9-10-7-9 4-2 12H44l-2-12-9-4-10 7-9-9
+                   7-10-4-9-12-2V44l12-2 4-9-7-10 9-9 10 7 9-4z"/>
+          <circle cx="50" cy="50" r="15" fill="#0b1324" stroke="#cfd8e6" stroke-width="2"/>
+        </g>
+      </defs>
+    </svg>
+  </section>
+
+  <footer class="login-foot">JAIN (Deemed-to-be University) · Office of Academics</footer>
 </main>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // The reveal on the hero's sign-in form, same behaviour as the login page.
+  // Show / hide the password, as the button says.
   (function () {
-    var btn = document.getElementById("pw-toggle");
-    var input = document.getElementById("password");
+    var btn = document.getElementById("pw-toggle"), input = document.getElementById("password");
     if (!btn || !input) return;
     btn.addEventListener("click", function () {
       var shown = input.type === "text";
@@ -231,6 +108,5 @@
     });
   })();
 </script>
-<script src="{{ url_for('static', filename='js/particle-text.js') }}"></script>
-<script src="{{ url_for('static', filename='js/preload.js') }}"></script>
+<script src="{{ url_for('static', filename='js/login-scene.js') }}"></script>
 {% endblock %}

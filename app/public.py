@@ -46,8 +46,9 @@ def landing():
     # listed here and cost one count query per school; it is gone, and so is
     # the counting.
     stats = {"departments": db.departments.count_documents({"active": True})}
+    # the sign-in page is a page of its own: no top bar, no footer
     return render_template("landing.html", stats=stats, next_url=nxt,
-                           resume=_resume_for(session.get("user")))
+                           resume=_resume_for(session.get("user")), hide_chrome=True)
 
 
 def _resume_for(user):

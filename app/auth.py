@@ -108,8 +108,6 @@ def login():
             {"dept_code": user["dept_code"], "first_login_at": {"$exists": False}},
             {"$set": {"first_login_at": now()}, "$unset": {"initial_password": ""}})
     audit(user["username"], "login.ok", request.remote_addr or "")
-    if user["role"] == "department":
-        session["intro"] = True          # the welcome scene, on the first page after signing in
 
     if nxt and nxt.startswith("/"):
         return redirect(nxt)
