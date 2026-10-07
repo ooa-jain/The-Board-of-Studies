@@ -3927,6 +3927,7 @@
       paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
       // the step that completes the record opens the review of everything
       if (CTX.final) { submitLabel(btn); openAll(); }
+      else if (CTX.programme_review) { submitLabel(btn); openProgramme(); }
       else submitAndGo(btn);
     }).catch(() => unreachable(btn));
   }
@@ -3935,6 +3936,15 @@
      to the next one. */
   function openAll() {
     window.SubmitAll.open({ record: CTX.urls.record, submit: CTX.urls.submit_all, beforeOpen: () => save() });
+  }
+
+  /* The programme's last step: its own review — Curriculum, Current Batch,
+     the earlier batches begun, Course Revision — submitted together, then on
+     to the next programme. */
+  function openProgramme() {
+    const q = "?programme=" + encodeURIComponent(CTX.programme);
+    window.SubmitAll.open({ record: CTX.urls.record + q, submit: CTX.urls.submit_all + q,
+                            title: "Review & submit this programme", beforeOpen: () => save() });
   }
 
   function submitAndGo(btn) {

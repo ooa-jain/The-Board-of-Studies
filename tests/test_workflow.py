@@ -424,8 +424,12 @@ def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
     for n, (code, part) in enumerate(order):
         body = client.post(f"/department/api/{part}/{code}/submit", json={}).get_json()
         assert body["ok"]
-        # on to the next part not yet submitted; after the last, back to Curriculum
-        if n + 1 < len(order):
+        # on to the programme's next step — after the current batch, its earlier
+        # batches — then the next programme; after the last, back to Curriculum
+        if part == "prog_syllabus":
+            assert f"/department/stage/prog_syllabus_b" in body["redirect"] and \
+                body["redirect"].endswith(f"/{code}"), body["redirect"]
+        elif n + 1 < len(order):
             nc, np_ = order[n + 1]
             assert body["redirect"].endswith(f"/department/stage/{np_}/{nc}"), body["redirect"]
         else:

@@ -98,7 +98,7 @@
     }
     foot.appendChild(row);
 
-    const ctl = Review.modal({ title: "Review & submit all stages", sub: j.dept_name, top, body, foot });
+    const ctl = Review.modal({ title: opts.title || "Review & submit all stages", sub: j.dept_name, top, body, foot });
     const printAll = () => {
       const all = el("div");
       items.forEach(it => {

@@ -562,4 +562,32 @@ def test_submitting_a_programme_part_goes_to_the_next_step_of_that_programme(app
     assert "✓ Submitted" in page                                             # Curriculum turns green
     syl = _sub(app, code)["programmes"]["MCAREG"]["prog_syllabus"]["data"]
     j = client.post("/department/api/prog_syllabus/MCAREG/submit", json=syl).get_json()
-    assert j["ok"] and j["redirect"].endswith("/department/stage/prog_revision/MCAREG")
+    # then each earlier batch, then Course Revision
+    assert j["ok"] and "/department/stage/prog_syllabus_b" in j["redirect"] and j["redirect"].endswith("/MCAREG")
+
+
+def test_each_step_says_where_it_goes_and_the_last_reviews_the_programme(app, client):
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    cur = client.get("/department/stage/prog_curriculum/MCAREG").get_data(as_text=True)
+    assert "Submit Curriculum &amp; go to Current Batch" in cur
+    syl = client.get("/department/stage/prog_syllabus/MCAREG").get_data(as_text=True)
+    assert "Submit Current Batch" in syl and "go to Existing Batch" in syl
+    from app.workflow import batches
+    with app.test_request_context():
+        older = [b["key"] for b in batches()["existing"]]
+    if older:
+        last_old = client.get(f"/department/stage/{older[-1]}/MCAREG").get_data(as_text=True)
+        assert "go to Course Revision" in last_old and "Skip to Course Revision" in last_old
+    rev = client.get("/department/stage/prog_revision/MCAREG").get_data(as_text=True)
+    assert "Review &amp; submit this programme" in rev and '"programme_review": true' in rev.replace("programme_review: true", '"programme_review": true')
+
+    record = client.get("/department/api/record?programme=MCAREG").get_json()
+    assert record["items"] and all(i["programme"] == "MCAREG" for i in record["items"])
+    j = client.post("/department/api/submit-all?programme=MCAREG").get_json()
+    assert j["ok"], j.get("failed")
+    sub = _sub(app, code)
+    assert all(sub["programmes"]["MCAREG"][k]["status"] == "submitted"
+               for k in ("prog_curriculum", "prog_syllabus", "prog_revision"))
+    assert sub["programmes"]["MCAIML"]["prog_curriculum"]["status"] != "submitted"   # only this programme
+    assert "/department/stage/prog_curriculum/" in j["redirect"]                    # on to the next programme

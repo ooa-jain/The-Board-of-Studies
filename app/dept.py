@@ -300,8 +300,22 @@ def stage(stage_key, programme_code=None):
         "status": {"$in": ["open", "done"]}}).sort("at", -1))
     board = stage_board(sub)
     final, record = _final_step(sub, dept, stage_key, (programme or {}).get("programme_code"))
+    step = next_step = None
+    last_step = False
+    if programme and stage_def.get("parent"):
+        steps = _programme_steps(sub, programme["programme_code"])
+        keys = [st["key"] for st in steps]
+        if stage_key in keys:
+            i = keys.index(stage_key)
+            step = steps[i]
+            next_step = steps[i + 1] if i + 1 < len(steps) else None
+            last_step = next_step is None
+            if last_step:
+                np_ = _next_programme(sub, dept, programme["programme_code"])
+                next_step = np_ and {**np_, "label": "the next programme"}
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
                            final=final, record=record, syllabi=syllabi, comments=comments,
+                           step=step, next_step=next_step, last_step=last_step,
                            course_map=course_map, back_to_structure=back,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),
@@ -732,17 +746,56 @@ def _submit_one(dept, sub, stage_key, programme, data):
     return {"ok": True, "status": status, "issues": issues, "summary": summary}
 
 
+def _step_label(key, cfg=None):
+    """A programme step as the buttons name it."""
+    d = STAGE_BY_KEY[key]
+    if key == "prog_curriculum":
+        return "Curriculum"
+    if key == "prog_syllabus":
+        return f"Current Batch {batches(cfg)['current']}".strip()
+    if d.get("existing_batch"):
+        return f"Existing Batch {d.get('batch', '')}".strip()
+    if key == "prog_revision":
+        return "Course Revision"
+    return d["title"]
+
+
+def _programme_steps(sub, code):
+    """One programme's steps, in order: Curriculum, Current Batch, each
+    earlier batch, Course Revision — with where each stands."""
+    stage_def = next(s for s in STAGE_BY_KEY.values() if s.get("parts"))
+    cfg = app_settings_doc()
+    return [{"key": k, "label": _step_label(k, cfg), "status": part_status(sub, code, k),
+             "optional": bool(STAGE_BY_KEY[k].get("optional")),
+             "url": url_for("dept.stage", stage_key=k, programme_code=code)}
+            for k in parts_for(stage_def, cfg)]
+
+
+def _next_programme(sub, dept, code):
+    """The programme after this one that still has something to submit."""
+    progs = [p["programme_code"] for p in programmes_of(sub, dept)]
+    here = progs.index(code) if code in progs else -1
+    for c in progs[here + 1:] + progs[:max(here, 0)]:
+        for st in _programme_steps(sub, c):
+            if st["status"] != "submitted" and not st["optional"]:
+                return st
+    return None
+
+
 def _next_part(dept, stage_key, programme_code):
     """After a programme part: the next step of the same programme not yet
     submitted (Curriculum → Current Batch → an earlier batch it has begun →
     Revision), then the programmes after it, then any left before it."""
     sub = get_or_create_submission(dept["dept_code"], _year())
-    items = [i for i in _record_items(sub, dept) if i["programme"]]
-    here = next((n for n, i in enumerate(items)
-                 if i["programme"] == programme_code and i["key"] == stage_key), -1)
-    for item in items[here + 1:] + items[:max(here, 0)]:
-        if item["status"] != "submitted":
-            return {"key": item["key"], "title": item["title"], "url": item["url"]}
+    steps = _programme_steps(sub, programme_code)
+    keys = [st["key"] for st in steps]
+    here = keys.index(stage_key) if stage_key in keys else -1
+    for st in steps[here + 1:]:
+        if st["status"] != "submitted":
+            return {"key": st["key"], "title": st["label"], "url": st["url"]}
+    nxt = _next_programme(sub, dept, programme_code)
+    if nxt:
+        return {"key": nxt["key"], "title": nxt["label"], "url": nxt["url"]}
     return None
 
 
@@ -786,7 +839,15 @@ def api_record():
     """The whole record, for “Review & submit all”."""
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
-    return jsonify({"ok": True, "dept_name": dept.get("dept_name", ""), "items": _record_items(sub, dept)})
+    items = _record_items(sub, dept)
+    only = request.args.get("programme")
+    name = dept.get("dept_name", "")
+    if only:
+        # one programme's own review: its parts, earlier batches it has begun included
+        items = [{**i, "title": _step_label(i["key"])} for i in items if i["programme"] == only]
+        name = next((p.get("programme_name") for p in programmes_of(sub, dept)
+                     if p["programme_code"] == only), only)
+    return jsonify({"ok": True, "dept_name": name, "items": items})
 
 
 @bp.post("/api/submit-all")
@@ -796,8 +857,11 @@ def api_submit_all():
     as saved. Stops at the first that cannot go, and says which and why."""
     dept = _dept()
     done = []
+    only = request.args.get("programme")
     sub = get_or_create_submission(dept["dept_code"], _year())
     for item in _record_items(sub, dept):
+        if only and item["programme"] != only:
+            continue
         if item["status"] == "submitted":
             continue
         sub = get_or_create_submission(dept["dept_code"], _year())
@@ -819,6 +883,14 @@ def api_submit_all():
                             "failed": {"title": item["title"], "url": item["url"],
                                        "issues": [i for i in res.get("issues", []) if i.get("level") == "error"][:8]}})
         done.append(item["title"])
+    if only:
+        sub = get_or_create_submission(dept["dept_code"], _year())
+        nxt = _next_programme(sub, dept, only)
+        if done:
+            flash(f"This programme is submitted — {len(done)} part{'s' if len(done) != 1 else ''}."
+                  + (" On to the next programme." if nxt else ""), "success")
+        return jsonify({"ok": True, "done": done,
+                        "redirect": nxt["url"] if nxt else url_for("dept.stage", stage_key="curriculum")})
     if done:
         flash(f"Submitted {len(done)} stage{'s' if len(done) != 1 else ''} and parts. "
               "Your Board of Studies record is with the Office of Academics.", "success")
