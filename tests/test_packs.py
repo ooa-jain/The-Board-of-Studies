@@ -439,3 +439,35 @@ def test_the_programme_report_page_offers_the_word_documents(app, client):
     r = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/s.docx")
     assert r.status_code == 200 and len(r.data) > 10000
     assert client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/x.docx").status_code == 404
+
+
+# ---------------------------------------------------------------- Fill from Drive, submit, download
+
+def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloads(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    code = _signed_in_department(app, client)
+    page = client.get("/department/").get_data(as_text=True)
+    assert "Fill from Drive" in page
+
+    r = client.post("/department/drive/fill", follow_redirects=True)
+    body = r.get_data(as_text=True)
+    assert "from the Drive folder" in body and "Fill again from Drive" in body
+    sub = _sub(app, code)
+    assert sub["stages"]["pre_bos"]["data"]["pre_bos_files"]["diac_signed"]["stored"]
+    assert sub["stages"]["bos_documents"]["data"]["meeting"]["bos_date"]
+    assert sub["stages"]["pre_bos"]["status"] == "draft"          # saved, for the department to submit
+
+    j = client.post("/department/api/submit-all").get_json()
+    assert j["ok"], j.get("failed")
+    assert _sub(app, code)["status"] == "sealed"
+
+    # the Office downloads it
+    office = app.test_client()
+    _admin(app, office)
+    ws = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    text = " ".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+    stages = text.split("Stages")[1].split("Department Information —")[0]
+    assert stages.count("✓ Submitted") >= 4                       # every stage in
+    assert "Open →" in text and "Curriculum (JAIN template)" in text

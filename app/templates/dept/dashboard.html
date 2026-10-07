@@ -7,7 +7,7 @@
     <div>
       <div class="crumbs">{{ dept.campus }} <span>›</span> {{ dept.school }}</div>
       <h1>{{ dept.dept_name }}</h1>
-      <p>Board of Studies submission for {{ year }}. Stages open in order — finish one to unlock the next.</p>
+      <p>Board of Studies submission for {{ year }}. Open any stage and fill it in any order; each is submitted once everything in it is complete.</p>
     </div>
     <div class="spacer head-aside">
       <div class="flex head-aside-row">
@@ -53,6 +53,20 @@
   </div>
   <form method="post" action="{{ url_for('dept.demo_fill_all') }}" class="spacer">
     <button class="btn btn-gold">Fill everything with sample data</button>
+  </form>
+</div>
+{% endif %}
+{% if drive and submission.status != 'sealed' %}
+<div class="demo-strip drive-strip">
+  <span class="demo-badge" aria-hidden="true">DRIVE</span>
+  <div>
+    <strong>{{ 'Filled from your Drive folder.' if drive.done else 'Fill everything from your Drive folder?' }}</strong>
+    <span class="small muted">Your course matrices, syllabi and documents{% if drive.folder %} (<a href="{{ drive.folder }}" target="_blank" rel="noopener">Drive folder</a>){% endif %}
+      fill every stage and programme. Anything the folder does not have gets an entry that suits, marked
+      “to be confirmed”. Then review and submit.</span>
+  </div>
+  <form method="post" action="{{ url_for('dept.drive_fill') }}" class="spacer">
+    <button class="btn btn-gold">{{ 'Fill again from Drive' if drive.done else 'Fill from Drive' }}</button>
   </form>
 </div>
 {% endif %}

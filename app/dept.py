@@ -180,7 +180,12 @@ def dashboard():
                     if c.get("programme_code") else url_for("dept.stage", stage_key=c["stage"]))
         c["where"] = STAGE_BY_KEY.get(c["stage"], {}).get("title", c["stage"]) + \
             (f" · {c['programme_code']}" if c.get("programme_code") else "")
+    from .autofill import pack_for
+    drive = pack_for(get_db(), dept)
     return render_template("dept/dashboard.html", dept=dept, submission=sub, open_comments=open_comments,
+                           drive=drive and {"title": drive["title"],
+                                            "folder": (drive.get("source") or {}).get("folder"),
+                                            "done": bool(sub.get("autofilled"))},
                            board=stage_board(sub), progress=progress(sub),
                            programmes=programmes_of(sub, dept), year=_year(),
                            next_step=next_action(sub))
@@ -574,6 +579,26 @@ def comment_done(cid):
                                                      "before": "open", "after": "done" + (f": {reply[:60]}" if reply else "")}])
     flash("Thank you — the Office of Academics sees it is done.", "success")
     return redirect(request.referrer or url_for("dept.dashboard"))
+
+
+@bp.post("/drive/fill")
+@department_required
+def drive_fill():
+    """A department with a Drive data pack: fill every stage from it, and
+    whatever the Drive folder did not cover with entries that suit."""
+    from .autofill import fill_from_drive, pack_for
+    dept = _dept()
+    if not pack_for(get_db(), dept):
+        abort(404)
+    done = fill_from_drive(dept, _year(), (_person() or {}).get("name") or dept["dept_code"])
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for key, part in (sub.get("stages") or {}).items():
+        if part.get("data"):
+            people.keep(dept["dept_code"], _year(), key, None, part["data"], _person())
+    flash(f"Filled {len(done)} stages and programme parts from the Drive folder; anything it did not "
+          "cover has an entry that suits, marked to be confirmed. Review, then press "
+          "“Review & submit all stages”.", "success")
+    return redirect(url_for("dept.dashboard"))
 
 
 @bp.post("/demo/fill-all")

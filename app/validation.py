@@ -410,6 +410,9 @@ def r_ugc_research_or_lieu(data, ctx, sk):
     return out
 
 
+LONG_COURSES = ("Research Project / Dissertation", "Summer Internship")
+
+
 def r_ltpe_credit_arithmetic(data, ctx, sk):
     cfg = U.DEFAULT_OTHER_RULES
     w = cfg["credit_from_hours"]
@@ -433,7 +436,8 @@ def r_ltpe_credit_arithmetic(data, ctx, sk):
                 f"Course {r.get('course_code') or f'in row {i + 1}'}: L-T-P-E of "
                 f"{int(l)}-{int(t)}-{int(p)}-{int(e)} works out to {expected:g} credits, "
                 f"but you entered {cr:g}.", section=sk, row=i, field="credits"))
-        if cr > cfg["max_credits_per_course"]:
+        # a project, dissertation or internship is one course worth more than a taught course
+        if cr > cfg["max_credits_per_course"] and r.get("nep_category") not in LONG_COURSES:
             out.append(err(f"Course {r.get('course_code') or f'in row {i + 1}'}: "
                            f"{cr:g} credits exceeds the {cfg['max_credits_per_course']}-credit "
                            f"ceiling for a single course.", section=sk, row=i, field="credits"))
