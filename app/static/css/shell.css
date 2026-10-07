@@ -289,3 +289,9 @@ body.has-side .wrap { max-width: none !important; }
 .pl-panel .pl-new .pl-in-programme_code::before { content: "Code (auto)"; }
 .pl-panel .pl-new .pl-in-degree::before { content: "Level"; }
 .pl-panel .pl-new .pl-in-year_introduced::before { content: "Since (year)"; }
+
+/* a document row's reference template, beside its status */
+.acc-tpl { margin-left: auto; margin-right: 10px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; text-decoration: none !important; white-space: nowrap; }
+.acc-tpl:hover { background: #dbeafe; }
+.acc-head .acc-tpl + .acc-chip { margin-left: 0; }

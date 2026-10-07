@@ -1291,7 +1291,7 @@
         });
       };
       if (def.template) {
-        const t = el("a", "tpl-link", "⤓ Download the template (Word)");
+        const t = el("a", "tpl-link", "⤓ Download the template for reference (Word)");
         t.href = CTX.urls.static + def.template;
         t.setAttribute("download", "");
         wrap.appendChild(t);
@@ -3701,6 +3701,15 @@
       const t = el("span", "acc-title", f.label);
       if (f.required) t.appendChild(el("span", "req", " *"));
       sum.appendChild(t);
+      if (f.template) {
+        // the reference template, right on the row, without opening it
+        const tpl = el("a", "acc-tpl", "⤓ Template");
+        tpl.href = CTX.urls.static + f.template;
+        tpl.setAttribute("download", "");
+        tpl.title = "Download the template for reference (Word)";
+        tpl.addEventListener("click", e => e.stopPropagation());
+        sum.appendChild(tpl);
+      }
       const chip = el("span", "acc-chip");
       sum.appendChild(chip);
       sum.appendChild(el("span", "acc-caret", "›"));

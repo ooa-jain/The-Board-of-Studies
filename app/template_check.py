@@ -39,7 +39,7 @@ TEMPLATES = {
     },
     "bos_composition": {
         "title": "Composition of BoS Members",
-        "file": None,
+        "file": "templates/Composition_of_BoS_Members.docx",
         "categories": None,          # the PAC's, filled in below
     },
     "dpac_signed": {

@@ -73,3 +73,22 @@ def test_a_blank_form_cannot_be_submitted(app, client):
 def test_the_templates_can_be_downloaded(client):
     r = client.get("/static/templates/Composition_of_DIAC.docx")
     assert r.status_code == 200 and r.data[:2] == b"PK"
+
+
+def test_every_document_template_offered_exists():
+    """Each upload that offers a reference template points at a real file,
+    and every BoS document that has a paper form offers one."""
+    from pathlib import Path
+
+    from app.schema import STAGE_BY_KEY
+    static = Path(__file__).resolve().parents[1] / "app" / "static"
+    offered = {}
+    for key in ("pre_bos", "bos_documents"):
+        for sec in STAGE_BY_KEY[key]["sections"]:
+            for f in sec.get("fields", []):
+                if f.get("template"):
+                    offered[f["name"]] = f["template"]
+                    assert (static / f["template"]).is_file(), f["template"]
+    for name in ("bos_composition", "external_profiles", "minutes", "attendance", "vision_mission",
+                 "feedback_curriculum", "feedback_new_programme", "pre_bos_minutes"):
+        assert name in offered, name
