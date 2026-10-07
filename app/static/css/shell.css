@@ -237,3 +237,8 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
   color: #1e3a8a; font-size: 12px; line-height: 1.45; white-space: normal; }
 .side-dev-body a { display: inline-block; margin-top: 4px; font-weight: 600; color: #1d4ed8; }
 @media (min-width: 901px) { html.side-collapsed .side-dev-body { display: none; } }
+
+/* the syllabus course sheet, and the page around it, use the full width */
+.sheet-wrap { max-width: none !important; }
+.sh-line .sh-in { max-width: 640px; }
+body.has-side .wrap { max-width: none !important; }
