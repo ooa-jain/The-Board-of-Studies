@@ -4770,3 +4770,10 @@ html.intro-open, html.intro-open body { overflow: hidden; }
   .intro-gear, .intro-hand.is-tap { animation: none; }
   .ip, .intro-scene, .intro-hand { transition: none; }
 }
+
+/* a submitted step of a programme: green, ticked */
+.pmap-node.is-submitted > .pmap-pill { background: #e6f4ea; border-color: #2f8a55; color: #1f6b44; }
+.pmap-node.is-submitted > .pmap-pill .pmap-title { color: #1f6b44; }
+.pmap-node.is-submitted.is-here > .pmap-pill { box-shadow: 0 0 0 3px rgba(47,138,85,.18); }
+.pmap-done { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #2f8a55; color: #fff; }
+.pmap-twig.is-submitted { background: #e6f4ea; color: #1f6b44; }

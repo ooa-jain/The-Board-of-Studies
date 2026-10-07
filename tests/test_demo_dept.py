@@ -17,7 +17,7 @@ def test_every_demo_stage_and_part_submits_as_filled(app, client):
         assert user == "demo.dept"
         db = get_db()
         assert not db.submissions.find_one({"dept_code": "DEMO"}), "the forms start empty"
-        assert db.files.count_documents({"dept_code": "DEMO"}) == 13   # one in every upload box
+        assert db.files.count_documents({"dept_code": "DEMO"}) == 14   # one in every upload box
         for r in db.files.find({"dept_code": "DEMO", "field": {"$in": ["diac_signed", "dpac_signed"]}}):
             assert r["keyword_match"]["template"]["ok"], r["keyword_match"]["template"]
         bad = [r["original_name"] for r in db.files.find({"dept_code": "DEMO"})

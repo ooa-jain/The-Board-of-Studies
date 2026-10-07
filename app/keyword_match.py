@@ -39,6 +39,10 @@ KEYWORDS = {
                 "members present / present / attendance", "date", "venue",
                 "approved / resolved / decided / recommended", "course matrix / curriculum / syllabus",
                 "observation / recommendation"],
+    # the Pre-BoS meeting's own minutes
+    "pre_bos_minutes": ["minutes / proceedings / MoM", "Pre-BoS / Pre BoS / pre-board / DIAC / DPAC / PAC",
+                        "meeting", "agenda", "members present / present / attendance", "date",
+                        "approved / resolved / decided / recommended / discussed"],
     "external_profiles": ["profile / curriculum vitae / CV / resume / biodata", "experience",
                           "qualification / Ph.D / degree / education", "designation / position / role",
                           "publications / research / projects", "email / contact / phone / mobile"],
@@ -64,6 +68,8 @@ KEYWORDS = {
 # (the minutes talk about the vision and mission); the title cannot.
 LEADS = {
     "minutes": ("the Minutes of Meeting", r"minutes|proceedings"),
+    # minutes either way: in this box they are this box's document
+    "pre_bos_minutes": ("the Pre-BoS Minutes", r"minutes|proceedings"),
     "vision_mission": ("the Vision and Mission", r"\bvision\b|\bmission\b"),
     "bos_composition": ("the Composition of BoS Members",
                         r"composition\s+of\s+(the\s+)?(bos|board)|bos\s+members|\bcategory\b.{0,40}\brole\b.{0,40}\bmembers\b"),

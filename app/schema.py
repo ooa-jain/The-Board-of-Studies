@@ -207,6 +207,9 @@ PRE_BOS = {
                  "template": "templates/Composition_of_PAC.docx",
                  "help": "Fill a name and designation for every category in the template. A Word "
                          "file is checked row by row; anything left blank is listed."},
+                {"name": "pre_bos_minutes", "label": "Minutes of the Meeting (Pre-BoS)",
+                 "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                 "help": "The minutes of the Pre-BoS meeting, signed — PDF or Word."},
                 {"name": "notes", "label": "Note to the Office of Academics", "type": "textarea",
                  "rows": 2, "wide": True, "help": "Optional."},
             ],

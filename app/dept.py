@@ -733,11 +733,15 @@ def _submit_one(dept, sub, stage_key, programme, data):
 
 
 def _next_part(dept, stage_key, programme_code):
-    """After a programme part: the next part of the same programme not yet
-    submitted, else the first one of the next programme."""
+    """After a programme part: the next step of the same programme not yet
+    submitted (Curriculum → Current Batch → an earlier batch it has begun →
+    Revision), then the programmes after it, then any left before it."""
     sub = get_or_create_submission(dept["dept_code"], _year())
-    for item in _record_items(sub, dept):
-        if item["programme"] and item["status"] != "submitted" and not item["optional"]:
+    items = [i for i in _record_items(sub, dept) if i["programme"]]
+    here = next((n for n, i in enumerate(items)
+                 if i["programme"] == programme_code and i["key"] == stage_key), -1)
+    for item in items[here + 1:] + items[:max(here, 0)]:
+        if item["status"] != "submitted":
             return {"key": item["key"], "title": item["title"], "url": item["url"]}
     return None
 

@@ -55,7 +55,8 @@ def test_a_blank_form_cannot_be_submitted(app, client):
     dpac = _up(client, "pac.docx", _filled(PAC, "dpac_signed"), "dpac_signed")
     assert dpac["match"]["template"]["ok"]
 
-    data = {"pre_bos_files": {"diac_signed": diac, "dpac_signed": dpac}}
+    data = {"pre_bos_files": {"diac_signed": diac, "dpac_signed": dpac,
+                              "pre_bos_minutes": {"name": "minutes.pdf", "stored": "x-minutes.pdf", "size": 900}}}
     # a blank form still saves — only submitting is refused
     assert client.post("/department/api/pre_bos/save", json=data).get_json()["ok"]
     j = client.post("/department/api/pre_bos/validate", json=data).get_json()

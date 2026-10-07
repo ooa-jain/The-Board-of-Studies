@@ -293,7 +293,8 @@ def _file(name):
 
 
 PRE_BOS_FILES_OK = {
-    "pre_bos_files": {"diac_signed": _file("diac.pdf"), "dpac_signed": _file("dpac.pdf")},
+    "pre_bos_files": {"diac_signed": _file("diac.pdf"), "dpac_signed": _file("dpac.pdf"),
+                      "pre_bos_minutes": _file("minutes.pdf")},
 }
 
 BOS_DOCS_OK = {
@@ -317,6 +318,7 @@ def test_pre_bos_requires_diac_and_dpac(app, client):
     msgs = [i["message"] for i in r.get_json()["issues"]]
     assert any("Department Industry-Academia Cell" in m for m in msgs)
     assert any("Programme Assessment Committee (DPAC)" in m for m in msgs)
+    assert any("Minutes of the Meeting (Pre-BoS)" in m for m in msgs)
 
     partial = {"pre_bos_files": {"diac_signed": _file("diac.pdf")}}
     assert not client.post("/department/api/pre_bos/submit", json=partial).get_json()["ok"]
@@ -330,7 +332,7 @@ def test_the_four_stages_in_order(app):
     assert STAGE_KEYS == ["dept_info", "pre_bos", "bos_documents", "curriculum"]
     files = [f["name"] for s in STAGE_BY_KEY["pre_bos"]["sections"]
              for f in s["fields"] if f["type"] == "file"]
-    assert files == ["diac_signed", "dpac_signed"]
+    assert files == ["diac_signed", "dpac_signed", "pre_bos_minutes"]
     assert STAGE_BY_KEY["curriculum"]["parts"] == ["prog_curriculum", "prog_syllabus",
                                                    "prog_revision"]
 

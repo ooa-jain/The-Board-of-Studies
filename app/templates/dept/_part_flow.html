@@ -61,6 +61,7 @@
       <span class="pmap-n">{{ n }}</span>
       <span class="pmap-title">{% if kind == 'current' %}{{ 'Current' if zigzag else 'Current Batch' }}{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
       {% if part.tag %}<span class="pmap-tag">{{ short(part.tag) }}</span>{% endif %}
+      {% if part.status == 'submitted' and not zigzag %}<span class="pmap-done">✓ Submitted</span>{% endif %}
       <i class="pmap-dot" aria-hidden="true"></i>
       {% if show_status %}<span class="sr-only">{{ words.get(part.status, part.status) }}</span>{% endif %}
     </a>

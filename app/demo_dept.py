@@ -67,6 +67,11 @@ DOCS = {
         "Feedback: more case studies and analytics in the curriculum."]),
 }
 # the optional ones too: a demo shows every box with a document in it
+DOCS["pre_bos_minutes.pdf"] = ("pre_bos", "pre_bos_minutes", [
+    "Minutes of the Pre-BoS Meeting — Department of Demonstration Studies",
+    "Date: 2 March 2027. Agenda: the DIAC and DPAC recommendations on the curriculum.",
+    "Members present: Dr. Demo Head, Prof. Leela Iyer, Ms. Asha Rao (Industry).",
+    "Resolved and approved: the DIAC and DPAC recommendations go to the Board of Studies."])
 DOCS["feedback_new_programme.pdf"] = ("bos_documents", "feedback_new_programme", [
     "Stakeholder Feedback for the New Programme",
     "Survey of employers and alumni on the proposed BBA (Business Analytics)",
@@ -244,7 +249,8 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                 "contact": {"office_email": "demo.office@example.edu", "faculty_count": 18},
                 "programmes_offered": PROGRAMMES}
     if stage_key == "pre_bos":
-        return {"pre_bos_files": {k: files[k] for k in ("diac_signed", "dpac_signed") if k in files}}
+        return {"pre_bos_files": {k: files[k] for k in ("diac_signed", "dpac_signed", "pre_bos_minutes")
+                                  if k in files}}
     if stage_key == "bos_documents":
         box = {k: files[k] for k in ("bos_composition", "vision_mission", "minutes", "attendance",
                                      "feedback_new_programme") if k in files}

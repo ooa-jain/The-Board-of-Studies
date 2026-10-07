@@ -548,3 +548,18 @@ def test_the_excel_links_each_programmes_course_revision_in_the_revision_templat
     sec = doc.sections[0]
     assert sec.page_width > sec.page_height                            # landscape, as the template
     assert "Percentage of change in syllabus revision" in " ".join(p.text for p in sec.footer.paragraphs)
+
+
+def test_submitting_a_programme_part_goes_to_the_next_step_of_that_programme(app, client):
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    sub = _sub(app, code)
+    data = sub["programmes"]["MCAREG"]["prog_curriculum"]["data"]
+    j = client.post("/department/api/prog_curriculum/MCAREG/submit", json=data).get_json()
+    assert j["ok"], j
+    assert j["redirect"].endswith("/department/stage/prog_syllabus/MCAREG")   # Current Batch, same programme
+    page = client.get(j["redirect"]).get_data(as_text=True)
+    assert "✓ Submitted" in page                                             # Curriculum turns green
+    syl = _sub(app, code)["programmes"]["MCAREG"]["prog_syllabus"]["data"]
+    j = client.post("/department/api/prog_syllabus/MCAREG/submit", json=syl).get_json()
+    assert j["ok"] and j["redirect"].endswith("/department/stage/prog_revision/MCAREG")

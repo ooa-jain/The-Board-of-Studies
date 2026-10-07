@@ -423,6 +423,16 @@ def _pre_bos_files(db, dept, year, actor, have):
         src = static / TEMPLATES[field]["file"]
         out[field] = _store(db, dept["dept_code"], year, "pre_bos", field, fname,
                             lambda path, src=src, field=field: fill(src, path, field, people=PEOPLE), actor)
+    if "pre_bos_minutes" in have:
+        out["pre_bos_minutes"] = have["pre_bos_minutes"]
+    else:
+        lines = [f"Minutes of the Pre-BoS Meeting — {dept['dept_name']}", NOTE,
+                 f"Meeting date: {BOS_DATE}. Agenda: the DIAC and DPAC recommendations on the curriculum.",
+                 "Members present: as in the DIAC and DPAC compositions.",
+                 "Resolved and approved: the recommendations go to the Board of Studies."]
+        out["pre_bos_minutes"] = _store(db, dept["dept_code"], year, "pre_bos", "pre_bos_minutes",
+                                        "Pre_BoS_Minutes.pdf",
+                                        lambda path: path.write_bytes(demo_dept._pdf(lines)), actor)
     return out
 
 
