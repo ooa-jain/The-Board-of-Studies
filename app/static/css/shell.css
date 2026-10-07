@@ -187,7 +187,7 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
 /* phones: wide tables scroll sideways inside their panel instead of being cut off */
 @media (max-width: 900px) {
   body.erp .panel > .erp-table, body.erp .card > .erp-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .stage-list th:nth-child(3), .stage-list td:nth-child(3) { display: none; }
+  .stages-table th:nth-child(3), .stages-table td:nth-child(3) { display: none; }
   body.erp .erp-table td.clip { max-width: 240px; }
 }
 /* the open programme's steps, under Curriculum in the menu */
@@ -227,3 +227,13 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
 .submit-all-body > div { flex: 1; min-width: 220px; }
 .submit-all-body strong { color: var(--sh-navy); }
 .submit-all-body p { margin: 4px 0 0; }
+
+/* developer preview: a laptop in the menu that opens to say what it means */
+.side-dev { margin: 0; }
+.side-dev > summary { list-style: none; cursor: pointer; }
+.side-dev > summary::-webkit-details-marker { display: none; }
+.side-dev > summary svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; width: 20px; height: 20px; }
+.side-dev-body { margin: 4px 4px 6px; padding: 10px 12px; border-radius: 8px; background: #eff6ff; border: 1px solid #bfdbfe;
+  color: #1e3a8a; font-size: 12px; line-height: 1.45; white-space: normal; }
+.side-dev-body a { display: inline-block; margin-top: 4px; font-weight: 600; color: #1d4ed8; }
+@media (min-width: 901px) { html.side-collapsed .side-dev-body { display: none; } }

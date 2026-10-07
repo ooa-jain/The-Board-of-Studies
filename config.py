@@ -58,7 +58,10 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = _bool("SESSION_COOKIE_SECURE", not DEBUG)
-    PERMANENT_SESSION_LIFETIME = 60 * 60 * 10  # 10 hours
+    # a sign-in lasts this many days on the same browser (renewed while in use)
+    PERMANENT_SESSION_LIFETIME = 60 * 60 * 24 * int(os.getenv("SESSION_DAYS", "14"))
+    # who is working on a shared department login, remembered on the browser
+    PERSON_COOKIE_DAYS = int(os.getenv("PERSON_COOKIE_DAYS", "180"))
 
     # The campuses as the Office of Academics workbook spells them, and the
     # two cities they sit in.

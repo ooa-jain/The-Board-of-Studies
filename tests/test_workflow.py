@@ -981,11 +981,14 @@ def test_developer_mode_says_so_on_every_page(app, client):
     """It is easy to switch on and easy to forget, so it announces itself."""
     u, p = make_department(app)
     login(client, u, p)
-    assert "Developer Preview" not in client.get("/department/").get_data(as_text=True)
+    assert 'class="side-dev"' not in client.get("/department/").get_data(as_text=True)
 
     set_dev_mode(app, True)
     for path in ("/department/", "/department/stage/dept_info"):
-        assert "Developer Preview" in client.get(path).get_data(as_text=True), path
+        body = client.get(path).get_data(as_text=True)
+        # a laptop in the menu, not a banner across the top
+        assert 'class="side-dev"' in body and "Developer preview" in body, path
+        assert "dev-banner" not in body, path
 
 
 def test_the_switch_is_on_the_settings_page_and_is_logged(app, client):

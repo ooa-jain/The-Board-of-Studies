@@ -24,6 +24,25 @@ def test_a_department_is_asked_who_it_is(app, client):
     assert b"Asha Rao" in page and b"Versions" in page
 
 
+def test_the_browser_remembers_who_it_is_after_signing_out(app, client):
+    """Once said, the same browser is not asked again — not after signing out
+    and back in either. Another department's login on it still asks."""
+    app.config["ASK_PERSON"] = True
+    u, p = make_department(app)
+    login(client, u, p)
+    _as(client, "Asha Rao", "asha@jain.ac.in")
+    client.get("/logout")
+    login(client, u, p)
+    r = client.get("/department/")
+    assert r.status_code == 200 and b"Asha Rao" in r.data
+
+    u2, p2 = make_department(app, code="ENG", name="Department of English")
+    client.get("/logout")
+    login(client, u2, p2)
+    r = client.get("/department/")
+    assert r.status_code == 302 and "/department/who" in r.headers["Location"]
+
+
 def test_a_second_person_is_told_who_else_is_on(app):
     app.config["ASK_PERSON"] = True
     u, p = make_department(app)

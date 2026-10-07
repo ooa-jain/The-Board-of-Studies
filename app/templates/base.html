@@ -38,6 +38,19 @@
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
+{# Developer mode, while it is on: a laptop in the menu, for everyone, that
+   opens to say what it means (the admin gets the switch) #}
+{% macro dev_item() -%}
+{% if app_settings and app_settings.dev_mode %}
+<details class="side-dev">
+  <summary class="side-link" title="Developer preview is on — all stages open for testing">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9H5zM2.5 18h19M9 18l.5-1.5h5L15 18"/></svg>
+    <span class="side-text">Developer preview</span><i class="side-dot st-draft"></i></summary>
+  <div class="side-dev-body">All stages are open for testing. Checks and saving work as usual.
+    {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}</div>
+</details>
+{% endif %}
+{%- endmacro %}
 {% if admin_shell %}
 {# The Office's pages: one sidebar on the left, and nothing across the top. #}
 {% set ep = request.endpoint or '' %}
@@ -78,6 +91,7 @@
       <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
     </a>
     {{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log')) }}
+    {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year if app_settings else '' }}</small></span>
@@ -135,6 +149,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span class="side-text">Versions</span></a>
     <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}" title="Password">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span class="side-text">Password</span></a>
+    {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       <span class="side-who"><strong>{{ current_user.person.name if current_user.person else current_user.name }}</strong>
@@ -251,20 +266,6 @@
 </header>
 {% endif %}
 
-{# Developer mode is easy to switch on and easy to forget, and while it is on
-   the portal is not behaving as departments will see it. So it says so, on
-   every page, to everyone — not only to the admin who set it. #}
-{% if app_settings and app_settings.dev_mode %}
-<div class="dev-banner" role="status">
-  <div class="wrap">
-    <strong>Developer Preview</strong> · All workflow stages are currently accessible for
-    testing. Submission validation and data-saving processes remain unchanged.
-    {% if current_user and current_user.role == 'admin' %}
-      <a href="{{ url_for('admin.app_settings') }}">Turn it off</a>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
 
 {% if app_settings and app_settings.banner %}
 <div class="site-banner" role="status">

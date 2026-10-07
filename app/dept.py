@@ -50,6 +50,37 @@ def _dept():
 # ---------------------------------------------------------------------------
 
 _NO_ASK = {"dept.who", "dept.versions", "dept.version_restore"}
+PERSON_COOKIE = "bos_person"
+
+
+def _person_signer():
+    from itsdangerous import URLSafeTimedSerializer
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="bos-person-v1")
+
+
+def _remembered_person(dept_code):
+    """The person this browser said it was, for this department, if it
+    said so recently enough."""
+    raw = request.cookies.get(PERSON_COOKIE)
+    if not raw:
+        return None
+    try:
+        days = current_app.config.get("PERSON_COOKIE_DAYS", 180)
+        v = _person_signer().loads(raw, max_age=days * 86400)
+    except Exception:
+        return None
+    if v.get("d") != dept_code or not v.get("n") or not v.get("e"):
+        return None
+    return {"name": v["n"], "email": v["e"]}
+
+
+def _remember_person(resp, dept_code, person):
+    days = current_app.config.get("PERSON_COOKIE_DAYS", 180)
+    resp.set_cookie(PERSON_COOKIE, _person_signer().dumps({"d": dept_code, "n": person["name"],
+                                                            "e": person["email"]}),
+                    max_age=days * 86400, httponly=True, samesite="Lax",
+                    secure=current_app.config.get("SESSION_COOKIE_SECURE", False))
+    return resp
 
 
 @bp.before_request
@@ -60,6 +91,13 @@ def _ask_who():
     if u.get("role") != "department":
         return None
     p = u.get("person")
+    if not p:
+        # this browser has said who it is before: no need to ask again
+        p = _remembered_person(u.get("dept_code"))
+        if p:
+            u["person"] = p
+            session["user"] = u
+            session.modified = True
     if p:
         people.seen(u["dept_code"], p)
         return None
@@ -92,7 +130,7 @@ def who():
             session.modified = True
             people.seen(dept["dept_code"], person)
             audit(me["username"], "person.set", f"{name} <{email}>")
-            return redirect(nxt)
+            return _remember_person(redirect(nxt), dept["dept_code"], person)
     return render_template("dept/who.html", dept=dept, nxt=nxt, error=error,
                            person=me.get("person"),
                            others=people.others_active(dept["dept_code"], me.get("person")),
