@@ -22,7 +22,7 @@
 {% endblock %}
 
 {% block content %}
-{% set words = {'done': 'Completed', 'progress': 'In progress', 'returned': 'Returned', 'new': 'Yet to start'} %}
+{% set words = {'done': 'Completed', 'progress': 'In progress', 'returned': 'Returned', 'new': 'Not started'} %}
 <nav class="lvl-tabs" aria-label="Programme level">
   {% for lv in ('UG', 'PG') %}
   {% set progs = groups.get(lv, []) %}

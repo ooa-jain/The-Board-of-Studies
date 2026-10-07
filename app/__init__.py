@@ -1,4 +1,4 @@
-"""Application factory for the JAIN Office of Academics Data Portal."""
+"""Application factory for the JAIN Office of Academic Affairs Data Portal."""
 
 from __future__ import annotations
 
@@ -60,6 +60,11 @@ def create_app(config_object=Config):
     def _load_user():
         g.user = session.get("user")
 
+    @app.template_filter("ay")
+    def _academic_year(value):
+        """An academic year as it is printed: 2027–28, with an en dash."""
+        return str(value or "").replace("-", "\u2013")
+
     @app.context_processor
     def _inject():
         from .schema import GROUP_ORDER, STAGE_BY_KEY, STAGES
@@ -72,7 +77,7 @@ def create_app(config_object=Config):
                 batch_info = batches()
             except Exception:
                 unread = 0
-        dept_nav = None
+        dept_nav = dept_drive = None
         if user.get("role") == "department" and user.get("dept_code"):
             # the department's menu: its stages, each with where it stands
             try:
@@ -81,10 +86,19 @@ def create_app(config_object=Config):
                                                or app.config["ACADEMIC_YEAR"])
                 dept_nav = [{"key": s["key"], "title": s["title"], "status": s["status"]}
                             for s in stage_board(sub)]
+                # the Drive import, offered in the Developer Preview item
+                if database.settings().get("dev_mode"):
+                    from .autofill import pack_for
+                    d = database.get_db().departments.find_one({"dept_code": user["dept_code"]})
+                    pack = d and pack_for(database.get_db(), d)
+                    if pack:
+                        dept_drive = {"done": bool(sub.get("autofilled")),
+                                      "folder": (pack.get("source") or {}).get("folder")}
             except Exception:
                 dept_nav = None
         return {
             "dept_nav": dept_nav,
+            "dept_drive": dept_drive,
             "updates_unread": unread,
             "batch_info": batch_info,
             "current_user": session.get("user"),
@@ -132,7 +146,7 @@ def create_app(config_object=Config):
         return render_template(
             "error.html", code=500, title="Something went wrong at our end",
             detail="Nothing you had saved is lost — drafts are kept as you "
-                   "type. Try again, and tell the Office of Academics if it "
+                   "type. Try again, and tell the Office of Academic Affairs if it "
                    "keeps happening.", why=why), 500
 
     return app

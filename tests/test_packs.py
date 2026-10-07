@@ -449,11 +449,18 @@ def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloa
     from openpyxl import load_workbook
     code = _signed_in_department(app, client)
     page = client.get("/department/").get_data(as_text=True)
-    assert "Fill from Drive" in page
+    assert "Sync from Drive" in page
 
     r = client.post("/department/drive/fill", follow_redirects=True)
     body = r.get_data(as_text=True)
-    assert "from the Drive folder" in body and "Fill again from Drive" in body
+    assert "Data imported from your Drive folder" in body
+    # once imported, syncing again lives in the Developer Preview item
+    assert 'class="demo-strip drive-strip"' not in body
+    from app.db import get_db
+    with app.app_context():
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
+    body = client.get("/department/").get_data(as_text=True)
+    assert "Re-sync from Drive" in body and "side-dev-drive" in body
     sub = _sub(app, code)
     assert sub["stages"]["pre_bos"]["data"]["pre_bos_files"]["diac_signed"]["stored"]
     assert sub["stages"]["bos_documents"]["data"]["meeting"]["bos_date"]
@@ -501,7 +508,7 @@ def test_the_curriculum_page_has_ug_and_pg_tabs(app, client):
     page = client.get("/department/stage/curriculum?level=PG").get_data(as_text=True)
     assert "UG programmes" in page and "PG programmes" in page
     assert "MCAREG" in page and "BCAGAI" not in page.split('class="prog-list"')[1].split("add-prog-strip")[0]
-    assert "Yet to start" in page or "In progress" in page
+    assert "Not started" in page or "In progress" in page
 
 
 def test_the_office_can_delete_all_of_a_departments_data(app, client):

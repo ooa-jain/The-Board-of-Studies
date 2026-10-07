@@ -7,20 +7,20 @@
     <div>
       <div class="crumbs">{{ dept.campus }} <span>›</span> {{ dept.school }}</div>
       <h1>{{ dept.dept_name }}</h1>
-      <p>Board of Studies · {{ year }}</p>
+      <p>Board of Studies | {{ year|ay }}</p>
     </div>
     <div class="spacer head-aside">
       <div class="flex head-aside-row">
         <div class="bar" role="progressbar" aria-valuenow="{{ progress.done }}" aria-valuemin="0"
-             aria-valuemax="{{ progress.total }}" aria-label="Stages submitted"
+             aria-valuemax="{{ progress.total }}" aria-label="Stages completed"
              style="width:170px"><i style="width:{{ progress.percent }}%"></i></div>
-        <span class="bar-label">{{ progress.done }} / {{ progress.total }} stages</span>
+        <span class="bar-label">{{ progress.done }} of {{ progress.total }} stages completed · {{ progress.percent }}%</span>
       </div>
       <div class="flex mt-1 head-aside-row">
         {# the downloads are the finished record, so they appear once it is #}
         {% if open_comments %}
 <div class="office-comment">
-  <div class="oc-head"><span class="oc-icon">💬</span><strong>{{ open_comments|length }} comment{{ 's' if open_comments|length != 1 }} from the Office of Academics</strong></div>
+  <div class="oc-head"><span class="oc-icon">💬</span><strong>{{ open_comments|length }} comment{{ 's' if open_comments|length != 1 }} from the Office of Academic Affairs</strong></div>
   <ul class="oc-list">
     {% for c in open_comments %}<li><a href="{{ c.url }}">{{ c.where }}</a> — {{ c.text }}</li>{% endfor %}
   </ul>
@@ -55,17 +55,18 @@
   </form>
 </div>
 {% endif %}
-{% if drive and submission.status != 'sealed' %}
+{% if drive and not drive.done and submission.status != 'sealed' %}
+{# the first import; after that, syncing again lives in the Developer
+   Preview item in the menu #}
 <div class="demo-strip drive-strip">
   <span class="demo-badge" aria-hidden="true">DRIVE</span>
   <div>
-    <strong>{{ 'Filled from your Drive folder.' if drive.done else 'Fill everything from your Drive folder?' }}</strong>
-    <span class="small muted">Your course matrices, syllabi and documents{% if drive.folder %} (<a href="{{ drive.folder }}" target="_blank" rel="noopener">Drive folder</a>){% endif %}
-      fill every stage and programme. Anything the folder does not have gets an entry that suits, marked
-      “to be confirmed”. Then review and submit.</span>
+    <strong>Import your data from the Drive folder</strong>
+    <span class="small muted">Course matrices, syllabi and supporting documents{% if drive.folder %} (<a href="{{ drive.folder }}" target="_blank" rel="noopener">Drive folder</a>){% endif %}
+      are imported into every stage and programme. Any missing information can be added manually during the relevant stage.</span>
   </div>
   <form method="post" action="{{ url_for('dept.drive_fill') }}" class="spacer">
-    <button class="btn btn-gold">{{ 'Fill again from Drive' if drive.done else 'Fill from Drive' }}</button>
+    <button class="btn btn-gold">Sync from Drive</button>
   </form>
 </div>
 {% endif %}
@@ -73,7 +74,7 @@
 <div class="alert alert-success">
   <div>
     <strong>This submission is complete and sealed.</strong>
-    The Office of Academics has the full record for {{ year }}. Contact them if anything needs reopening.
+    The Office of Academic Affairs has the full record for {{ year|ay }}. Contact them if anything needs reopening.
   </div>
 </div>
 {% endif %}
@@ -89,11 +90,11 @@
 {% endif %}
 
 {% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned',
-                'open': 'Yet to start', 'locked': 'Locked', 'optional': 'Optional'} %}
+                'open': 'Not started', 'locked': 'Locked', 'optional': 'Optional'} %}
 {% if resume %}
 {# where you left off, in one big button #}
 <a class="resume-card" href="{{ resume.url }}">
-  <span class="resume-kicker">{{ 'Continue ' ~ resume.where if resume.where != 'next to do' else 'Next to do' }}</span>
+  <span class="resume-kicker">{{ 'Continue ' ~ resume.where if resume.where != 'next to do' else 'Next step' }}</span>
   <span class="resume-title">{{ resume.title }}</span>
   {% if resume.at %}<span class="resume-meta">Last opened {{ resume.at.strftime('%d %b, %H:%M') }}{% if resume.name %} by {{ resume.name }}{% endif %}</span>{% endif %}
   <span class="resume-go">Continue <span aria-hidden="true">→</span></span>
@@ -101,9 +102,9 @@
 {% endif %}
 
 <div class="erp-tiles">
-  <div class="erp-tile t-navy"><b>{{ progress.done }}/{{ progress.total }}</b><span>Stages submitted</span></div>
+  <div class="erp-tile t-navy"><b>{{ progress.done }}/{{ progress.total }}</b><span>Stages completed</span></div>
   <div class="erp-tile t-teal"><b>{{ programmes|length }}</b><span>Programmes</span></div>
-  <div class="erp-tile t-green"><b>{{ prog_rows|selectattr('done')|list|length }}</b><span>Programmes complete</span></div>
+  <div class="erp-tile t-green"><b>{{ prog_rows|selectattr('done')|list|length }}</b><span>Programmes completed</span></div>
   <div class="erp-tile t-amber"><b>{{ board|sum(attribute='errors') }}</b><span>Errors to fix</span></div>
 </div>
 
@@ -112,7 +113,7 @@
     {% if next_step and not resume %}<a class="btn btn-sm btn-gold spacer-left" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
       {{ 'Continue' if next_step.status == 'draft' else 'Correct' if next_step.status == 'returned' else 'Next Stage' }}: {{ next_step.title }} →</a>{% endif %}</div>
   <table class="erp-table stages-table">
-    <thead><tr><th class="num">#</th><th>Stage</th><th>Group</th><th>Status</th><th class="num">Errors</th><th></th></tr></thead>
+    <thead><tr><th class="num">#</th><th>Stage</th><th>Stage Group</th><th>Status</th><th class="num">Errors</th><th></th></tr></thead>
     <tbody>
     {% for s in board %}
       <tr>
@@ -144,7 +145,7 @@
     </div>
     {% endif %}
     <span class="erp-legend"><i class="dot st-submitted"></i>Completed <i class="dot st-draft"></i>In progress
-      <i class="dot st-open"></i>Yet to start <i class="dot st-optional"></i>Optional</span></div>
+      <i class="dot st-open"></i>Not started <i class="dot st-optional"></i>Optional</span></div>
   <table class="erp-table erp-dots">
     <thead><tr><th>Code</th><th>Programme</th><th>Level</th>
       {% for h in prog_heads %}<th class="c">{{ h }}</th>{% endfor %}<th></th></tr></thead>

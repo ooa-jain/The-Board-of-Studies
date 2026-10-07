@@ -279,7 +279,7 @@
       .rv-long-item{font-size:12px;margin:2px 0} .foot{margin-top:24px;font-size:12px;color:#5f6672}`;
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title.replace(/</g, "&lt;")}</title><style>${css}</style></head><body>
       <h1></h1><p class="sub"></p><div id="b"></div>
-      <p class="foot">BoS Academic Portal · JAIN (Deemed-to-be University) · Office of Academics · printed ${new Date().toLocaleString()}</p></body></html>`);
+      <p class="foot">BoS Academic Portal · JAIN (Deemed-to-be University) · Office of Academic Affairs · printed ${new Date().toLocaleString()}</p></body></html>`);
     w.document.close();
     w.document.querySelector("h1").textContent = title;
     w.document.querySelector(".sub").textContent = sub || "";

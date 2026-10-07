@@ -271,3 +271,10 @@ body.has-side .wrap { max-width: none !important; }
 .lv-bar > i { display: block; height: 100%; background: #16a34a; }
 .lv-tab[aria-selected="true"] .lv-bar { background: rgba(255, 255, 255, .3); }
 .erp-dots tbody tr[hidden] { display: none; }
+.side-dev-drive { margin-top: 10px; padding-top: 10px; border-top: 1px solid #bfdbfe; display: grid; gap: 4px; }
+.side-dev-drive strong { color: #0e2a5c; font-size: 12px; }
+.side-dev-drive form { margin: 4px 0 0; }
+.side-dev-body .side-dev-btn { display: block; width: 100%; margin-top: 10px; padding: 8px 10px; border-radius: 6px; text-align: center;
+  background: var(--sh-navy); color: #fff; text-decoration: none; border: 1px solid var(--sh-navy); font: inherit; font-weight: 600; cursor: pointer; }
+.side-dev-body .side-dev-btn.is-ghost { background: #fff; color: var(--sh-navy); margin-top: 4px; }
+.side-dev-body .side-dev-btn:hover { background: #163a7a; color: #fff; }

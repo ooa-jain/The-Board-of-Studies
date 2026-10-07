@@ -214,12 +214,12 @@
   <div class="danger-body">
     <p class="small">
       This removes all <strong>{{ total }}</strong> department records, every department
-      login, and every submission filed against them. The Office of Academics keeps no
+      login, and every submission filed against them. The Office of Academic Affairs keeps no
       other copy inside the portal.
     </p>
     <p class="small muted">
       It is recoverable: <span class="mono">python seed.py --logins</span> rebuilds the
-      whole master from the Office of Academics workbook and issues fresh logins. What
+      whole master from the Office of Academic Affairs workbook and issues fresh logins. What
       does not come back is the submitted work.
     </p>
     <form method="post" action="{{ url_for('admin.departments_clear') }}" class="flex flex-wrap">

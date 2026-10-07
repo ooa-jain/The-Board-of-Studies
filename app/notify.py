@@ -249,7 +249,7 @@ def _send_email(to, note):
     msg["Subject"] = "BoS Portal: " + note["text"][:150]
     msg["From"] = c["SMTP_FROM"]
     msg["To"] = ", ".join(to)
-    msg.set_content(message(note) + "\n\n— BoS Academic Portal, Office of Academics")
+    msg.set_content(message(note) + "\n\n— BoS Academic Portal, Office of Academic Affairs")
     cls = smtplib.SMTP_SSL if c.get("SMTP_SSL") else smtplib.SMTP
     with cls(c["SMTP_HOST"], c["SMTP_PORT"], timeout=20) as s:
         if not c.get("SMTP_SSL"):

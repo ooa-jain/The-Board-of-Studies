@@ -3,11 +3,11 @@
 {% block header %}{% set ov_tab = 'monitor' %}{% include "admin/_overview_head.html" %}{% endblock %}
 
 {% block content %}
-{% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Yet to start', 'locked': 'Locked'} %}
+{% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Not started', 'locked': 'Locked'} %}
 <section class="panel">
   <div class="panel-head"><h3>Departments × stages</h3>
     <span class="erp-legend"><i class="dot st-submitted"></i>Completed <i class="dot st-draft"></i>In progress
-      <i class="dot st-open"></i>Yet to start <i class="dot st-returned"></i>Returned</span></div>
+      <i class="dot st-open"></i>Not started <i class="dot st-returned"></i>Returned</span></div>
   <div class="table-wrap">
     <table class="erp-table erp-dots">
       <thead><tr><th>Department</th><th>Code</th><th>Campus</th>

@@ -297,7 +297,7 @@ function deptHome() {
       <button class="btn gold" id="fillall">Fill everything with sample data</button></div>
     ${next >= 0 ? `<div class="next"><div class="spacer"><small>Next stage</small><h2>${STAGES[next].title}</h2></div>
       <button class="btn gold" data-open="${next}">Continue →</button></div>`
-      : `<div class="card" style="background:#e8f4ec;border-color:#cfe6d7"><b>All stages submitted.</b> The Office of Academics has the full record.</div>`}
+      : `<div class="card" style="background:#e8f4ec;border-color:#cfe6d7"><b>All stages submitted.</b> The Office of Academic Affairs has the full record.</div>`}
     <div class="stages" id="stages"></div>`;
   const box = $("#stages");
   STAGES.forEach((s, i) => {
@@ -495,7 +495,7 @@ function review(key, s, mode) {
   if (mode === "dept-view") return modal("What was submitted", title, statsBar(key), reviewBody(key, s, false), copyRow(title, key, s));
   const foot = el("div");
   foot.innerHTML = `<label class="terms"><input type="checkbox" id="agree"> <span>I have checked everything above. I understand that once submitted,
-    this stage is locked and cannot be changed — only the Office of Academics can send it back for correction.</span></label>
+    this stage is locked and cannot be changed — only the Office of Academic Affairs can send it back for correction.</span></label>
     <div class="row"><button class="btn" id="copy">Download a copy</button><span class="spacer"></span>
     <button class="btn" id="backedit">Back to editing</button><button class="btn gold" id="now" disabled>Submit now</button></div>`;
   modal("Review before you submit", title + " — " + DEPT.name, statsBar(key), reviewBody(key, s, true), foot);
@@ -511,7 +511,7 @@ function review(key, s, mode) {
     notify("s", `${DEPT.name} — Stage submitted: ${title}`, key);
     const panel = document.querySelector(".panel");
     panel.querySelector("h3").textContent = "Submitted";
-    panel.querySelector(".stats").replaceWith(el("div", "done", `<span>✓</span><div><b>Submitted to the Office of Academics.</b><br>Keep a copy of what you sent.</div>`));
+    panel.querySelector(".stats").replaceWith(el("div", "done", `<span>✓</span><div><b>Submitted to the Office of Academic Affairs.</b><br>Keep a copy of what you sent.</div>`));
     panel.querySelectorAll(".rsec h4 button, .chip button").forEach(b => b.remove());
     const f = panel.querySelector(".panel-f"); f.innerHTML = "";
     const r = copyRow(title, key, s);
@@ -556,7 +556,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
 /* --------------------------------------------------------------- admin */
 function adminHome() {
   const done = STAGES.filter(s => S.status[s.key] === "submitted").length;
-  app.innerHTML = `<div class="head"><div class="crumbs">Office of Academics</div><h1>Board of Studies — 2027-28</h1><p>Where every department stands this academic year.</p></div>
+  app.innerHTML = `<div class="head"><div class="crumbs">Office of Academic Affairs</div><h1>Board of Studies — 2027-28</h1><p>Where every department stands this academic year.</p></div>
     <div class="kpis"><div class="kpi"><b>4</b><span>Departments</span></div><div class="kpi"><b>${done === 4 ? 1 : 0}</b><span>Complete</span></div>
     <div class="kpi"><b>${done ? 1 : 0}</b><span>In progress</span></div><div class="kpi"><b>${done ? 3 : 4}</b><span>Not started</span></div></div>
     <div class="card"><h3>Departments</h3><div class="tablewrap"><table class="t"><tr><th>Department</th><th>Campus</th><th>Progress</th><th></th></tr>
@@ -623,7 +623,7 @@ function adminReview(key, s) {
     if (!note) return toast("warn", "Say what to correct", "Write a short note for the department first.");
     S.status[key] = "returned"; S.returned[key] = note;
     if (!s.programme) { /* the department can edit it again */ }
-    notify("r", `Office of Academics — sent back ${title}: ${note}`, key);
+    notify("r", `Office of Academic Affairs — sent back ${title}: ${note}`, key);
     closeModal(); render();
     toast("ok", "Sent back", "The department sees the note and can correct the stage.");
   };

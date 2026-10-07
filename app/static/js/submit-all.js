@@ -81,7 +81,7 @@
       terms.appendChild(tick);
       terms.appendChild(el("span", null,
         "I have checked every stage above. I understand that once submitted, the Board of Studies record " +
-        "goes to the Office of Academics and is locked — only the Office can send a part back for correction."));
+        "goes to the Office of Academic Affairs and is locked — only the Office can send a part back for correction."));
       foot.appendChild(terms);
       tick.addEventListener("change", () => { go.disabled = !tick.checked; });
     }
@@ -120,7 +120,7 @@
           const done = el("div", "rv-done");
           done.appendChild(el("span", "rv-done-tick", "✓"));
           const w = el("div");
-          w.appendChild(el("strong", null, "Your Board of Studies record is with the Office of Academics."));
+          w.appendChild(el("strong", null, "Your Board of Studies record is with the Office of Academic Affairs."));
           w.appendChild(el("span", null, res.done.length
             ? `${res.done.length} stage${res.done.length === 1 ? "" : "s"} and programme parts submitted just now — every one is ticked below.`
             : "Everything was already submitted."));

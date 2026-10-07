@@ -19,7 +19,7 @@
     <span class="login-kicker">Board of Studies · {{ app_settings.academic_year if app_settings else '' }}</span>
     <h1>BoS Academic Portal</h1>
     <p class="login-lede">Your record, stage by stage — fill each one, tick it off, and it goes to the
-      Office of Academics.</p>
+      Office of Academic Affairs.</p>
 
     <div class="login-card" id="signin">
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -48,7 +48,7 @@
         </label>
         <button class="login-go" type="submit">Sign in <span aria-hidden="true">→</span></button>
       </form>
-      <p class="login-note">No login, or it stopped working? Write to the Office of Academics ·
+      <p class="login-note">No login, or it stopped working? Write to the Office of Academic Affairs ·
         <a href="{{ url_for('public.about') }}">Help</a></p>
     </div>
     <span class="login-hint" aria-hidden="true">Move the pointer to turn the scene · click a panel</span>
@@ -89,7 +89,7 @@
     </svg>
   </section>
 
-  <footer class="login-foot">JAIN (Deemed-to-be University) · Office of Academics</footer>
+  <footer class="login-foot">JAIN (Deemed-to-be University) · Office of Academic Affairs</footer>
 </main>
 {% endblock %}
 

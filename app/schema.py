@@ -210,7 +210,7 @@ PRE_BOS = {
                 {"name": "pre_bos_minutes", "label": "Minutes of the Meeting (Pre-BoS)",
                  "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
                  "help": "The minutes of the Pre-BoS meeting, signed — PDF or Word."},
-                {"name": "notes", "label": "Note to the Office of Academics", "type": "textarea",
+                {"name": "notes", "label": "Note to the Office of Academic Affairs", "type": "textarea",
                  "rows": 2, "wide": True, "help": "Optional."},
             ],
         },

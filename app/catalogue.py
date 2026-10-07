@@ -1,4 +1,4 @@
-"""The Office of Academics programme catalogue, and which rows belong to whom.
+"""The Office of Academic Affairs programme catalogue, and which rows belong to whom.
 
 app/data/programmes.json is built from the programme workbook by
 tools/import_programmes.py. The workbook names a department and a Bengaluru

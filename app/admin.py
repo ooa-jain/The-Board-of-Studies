@@ -1,4 +1,4 @@
-"""Office of Academics administration console."""
+"""Office of Academic Affairs administration console."""
 
 from __future__ import annotations
 
@@ -357,7 +357,7 @@ def departments_clear():
 
     This empties the master, so it asks for the word to be typed rather than
     for a button to be clicked. It is not as final as it sounds: seed.py puts
-    the whole list back from the Office of Academics workbook.
+    the whole list back from the Office of Academic Affairs workbook.
     """
     db = get_db()
     if (request.form.get("confirm") or "").strip().upper() != "REMOVE ALL":

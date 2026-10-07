@@ -2724,7 +2724,7 @@
 
     const lock = el("span", "pcard-lock");
     lock.innerHTML = LOCK;
-    lock.title = "From the Office of Academics record";
+    lock.title = "From the Office of Academic Affairs record";
     card.appendChild(lock);
 
     const bottom = el("div", "pcard-bottom");
@@ -2821,7 +2821,7 @@
   }
 
   // ------------------------------------------------------- programme list
-  /* The department's programmes from the Office of Academics workbook, in a
+  /* The department's programmes from the Office of Academic Affairs workbook, in a
      UG tab and a PG tab. The minus takes a programme off — after asking why —
      and the plus puts it back or adds one the workbook does not have. A
      removed programme stays in the list, struck through with its reason, so
@@ -2871,7 +2871,7 @@
         fs.appendChild(lab);
       });
       form.appendChild(fs);
-      const noteLab = el("label", "reason-note-lab", "Anything the Office of Academics should know");
+      const noteLab = el("label", "reason-note-lab", "Anything the Office of Academic Affairs should know");
       const note = el("textarea");
       note.rows = 3;
       note.value = row.removal_note || "";
@@ -3616,7 +3616,7 @@
     if (!STAGE.sections || !STAGE.sections.length) {
       const note = el("div", "alert alert-warning");
       note.appendChild(el("div", null,
-        "This stage has no fields to fill in. Tell the Office of Academics if that looks wrong."));
+        "This stage has no fields to fill in. Tell the Office of Academic Affairs if that looks wrong."));
       root.appendChild(note);
       return;
     }
@@ -4060,7 +4060,7 @@
     terms.appendChild(tick);
     terms.appendChild(el("span", null,
       "I have checked everything above. I understand that once submitted, the whole Board of Studies " +
-      "record goes to the Office of Academics and is locked — only the Office can send a part back for correction."));
+      "record goes to the Office of Academic Affairs and is locked — only the Office can send a part back for correction."));
     foot.appendChild(terms);
     const row = el("div", "rv-actions");
     const copy = el("button", "btn btn-ghost", "Download a copy");
@@ -4116,7 +4116,7 @@
         const done = el("div", "rv-done");
         done.appendChild(el("span", "rv-done-tick", "✓"));
         const w = el("div");
-        w.appendChild(el("strong", null, "Submitted to the Office of Academics."));
+        w.appendChild(el("strong", null, "Submitted to the Office of Academic Affairs."));
         w.appendChild(el("span", null, j.next ? `Next: ${j.next.title}. Keep a copy of what you sent first.` : "Keep a copy of what you sent."));
         done.appendChild(w);
         ctl.panel.querySelector(".rv-stats").replaceWith(done);
@@ -4175,6 +4175,14 @@
 
   if (!CTX.readonly) {
     document.getElementById("btn-submit").addEventListener("click", submit);
+    // Save draft: keep what is there now, to come back to later
+    const draftBtn = document.getElementById("btn-save-draft");
+    if (draftBtn) draftBtn.addEventListener("click", () => {
+      dirty = true;
+      save().then(() => {
+        if (window.Toast) window.Toast.success("Your draft is saved. Pick up from here any time.", { title: "Draft saved" });
+      });
+    });
     const sampleBtn = document.getElementById("btn-sample");
     if (sampleBtn) sampleBtn.addEventListener("click", () => {
       sampleBtn.disabled = true;

@@ -115,7 +115,7 @@ NEP_CATEGORY_TO_KEY = {
 }
 
 # ---------------------------------------------------------------------------
-# Other rules the Office of Academics enforces alongside Table 2
+# Other rules the Office of Academic Affairs enforces alongside Table 2
 # ---------------------------------------------------------------------------
 
 DEFAULT_OTHER_RULES = {

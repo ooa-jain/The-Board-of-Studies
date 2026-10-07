@@ -21,7 +21,7 @@ def test_a_department_is_asked_who_it_is(app, client):
     r = _as(client, "Asha Rao", "asha@jain.ac.in")
     assert r.status_code == 302 and r.headers["Location"].endswith("/department/")
     page = client.get("/department/").data
-    assert b"Asha Rao" in page and b"Versions" in page
+    assert b"Asha Rao" in page and b"Version History" in page
 
 
 def test_the_browser_remembers_who_it_is_after_signing_out(app, client):

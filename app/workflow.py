@@ -15,7 +15,7 @@ Stage status values
     open        can be filled
     draft       partially filled, saved but not submitted
     submitted   submitted and validated clean; read-only for the department
-    returned    the Office of Academics sent it back for correction
+    returned    the Office of Academic Affairs sent it back for correction
 """
 
 from __future__ import annotations
@@ -469,7 +469,7 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
 
 
 def return_stage(dept_code, academic_year, stage_key, note, actor="", programme_code=None):
-    """Office of Academics sends a submitted stage back for correction."""
+    """Office of Academic Affairs sends a submitted stage back for correction."""
     stage = STAGE_BY_KEY.get(stage_key) or {}
     if stage.get("parts"):
         # every submitted part goes back — or just one programme's
@@ -567,7 +567,7 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
 
 
 def catalogue_rows(department):
-    """The department's programmes from the Office of Academics workbook, as
+    """The department's programmes from the Office of Academic Affairs workbook, as
     rows of the Programmes offered list — every one kept until the
     department says otherwise."""
     everyone = list(get_db().departments.find({}, {"dept_name": 1, "campus": 1}))
@@ -658,7 +658,7 @@ def course_options(code, title):
 def programme_fill_source(submission, department):
     """Programmes for the "fill in all" button in Programme Information:
     the list confirmed in Department Information, or — if that was never
-    saved — the department's programmes from the Office of Academics
+    saved — the department's programmes from the Office of Academic Affairs
     workbook."""
     offered = offered_programmes(submission)
     if offered is None:

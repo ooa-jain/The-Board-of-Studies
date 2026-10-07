@@ -73,7 +73,7 @@
 {% endif %}
 {% for c in comments %}
 <div class="office-comment {{ 'is-done' if c.status == 'done' else '' }}">
-  <div class="oc-head"><span class="oc-icon">💬</span><strong>Comment from the Office of Academics</strong>
+  <div class="oc-head"><span class="oc-icon">💬</span><strong>Comment from the Office of Academic Affairs</strong>
     <span class="small muted">{{ c.at.strftime('%d %b %Y') }}</span>
     {% if c.status == 'done' %}<span class="sh-pill is-submitted">Marked done</span>{% endif %}</div>
   <p class="oc-text">{{ c.text }}</p>
@@ -87,7 +87,7 @@
 {% endfor %}
 {% if state.returned_note %}
 <div class="alert alert-warning">
-  <div><strong>Sent back by the Office of Academics:</strong> {{ state.returned_note }}</div>
+  <div><strong>Sent back by the Office of Academic Affairs:</strong> {{ state.returned_note }}</div>
 </div>
 {% endif %}
 
@@ -123,7 +123,7 @@
         <div>
           <strong>This form needs JavaScript.</strong>
           The stage fields, the live checks and the credit tally are all built in the browser.
-          Turn JavaScript on for this site, or write to the Office of Academics and they will
+          Turn JavaScript on for this site, or write to the Office of Academic Affairs and they will
           take your submission another way.
         </div>
       </div>
@@ -176,6 +176,7 @@
     {# an earlier batch is a record, not a requirement: it can be passed by #}
     <a class="btn btn-ghost" href="{{ next_step.url }}">Skip to {{ next_step.label }} →</a>
     {% endif %}
+    <button class="btn btn-ghost" type="button" id="btn-save-draft">Save draft</button>
     <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% elif step and last_step %}Review &amp; submit this programme →{% elif step and next_step %}Submit {{ step.label }} &amp; go to {{ next_step.label }} →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
   </div>
 </div>

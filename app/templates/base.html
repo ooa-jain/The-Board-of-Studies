@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="BoS Academic Portal — where JAIN departments file their Board of Studies record with the Office of Academics for the academic year.">
+  <meta name="description" content="BoS Academic Portal — where JAIN departments file their Board of Studies record with the Office of Academic Affairs for the academic year.">
   <meta name="theme-color" content="#091324">
-  <title>{% block title %}BoS Academic Portal{% endblock %} · JAIN Office of Academics</title>
+  <title>{% block title %}BoS Academic Portal{% endblock %} · JAIN Office of Academic Affairs</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -43,12 +43,23 @@
 {% macro dev_item() -%}
 {% if app_settings and app_settings.dev_mode %}
 <details class="side-dev">
-  <summary class="side-link" title="Developer preview is on — all stages open for testing">
+  <summary class="side-link" title="Developer Preview is on — all stages open for testing">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9H5zM2.5 18h19M9 18l.5-1.5h5L15 18"/></svg>
-    <span class="side-text">Developer preview</span><i class="side-dot st-draft"></i></summary>
+    <span class="side-text">Developer Preview</span><i class="side-dot st-draft"></i></summary>
   <div class="side-dev-body">All stages are open for testing. Checks and saving work as usual.
     {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}
     {% if current_user and current_user.role == 'department' %}
+    {% if dept_drive %}
+    <div class="side-dev-drive">
+      <strong>{{ 'Data imported from your Drive folder' if dept_drive.done else 'Import from your Drive folder' }}</strong>
+      <span>Course matrices, syllabi and supporting documents{% if dept_drive.folder %} (<a href="{{ dept_drive.folder }}" target="_blank" rel="noopener">folder</a>){% endif %}.
+        Missing information can be added manually during the relevant stage.</span>
+      <form method="post" action="{{ url_for('dept.drive_fill') }}"
+            {% if dept_drive.done %}onsubmit="return confirm('Re-sync data from Drive? Existing imported data may be updated.')"{% endif %}>
+        <button class="side-dev-btn is-ghost" type="submit">{{ 'Re-sync from Drive' if dept_drive.done else 'Sync from Drive' }}</button>
+      </form>
+    </div>
+    {% endif %}
     <a class="side-dev-btn" href="{{ url_for('dept.dashboard', review=1) }}">Review &amp; submit all stages →</a>{% endif %}</div>
 </details>
 {% endif %}
@@ -66,7 +77,7 @@
     <a class="side-brand" href="{{ url_for('admin.dashboard') }}" title="BoS Academic Portal">
       <img class="side-logo" alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
       <img class="side-roundel" alt="" src="{{ url_for('static', filename='img/favicon-180.png') }}" width="180" height="180">
-      <span class="side-brand-text">BoS Academic Portal<small>Office of Academics</small></span>
+      <span class="side-brand-text">BoS Academic Portal<small>Office of Academic Affairs</small></span>
     </a>
     <button class="side-collapse" type="button" id="side-collapse" aria-expanded="true" aria-controls="topnav" title="Collapse the menu">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2 2 2"/></svg>
@@ -96,7 +107,7 @@
     {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
-      <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year if app_settings else '' }}</small></span>
+      <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year|ay if app_settings else '' }}</small></span>
       <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
     </div>
@@ -132,7 +143,7 @@
     {% for st in dept_nav %}
     <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}" title="{{ st.title }}">
       <span class="side-num">{{ loop.index }}</span><span class="side-text">{{ st.title }}</span>
-      <i class="side-dot st-{{ st.status }}" title="{{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Yet to start', 'locked': 'Locked'}.get(st.status, st.status) }}"></i></a>
+      <i class="side-dot st-{{ st.status }}" title="{{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Not started', 'locked': 'Locked'}.get(st.status, st.status) }}"></i></a>
     {% if st.key == here_top and prog_steps and programme %}
     {# the programme open now, and its steps, under Curriculum #}
     <div class="side-sub" aria-label="{{ programme.programme_code }} steps">
@@ -147,15 +158,15 @@
     {% endif %}
     {% endfor %}
     <span class="side-sep"></span>
-    <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}" title="Versions">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span class="side-text">Versions</span></a>
-    <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}" title="Password">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span class="side-text">Password</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}" title="Version History">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span class="side-text">Version History</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}" title="Change Password">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span class="side-text">Change Password</span></a>
     {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       <span class="side-who"><strong>{{ current_user.person.name if current_user.person else current_user.name }}</strong>
-        <small><a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Change' if current_user.person else 'Add your name' }}</a></small></span>
+        <small><a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Switch account' if current_user.person else 'Add your name' }}</a></small></span>
       <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
     </div>
@@ -182,7 +193,7 @@
            width="1103" height="319">
       <span class="brand-text">
         <strong>BoS Academic Portal</strong>
-        <span>Office of Academics</span>
+        <span>Office of Academic Affairs</span>
       </span>
     </a>
 
@@ -277,9 +288,8 @@
 
 {% if side_shell %}
 <div class="erp-bar">
-  <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academics</span>
-  <span class="erp-bar-mid">Board of Studies Portal</span>
-  <span class="erp-bar-year">{{ app_settings.academic_year if app_settings else '' }}</span>
+  <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
+  <span class="erp-bar-mid">Board of Studies{% if app_settings and app_settings.academic_year %} | {{ app_settings.academic_year|ay }}{% endif %}</span>
 </div>
 {% endif %}
 {% block header %}{% endblock %}
@@ -311,9 +321,9 @@
     <img class="brand-logo" alt=""
          src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
          width="1103" height="319">
-    <span>JAIN (Deemed-to-be University) · Office of Academics</span>
+    <span>JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
     <span class="spacer">BoS Academic Portal</span>
-    <span>{{ app_settings.academic_year if app_settings else '' }}</span>
+    <span>{{ app_settings.academic_year|ay if app_settings else '' }}</span>
   </div>
 </footer>
 {% endif %}

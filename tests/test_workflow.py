@@ -479,7 +479,7 @@ def test_the_dashboard_names_the_next_step(app, client):
     u, p = make_department(app)
     login(client, u, p)
     body = client.get("/department/").get_data(as_text=True)
-    assert "Next to do" in body and 'class="resume-card"' in body
+    assert "Next step" in body and 'class="resume-card"' in body
     assert "Department Information" in body
 
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
@@ -1000,7 +1000,7 @@ def test_developer_mode_says_so_on_every_page(app, client):
     for path in ("/department/", "/department/stage/dept_info"):
         body = client.get(path).get_data(as_text=True)
         # a laptop in the menu, not a banner across the top
-        assert 'class="side-dev"' in body and "Developer preview" in body, path
+        assert 'class="side-dev"' in body and "Developer Preview" in body, path
         assert "dev-banner" not in body, path
 
 

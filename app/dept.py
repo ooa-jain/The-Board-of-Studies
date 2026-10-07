@@ -178,7 +178,7 @@ def version_restore(vid):
     sub = get_or_create_submission(dept["dept_code"], _year())
     code = v["programme_code"] or None
     if _part(sub, v["stage"], code).get("status") in ("submitted", "approved"):
-        flash("That stage is submitted, so it cannot be changed. Ask the Office of Academics "
+        flash("That stage is submitted, so it cannot be changed. Ask the Office of Academic Affairs "
               "to send it back first.", "error")
         return redirect(url_for("dept.versions"))
     programme = None
@@ -398,7 +398,7 @@ def add_programme():
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
     if sub.get("status") == "sealed":
-        flash("This record is complete and sealed. Ask the Office of Academics to reopen "
+        flash("This record is complete and sealed. Ask the Office of Academic Affairs to reopen "
               "Department Information before adding a programme.", "error")
         return redirect(url_for("dept.stage", stage_key="curriculum"))
     if stage_state(sub, "dept_info").get("status") == "submitted":
@@ -659,7 +659,7 @@ def comment_done(cid):
     get_db().comments.update_one({"_id": c["_id"]}, {"$set": {"status": "done", "reply": reply, "done_at": now()}})
     _tell(dept, "saved", c["stage"], None, changes=[{"section": "Comment from the Office", "field": c["text"][:60],
                                                      "before": "open", "after": "done" + (f": {reply[:60]}" if reply else "")}])
-    flash("Thank you — the Office of Academics sees it is done.", "success")
+    flash("Thank you — the Office of Academic Affairs sees it is done.", "success")
     return redirect(request.referrer or url_for("dept.dashboard"))
 
 
@@ -677,9 +677,9 @@ def drive_fill():
     for key, part in (sub.get("stages") or {}).items():
         if part.get("data"):
             people.keep(dept["dept_code"], _year(), key, None, part["data"], _person())
-    flash(f"Filled {len(done)} stages and programme parts from the Drive folder; anything it did not "
-          "cover has an entry that suits, marked to be confirmed. Review, then press "
-          "“Review & submit all stages”.", "success")
+    flash(f"Data imported from your Drive folder into {len(done)} stages and programme parts. "
+          "Anything the folder did not have is marked “to be confirmed” — add it manually during "
+          "the relevant stage.", "success")
     return redirect(url_for("dept.dashboard"))
 
 
@@ -1004,7 +1004,7 @@ def api_submit_all():
                         "redirect": nxt["url"] if nxt else url_for("dept.stage", stage_key="curriculum")})
     if done:
         flash(f"Submitted {len(done)} stage{'s' if len(done) != 1 else ''} and parts. "
-              "Your Board of Studies record is with the Office of Academics.", "success")
+              "Your Board of Studies record is with the Office of Academic Affairs.", "success")
     return jsonify({"ok": True, "done": done, "redirect": url_for("dept.dashboard")})
 
 

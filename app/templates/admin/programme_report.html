@@ -12,7 +12,7 @@
       </div>
       <h1>{{ programme.programme_name }}</h1>
       <p>{{ programme.programme_code }}{% if programme.degree_level %} · {{ programme.degree_level }}{% endif %}
-         {% if programme.specialisation %} · {{ programme.specialisation }}{% endif %} · {{ year }}</p>
+         {% if programme.specialisation %} · {{ programme.specialisation }}{% endif %} · {{ year|ay }}</p>
     </div>
     <div class="spacer head-aside no-print">
       {% if curriculum_doc %}<a class="btn btn-ghost btn-sm" href="{{ curriculum_doc }}" target="_blank" rel="noopener">Curriculum →</a>{% endif %}

@@ -111,7 +111,7 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
     for col, w in zip("ABCDEFGHIJK", (6, 34, 46, 15, 15, 16, 2, 13, 13, 15, 13)):
         ws.column_dimensions[col].width = w
 
-    ws["A1"] = "JAIN (Deemed-to-be University) — Office of Academics"
+    ws["A1"] = "JAIN (Deemed-to-be University) — Office of Academic Affairs"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
     ws["A2"] = f"Board of Studies record · {rep['dept'].get('dept_name', dept_code)} · {year}"
     ws["A2"].font = Font(size=11, color="53627A")
@@ -671,7 +671,7 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
 
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("JAIN (Deemed-to-be University) — Office of Academics")
+    run = title.add_run("JAIN (Deemed-to-be University) — Office of Academic Affairs")
     run.bold = True
     run.font.size = Pt(16)
     run.font.color.rgb = RGBColor(0x0F, 0x2A, 0x4A)

@@ -51,7 +51,7 @@ def test_a_comment_reopens_a_stage_and_the_department_answers_it(app, client):
     login(client, user, pw)
     assert "Upload the signed minutes." in client.get("/department/").get_data(as_text=True)
     page = client.get("/department/stage/bos_documents").get_data(as_text=True)
-    assert "Comment from the Office of Academics" in page
+    assert "Comment from the Office of Academic Affairs" in page
     client.post(f"/department/comments/{c['_id']}/done", data={"reply": "Uploaded the signed copy."})
     with app.app_context():
         c = get_db().comments.find_one({"_id": c["_id"]})

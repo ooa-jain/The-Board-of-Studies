@@ -12,7 +12,7 @@ CAMPUS_INFO = [
         "name": "Bengaluru",
         "state": "Karnataka",
         "blurb": "The principal campus of JAIN (Deemed-to-be University), and the seat of the "
-                 "Office of Academics. Schools across commerce, management, engineering, "
+                 "Office of Academic Affairs. Schools across commerce, management, engineering, "
                  "sciences, humanities and law submit their Board of Studies records here.",
         "art": "bengaluru",
         "accent": "#C8A44B",
