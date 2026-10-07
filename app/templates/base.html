@@ -27,6 +27,9 @@
 {# A page may put a loading curtain here. It is display:none unless the page's
    own head script reveals it, so it can never cover the site by accident. #}
 {% block curtain %}{% endblock %}
+{% if current_user and current_user.role == 'department' and not hide_chrome and session.pop('intro', False) %}
+{% include "_intro.html" %}
+{% endif %}
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 

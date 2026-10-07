@@ -4691,3 +4691,82 @@ body.has-side .dev-banner, body.has-side .site-banner { margin: 0; }
 /* the Office's pages: the sidebar stays, the page beside it waits */
 body.has-side .page-skeleton { left: var(--side-w); padding-top: 40px; z-index: 55; }
 @media (max-width: 900px) { body.has-side .page-skeleton { left: 0; padding-top: 100px; } }
+
+/* ==========================================================================
+   A department's welcome scene, once after signing in (templates/_intro.html)
+   ========================================================================== */
+html.intro-open, html.intro-open body { overflow: hidden; }
+.intro { position: fixed; inset: 0; z-index: 2000; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: center; gap: 24px; padding: 4vh 6vw; overflow: hidden; color: #fff;
+  background: radial-gradient(120% 90% at 75% 40%, #16306b 0%, #0b1730 55%, #060c1a 100%);
+  opacity: 0; transition: opacity .45s ease; }
+.intro.is-on { opacity: 1; }
+.intro.is-leaving { opacity: 0; transform: scale(1.02); transition: opacity .55s ease, transform .55s ease; }
+.intro-glow { position: absolute; width: 60vmax; height: 60vmax; right: -10vmax; top: -10vmax; border-radius: 50%;
+  background: radial-gradient(circle, rgba(120,140,255,.28), transparent 60%); filter: blur(10px); pointer-events: none; }
+.intro-copy { position: relative; z-index: 2; max-width: 460px; }
+.intro-logo { width: 150px; height: auto; display: block; margin-bottom: 28px; }
+.intro-kicker { display: block; color: #f5c542; font-size: .78rem; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase; margin-bottom: 10px; }
+.intro-copy h2 { color: #fff; font-size: clamp(1.9rem, 3.4vw, 2.9rem); line-height: 1.12; margin: 0 0 14px; }
+.intro-copy p { color: #c3cfe6; font-size: 1.05rem; line-height: 1.55; margin: 0 0 26px; }
+.intro-go { display: inline-flex; align-items: center; gap: 10px; padding: 14px 26px; border: 0; border-radius: 999px;
+  background: #f2a900; color: #0b1730; font: 700 1rem var(--font, Roboto, sans-serif); cursor: pointer;
+  box-shadow: 0 14px 30px -12px rgba(242,169,0,.7); transition: transform .15s ease; }
+.intro-go:hover { transform: translateY(-2px); }
+.intro-go:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.intro-hint { display: block; margin-top: 16px; color: #7f8fb0; font-size: .8rem; }
+
+.intro-stage { position: relative; height: min(70vh, 560px); perspective: 1400px; }
+.intro-scene { --tx: 0deg; --ty: 0deg; position: absolute; inset: 0; transform-style: preserve-3d;
+  transform: rotateY(calc(-16deg + var(--tx))) rotateX(calc(6deg + var(--ty))) rotateZ(-3deg);
+  transition: transform .35s ease-out; }
+.ip { position: absolute; top: 8%; left: 4%; width: 40%; height: 74%; padding: 26px 18px 18px; border-radius: 16px;
+  display: flex; flex-direction: column; gap: 12px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.35); box-shadow: 0 30px 60px -30px rgba(0,0,0,.8);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  transition: transform .8s cubic-bezier(.6,.05,.25,1), opacity .8s ease, filter .8s ease; }
+.ip-navy { background: linear-gradient(160deg, rgba(88,112,240,.92), rgba(47,79,216,.85)); }
+.ip-gold { background: linear-gradient(160deg, rgba(244,196,90,.9), rgba(214,150,30,.82)); }
+.ip-glass { background: linear-gradient(160deg, rgba(225,232,245,.82), rgba(150,165,190,.7)); }
+.ip[data-pos="0"] { transform: translateX(0) translateY(-4%) translateZ(-140px); opacity: .7; filter: saturate(.75); }
+.ip[data-pos="1"] { transform: translateX(48%) translateY(0) translateZ(-50px); opacity: .9; }
+.ip[data-pos="2"] { transform: translateX(96%) translateY(4%) translateZ(60px); opacity: 1; }
+.ip-dot { position: absolute; top: 9px; right: 11px; width: 10px; height: 10px; border-radius: 50%;
+  background: #fff; box-shadow: inset 0 0 0 2px rgba(11,23,48,.35); }
+.ip-title { font-weight: 800; font-size: .95rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.ip-glass .ip-title { color: #0e2a5c; text-shadow: none; }
+.ip-card { position: relative; display: grid; gap: 6px; padding: 12px 40px 12px 12px; border-radius: 8px;
+  background: rgba(255,255,255,.95); box-shadow: 0 8px 18px -10px rgba(0,0,0,.6);
+  transition: transform .3s ease, box-shadow .3s ease; }
+.ip-card b { font-size: .74rem; color: #0e2a5c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ip-card i { display: block; height: 4px; border-radius: 4px; background: #c9d2e3; width: 88%; }
+.ip-card i.short { width: 55%; }
+.ip-tick { position: absolute; right: 10px; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 50%;
+  display: grid; place-items: center; font-style: normal; font-size: .75rem; font-weight: 800;
+  background: #e7ecf4; color: transparent; transition: background .3s ease, color .3s ease, transform .3s ease; }
+.ip-card.is-done { transform: translateZ(14px) scale(1.03); box-shadow: 0 14px 26px -12px rgba(31,107,68,.6); }
+.ip-card.is-done .ip-tick { background: #1f8a4c; color: #fff; transform: scale(1.12); }
+
+.intro-hand { position: absolute; left: 70%; top: 45%; width: clamp(140px, 17vw, 230px); z-index: 3;
+  transform: translate(-8%, -4%) rotate(-6deg); transform-origin: 8% 6%;
+  transition: left .6s cubic-bezier(.5,0,.2,1), top .6s cubic-bezier(.5,0,.2,1);
+  filter: drop-shadow(0 18px 24px rgba(0,0,0,.45)); pointer-events: none; }
+.intro-hand.is-tap { animation: intro-tap .7s ease .25s; }
+@keyframes intro-tap { 0%, 100% { transform: translate(-8%, -4%) rotate(-6deg) scale(1); }
+  45% { transform: translate(-4%, 0) rotate(-6deg) scale(.94); } }
+.intro-gear { position: absolute; z-index: 2; filter: drop-shadow(0 8px 10px rgba(0,0,0,.5)); }
+.intro-gear.g1 { width: 74px; left: 2%; bottom: 14%; animation: intro-spin 6s linear infinite; }
+.intro-gear.g2 { width: 104px; left: 9%; bottom: 2%; animation: intro-spin 8s linear infinite reverse; }
+@keyframes intro-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 860px) {
+  .intro { grid-template-columns: 1fr; align-content: center; padding: 6vh 22px; }
+  .intro-stage { height: 46vh; order: -1; }
+  .intro-logo { width: 110px; margin-bottom: 16px; }
+  .intro-hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-gear, .intro-hand.is-tap { animation: none; }
+  .ip, .intro-scene, .intro-hand { transition: none; }
+}

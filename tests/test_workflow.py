@@ -1199,3 +1199,18 @@ def test_batch_is_worked_out_not_asked(app, client):
                 json={"details": {"degree_level": "PG Diploma - 1 Year"}})
     page = client.get("/department/stage/prog_curriculum/MCMNEW").get_data(as_text=True)
     assert _stage_data(page)["details"]["batch"] == "2026-27"
+
+
+def test_a_department_gets_the_welcome_scene_once_after_signing_in(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    first = client.get("/department/", follow_redirects=True).get_data(as_text=True)
+    assert 'id="intro"' in first and "Start filling" in first
+    again = client.get("/department/", follow_redirects=True).get_data(as_text=True)
+    assert 'id="intro"' not in again                      # once a sign-in, not on every page
+
+
+def test_the_office_never_gets_the_welcome_scene(app, client):
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    page = client.get("/admin/", follow_redirects=True).get_data(as_text=True)
+    assert 'id="intro"' not in page
