@@ -419,17 +419,17 @@ def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
     # every part validates clean — the parts' own checks are covered elsewhere
     monkeypatch.setattr(workflow, "validate_stage",
                         lambda *a, **k: ([], {"errors": 0, "warnings": 0}))
+    # the earlier batches are required too, in their place between the
+    # current batch and Course Revision
     order = [(code, part) for code in ("BCMREG", "MCMNEW")
-             for part in ("prog_curriculum", "prog_syllabus", "prog_revision")]
+             for part in ("prog_curriculum", "prog_syllabus", "prog_syllabus_b2024",
+                          "prog_syllabus_b2025", "prog_revision")]
     for n, (code, part) in enumerate(order):
         body = client.post(f"/department/api/{part}/{code}/submit", json={}).get_json()
         assert body["ok"]
-        # on to the programme's next step — after the current batch, its earlier
-        # batches — then the next programme; after the last, back to Curriculum
-        if part == "prog_syllabus":
-            assert f"/department/stage/prog_syllabus_b" in body["redirect"] and \
-                body["redirect"].endswith(f"/{code}"), body["redirect"]
-        elif n + 1 < len(order):
+        # on to the programme's next step, then the next programme; after the
+        # last, back to Curriculum
+        if n + 1 < len(order):
             nc, np_ = order[n + 1]
             assert body["redirect"].endswith(f"/department/stage/{np_}/{nc}"), body["redirect"]
         else:

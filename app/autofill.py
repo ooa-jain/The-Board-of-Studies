@@ -319,6 +319,36 @@ def _revision(sub, programme, stored, year):
     return data
 
 
+def _batch_syllabus(current, batch_label, stored):
+    """An earlier batch's syllabus, where the Drive has none: the current
+    batch's courses as a stand-in — the batch's year in the course codes,
+    each course marked to be confirmed against what that batch was taught."""
+    data = dict(stored or {})
+    if [c for c in (data.get("courses") or []) if isinstance(c, dict) and c.get("course_title")]:
+        return data
+    yy = str(batch_label or "")[2:4]
+    out = []
+    for c in (current or {}).get("courses") or []:
+        if not isinstance(c, dict):
+            continue
+        c = {k: (list(v) if isinstance(v, list) else v) for k, v in c.items()}
+        code_ = str(c.get("course_code") or "")
+        if yy.isdigit() and re.match(r"^\d{2}", code_):
+            c["course_code"] = yy + code_[2:]
+        mods = [dict(m or {}) for m in c.get("modules") or []]
+        if mods:
+            # the earlier batch read one module differently: so Course
+            # Revision has a change to measure
+            last = mods[-1]
+            last["revised"] = (str(last.get("revised") or "").rstrip(". ") +
+                               ". (As taught to the " + str(batch_label) + " batch — to be confirmed.)")
+            c["modules"] = mods
+        c["books"] = (str(c.get("books") or "").strip() + "\n" + NOTE).strip()
+        out.append(c)
+    data["courses"] = out
+    return data
+
+
 # ---------------------------------------------------------------------------
 # the documents
 # ---------------------------------------------------------------------------
@@ -496,12 +526,25 @@ def fill_from_drive(dept, year, actor):
     # every programme, in the order a department fills them
     for programme in programmes_of(fresh(), dept):
         pcode = programme["programme_code"]
-        for part, build in (("prog_curriculum", _curriculum), ("prog_syllabus", _syllabus),
-                            ("prog_revision", _revision)):
+        from .workflow import parts_for
+        stage_def = next(s for s in STAGE_BY_KEY.values() if s.get("parts"))
+        builds = {"prog_curriculum": _curriculum, "prog_syllabus": _syllabus, "prog_revision": _revision}
+        for part in parts_for(stage_def):
+            build = builds.get(part)
             sub = fresh()
             if _is_submitted(sub, pcode, part):
                 continue
             stored = programme_stage_state(sub, pcode, part).get("data") or {}
+            if build is None:
+                # an earlier batch: the current batch's syllabus as a stand-in
+                current = programme_stage_state(sub, pcode, "prog_syllabus").get("data") or {}
+                data = _batch_syllabus(current, STAGE_BY_KEY[part].get("batch"), stored)
+                base = prefill_for(part, dept, year, programme, fresh())
+                for k, v in base.items():
+                    data.setdefault(k, v)
+                save_draft(code, year, part, data, pcode)
+                done.append(f"{pcode} · {STAGE_BY_KEY[part]['title']}")
+                continue
             if part == "prog_curriculum":
                 syl = (programme_stage_state(sub, pcode, "prog_syllabus").get("data") or {}).get("courses")
                 from_syl = (_syllabus(sub, programme, {"courses": syl}, year)["courses"]

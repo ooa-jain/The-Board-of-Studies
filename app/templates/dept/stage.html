@@ -172,10 +172,6 @@
     <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
     <span class="spacer"></span>
     {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
-    {% if step and step.optional and next_step %}
-    {# an earlier batch is a record, not a requirement: it can be passed by #}
-    <a class="btn btn-ghost" href="{{ next_step.url }}">Skip to {{ next_step.label }} →</a>
-    {% endif %}
     <button class="btn btn-ghost" type="button" id="btn-save-draft">Save draft</button>
     <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% elif step and last_step %}Review &amp; submit this programme →{% elif step and next_step %}Submit {{ step.label }} &amp; go to {{ next_step.label }} →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
   </div>
