@@ -160,3 +160,33 @@ html.side-ready body.has-side .page-skeleton { transition: opacity .18s ease, le
 .pill.pill-progress, .page-head .pill.pill-progress { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 /* the selected tab of a row card reads in navy (its colour variable had become a hairline) */
 .rc-tab[aria-selected=true] { color: #0e2a5c; }
+
+/* ---- visual QA touch-ups ---- */
+/* the white dash cards read in navy (their old white text was invisible) */
+body.erp .dash-card b, body.erp .dash-card small, body.erp .dash-card .dc-big { color: #0e2a5c !important; }
+body.erp .dash-card small { color: #6b7280 !important; }
+body.erp .dc-ico { background: #eef1f6; }
+/* the page skeleton starts below the institution bar, so the bar never flashes */
+body.has-side .page-skeleton { top: 44px !important; }
+body.has-side .page-skeleton .sk-shell { inset: 12px 0 0 0; }
+@media (max-width: 900px) { body.has-side .page-skeleton { top: 96px !important; } body.has-side .page-skeleton .sk-shell { inset: 0; } }
+/* long stage names in the dots grid may wrap, so the last column is never clipped */
+.erp-dots th.c { white-space: normal; min-width: 64px; line-height: 1.2; }
+/* collapsed rail: the name block takes no room above sign-out */
+@media (min-width: 901px) { html.side-collapsed .side-who { display: none; } }
+/* square tables inside square panels: no notched corners */
+body.erp .table-wrap, body.erp .rt-wrap { border-radius: 0; }
+/* the 3D flow's "nothing yet" note sits on a light card, not over the scene */
+.flow-empty:not([hidden]) { background: rgba(244, 245, 247, .94); }
+/* small muted text keeps AA contrast on the grey ground */
+body.erp .crumbs, body.erp .page-head p, .side-foot .side-who small, .side-foot .side-who small a { color: #5b6474 !important; }
+/* the page subtitle wraps instead of cutting off its links */
+body.erp .page-head p { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+/* a hidden button stays hidden */
+.btn[hidden] { display: none !important; }
+/* phones: wide tables scroll sideways inside their panel instead of being cut off */
+@media (max-width: 900px) {
+  body.erp .panel > .erp-table, body.erp .card > .erp-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stage-list th:nth-child(3), .stage-list td:nth-child(3) { display: none; }
+  body.erp .erp-table td.clip { max-width: 240px; }
+}

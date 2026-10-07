@@ -101,7 +101,7 @@
   <div class="panel-head"><h3>Stages</h3>
     {% if next_step %}<a class="btn btn-sm btn-gold spacer-left" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
       {{ 'Continue' if next_step.status == 'draft' else 'Correct' if next_step.status == 'returned' else 'Next Stage' }}: {{ next_step.title }} →</a>{% endif %}</div>
-  <table class="erp-table">
+  <table class="erp-table stage-list">
     <thead><tr><th class="num">#</th><th>Stage</th><th>Group</th><th>Status</th><th class="num">Errors</th><th></th></tr></thead>
     <tbody>
     {% for s in board %}
