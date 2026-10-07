@@ -117,6 +117,18 @@
     <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}" title="{{ st.title }}">
       <span class="side-num">{{ loop.index }}</span><span class="side-text">{{ st.title }}</span>
       <i class="side-dot st-{{ st.status }}" title="{{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Yet to start', 'locked': 'Locked'}.get(st.status, st.status) }}"></i></a>
+    {% if st.key == here_top and prog_steps and programme %}
+    {# the programme open now, and its steps, under Curriculum #}
+    <div class="side-sub" aria-label="{{ programme.programme_code }} steps">
+      <a class="side-sub-prog" href="{{ url_for('dept.stage', stage_key='curriculum') }}#prog-{{ programme.programme_code }}"
+         title="{{ programme.programme_name }}">{{ programme.programme_code }}</a>
+      {% for ps in prog_steps %}
+      <a class="side-sub-link{{ ' is-on' if ps.key == stage.key }}" href="{{ ps.url }}"
+         {% if ps.key == stage.key %}aria-current="page"{% endif %}>
+        <i class="side-dot st-{{ ps.status }}"></i><span class="side-text">{{ ps.label }}</span></a>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% endfor %}
     <span class="side-sep"></span>
     <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}" title="Versions">

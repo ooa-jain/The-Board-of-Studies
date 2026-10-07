@@ -470,7 +470,7 @@ def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloa
     text = " ".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
     stages = text.split("Stages")[1].split("Department Information —")[0]
     assert stages.count("✓ Submitted") >= 4                       # every stage in
-    assert "Open →" in text and "Curriculum (JAIN template)" in text
+    assert "Open →" in text and "Documents (JAIN templates)" in text
 
 
 
@@ -533,9 +533,13 @@ def test_the_excel_links_each_programmes_course_revision_in_the_revision_templat
     _admin(app, office)
     ws = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))["Report"]
     cells = [c for row in ws.iter_rows() for c in row]
-    labels = [c.value for c in cells if c.value and "Course Revision (JAIN template)" in str(c.value)]
+    # one row per programme, each with its Curriculum, Syllabus and Course
+    # Revision documents in their own columns (H, I, J)
     links = [c.hyperlink.target for c in cells if c.hyperlink and "/share/v/" in c.hyperlink.target]
-    assert labels and links and len(labels) == len(links)
+    curricula = [c for c in cells if c.hyperlink and "/share/c/" in c.hyperlink.target]
+    assert links and len(links) == len(curricula)
+    assert {c.column for c in cells if c.hyperlink and "/share/v/" in c.hyperlink.target} == {10}
+    assert {c.column for c in curricula} == {8}
 
     viewer = app.test_client().get(urlparse(links[0]).path)          # no sign-in
     body = viewer.get_data(as_text=True)

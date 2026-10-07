@@ -627,40 +627,21 @@ def test_department_cannot_touch_another_departments_stage(app, client):
     assert "Department of English" not in r.get_data(as_text=True)
 
 
-def test_the_stage_side_menu_branches_by_group(app, client):
-    """The side menu groups the thirteen stages, and renders them.
-
-    Asserting on the titles matters as much as on the groups: the group dict
-    is walked in the template, and a mis-named key there fails silently by
-    rendering an empty menu rather than by raising.
-    """
+def test_the_stages_are_in_the_left_menu_only(app, client):
+    """The left menu lists the stages, the one being filled is marked, and
+    the stage page no longer repeats them in a tree on the right."""
     from html import escape
 
     from app.schema import STAGES
     u, p = make_department(app)
     login(client, u, p)
     body = client.get("/department/stage/dept_info").get_data(as_text=True)
-
-    groups = []
     for s in STAGES:
-        if s["group"] not in groups:
-            groups.append(s["group"])
-    # a group heading appearing twice with other groups in between would give
-    # the menu two branches of the same name
-    assert len(groups) == len(set(groups)), "group names have to be unique"
-    for g in groups:
-        assert f'<span class="branch-label">{escape(g)}</span>' in body, g
-    for s in STAGES:
-        assert escape(s["title"]) in body, s["title"]
-
-    # the group you are in is the open one, and the rest are folded
-    tops = re.findall(r'id="branch-g\d+"\s+data-open="(\w+)"', body)
-    assert len(tops) == len(groups)
-    assert tops.count("true") == 1
-
-    # the stage being filled is marked, and nothing is locked
-    assert 'class="branch-row is-open is-here"' in body
-    assert 'class="branch-row is-locked"' not in body
+        if not s.get("parent") and not s.get("container_child"):
+            assert escape(s["title"]) in body, s["title"]
+    assert "data-branch" not in body and 'class="branch-label"' not in body
+    assert re.search(r'class="side-link is-on" href="/department/stage/dept_info"', body)
+    assert "Review &amp; submit all stages" in body
 
 
 def test_grouped_board_counts_each_group(app):

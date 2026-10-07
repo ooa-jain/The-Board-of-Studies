@@ -20,6 +20,7 @@ from .workflow import compute_status, programmes_of, progress
 NAVY = "0F2A4A"
 HEAD = "DCE6F1"      # column heads: a quiet blue-grey
 LIGHT = "F3F6FA"
+PROG_COLS = 11       # the Report sheet's width: the programmes table's columns
 
 _thin = Side(style="thin", color="D5DEE8")
 BORDER = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
@@ -74,12 +75,22 @@ def _link(cell, text, url):
         cell.font = LINK_FONT
 
 
-def _section_title(ws, row, text, width=7):
+def _section_title(ws, row, text, width=PROG_COLS):
     c = ws.cell(row=row, column=1, value=text)
     c.font = Font(bold=True, size=12, color="FFFFFF")
     for col in range(1, width + 1):
         ws.cell(row=row, column=col).fill = PatternFill("solid", fgColor=NAVY)
     ws.row_dimensions[row].height = 22
+
+
+# status -> (cell fill, text colour)
+STATUS_LOOK = {
+    "submitted": ("DFF3E4", "1D7A3E"),
+    "draft": ("E8F0FE", "1D4ED8"),
+    "returned": ("FDE7E7", "B42318"),
+    "open": ("F1F3F6", "53627A"),
+    "locked": ("F1F3F6", "53627A"),
+}
 
 
 def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
@@ -93,7 +104,11 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
     ws = wb.active
     ws.title = "Report"
     ws.sheet_view.showGridLines = False
-    for col, w in zip("ABCDEFG", (6, 34, 46, 18, 18, 18, 20)):
+    # prints landscape, one page wide
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    for col, w in zip("ABCDEFGHIJK", (6, 34, 46, 15, 15, 16, 2, 13, 13, 15, 13)):
         ws.column_dimensions[col].width = w
 
     ws["A1"] = "JAIN (Deemed-to-be University) — Office of Academics"
@@ -163,35 +178,79 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
             ws.cell(row=r, column=2, value="None.").font = Font(italic=True, color="7A8699")
             r += 1
             continue
-        _head(ws, r, ["", "Programme", "Code · degree", "Curriculum", "Syllabus", "Course Revision",
-                      "Report"], fill=HEAD, color=NAVY)
+        # status on the left, the programme's documents on the right — one
+        # row per programme, each document in its own column
+        ws.cell(row=r, column=4, value="Status")
+        ws.cell(row=r, column=8, value="Documents (JAIN templates)")
+        for col in range(1, PROG_COLS + 1):
+            c = ws.cell(row=r, column=col)
+            c.fill = PatternFill("solid", fgColor=LIGHT)
+            c.font = Font(bold=True, size=9, color="53627A")
+            c.alignment = Alignment(horizontal="center")
+        ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=6)
+        ws.merge_cells(start_row=r, start_column=8, end_row=r, end_column=PROG_COLS)
         r += 1
-        for p in progs:
+        _head(ws, r, ["", "Programme", "Code · degree", "Curriculum", "Syllabus", "Course Revision", "",
+                      "Curriculum", "Syllabus", "Course Revision", "Full report"], fill=HEAD, color=NAVY)
+        ws.cell(row=r, column=7).fill = PatternFill()
+        ws.cell(row=r, column=7).border = Border()
+        for col in (1, 4, 5, 6, 8, 9, 10, 11):
+            ws.cell(row=r, column=col).alignment = Alignment(horizontal="center", vertical="center",
+                                                             wrap_text=True)
+        r += 1
+        for n, p in enumerate(progs):
             all_done = all(x["status"] == "submitted" for x in p["parts"])
-            ws.cell(row=r, column=1, value="✓" if all_done else "·").fill = OK_FILL if all_done else NO_FILL
+            band = PatternFill("solid", fgColor="FAFBFD") if n % 2 else PatternFill()
+            for col in (1, 2, 3, 8, 9, 10, 11):
+                ws.cell(row=r, column=col).fill = band
+            tick = ws.cell(row=r, column=1, value="✓" if all_done else "")
+            tick.font = Font(bold=True, color="1D7A3E")
             _link(ws.cell(row=r, column=2), p["programme_name"], p["report"])
-            ws.cell(row=r, column=2).alignment = Alignment(wrap_text=True, vertical="top")
             ws.cell(row=r, column=3, value=" · ".join(x for x in (p["programme_code"],
                                                                p.get("degree_level")) if x))
-            for i, part in enumerate(p["parts"]):
+            for i, part in enumerate(p["parts"][:3]):
+                fill, colour = STATUS_LOOK.get(part["status"], STATUS_LOOK["open"])
                 c = ws.cell(row=r, column=4 + i, value=status_word(part["status"]))
-                c.fill = OK_FILL if part["status"] == "submitted" else PatternFill()
-            _link(ws.cell(row=r, column=7), "Open report →" if p["report"] else "", p["report"])
+                c.fill = PatternFill("solid", fgColor=fill)
+                c.font = Font(bold=True, size=9, color=colour)
+            for col, url in ((8, p.get("curriculum_doc")), (9, p.get("syllabus_doc")),
+                             (10, p.get("revision_doc")), (11, p["report"])):
+                c = ws.cell(row=r, column=col)
+                if url:
+                    _link(c, "Open →", url)
+                else:
+                    c.value = "—"
+                    c.font = Font(color="9AA3B2")
+            for col in range(1, PROG_COLS + 1):
+                c = ws.cell(row=r, column=col)
+                if col != 7:
+                    c.border = BORDER
+                c.alignment = Alignment(vertical="center", wrap_text=col in (2, 3),
+                                        horizontal="center" if col in (1, 4, 5, 6, 8, 9, 10, 11) else None)
+            # long names wrap: give the row room for them
+            lines = min(4, max(1, -(-len(p["programme_name"]) // 36)))
+            ws.row_dimensions[r].height = max(20, 14 * lines + 4)
             r += 1
-            # the programme's Curriculum and Syllabus, generated in the
-            # Office's own templates, right after the programme
-            for label, url in (("Curriculum (JAIN template)", p.get("curriculum_doc")),
-                                ("Syllabus (JAIN template)", p.get("syllabus_doc")),
-                                ("Course Revision (JAIN template)", p.get("revision_doc"))):
-                if not url:
-                    continue
-                ws.cell(row=r, column=2, value=f"   {label}").font = Font(size=9, bold=True,
-                                                                         color=NAVY)
-                _link(ws.cell(row=r, column=3), "Open →", url)
-                r += 1
-            for where, name, url in p["documents"]:
-                ws.cell(row=r, column=2, value=f"   {where} document").font = Font(size=9, color="53627A")
+
+        # the files the department uploaded against these programmes, in a
+        # table of their own below
+        uploads = [(p["programme_code"], where, name, url)
+                   for p in progs for where, name, url in p["documents"]]
+        if uploads:
+            r += 1
+            ws.cell(row=r, column=2, value="Files uploaded with these programmes").font = \
+                Font(bold=True, size=10, color=NAVY)
+            r += 1
+            _head(ws, r, ["", "Programme", "File", "Uploaded for"], fill=HEAD, color=NAVY)
+            ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=6)
+            r += 1
+            for code, where, name, url in uploads:
+                ws.cell(row=r, column=2, value=code)
                 _link(ws.cell(row=r, column=3), name, url)
+                ws.cell(row=r, column=4, value=where)
+                ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=6)
+                for col in range(2, 7):
+                    ws.cell(row=r, column=col).border = BORDER
                 r += 1
 
     _programmes_sheet(wb, rep)
@@ -676,14 +735,17 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
                          + (f", {p['degree_level']}" if p.get("degree_level") else "") + ")")
             para.add_run("\n" + " · ".join(f"{x['title']}: {status_word(x['status'])}"
                                             for x in p["parts"])).font.size = Pt(9)
-            for label, url in (("Curriculum (JAIN template)", p.get("curriculum_doc")),
-                                ("Syllabus (JAIN template)", p.get("syllabus_doc")),
-                                ("Course Revision (JAIN template)", p.get("revision_doc"))):
-                if url:
-                    d = doc.add_paragraph()
-                    d.paragraph_format.left_indent = Pt(24)
-                    d.add_run(f"{label}: ").font.size = Pt(9)
-                    _hyperlink(d, "Open", url)
+            docs = [(label, url) for label, url in (("Curriculum", p.get("curriculum_doc")),
+                                                     ("Syllabus", p.get("syllabus_doc")),
+                                                     ("Course Revision", p.get("revision_doc"))) if url]
+            if docs:
+                d = doc.add_paragraph()
+                d.paragraph_format.left_indent = Pt(24)
+                d.add_run("Documents (JAIN templates): ").font.size = Pt(9)
+                for k, (label, url) in enumerate(docs):
+                    if k:
+                        d.add_run(" · ").font.size = Pt(9)
+                    _hyperlink(d, label, url)
             for where, name, url in p["documents"]:
                 d = doc.add_paragraph()
                 d.paragraph_format.left_indent = Pt(24)

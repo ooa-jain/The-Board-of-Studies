@@ -314,6 +314,7 @@ def stage(stage_key, programme_code=None):
     board = stage_board(sub)
     final, record = _final_step(sub, dept, stage_key, (programme or {}).get("programme_code"))
     step = next_step = None
+    steps = []
     last_step = False
     if programme and stage_def.get("parent"):
         steps = _programme_steps(sub, programme["programme_code"])
@@ -328,7 +329,7 @@ def stage(stage_key, programme_code=None):
                 next_step = np_ and {**np_, "label": "the next programme"}
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
                            final=final, record=record, syllabi=syllabi, comments=comments,
-                           step=step, next_step=next_step, last_step=last_step,
+                           step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),

@@ -156,138 +156,9 @@
     </div>
     {% endif %}
 
-    {# The whole sequence as branches. The group you are working in is open;
-       the others are folded, and each says how far through it you are. A
-       submitted stage stays reachable — read-only — so the branch is a link;
-       a locked one is plain text, because there is nowhere to go yet. #}
-    {% set done_count = board|selectattr('status','equalto','submitted')|list|length %}
-    <nav class="card branch-card" aria-label="All stages" data-branch>
-      <div class="card-head">
-        <h3 class="card-title-sm">Stages</h3>
-        <span class="spacer branch-tally">{{ done_count }}/{{ board|length }} done</span>
-      </div>
-      <div class="card-body tight scroll-300 scroll-tall">
-        <ul class="branch">
-          {% for g in groups %}
-          {% set here = g.stages|selectattr('key','equalto',stage.parent or stage.key)|list|length > 0 %}
-          <li class="branch-group{{ ' is-done' if g.complete }}">
-            <button class="branch-parent" type="button"
-                    aria-expanded="{{ 'true' if here else 'false' }}"
-                    aria-controls="branch-g{{ loop.index }}">
-              <span class="branch-caret" aria-hidden="true"></span>
-              <span class="branch-label">{{ g.name }}</span>
-              <span class="branch-tally">
-                {{ g.done }}/{{ g.total }}
-                <span class="sr-only">stages submitted</span>
-              </span>
-            </button>
-            <ul class="branch-children" id="branch-g{{ loop.index }}"
-                data-open="{{ 'true' if here else 'false' }}">
-              {% for s in g.stages %}
-              <li class="branch-row is-{{ s.status }}{{ ' is-here' if s.key == (stage.parent or stage.key) }}"
-                  style="--i: {{ loop.index0 }}">
-                {% if s.status == 'locked' %}
-                <span class="branch-dead">
-                  <span class="branch-icon">{{ art.stage_icon(s.status) }}</span>
-                  <span class="branch-text">{{ s.title }}</span>
-                  <span class="sr-only">— locked, opens once the stage before it is submitted</span>
-                </span>
-                {% else %}
-                <a class="branch-link" href="{{ url_for('dept.stage', stage_key=s.key) }}"
-                   {% if s.key == (stage.parent or stage.key) %}aria-current="page"{% endif %}>
-                  <span class="branch-icon">{{ art.stage_icon(s.status) }}</span>
-                  <span class="branch-text">{{ s.title }}</span>
-                  <span class="sr-only">
-                    — {{ {'submitted': 'submitted', 'draft': 'in progress',
-                          'returned': 'returned for correction'}.get(s.status, 'open') }}
-                    {{- ', this stage' if s.key == (stage.parent or stage.key) }}
-                  </span>
-                </a>
-                {% endif %}
-                {% if s.key == 'curriculum' and prog_tree and s.status != 'locked' %}
-                {# every mapped programme, UG and PG, and its three parts #}
-                <ul class="branch-children branch-nested">
-                  {% for lv in prog_tree %}
-                  <li class="branch-row is-open">
-                    <button class="branch-parent branch-parent-sm" type="button"
-                            aria-expanded="{{ 'true' if lv.here or not programme else 'false' }}"
-                            aria-controls="branch-lv-{{ lv.name }}">
-                      <span class="branch-caret" aria-hidden="true"></span>
-                      <span class="branch-label">{{ lv.name }} programmes</span>
-                      <span class="branch-tally">{{ lv.done }}/{{ lv.programmes|length }}</span>
-                    </button>
-                    <ul class="branch-children branch-nested" id="branch-lv-{{ lv.name }}"
-                        data-open="{{ 'true' if lv.here or not programme else 'false' }}">
-                      {% for pr in lv.programmes %}
-                      <li class="branch-row is-open{{ ' is-here-prog' if pr.here }}">
-                        {# the arrow opens the programme's parts here; the code
-                           opens its step flowchart #}
-                        <div class="branch-prog-line">
-                          <button class="branch-parent branch-parent-sm branch-caret-btn" type="button"
-                                  aria-expanded="{{ 'true' if pr.here else 'false' }}"
-                                  aria-controls="branch-pr-{{ lv.name }}-{{ loop.index }}"
-                                  aria-label="Show the parts of {{ pr.code }}">
-                            <span class="branch-caret" aria-hidden="true"></span>
-                          </button>
-                          <a class="branch-prog-link" title="{{ pr.name }} — open its steps"
-                             href="{{ url_for('dept.stage', stage_key='curriculum') }}#prog-{{ pr.code }}">{{ pr.code }}</a>
-                        </div>
-                        <ul class="branch-children branch-nested" id="branch-pr-{{ lv.name }}-{{ loop.index }}"
-                            data-open="{{ 'true' if pr.here else 'false' }}">
-                          {% set older = pr.parts|selectattr('existing')|list %}
-                          {% for pt in pr.parts if not pt.existing %}
-                          {% set is_here = pr.here and pt.key == stage.key %}
-                          <li class="branch-row is-{{ pt.status }}{{ ' is-here' if is_here }}">
-                            <a class="branch-link"
-                               href="{{ url_for('dept.stage', stage_key=pt.key, programme_code=pr.code) }}"
-                               {% if is_here %}aria-current="page"{% endif %}>
-                              <span class="branch-icon">{{ art.stage_icon(pt.status) }}</span>
-                              <span class="branch-text">{{ pt.title }}{% if pt.tag %}<span class="branch-tag">{{ pt.tag }}</span>{% endif %}</span>
-                            </a>
-                          </li>
-                          {% if pt.key == 'prog_syllabus' and older %}
-                          {# the earlier batches' syllabi, one branch down #}
-                          {% set older_here = pr.here and older|selectattr('key', 'equalto', stage.key)|list %}
-                          <li class="branch-row is-open">
-                            <button class="branch-parent branch-parent-sm" type="button"
-                                    aria-expanded="{{ 'true' if older_here else 'false' }}"
-                                    aria-controls="branch-old-{{ lv.name }}-{{ loop.index }}-{{ pr.code }}">
-                              <span class="branch-caret" aria-hidden="true"></span>
-                              <span class="branch-label">Existing batches</span>
-                              <span class="branch-tally">{{ older|length }}</span>
-                            </button>
-                            <ul class="branch-children branch-nested" id="branch-old-{{ lv.name }}-{{ loop.index }}-{{ pr.code }}"
-                                data-open="{{ 'true' if older_here else 'false' }}">
-                              {% for ob in older %}
-                              {% set ob_here = pr.here and ob.key == stage.key %}
-                              <li class="branch-row is-{{ ob.status }}{{ ' is-here' if ob_here }}">
-                                <a class="branch-link"
-                                   href="{{ url_for('dept.stage', stage_key=ob.key, programme_code=pr.code) }}"
-                                   {% if ob_here %}aria-current="page"{% endif %}>
-                                  <span class="branch-icon">{{ art.stage_icon(ob.status) }}</span>
-                                  <span class="branch-text">{{ ob.tag }}</span>
-                                </a>
-                              </li>
-                              {% endfor %}
-                            </ul>
-                          </li>
-                          {% endif %}
-                          {% endfor %}
-                        </ul>
-                      </li>
-                      {% endfor %}
-                    </ul>
-                  </li>
-                  {% endfor %}
-                </ul>
-                {% endif %}
-              </li>
-              {% endfor %}
-            </ul>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
+    {# the stages and the programme's steps live in the left menu; here only
+       the way to submit everything at once #}
+    <div class="card branch-card">
       {# submitting lives with the stages: this one, then on to the next;
          only the last one — the one that completes the record — opens the
          review of everything first #}
@@ -303,7 +174,7 @@
         </div>
         {% endif %}
       </div>
-    </nav>
+    </div>
   </aside>
 </div>
 
