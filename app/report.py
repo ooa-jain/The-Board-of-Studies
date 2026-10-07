@@ -208,7 +208,8 @@ def build(db, dept_code, year, links=None):
                                   "report": links.programme(code),
                                   # generated documents only once there is something in them
                                   "curriculum_doc": has["prog_curriculum"] and links.generated("c", code),
-                                  "syllabus_doc": has["prog_syllabus"] and links.generated("s", code)})
+                                  "syllabus_doc": has["prog_syllabus"] and links.generated("s", code),
+                                  "revision_doc": has["prog_revision"] and links.generated("v", code)})
 
     return {"dept": dept, "submission": sub, "year": year, "info": info,
             "stages": stages, "programmes": programmes}
@@ -246,6 +247,8 @@ def programme_context(db, dept, year, programme_code, links):
             "curriculum_doc": bool(cur.get("semester_structure")) and links.generated("c", code),
             "syllabus_doc": bool(((stored.get("prog_syllabus") or {}).get("data") or {}).get("courses"))
             and links.generated("s", code),
+            "revision_doc": bool(((stored.get("prog_revision") or {}).get("data") or {}).get("courses"))
+            and links.generated("v", code),
             "profile": profile,
             "semesters": sorted(semesters.items(), key=lambda kv: str(kv[0])),
             "minors": cur.get("minors") or [],
@@ -280,7 +283,8 @@ class ShareLinks:
         from flask import url_for
 
         from .share import generated_token
-        return url_for("share.curriculum" if kind == "c" else "share.syllabus",
+        from .share import ENDPOINTS
+        return url_for(ENDPOINTS[kind],
                        token=generated_token(kind, self.dept_code, code, self.year),
                        _external=True)
 

@@ -944,7 +944,7 @@ def wipe_department(dept_code):
 def programme_docx(dept_code, programme_code, kind):
     """The programme's Curriculum ("c") or Syllabus ("s") in the Office's templates."""
     from .share import DOCX, generated_docx
-    if kind not in ("c", "s"):
+    if kind not in ("c", "s", "v"):
         abort(404)
     out = generated_docx(kind, dept_code, programme_code, _year()) or abort(404)
     return send_file(out[0], as_attachment=True, download_name=out[1], mimetype=DOCX)

@@ -16,6 +16,7 @@ every link at once.
                             curriculum template (app/docgen.py), shown on
                             the page; /file downloads the Word document
     /share/s/<token>        its Syllabus, in the syllabus template, the same way
+    /share/v/<token>        its Course Revision, in the syllabus revision template
 """
 
 from __future__ import annotations
@@ -110,19 +111,25 @@ def report(token):
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
+# the documents generated for a programme, by the letter in their links
+GENERATED = {"c": "Curriculum", "s": "Syllabus", "v": "Course Revision"}
+ENDPOINTS = {"c": "share.curriculum", "s": "share.syllabus", "v": "share.revision"}
+
+
 def generated_docx(kind, dept_code, programme_code, year):
-    """(buffer, file name) for a programme's generated Curriculum or Syllabus, or None."""
-    from .docgen import curriculum_docx, syllabus_docx
-    make = curriculum_docx if kind == "c" else syllabus_docx
+    """(buffer, file name) for a programme's generated Curriculum, Syllabus or
+    Course Revision, or None."""
+    from .docgen import curriculum_docx, revision_docx, syllabus_docx
+    make = {"c": curriculum_docx, "s": syllabus_docx, "v": revision_docx}[kind]
     buf = make(get_db(), dept_code, year, programme_code)
     if buf is None:
         return None
-    name = "Curriculum" if kind == "c" else "Syllabus"
-    return buf, f"{programme_code}-{name}-{year}.docx"
+    return buf, f"{programme_code}-{GENERATED[kind].replace(' ', '-')}-{year}.docx"
 
 
 @bp.route("/c/<token>", endpoint="curriculum", defaults={"kind": "c"})
 @bp.route("/s/<token>", endpoint="syllabus", defaults={"kind": "s"})
+@bp.route("/v/<token>", endpoint="revision", defaults={"kind": "v"})
 def generated(token, kind):
     """The generated Curriculum or Syllabus, shown on the page as the Word
     document lays it out, with a Download button."""
@@ -131,7 +138,7 @@ def generated(token, kind):
     out = generated_docx(kind, dept_code, programme_code, year) or abort(404)
     dept = get_db().departments.find_one({"dept_code": dept_code}) or {}
     return render_template("share/generated.html", view=to_view(out[0]), dept=dept, year=year,
-                           title=("Curriculum" if kind == "c" else "Syllabus"),
+                           title=GENERATED[kind],
                            programme_code=programme_code, file_name=out[1],
                            download_url=url_for(request.endpoint, token=token) + "/file",
                            hide_chrome=True)
@@ -139,6 +146,7 @@ def generated(token, kind):
 
 @bp.route("/c/<token>/file", endpoint="curriculum_file", defaults={"kind": "c"})
 @bp.route("/s/<token>/file", endpoint="syllabus_file", defaults={"kind": "s"})
+@bp.route("/v/<token>/file", endpoint="revision_file", defaults={"kind": "v"})
 def generated_file(token, kind):
     dept_code, programme_code, year = _read(token, kind)
     out = generated_docx(kind, dept_code, programme_code, year) or abort(404)

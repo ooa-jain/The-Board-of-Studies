@@ -519,3 +519,32 @@ def test_the_office_can_delete_all_of_a_departments_data(app, client):
     with app.app_context():
         assert not get_db().files.count_documents({"dept_code": code})
         assert get_db().departments.find_one({"dept_code": code})  # the department stays
+
+
+def test_the_excel_links_each_programmes_course_revision_in_the_revision_template(app, client):
+    import io
+    from urllib.parse import urlparse
+
+    from docx import Document
+    from openpyxl import load_workbook
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    office = app.test_client()
+    _admin(app, office)
+    ws = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    cells = [c for row in ws.iter_rows() for c in row]
+    labels = [c.value for c in cells if c.value and "Course Revision (JAIN template)" in str(c.value)]
+    links = [c.hyperlink.target for c in cells if c.hyperlink and "/share/v/" in c.hyperlink.target]
+    assert labels and links and len(labels) == len(links)
+
+    viewer = app.test_client().get(urlparse(links[0]).path)          # no sign-in
+    body = viewer.get_data(as_text=True)
+    assert viewer.status_code == 200 and "Download Word" in body
+    for words in ("Percentage of change in syllabus revision for all Courses", "YEAR OF REVISION",
+                  "COURSE-WISE FOR ALL SEMESTERS", "MODULE-WISE FOR ALL COURSES",
+                  "AVERAGE PERCENTAGE ON REVISION CONSIDERING ALL MODULES"):
+        assert words in body
+    doc = Document(io.BytesIO(app.test_client().get(urlparse(links[0]).path + "/file").data))
+    sec = doc.sections[0]
+    assert sec.page_width > sec.page_height                            # landscape, as the template
+    assert "Percentage of change in syllabus revision" in " ".join(p.text for p in sec.footer.paragraphs)

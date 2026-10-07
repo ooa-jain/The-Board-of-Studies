@@ -249,6 +249,12 @@ def _letterhead(header_line, portrait=False):
     return doc
 
 
+def _title(text):
+    """Word keeps a document title to 255 characters."""
+    text = str(text)
+    return text if len(text) <= 255 else text[:254] + "…"
+
+
 def _save(doc):
     buf = io.BytesIO()
     doc.save(buf)
@@ -530,7 +536,7 @@ def curriculum_docx(db, dept_code, year, programme_code):
     if minors:
         _page_break(doc)
         _minors_table(doc, minors, width)
-    doc.core_properties.title = f"{name} — Curriculum {batch}".strip()
+    doc.core_properties.title = _title(f"{name} — Curriculum {batch}".strip())
     return _save(doc)
 
 
@@ -637,7 +643,210 @@ def syllabus_docx(db, dept_code, year, programme_code):
             sem = c.get("semester")
             _para(doc, f"SEMESTER {_fmt(sem)}", bold=True, size=11, color=NAVY, after=4)
         _course_sheet(doc, name, copy.deepcopy(c), width)
-    doc.core_properties.title = f"{name} — Syllabus {batch}".strip()
+    doc.core_properties.title = _title(f"{name} — Syllabus {batch}".strip())
+    return _save(doc)
+
+
+# ---------------------------------------------------------------------------
+# Course Revision — the "Percentage of change in syllabus revision" document
+# (BBA Syllabus Revision 2024): its letterhead, orange bands, (A)–(D),
+# course-wise by semester, module-wise for every course
+# ---------------------------------------------------------------------------
+
+REVISION_BASE = Path(__file__).parent / "doc_templates" / "revision_base.docx"
+ORANGE = "FF9933"
+YELLOW = "FFFF00"
+GREY = "D3D3D3"
+THRESHOLD = 20
+ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+
+
+def _rev_font(doc):
+    for st in doc.styles:
+        if st.name == "Normal":
+            st.font.name = "Palatino Linotype"
+            st.font.size = Pt(10)
+
+
+def _orange_band(doc, text, width, size=11, underline=True):
+    t = doc.add_table(rows=1, cols=1)
+    _borders(t)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    cell = t.rows[0].cells[0]
+    _write(cell, text, bold=True, size=size, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for r in cell.paragraphs[0].runs:
+        r.underline = underline
+    _shade(cell, ORANGE)
+    _widths(t, [width])
+    return t
+
+
+def _sem_heading(doc, sem):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(8)
+    p.paragraph_format.space_after = Pt(4)
+    label = f"SEMESTER {ROMAN[int(sem) - 1]}" if sem and 0 < int(sem) <= 10 else "SEMESTER NOT GIVEN"
+    r = p.add_run(label)
+    r.bold = True
+    r.underline = True
+    r.font.size = Pt(11)
+
+
+def _pct(v):
+    v = _num(v)
+    return "—" if v is None else f"{_fmt(v)}%"
+
+
+def revision_docx(db, dept_code, year, programme_code):
+    """The programme's Course Revision in the Office's revision template."""
+    from .exporter import revision_summary
+    rec = programme_record(db, dept_code, year, programme_code)
+    if not rec:
+        return None
+    dept, prog, cur, _ = rec
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+    stored = ((sub.get("programmes") or {}).get(prog["programme_code"]) or {}).get("prog_revision") or {}
+    courses = [c for c in ((stored.get("data") or {}).get("courses") or []) if isinstance(c, dict)]
+    name = _title_line(prog, cur)[0]
+    rev_year = next((str(c.get("year_latest")) for c in courses if c.get("year_latest")), year[:4])
+
+    doc = Document(str(REVISION_BASE))
+    _rev_font(doc)
+    sec = doc.sections[0]
+    width = int(sec.page_width - sec.left_margin - sec.right_margin)
+    s = revision_summary(courses, THRESHOLD)
+
+    # --- page 1: who and when, (A)–(D), the note, the signatures
+    _orange_band(doc, "Percentage of change in syllabus revision for all Courses", width * 0.72, underline=False)
+    t = doc.add_table(rows=2, cols=4)
+    _borders(t)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for r, (l1, v1, l2, v2) in enumerate((("NAME OF THE PROGRAMME :", name, "PROGRAMME CODE :", prog["programme_code"]),
+                                           ("NAME OF THE DEPARTMENT :", dept.get("dept_name", ""), "YEAR OF REVISION :", rev_year))):
+        cells = t.rows[r].cells
+        for i, (txt, label) in enumerate(((l1, True), (v1, False), (l2, True), (v2, False))):
+            _write(cells[i], txt, bold=True, size=9.5, align=None if label else WD_ALIGN_PARAGRAPH.CENTER)
+            if label:
+                for run in cells[i].paragraphs[0].runs:
+                    run.underline = True
+                _shade(cells[i], ORANGE)
+    _widths(t, [width * x for x in (0.16, 0.26, 0.15, 0.15)])
+    doc.add_paragraph()
+
+    t = doc.add_table(rows=0, cols=3)
+    _borders(t)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for k, label, v in (("(A)", "Total Number of Courses", str(s["A"])),
+                        ("(B)", f"Number of Courses with Syllabus revision above {THRESHOLD}%", str(s["B"])),
+                        ("(C)", "Percentage of Courses revised\nFormula: (B / A) x 100", _fmt(s["C"])),
+                        ("(D)", "Average Percentage of Syllabus revised considering the percentage of "
+                                "syllabus revision in each course *", _pct(s["D"]))):
+        cells = t.add_row().cells
+        _write(cells[0], k, bold=True, size=9.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _write(cells[1], label, bold=True, size=9.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _write(cells[2], v, bold=True, size=9.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        if k == "(D)":
+            _shade(cells[2], YELLOW)
+    _widths(t, [width * 0.06, width * 0.56, width * 0.1])
+    doc.add_paragraph()
+    t = doc.add_table(rows=1, cols=1)
+    _borders(t)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _write(t.rows[0].cells[0],
+           f"* In {name}, out of {s['A']} number of Courses, {s['B']} number of Courses have undergone syllabus "
+           f"revision with more than {THRESHOLD}% is considered and the same is highlighted in YELLOW COLOUR. "
+           f"And, the other courses in which the syllabus revision is less than {THRESHOLD}% are highlighted in "
+           "GREY COLOUR which are not considered in the above-mentioned percentage of syllabus revision.",
+           bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    _widths(t, [width * 0.62])
+    for _ in range(3):
+        doc.add_paragraph()
+    p = doc.add_paragraph()
+    p.paragraph_format.left_indent = Pt(40)
+    r = p.add_run("Head of the Department" + "\t" * 6 + "Director / Deputy Director of the School")
+    r.bold = True
+
+    if not courses:
+        _page_break(doc)
+        _para(doc, "No Course Revision has been entered for this programme yet.", size=11)
+        doc.core_properties.title = _title(f"{name} — Course Revision {rev_year}")
+        return _save(doc)
+
+    pairs = list(zip(s["rows"], s["avgs"]))
+    sems = sorted({_num(c.get("semester")) for c, _ in pairs}, key=lambda x: (x is None, x or 0))
+
+    # --- course-wise, semester by semester
+    _page_break(doc)
+    _orange_band(doc, "PERCENTAGE OF CHANGE IN SYLLABUS – COURSE-WISE FOR ALL SEMESTERS", width)
+    for sem in sems:
+        _sem_heading(doc, sem)
+        t = doc.add_table(rows=1, cols=4)
+        _borders(t)
+        t.alignment = WD_TABLE_ALIGNMENT.CENTER
+        for i, h in enumerate(("SL", "COURSE CODE", "COURSE TITLE", "PERCENTAGE OF CHANGE IN SYLLABUS")):
+            _write(t.rows[0].cells[i], h, bold=True, size=9.5)
+            for run in t.rows[0].cells[i].paragraphs[0].runs:
+                run.underline = True
+            _shade(t.rows[0].cells[i], ORANGE)
+        for n, (c, avg) in enumerate([x for x in pairs if _num(x[0].get("semester")) == sem], 1):
+            cells = t.add_row().cells
+            mark = YELLOW if (avg or 0) > THRESHOLD else GREY
+            for i, v in enumerate((str(n), c.get("course_code") or "", str(c.get("course_title") or "").upper(),
+                                   _pct(avg))):
+                _write(cells[i], v, bold=True, size=9.5)
+                _shade(cells[i], mark)
+        _widths(t, [width * x for x in (0.06, 0.18, 0.52, 0.18)])
+
+    # --- module-wise, course by course
+    _page_break(doc)
+    _orange_band(doc, "PERCENTAGE OF CHANGE IN SYLLABUS – MODULE-WISE FOR ALL COURSES", width * 0.72)
+    for sem in sems:
+        _sem_heading(doc, sem)
+        t = doc.add_table(rows=1, cols=2)
+        _borders(t)
+        t.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _write(t.rows[0].cells[0], "NAME OF THE PROGRAMME :", bold=True, size=10)
+        t.rows[0].cells[0].paragraphs[0].runs[0].underline = True
+        _write(t.rows[0].cells[1], name, bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _widths(t, [width * 0.2, width * 0.22])
+        for c, avg in [x for x in pairs if _num(x[0].get("semester")) == sem]:
+            doc.add_paragraph()
+            t = doc.add_table(rows=1, cols=4)
+            _borders(t)
+            t.alignment = WD_TABLE_ALIGNMENT.CENTER
+            for i, h in enumerate(("", "YEAR OF PREVIOUS REVISION IN A SUBJECT / COURSE",
+                                   "YEAR OF LATEST REVISION OF A SUBJECT / COURSE", "PERCENTAGE OF CHANGE")):
+                _write(t.rows[0].cells[i], h, bold=True, size=9.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+                for run in t.rows[0].cells[i].paragraphs[0].runs:
+                    run.underline = True
+                _shade(t.rows[0].cells[i], ORANGE)
+            for label, prev, new in (("YEAR", c.get("year_previous") or "—", c.get("year_latest") or rev_year),
+                                     ("SUBJECT / COURSE TITLE", (c.get("prev_title") or "—").upper(),
+                                      str(c.get("course_title") or "").upper()),
+                                     ("SUBJECT CODE", c.get("prev_code") or "—", c.get("course_code") or "")):
+                cells = t.add_row().cells
+                _write(cells[0], label, bold=True, size=9.5)
+                cells[0].paragraphs[0].runs[0].underline = True
+                _write(cells[1], prev, bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+                _write(cells[2], new, bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+            for n, m in enumerate([m for m in c.get("modules") or [] if isinstance(m, dict)], 1):
+                cells = t.add_row().cells
+                pct = _num(m.get("pct"))
+                _write(cells[0], f"Module {ROMAN[n - 1] if n <= 10 else n}", size=9.5,
+                       align=WD_ALIGN_PARAGRAPH.CENTER)
+                _write(cells[1], m.get("previous") or "", size=9, align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+                _write(cells[2], m.get("revised") or "", size=9, align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+                _write(cells[3], _pct(pct), size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+                if str(m.get("revised") or "").strip() and (pct or 0) > 0:
+                    _shade(cells[2], YELLOW)
+            cells = t.add_row().cells
+            _write(cells[0], "AVERAGE PERCENTAGE ON REVISION CONSIDERING ALL MODULES", bold=True, size=9.5)
+            _write(cells[3], _pct(avg), bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+            _shade(cells[3], YELLOW if (avg or 0) > THRESHOLD else GREY)
+            _widths(t, [width * x for x in (0.16, 0.34, 0.34, 0.12)])
+
+    doc.core_properties.title = _title(f"{name} — Course Revision {rev_year}")
     return _save(doc)
 
 

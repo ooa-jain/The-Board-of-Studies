@@ -181,7 +181,8 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
             # the programme's Curriculum and Syllabus, generated in the
             # Office's own templates, right after the programme
             for label, url in (("Curriculum (JAIN template)", p.get("curriculum_doc")),
-                                ("Syllabus (JAIN template)", p.get("syllabus_doc"))):
+                                ("Syllabus (JAIN template)", p.get("syllabus_doc")),
+                                ("Course Revision (JAIN template)", p.get("revision_doc"))):
                 if not url:
                     continue
                 ws.cell(row=r, column=2, value=f"   {label}").font = Font(size=9, bold=True,
@@ -676,7 +677,8 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
             para.add_run("\n" + " · ".join(f"{x['title']}: {status_word(x['status'])}"
                                             for x in p["parts"])).font.size = Pt(9)
             for label, url in (("Curriculum (JAIN template)", p.get("curriculum_doc")),
-                                ("Syllabus (JAIN template)", p.get("syllabus_doc"))):
+                                ("Syllabus (JAIN template)", p.get("syllabus_doc")),
+                                ("Course Revision (JAIN template)", p.get("revision_doc"))):
                 if url:
                     d = doc.add_paragraph()
                     d.paragraph_format.left_indent = Pt(24)
