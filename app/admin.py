@@ -889,6 +889,56 @@ def programme_report(dept_code, programme_code):
     return render_template("admin/programme_report.html", **ctx)
 
 
+@bp.route("/export/<dept_code>/preview/<kind>")
+@admin_required
+def export_preview(dept_code, kind):
+    """The Excel or Word download, shown in a browser tab: every sheet as a
+    tab of its own, with the download beside it."""
+    from .share import _docx_blocks, _xlsx_sheets
+    dept = get_db().departments.find_one({"dept_code": dept_code}) or abort(404)
+    links = ShareLinks(dept_code, _year())
+    if kind == "xlsx":
+        buf, body = department_excel(dept_code, _year(), links), None
+        body = _xlsx_sheets(buf, max_rows=3000, max_cols=12)
+        name, url = f"BoS-{dept_code}-{_year()}.xlsx", url_for("admin.export_department", dept_code=dept_code)
+    elif kind == "docx":
+        buf = submission_word(dept_code, _year(), links)
+        body = _docx_blocks(buf)
+        name, url = f"BoS-Report-{dept_code}-{_year()}.docx", url_for("admin.export_department_word",
+                                                                      dept_code=dept_code)
+    else:
+        abort(404)
+    rec = {"original_name": name, "dept_code": dept_code, "academic_year": _year(),
+           "size": len(buf.getvalue())}
+    return render_template("share/doc.html", rec=rec, dept=dept, kind=kind, body=body,
+                           file_url=url, download_url=url, hide_chrome=True)
+
+
+@bp.post("/departments/<dept_code>/wipe")
+@admin_required
+def wipe_department(dept_code):
+    """Delete everything the department has entered and uploaded — every year,
+    every stage, every file — keeping the department and its login."""
+    import shutil
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
+        flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
+        return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+    counts = {}
+    for col in ("submissions", "files", "comments", "notifications", "versions"):
+        counts[col] = db[col].delete_many({"dept_code": dept_code}).deleted_count
+    root = current_app.config["UPLOAD_ROOT"]
+    for year_dir in (root.iterdir() if root.is_dir() else []):
+        folder = year_dir / dept_code
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+    audit(_actor(), "department.wiped", dept_code, counts)
+    flash(f"All of {dept['dept_name']}'s data is deleted: {counts['submissions']} record(s), "
+          f"{counts['files']} file(s). The department and its login are kept.", "success")
+    return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+
+
 @bp.route("/report/<dept_code>/<programme_code>/<kind>.docx")
 @admin_required
 def programme_docx(dept_code, programme_code, kind):

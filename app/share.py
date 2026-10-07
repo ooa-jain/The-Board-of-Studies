@@ -155,7 +155,7 @@ def _docx_blocks(path, limit=4000):
     from docx.table import Table
     from docx.text.paragraph import Paragraph
     try:
-        doc = Document(str(path))
+        doc = Document(path if hasattr(path, "read") else str(path))
     except Exception:
         return None
     out = []
@@ -187,7 +187,7 @@ def _docx_blocks(path, limit=4000):
 def _xlsx_sheets(path, max_rows=600, max_cols=40):
     from openpyxl import load_workbook
     try:
-        wb = load_workbook(str(path), read_only=True, data_only=True)
+        wb = load_workbook(path if hasattr(path, "read") else str(path), read_only=True, data_only=True)
     except Exception:
         return None
     sheets = []

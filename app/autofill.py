@@ -224,7 +224,32 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
     for k, v in list(profile.items()):
         if v in (None, ""):
             del profile[k]
+    if not [m for m in data.get("minors") or [] if isinstance(m, dict)]:
+        data["minors"] = _minors(data["semester_structure"], ug)
     return data
+
+
+MINOR_STREAMS = [("Data Analytics", ["Introduction to Data Analytics", "Statistics for Data Science",
+                                     "Data Visualisation", "Predictive Analytics"]),
+                 ("Cyber Security", ["Foundations of Cyber Security", "Network Security",
+                                     "Ethical Hacking", "Digital Forensics"])]
+
+
+def _minors(structure, ug):
+    """Annexure I: the minor streams a student can take, from the structure's
+    minor courses where it has them."""
+    picked = [r for r in structure if r.get("nep_category") == ("Minor Stream" if ug
+                                                                else "Discipline Specific Elective (DSE)")]
+    if picked:
+        stream = "Minor stream" if ug else "Discipline electives (Honours basket)"
+        return [{"minor_title": stream, "semester": r.get("semester"), "course_code": r.get("course_code"),
+                 "course_title": r.get("course_title"), "credits": r.get("credits")} for r in picked]
+    out = []
+    for n, (stream, titles) in enumerate(MINOR_STREAMS, 1):
+        for i, t in enumerate(titles, 1):
+            out.append({"minor_title": stream, "semester": i + 2, "course_code": f"26MN{n}{i + 2}{i:02d}",
+                        "course_title": t, "credits": 4})
+    return out
 
 
 def _syllabus(sub, programme, stored, year):
@@ -277,6 +302,17 @@ def _revision(sub, programme, stored, year):
         r = dict(r)
         if not [m for m in r.get("modules") or [] if str((m or {}).get("revised") or "").strip()]:
             r["modules"] = _module_rows(r.get("course_title") or "the course")
+        mods = []
+        for m in r["modules"]:
+            m = dict(m or {})
+            if m.get("pct") in (None, "") and str(m.get("revised") or "").strip():
+                # no earlier syllabus of the course: all of it is new
+                m["pct"] = 100 if not str(m.get("previous") or "").strip() else 0
+            mods.append(m)
+        r["modules"] = mods
+        pcts = [float(m["pct"]) for m in mods if m.get("pct") not in (None, "")]
+        if pcts and r.get("avg_change") in (None, ""):
+            r["avg_change"] = round(sum(pcts) / len(pcts), 2)
         r.setdefault("year_latest", year[:4])
         out.append(r)
     data["courses"] = out

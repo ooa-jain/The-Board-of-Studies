@@ -402,9 +402,21 @@ def _programme_hub(stage_def, programmes, sub, dept):
             p["parts"].append(dict(_part_item(sub, p["programme_code"], k, cfg),
                                    errors=(st.get("summary") or {}).get("errors", 0),
                                    note=st.get("returned_note")))
+        # the parts that count: the current batch (earlier batches are optional records)
+        counted = [x for x in p["parts"] if not x["optional"]]
+        p["done"] = sum(1 for x in counted if x["status"] == "submitted")
+        p["total"] = len(counted)
+        p["state"] = ("done" if p["done"] == p["total"] else
+                      "returned" if any(x["status"] == "returned" for x in counted) else
+                      "progress" if any(x["status"] in ("draft", "submitted") for x in counted) else "new")
+        p["filled"] = sum(1 for x in counted if x["status"] in ("draft", "submitted"))
+        p["url"] = url_for("dept.stage", stage_key=counted[0]["key"], programme_code=p["programme_code"])
         groups.setdefault("PG" if p["level"] in ("PG", "PGD") else "UG", []).append(p)
     board = stage_board(sub)
-    return render_template("dept/choose_programme.html", stage=stage_def, groups=groups,
+    level = request.args.get("level", "").upper()
+    if level not in groups:
+        level = "UG" if "UG" in groups else "PG"
+    return render_template("dept/choose_programme.html", stage=stage_def, groups=groups, level=level,
                            submission=sub, dept=dept, board=board,
                            groups_board=grouped_board(board),
                            status=compute_status(sub, stage_def["key"]))

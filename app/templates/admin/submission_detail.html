@@ -20,8 +20,13 @@
         <span class="bar-label">{{ progress.done }} / {{ progress.total }}</span>
       </div>
       <div class="flex mt-1" style="justify-content:flex-end">
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Excel</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
+        {# downloads the file and opens a preview of it in another tab #}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}"
+           data-preview="{{ url_for('admin.export_preview', dept_code=dept.dept_code, kind='xlsx') }}">Excel</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}"
+           data-preview="{{ url_for('admin.export_preview', dept_code=dept.dept_code, kind='docx') }}">Word</a>
+        <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener"
+           href="{{ url_for('admin.export_preview', dept_code=dept.dept_code, kind='xlsx') }}">Preview</a>
       </div>
     </div>
   </div>
@@ -243,6 +248,19 @@
 </div>
 {% endfor %}
 {% endif %}
+
+<details class="card danger-zone mt-2">
+  <summary>Delete all of this department's data</summary>
+  <div class="card-body">
+    <p class="small">Every stage, programme part, uploaded file, comment and update of
+      <strong>{{ dept.dept_name }}</strong>, in every academic year, is deleted for good. The department
+      and its login stay, so it can start again.</p>
+    <form method="post" action="{{ url_for('admin.wipe_department', dept_code=dept.dept_code) }}" class="flex">
+      <input name="confirm" placeholder="Type {{ dept.dept_code }} to confirm" autocomplete="off" required>
+      <button class="btn btn-danger btn-sm">Delete all data</button>
+    </form>
+  </div>
+</details>
 {% endblock %}
 
 {% block scripts %}
@@ -250,6 +268,11 @@
 <script src="{{ url_for('static', filename='js/review.js') }}"></script>
 <script src="{{ url_for('static', filename='js/admin-review.js') }}"></script>
 <script>
+  // Excel / Word: the file downloads here, and its preview opens in another tab
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("a[data-preview]");
+    if (a && !e.ctrlKey && !e.metaKey) window.open(a.dataset.preview, "_blank", "noopener");
+  });
   document.addEventListener("click", function (e) {
     var b = e.target.closest("[data-summary]");
     if (!b) return;

@@ -271,6 +271,10 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                 "course_specialisation": programme["programme_name"],
             },
             "semester_structure": courses,
+            # Annexure I: the minor stream's courses, as the structure has them
+            "minors": [{"minor_title": "Marketing", "semester": c["semester"], "course_code": c["course_code"],
+                        "course_title": c["course_title"], "credits": c["credits"]}
+                       for c in courses if c["nep_category"] == "Minor Stream"],
             **({"curriculum_file": {"document": files["prog_curriculum.document"]}}
                if "prog_curriculum.document" in files else {}),
         }

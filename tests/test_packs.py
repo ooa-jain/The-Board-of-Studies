@@ -259,7 +259,7 @@ def test_the_drive_strip_shows_the_departments_login(app, client):
 
 # ---------------------------------------------------------------- the single-sheet report
 
-def test_department_excel_is_one_sheet_with_ticks_and_links(app, client):
+def test_department_excel_report_sheet_has_ticks_and_links(app, client):
     import io
 
     from openpyxl import load_workbook
@@ -268,7 +268,7 @@ def test_department_excel_is_one_sheet_with_ticks_and_links(app, client):
     _admin(app, client)
     r = client.get(f"/admin/export/{code}.xlsx")
     wb = load_workbook(io.BytesIO(r.data))
-    assert wb.sheetnames == ["Report"]
+    assert wb.sheetnames == ["Report", "Programmes", "Course Revision"]
     ws = wb["Report"]
     cells = [c for row in ws.iter_rows() for c in row if c.value is not None]
     text = " ".join(str(c.value) for c in cells)
@@ -471,3 +471,51 @@ def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloa
     stages = text.split("Stages")[1].split("Department Information —")[0]
     assert stages.count("✓ Submitted") >= 4                       # every stage in
     assert "Open →" in text and "Curriculum (JAIN template)" in text
+
+
+
+def test_the_excel_has_programmes_with_annexure_and_the_revision_template(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    office = app.test_client()
+    _admin(app, office)
+    wb = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))
+    progs = " ".join(str(c.value) for row in wb["Programmes"].iter_rows() for c in row if c.value)
+    assert "Programme Structure" in progs and "25MCAC101" in progs
+    assert "Minor / Honours — Annexure I" in progs and "No minors entered." not in progs
+    rev = " ".join(str(c.value) for row in wb["Course Revision"].iter_rows() for c in row if c.value)
+    for words in ("Percentage of change in syllabus revision for", "(A)", "(D)",
+                  "course-wise, by semester", "module-wise for all courses",
+                  "Average percentage on revision considering all modules"):
+        assert words in rev
+    page = office.get(f"/admin/export/{code}/preview/xlsx").get_data(as_text=True)
+    assert "Course Revision" in page and "Programmes" in page and "Download" in page
+    assert office.get(f"/admin/export/{code}/preview/docx").status_code == 200
+
+
+def test_the_curriculum_page_has_ug_and_pg_tabs(app, client):
+    _signed_in_department(app, client)
+    page = client.get("/department/stage/curriculum?level=PG").get_data(as_text=True)
+    assert "UG programmes" in page and "PG programmes" in page
+    assert "MCAREG" in page and "BCAGAI" not in page.split('class="prog-list"')[1].split("add-prog-strip")[0]
+    assert "Yet to start" in page or "In progress" in page
+
+
+def test_the_office_can_delete_all_of_a_departments_data(app, client):
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    office = app.test_client()
+    _admin(app, office)
+    office.post(f"/admin/departments/{code}/wipe", data={"confirm": "nope"})
+    assert _sub(app, code)                                         # not without the code typed
+    r = office.post(f"/admin/departments/{code}/wipe", data={"confirm": code}, follow_redirects=True)
+    assert "data is deleted" in r.get_data(as_text=True)
+    sub = _sub(app, code) or {}                                   # an empty record, ready to start again
+    assert not sub.get("stages") and not sub.get("programmes")
+    from app.db import get_db
+    with app.app_context():
+        assert not get_db().files.count_documents({"dept_code": code})
+        assert get_db().departments.find_one({"dept_code": code})  # the department stays

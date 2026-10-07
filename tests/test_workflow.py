@@ -363,12 +363,14 @@ def test_bos_documents_needs_every_upload_but_the_new_programme_feedback(app, cl
 def test_curriculum_lists_the_programmes_kept_under_ug_and_pg(app, client):
     _through_bos_documents(app, client)
     page = client.get("/department/stage/curriculum").get_data(as_text=True)
+    # two tabs, UG open first; a line per programme that opens it
     assert "UG programmes" in page and "PG programmes" in page
-    assert "Bachelor of Commerce" in page and "Master of Commerce" in page
+    assert "Bachelor of Commerce" in page and "Master of Commerce" not in page
+    assert "/department/stage/prog_curriculum/BCMREG" in page
+    pg = client.get("/department/stage/curriculum?level=PG").get_data(as_text=True)
+    assert "Master of Commerce" in pg and "Bachelor of Commerce" not in pg
     # the programme removed in Department Information is not offered
-    assert "BCHCOF" not in page
-    for part in ("prog_curriculum", "prog_syllabus", "prog_revision"):
-        assert f"/department/stage/{part}/BCMREG" in page
+    assert "BCHCOF" not in page and "BCHCOF" not in pg
 
 
 def _stage_data(body):

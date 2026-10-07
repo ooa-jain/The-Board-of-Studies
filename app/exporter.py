@@ -193,10 +193,300 @@ def department_excel(dept_code: str, year: str, links=None) -> io.BytesIO:
                 _link(ws.cell(row=r, column=3), name, url)
                 r += 1
 
+    _programmes_sheet(wb, rep)
+    _revision_sheet(wb, rep)
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+# ---------------------------------------------------------------------------
+# the programmes, sheet by sheet: structure, Annexure I, syllabus; revision
+# ---------------------------------------------------------------------------
+
+ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+BAND = PatternFill("solid", fgColor="E8EEF6")
+GREEN = PatternFill("solid", fgColor="C6E0B4")
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def average_change(modules):
+    """A course's revision, the mean of its modules' % change (as the form works it out)."""
+    v = [_num(m.get("pct")) for m in modules or []
+         if isinstance(m, dict) and str(m.get("revised") or "").strip()]
+    v = [x for x in v if x is not None]
+    return round(sum(v) / len(v), 2) if v else None
+
+
+def revision_summary(courses, threshold=20):
+    """(A)–(D), as the Course Revision form shows them."""
+    rows = [c for c in courses if c.get("course_code")]
+    avgs = [_num(c.get("avg_change")) if _num(c.get("avg_change")) is not None
+            else average_change(c.get("modules")) for c in rows]
+    a = len(rows)
+    b = sum(1 for x in avgs if (x or 0) > threshold)
+    known = [x for x in avgs if x is not None]
+    return {"A": a, "B": b, "C": round(b / a * 100, 2) if a else 0,
+            "D": round(sum(known) / len(known), 2) if known else None, "avgs": avgs, "rows": rows}
+
+
+def _put(ws, r, values, bold=False, fill=None, wrap=False, font=None):
+    for i, v in enumerate(values, start=1):
+        c = ws.cell(row=r, column=i, value=v)
+        c.border = BORDER
+        c.alignment = Alignment(vertical="top", wrap_text=wrap or isinstance(v, str) and len(v) > 30)
+        if bold or font:
+            c.font = font or Font(bold=True, size=10)
+        if fill:
+            c.fill = fill
+
+
+def _band(ws, r, text, width, fill=BAND, color=NAVY):
+    ws.cell(row=r, column=1, value=text).font = Font(bold=True, size=10, color=color)
+    for col in range(1, width + 1):
+        ws.cell(row=r, column=col).fill = fill
+        ws.cell(row=r, column=col).border = BORDER
+
+
+def _programme_list(rep):
+    return rep["programmes"]["UG"] + rep["programmes"]["PG"]
+
+
+def _programmes_sheet(wb, rep):
+    from .report import programme_context
+    ws = wb.create_sheet("Programmes")
+    ws.sheet_view.showGridLines = False
+    for col, w in zip("ABCDEFGHIJK", (14, 44, 22, 6, 6, 6, 6, 9, 9, 9, 9)):
+        ws.column_dimensions[col].width = w
+    ws["A1"] = f"Programmes — {rep['dept'].get('dept_name', '')} · {rep['year']}"
+    ws["A1"].font = Font(bold=True, size=14, color=NAVY)
+    ws["A2"] = "Each programme's structure, its minors (Annexure I) and its syllabus, as entered."
+    ws["A2"].font = Font(size=10, color="53627A")
+    r = 4
+    db = get_db()
+    for p in _programme_list(rep):
+        ctx = programme_context(db, rep["dept"], rep["year"], p["programme_code"], _NoLinks())
+        if not ctx:
+            continue
+        _section_title(ws, r, f"{p['programme_code']} — {p['programme_name']}", width=11)
+        r += 1
+        ws.cell(row=r, column=1, value=" · ".join(x for x in (p.get("degree_level"), p.get("specialisation"),
+                                                              f"batch {p['batch']}" if p.get("batch") else "")
+                                                   if x)).font = Font(italic=True, size=9, color="53627A")
+        r += 2
+        # structure
+        ws.cell(row=r, column=1, value="Programme Structure").font = Font(bold=True, size=11, color=NAVY)
+        r += 1
+        if ctx["semesters"]:
+            _put(ws, r, ["Course code", "Course title", "Course group", "L", "T", "P", "E", "Credits",
+                         "CA marks", "TEE marks", "Total"], bold=True, fill=GREEN)
+            r += 1
+            total = 0
+            for sem, rows in ctx["semesters"]:
+                sem_cr = sum(_num(x.get("credits")) or 0 for x in rows)
+                total += sem_cr
+                _band(ws, r, f"Semester {sem}  ·  {sem_cr:g} credits", 11)
+                r += 1
+                for x in rows:
+                    _put(ws, r, [x.get("course_code"), x.get("course_title"), x.get("nep_category"),
+                                 x.get("l"), x.get("t"), x.get("p"), x.get("e"), x.get("credits"),
+                                 x.get("cia"), x.get("ese"), x.get("total_marks")])
+                    r += 1
+            _put(ws, r, ["Total", "", "", "", "", "", "", total, "", "", ""], bold=True)
+            r += 1
+        else:
+            ws.cell(row=r, column=1, value="Not entered yet.").font = Font(italic=True, color="7A8699")
+            r += 1
+        # Annexure I
+        r += 1
+        ws.cell(row=r, column=1, value="Minor / Honours — Annexure I").font = Font(bold=True, size=11, color=NAVY)
+        r += 1
+        if ctx["minors"]:
+            _put(ws, r, ["Course code", "Course title", "Minor stream", "Sem", "", "", "", "Credits"],
+                 bold=True, fill=GREEN)
+            r += 1
+            for m in ctx["minors"]:
+                _put(ws, r, [m.get("course_code"), m.get("course_title"), m.get("minor_title"),
+                             m.get("semester"), "", "", "", m.get("credits")])
+                r += 1
+        else:
+            ws.cell(row=r, column=1, value="No minors entered.").font = Font(italic=True, color="7A8699")
+            r += 1
+        # syllabus
+        r += 1
+        ws.cell(row=r, column=1, value="Syllabus").font = Font(bold=True, size=11, color=NAVY)
+        r += 1
+        if ctx["syllabus"]:
+            _put(ws, r, ["Course code", "Course title", "Modules (hours)", "Sem", "", "", "",
+                         "Credits", "Hrs/week", "Total hrs", ""], bold=True, fill=GREEN)
+            r += 1
+            for c in ctx["syllabus"]:
+                mods = "; ".join(f"{m.get('title') or ''} ({m.get('hours') or '—'})"
+                                 for m in c.get("modules") or [] if isinstance(m, dict))
+                _put(ws, r, [c.get("course_code"), c.get("course_title"), mods, c.get("semester"), "", "", "",
+                             c.get("credits"), c.get("hours_per_week"), c.get("teaching_hours"), ""], wrap=True)
+                r += 1
+        else:
+            ws.cell(row=r, column=1, value="Not entered yet.").font = Font(italic=True, color="7A8699")
+            r += 1
+        r += 2
+    ws.freeze_panes = "A4"
+
+
+def _revision_sheet(wb, rep):
+    """Course Revision in the revision document's own layout: who and when,
+    (A)–(D), course-wise % change by semester, then module-wise per course."""
+    from .report import programme_context
+    ws = wb.create_sheet("Course Revision")
+    ws.sheet_view.showGridLines = False
+    for col, w in zip("ABCD", (8, 60, 60, 16)):
+        ws.column_dimensions[col].width = w
+    ws["A1"] = f"Course Revision — {rep['dept'].get('dept_name', '')} · {rep['year']}"
+    ws["A1"].font = Font(bold=True, size=14, color=NAVY)
+    r = 3
+    db = get_db()
+    for p in _programme_list(rep):
+        ctx = programme_context(db, rep["dept"], rep["year"], p["programme_code"], _NoLinks())
+        if not ctx:
+            continue
+        courses = [c for c in ctx["revision"] if isinstance(c, dict)]
+        _section_title(ws, r, "Percentage of change in syllabus revision for", width=4)
+        r += 1
+        year = next((c.get("year_latest") for c in courses if c.get("year_latest")), "")
+        for label, v in (("Name of the programme", p["programme_name"]), ("Programme code", p["programme_code"]),
+                         ("Name of the department", rep["dept"].get("dept_name")), ("Year of revision", year)):
+            _put(ws, r, ["", label, v, ""])
+            ws.cell(row=r, column=2).font = Font(bold=True, size=10)
+            r += 1
+        if not courses:
+            ws.cell(row=r, column=2, value="No revision entered yet.").font = Font(italic=True, color="7A8699")
+            r += 3
+            continue
+        s = revision_summary(courses)
+        r += 1
+        for k, label, v in (("(A)", "Total number of courses", s["A"]),
+                            ("(B)", "Number of courses with syllabus revision above 20%", s["B"]),
+                            ("(C)", "Percentage of courses revised — (B / A) × 100", s["C"]),
+                            ("(D)", "Average percentage of syllabus revised, across all courses",
+                             "—" if s["D"] is None else f"{s['D']:g}%")):
+            _put(ws, r, [k, label, "", v], bold=False)
+            ws.cell(row=r, column=4).font = Font(bold=True, size=10)
+            r += 1
+        r += 1
+        ws.cell(row=r, column=1, value="Percentage of change in syllabus — course-wise, by semester").font = \
+            Font(bold=True, size=11, color=NAVY)
+        r += 1
+        _put(ws, r, ["SL", "Course code", "Course title", "% change"], bold=True, fill=GREEN)
+        r += 1
+        pairs = list(zip(s["rows"], s["avgs"]))
+        sems = sorted({_num(c.get("semester")) for c, _ in pairs}, key=lambda x: (x is None, x or 0))
+        for sem in sems:
+            _band(ws, r, f"Semester {ROMAN[int(sem) - 1] if sem and 0 < sem <= 10 else sem or '—'}", 4)
+            r += 1
+            for i, (c, avg) in enumerate([x for x in pairs if _num(x[0].get("semester")) == sem], 1):
+                _put(ws, r, [i, c.get("course_code"), c.get("course_title"), "—" if avg is None else f"{avg:g}%"])
+                r += 1
+        r += 1
+        ws.cell(row=r, column=1, value="Percentage of change in syllabus — module-wise for all courses").font = \
+            Font(bold=True, size=11, color=NAVY)
+        r += 1
+        for c, avg in pairs:
+            _band(ws, r, f"{c.get('course_code')} — {c.get('course_title')}", 4, fill=GREEN, color="1A1A1A")
+            r += 1
+            _put(ws, r, ["Module", f"Previous syllabus {c.get('year_previous') or ''}".strip(),
+                         f"Revised syllabus {c.get('year_latest') or ''}".strip(), "% change"], bold=True)
+            r += 1
+            for n, m in enumerate([m for m in c.get("modules") or [] if isinstance(m, dict)], 1):
+                pct = _num(m.get("pct"))
+                _put(ws, r, [n, m.get("previous") or "—", m.get("revised") or "",
+                             "—" if pct is None else f"{pct:g}%"], wrap=True)
+                r += 1
+            _put(ws, r, ["", "Average percentage on revision considering all modules", "",
+                         "—" if avg is None else f"{avg:g}%"], bold=True)
+            r += 2
+        r += 1
+
+
+def _word_table(doc, head, rows, widths=None):
+    t = doc.add_table(rows=1, cols=len(head))
+    t.style = "Table Grid"
+    for i, h in enumerate(head):
+        t.rows[0].cells[i].text = h
+        for r in t.rows[0].cells[i].paragraphs[0].runs:
+            r.bold = True
+    for row in rows:
+        cells = t.add_row().cells
+        for i, v in enumerate(row):
+            cells[i].text = "" if v is None else str(v)
+    for row in t.rows:
+        for c in row.cells:
+            for p in c.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(8.5)
+    return t
+
+
+def _word_programmes(doc, rep):
+    """Each programme's structure, Annexure I and Course Revision summary."""
+    from .report import programme_context
+    db = get_db()
+    for p in _programme_list(rep):
+        ctx = programme_context(db, rep["dept"], rep["year"], p["programme_code"], _NoLinks())
+        if not ctx:
+            continue
+        doc.add_page_break()
+        doc.add_heading(f"{p['programme_code']} — {p['programme_name']}", level=1)
+        doc.add_heading("Programme structure", level=2)
+        rows = []
+        for sem, rs in ctx["semesters"]:
+            rows.append((f"Semester {sem}", "", "", f"{sum(_num(x.get('credits')) or 0 for x in rs):g}"))
+            rows += [(x.get("course_code"), x.get("course_title"), x.get("nep_category"), x.get("credits"))
+                     for x in rs]
+        if rows:
+            _word_table(doc, ("Course code", "Course title", "Course group", "Credits"), rows)
+        else:
+            doc.add_paragraph().add_run("Not entered yet.").italic = True
+        doc.add_heading("Minor / Honours — Annexure I", level=2)
+        if ctx["minors"]:
+            _word_table(doc, ("Minor stream", "Sem", "Course code", "Course title", "Credits"),
+                        [(m.get("minor_title"), m.get("semester"), m.get("course_code"), m.get("course_title"),
+                          m.get("credits")) for m in ctx["minors"]])
+        else:
+            doc.add_paragraph().add_run("No minors entered.").italic = True
+        doc.add_heading("Course Revision", level=2)
+        courses = [c for c in ctx["revision"] if isinstance(c, dict)]
+        if courses:
+            s = revision_summary(courses)
+            _word_table(doc, ("", "Summary", "Value"), [
+                ("(A)", "Total number of courses", s["A"]),
+                ("(B)", "Number of courses with syllabus revision above 20%", s["B"]),
+                ("(C)", "Percentage of courses revised — (B / A) × 100", s["C"]),
+                ("(D)", "Average percentage of syllabus revised", "—" if s["D"] is None else f"{s['D']:g}%")])
+            doc.add_paragraph()
+            _word_table(doc, ("Sem", "Course code", "Course title", "% change"),
+                        [(c.get("semester"), c.get("course_code"), c.get("course_title"),
+                          "—" if a is None else f"{a:g}%") for c, a in zip(s["rows"], s["avgs"])])
+        else:
+            doc.add_paragraph().add_run("No revision entered yet.").italic = True
+
+
+class _NoLinks:
+    def file(self, stage, value):
+        return None
+
+    def programme(self, code):
+        return None
+
+    def generated(self, kind, code):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -397,6 +687,8 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
                 d.paragraph_format.left_indent = Pt(24)
                 d.add_run(f"{where} document: ").font.size = Pt(9)
                 _hyperlink(d, name, url)
+
+    _word_programmes(doc, rep)
 
     buf = io.BytesIO()
     doc.save(buf)
