@@ -182,7 +182,20 @@ def dashboard():
             (f" · {c['programme_code']}" if c.get("programme_code") else "")
     from .autofill import pack_for
     drive = pack_for(get_db(), dept)
+    # each programme's steps as a row of dots
+    prog_rows, prog_heads = [], []
+    for p in programmes_of(sub, dept):
+        steps = _programme_steps(sub, p["programme_code"])
+        prog_heads = prog_heads or [st["label"].replace("Existing Batch ", "").replace("Current Batch ", "Current ")
+                                    for st in steps]
+        # an earlier batch not begun is optional, not overdue
+        shown = [{**st, "status": "optional" if st["optional"] and st["status"] == "open" else st["status"]}
+                 for st in steps]
+        prog_rows.append({"code": p["programme_code"], "name": p["programme_name"], "level": p.get("level") or "",
+                          "steps": shown, "url": steps[0]["url"] if steps else "#",
+                          "done": all(st["status"] == "submitted" for st in steps if not st["optional"])})
     return render_template("dept/dashboard.html", dept=dept, submission=sub, open_comments=open_comments,
+                           prog_rows=prog_rows, prog_heads=prog_heads,
                            drive=drive and {"title": drive["title"],
                                             "folder": (drive.get("source") or {}).get("folder"),
                                             "done": bool(sub.get("autofilled"))},

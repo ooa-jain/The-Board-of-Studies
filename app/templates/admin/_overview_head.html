@@ -12,7 +12,6 @@
     <div>
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Overview</div>
       <h1>Overview — {{ year }}</h1>
-      <p>Every department: where it stands, what it filed, what is wrong, and what you asked to change.</p>
 {% if batch_info %}
 <div class="batch-strip">
   <span class="bs-label">Current batch</span><span class="batch-tag is-current">{{ batch_info.current }}</span>

@@ -48,54 +48,17 @@
     <div class="hero-split">
       <div>
         <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
-        <h1 class="hero-display">
-          Board of Studies<br><em>Academic Record</em>
-          <span class="hero-tagline">One Submission. One Record.</span>
-        </h1>
-        <p class="hero-lede">Four structured stages. One consolidated academic record.
-          Validated as you submit.</p>
-
-        <div class="frame frame-navy frame-stories">
-          <h3 class="frame-tab">Portal Workflow</h3>
-          <div class="story-list">
-            <div class="story-item">
-              <span class="story-num frame-num">01</span>
-              <span>
-                <span class="story-kicker">Structured Workflow</span>
-                <span class="story-line">Fill the stages in any order</span>
-                <span class="story-detail">Every stage is open from the start, and is submitted once
-                  everything in it is complete.</span>
-              </span>
-            </div>
-            <div class="story-item">
-              <span class="story-num frame-num">02</span>
-              <span>
-                <span class="story-kicker">Real-Time Validation</span>
-                <span class="story-line">Information is validated during submission</span>
-                <span class="story-detail">Required fields and academic data are checked as you
-                  enter information.</span>
-              </span>
-            </div>
-            <div class="story-item">
-              <span class="story-num frame-num">03</span>
-              <span>
-                <span class="story-kicker">Document Submission</span>
-                <span class="story-line">Upload approved BoS documentation</span>
-                <span class="story-detail">Submit the required Board of Studies composition and
-                  supporting documents securely.</span>
-              </span>
-            </div>
-            <div class="story-item">
-              <span class="story-num frame-num">04</span>
-              <span>
-                <span class="story-kicker">Department-Based Access</span>
-                <span class="story-line">Access is assigned to the department</span>
-                <span class="story-detail">The portal account is linked to the department rather
-                  than an individual user.</span>
-              </span>
-            </div>
-          </div>
-        </div>
+        <h1 class="hero-display erp-title">Board of Studies Portal</h1>
+        <p class="hero-lede">Department submissions for the academic year, in four stages.</p>
+        <table class="erp-table erp-stages">
+          <thead><tr><th>Stage</th><th>What is filed</th></tr></thead>
+          <tbody>
+            <tr><td>Level 0</td><td>Department information and programmes</td></tr>
+            <tr><td>Stage 1</td><td>Pre-BoS — DIAC, DPAC, minutes</td></tr>
+            <tr><td>Stage 2</td><td>BoS documents — composition, minutes, attendance, feedback</td></tr>
+            <tr><td>Stage 3</td><td>Curriculum, syllabus and course revision per programme</td></tr>
+          </tbody>
+        </table>
       </div>
 
       {% if resume %}
@@ -240,42 +203,11 @@
         </form>
 
         <p class="signin-note">
-          Your username is your department, its school and a number. If you do not have one,
-          or the password no longer works, write to the Office of Academics and a new one
-          will be issued. <a href="{{ url_for('public.about') }}">What happens after you sign in</a>
+          No login, or it stopped working? Write to the Office of Academics.
+          <a href="{{ url_for('public.about') }}">Help</a>
         </p>
       </aside>
       {% endif %}
-    </div>
-  </div>
-</section>
-
-{# ----------------------------------------------------------------- how ---#}
-<section class="section section-dark" id="how">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Behind the scenes</span>
-      <h2>How a submission moves</h2>
-      <p>Each stage unlocks the next. Nothing is accepted until it passes.</p>
-      <div class="band-art">{{ art.flow() }}</div>
-    </div>
-    <div class="flow">
-      <div>
-        <h4>Level 0 · Department Information</h4>
-        <p>Confirm the department record and the programmes mapped to it.</p>
-      </div>
-      <div>
-        <h4>Stage 1 · Pre-BoS</h4>
-        <p>Upload the signed DIAC and DPAC compositions.</p>
-      </div>
-      <div>
-        <h4>Stage 2 · BoS Documents</h4>
-        <p>BoS composition, minutes, photographs, attendance and stakeholder feedback.</p>
-      </div>
-      <div>
-        <h4>Stage 3 · Curriculum</h4>
-        <p>Curriculum, syllabus and course revision for every UG and PG programme.</p>
-      </div>
     </div>
   </div>
 </section>

@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/erp.css') }}">
 
   {# the JGI roundel, the only square part of the lockup #}
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
@@ -22,7 +23,9 @@
   {% block head %}{% endblock %}
 </head>
 {% set admin_shell = current_user and current_user.role == 'admin' and not hide_chrome %}
-<body class="{% block body_class %}{% endblock %}{{ ' has-side' if admin_shell }}">
+{% set dept_shell = current_user and current_user.role == 'department' and not hide_chrome and dept_nav is not none %}
+{% set side_shell = admin_shell or dept_shell %}
+<body class="{% block body_class %}{% endblock %}{{ ' has-side erp' if side_shell }}">
 
 {# A page may put a loading curtain here. It is display:none unless the page's
    own head script reveals it, so it can never cover the site by accident. #}
@@ -69,6 +72,45 @@
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year if app_settings else '' }}</small></span>
+      <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
+    </div>
+  </nav>
+</aside>
+{% elif dept_shell %}
+{# A department's pages: the same left menu as the Office's — home, its four
+   stages with where each stands, its versions and password. #}
+{% set ep = request.endpoint or '' %}
+{% set here_stage = (request.view_args or {}).get('stage_key') %}
+{% set here_top = (STAGE_BY_KEY.get(here_stage) or {}).get('parent') or here_stage %}
+<aside class="admin-side">
+  <div class="side-head">
+    <a class="side-brand" href="{{ url_for('dept.dashboard') }}">
+      <img alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
+      <span>BoS Academic Portal<small>{{ current_user.dept_code }}</small></span>
+    </a>
+    <button class="side-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="topnav">
+      <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span class="sr-only">Menu</span>
+    </button>
+  </div>
+  <nav class="side-nav" id="topnav" aria-label="Department">
+    <a class="side-link{{ ' is-on' if ep == 'dept.dashboard' }}" href="{{ url_for('dept.dashboard') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span>Home</span></a>
+    <span class="side-label">Stages</span>
+    {% for st in dept_nav %}
+    <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}">
+      <span class="side-num">{{ loop.index }}</span><span>{{ st.title }}</span>
+      <i class="side-dot st-{{ st.status }}" title="{{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Yet to start', 'locked': 'Locked'}.get(st.status, st.status) }}"></i></a>
+    {% endfor %}
+    <span class="side-sep"></span>
+    <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span>Versions</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span>Password</span></a>
+    <div class="side-foot">
+      <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
+      <span class="side-who"><strong>{{ current_user.person.name if current_user.person else current_user.name }}</strong>
+        <small><a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Change' if current_user.person else 'Add your name' }}</a></small></span>
       <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
     </div>
@@ -202,6 +244,13 @@
 </div>
 {% endif %}
 
+{% if side_shell %}
+<div class="erp-bar">
+  <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academics</span>
+  <span class="erp-bar-mid">Board of Studies Portal</span>
+  <span class="erp-bar-year">{{ app_settings.academic_year if app_settings else '' }}</span>
+</div>
+{% endif %}
 {% block header %}{% endblock %}
 
 {% block body %}
@@ -225,7 +274,7 @@
 </main>
 {% endblock %}
 
-{% if not hide_chrome and not admin_shell %}
+{% if not hide_chrome and not side_shell %}
 <footer class="site">
   <div class="wrap">
     <img class="brand-logo" alt=""

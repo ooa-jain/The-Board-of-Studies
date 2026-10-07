@@ -1,0 +1,189 @@
+/* ==========================================================================
+   The portal as an academic ERP: an institution bar, a left menu, compact
+   panels with title strips, dense tables, small square buttons, short
+   coloured status words and status dots — and few words on the page.
+   Loaded after app.css; everything is scoped to body.erp (signed in) or to
+   the components it names.
+   ========================================================================== */
+:root {
+  --erp-navy: #0e2a5c;
+  --erp-blue: #1f5fae;
+  --erp-bg: #eef1f5;
+  --erp-line: #d6dde8;
+  --erp-head: #e8eef7;
+  --erp-th: #dde6f2;
+  --erp-text: #1d2a3d;
+  --erp-muted: #66748a;
+  --erp-green: #2e9e4f;
+  --erp-amber: #f0a500;
+  --erp-red: #d9433a;
+  --erp-grey: #b8c0cc;
+}
+
+/* ---- page ---- */
+body.erp { background: var(--erp-bg); color: var(--erp-text); font-size: 13.5px; }
+@media (min-width: 901px) { body.erp.has-side { padding-top: 0; } }
+@media (max-width: 900px) { body.erp.has-side { padding-top: 64px; } }
+body.erp main { padding-top: 14px; padding-bottom: 40px; }
+body.erp .wrap { max-width: 1400px; padding: 0 20px; }
+
+/* the institution bar across the top */
+.erp-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 16px;
+  height: 44px; padding: 0 20px; background: var(--erp-navy); color: #fff; font-size: 12.5px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.08), 0 2px 6px rgba(0,0,0,.12); }
+.erp-bar-name { color: #c9d6ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erp-bar-mid { margin: 0 auto; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 12px; }
+.erp-bar-year { color: #f5c542; font-weight: 700; white-space: nowrap; }
+@media (max-width: 900px) { .erp-bar { top: 64px; height: 36px; } .erp-bar-name { display: none; } }
+
+/* ---- page heading: a title and one line, nothing more ---- */
+body.erp .page-head { padding: 14px 0 6px; background: transparent; border: 0; }
+body.erp .page-head .wrap { align-items: center; gap: 12px; }
+body.erp .page-head h1 { font-size: 1.32rem; line-height: 1.25; margin: 2px 0 2px; color: var(--erp-navy);
+  font-weight: 700; letter-spacing: 0; }
+body.erp .page-head h1::after, body.erp .page-head .wrap > div > h1 + span { display: none; }
+body.erp .page-head p { font-size: 12.5px; color: var(--erp-muted); margin: 0; max-width: 820px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.erp .crumbs { font-size: 11.5px; letter-spacing: .02em; color: var(--erp-muted); }
+body.erp .page-head .head-aside { gap: 6px; }
+
+/* ---- panels: white, a thin border, a title strip ---- */
+body.erp .card, .panel { background: #fff; border: 1px solid var(--erp-line); border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(16, 32, 64, .05); margin-bottom: 14px; }
+body.erp .card-head, .panel-head { display: flex; align-items: center; gap: 10px; min-height: 38px;
+  padding: 7px 14px; background: var(--erp-head); border-bottom: 1px solid var(--erp-line);
+  border-radius: 4px 4px 0 0; }
+body.erp .card-head h3, .panel-head h3 { font-size: 13.5px; font-weight: 700; color: var(--erp-navy); margin: 0;
+  letter-spacing: 0; }
+.panel-head .spacer-left, .panel-head .erp-legend { margin-left: auto; }
+body.erp .card-body { padding: 12px 14px; }
+
+/* ---- tables: dense, a tinted head, zebra rows ---- */
+body.erp table.data, .erp-table { width: 100%; border-collapse: collapse; font-size: 12.8px; background: #fff; }
+body.erp table.data th, .erp-table th { background: var(--erp-th); color: var(--erp-navy); font-weight: 700;
+  font-size: 11.5px; text-transform: none; letter-spacing: 0; padding: 7px 10px; text-align: left;
+  border-bottom: 1px solid var(--erp-line); white-space: nowrap; }
+body.erp table.data td, .erp-table td { padding: 6px 10px; border-bottom: 1px solid #e7ecf3; vertical-align: middle; }
+body.erp table.data tbody tr:nth-child(even), .erp-table tbody tr:nth-child(even) { background: #f8fafc; }
+body.erp table.data tbody tr:hover, .erp-table tbody tr:hover { background: #eef4fc; }
+.erp-table .num, .erp-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.erp-table .c, .erp-table th.c { text-align: center; }
+.erp-table td.act { text-align: right; white-space: nowrap; }
+.erp-table td.clip { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.erp-table a { color: var(--erp-blue); }
+.erp-table .muted { color: var(--erp-muted); }
+.erp-dots td.c { width: 1%; padding-left: 14px; padding-right: 14px; }
+
+/* status words and dots: Completed green, In progress amber, Yet to start red */
+.st { font-weight: 700; font-size: 12px; }
+.st-submitted { color: var(--erp-green); }
+.st-draft { color: #c98600; }
+.st-open, .st-locked { color: var(--erp-red); }
+.st-returned { color: #b42318; }
+.dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle;
+  background: var(--erp-grey); box-shadow: inset 0 -1px 0 rgba(0,0,0,.12); }
+.dot.st-submitted { background: var(--erp-green); }
+.dot.st-draft { background: var(--erp-amber); }
+.dot.st-open, .dot.st-locked { background: var(--erp-red); }
+.dot.st-returned { background: #7a1c14; }
+.erp-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--erp-muted); }
+.erp-legend .dot { width: 9px; height: 9px; margin-left: 8px; }
+
+/* number tiles, like the seat-matrix tiles */
+.erp-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.erp-tile { padding: 12px 14px; border-radius: 4px; color: #fff; display: flex; flex-direction: column; gap: 2px; }
+.erp-tile b { font-size: 1.45rem; line-height: 1.1; }
+.erp-tile span { font-size: 12px; opacity: .92; }
+.t-navy { background: #5a6474; } .t-teal { background: #17a2b8; } .t-green { background: #28a745; }
+.t-amber { background: #f0b400; color: #1d2a3d; }
+@media (max-width: 760px) { .erp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- buttons: small and square ---- */
+body.erp .btn { border-radius: 4px; padding: 7px 14px; font-size: 12.5px; letter-spacing: 0;
+  text-transform: none; font-weight: 600; box-shadow: none; }
+body.erp .btn-sm { padding: 4px 10px; font-size: 12px; }
+body.erp .btn-gold { background: var(--erp-blue); color: #fff; border-color: var(--erp-blue); }
+body.erp .btn-gold:hover { background: #174d8e; }
+body.erp .btn-ghost { background: #fff; color: var(--erp-navy); border: 1px solid #c3cddb; }
+body.erp .btn-ghost:hover { background: #f1f5fa; }
+body.erp .pill { border-radius: 3px; font-size: 11.5px; padding: 2px 8px; }
+
+/* ---- forms: compact, labels small, help only when the box is in use ---- */
+body.erp input:not([type=checkbox]):not([type=radio]):not([type=file]), body.erp select, body.erp textarea {
+  border-radius: 3px; font-size: 13px; padding: 6px 9px; min-height: 32px; border-color: #c3cddb; }
+body.erp .field label, body.erp .lbl { font-size: 12px; font-weight: 600; color: #3a4a60; letter-spacing: 0;
+  text-transform: none; }
+body.erp .field .help { display: none; font-size: 11.5px; }
+body.erp .field:focus-within .help, body.erp .field .help.is-ok, body.erp .field .help.is-bad-text { display: block; }
+body.erp .section-help { font-size: 12px; color: var(--erp-muted); margin: 0 0 8px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+body.erp .section-help:hover { white-space: normal; }
+body.erp .section-block { background: #fff; border: 1px solid var(--erp-line); border-radius: 4px; padding: 0 14px 14px;
+  margin-bottom: 14px; }
+body.erp .section-block > h3 { margin: 0 -14px 12px; padding: 9px 14px; background: var(--erp-head);
+  border-bottom: 1px solid var(--erp-line); font-size: 13.5px; font-weight: 700; color: var(--erp-navy);
+  border-radius: 4px 4px 0 0; font-family: inherit; }
+body.erp .savebar { box-shadow: 0 -2px 8px rgba(16, 32, 64, .08); }
+
+/* ---- alerts and notes: one line where they can be ---- */
+body.erp .alert { border-radius: 4px; padding: 9px 12px; font-size: 12.8px; }
+body.erp .demo-strip { border-radius: 4px; padding: 10px 14px; border-style: solid; }
+@media (min-width: 761px) {
+  body.erp .demo-strip .small.muted { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 760px; }
+}
+
+/* ---- the left menu, ERP style: square, a label for the stages ---- */
+body.erp .admin-side { background: #1d2733; }
+body.erp .side-link { border-radius: 4px; padding: 8px 12px; font-size: 13px; }
+body.erp .side-link.is-on { background: var(--erp-blue); color: #fff; box-shadow: none; }
+.side-label { display: block; margin: 12px 12px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: #8796ad; }
+.side-num { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 3px; flex: 0 0 20px;
+  background: rgba(255,255,255,.1); font-size: 11px; font-weight: 700; }
+.side-link.is-on .side-num { background: rgba(255,255,255,.22); }
+.side-dot { margin-left: auto; width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; background: var(--erp-grey); }
+.side-dot.st-submitted { background: #3cc26a; } .side-dot.st-draft { background: var(--erp-amber); }
+.side-dot.st-open, .side-dot.st-locked { background: #ef6a5f; } .side-dot.st-returned { background: #ff8a80; }
+.side-who small a { color: #a9bcdc; text-decoration: underline; }
+
+/* ---- the dashboard's big decorative pieces give way to the panels ---- */
+body.erp .dash { border-radius: 6px; box-shadow: 0 1px 2px rgba(16, 32, 64, .06); border: 1px solid var(--erp-line);
+  padding: 14px; }
+body.erp .dash-overview, body.erp .dash-card { border-radius: 6px; }
+body.erp .ov-tabs { border-radius: 4px; padding: 3px; }
+body.erp .ov-tabs a { border-radius: 3px; padding: 6px 14px; font-size: 12.5px; }
+body.erp .lvl-tabs { border-radius: 4px; }
+body.erp .lvl-tab { border-radius: 3px; padding: 8px 16px; }
+body.erp .prog-row { border-radius: 4px; padding: 10px 14px; }
+
+/* ---- the sign-in page: a portal login, not a brochure ---- */
+.erp-title { font-size: clamp(2rem, 3.4vw, 2.8rem) !important; line-height: 1.1 !important; }
+.erp-stages { margin-top: 18px; max-width: 560px; border: 1px solid var(--erp-line); border-radius: 4px; overflow: hidden; }
+.erp-stages td:first-child { font-weight: 700; color: var(--erp-navy); white-space: nowrap; width: 90px; }
+
+/* codes never break across lines */
+.erp-table .mono, body.erp table.data .mono { white-space: nowrap; }
+/* an optional step not begun: neither due nor late */
+.dot.st-optional { background: transparent; box-shadow: inset 0 0 0 2px var(--erp-grey); }
+
+/* the Office's home: flat tiles rather than glossy cards */
+body.erp .dash-overview { background: var(--erp-navy); border-radius: 4px; box-shadow: none; }
+body.erp .dash-card { border-radius: 4px; box-shadow: none; }
+body.erp .dash-card.dc-blue { background: #17a2b8; }
+body.erp .dash-card.dc-orange { background: #f0b400; color: #1d2a3d; }
+body.erp .dash-card.dc-orange * { color: #1d2a3d; }
+body.erp .dash-stage { border-radius: 4px; box-shadow: none; border: 1px solid var(--erp-line); }
+body.erp .dash-stage .ds-ico { border-radius: 4px; }
+body.erp .dash-top h1 { font-size: 1.32rem; }
+body.erp .dash-search { border-radius: 4px; }
+
+/* uploaded documents: white cards with a border */
+body.erp .doc-card, body.erp .doc-row { background: #fff; border: 1px solid var(--erp-line); border-radius: 4px; }
+
+/* narrow screens: titles wrap, wide tables scroll inside their panel */
+.panel-head { flex-wrap: wrap; }
+.erp-legend { flex-wrap: wrap; }
+.panel { overflow-x: auto; }
+@media (max-width: 760px) { .panel-head .erp-legend { margin-left: 0; width: 100%; } }
+body.erp .card, body.erp .table-wrap { overflow-x: auto; }
+@media (max-width: 760px) { body.erp .page-head p { white-space: normal; } }

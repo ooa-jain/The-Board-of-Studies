@@ -828,7 +828,7 @@ def test_a_signed_in_department_is_not_asked_to_sign_in_again(app, client):
 
     assert 'name="password"' not in body, "the home page still asks for a password"
     assert "Sign out" in body
-    assert ">Home</a>" in body, "no way back to the home page from the bar"
+    assert ">Home</a>" in body or ">Home</span></a>" in body, "no way back to the home page from the menu"
     assert "Department Information" in body
 
 

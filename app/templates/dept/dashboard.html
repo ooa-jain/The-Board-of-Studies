@@ -7,7 +7,7 @@
     <div>
       <div class="crumbs">{{ dept.campus }} <span>›</span> {{ dept.school }}</div>
       <h1>{{ dept.dept_name }}</h1>
-      <p>Board of Studies submission for {{ year }}. Open any stage and fill it in any order; each is submitted once everything in it is complete.</p>
+      <p>Board of Studies · {{ year }}</p>
     </div>
     <div class="spacer head-aside">
       <div class="flex head-aside-row">
@@ -27,7 +27,6 @@
 </div>
 {% endif %}
 <div class="dash-all">
-  <span class="small muted">Filled in your stages? See every one together and submit them all at once.</span>
   <button class="btn btn-all" type="button" id="btn-all">Review &amp; submit all stages</button>
 </div>
 {% if submission.status == 'sealed' %}
@@ -89,118 +88,59 @@
 </div>
 {% endif %}
 
-{# The one thing to do next, worked out by the portal rather than left for
-   the department to find in a list of thirteen. #}
-{% if next_step %}
-<a class="next-step" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
-  <span class="next-step-label">
-    {% if next_step.status == 'returned' %}Sent back — needs your correction
-    {% elif next_step.status == 'draft' %}Pick up where you left off
-    {% else %}Next Stage{% endif %}
-  </span>
-  <span class="next-step-title">{{ next_step.title }}</span>
-  <span class="next-step-blurb">{{ next_step.blurb }}</span>
-  <span class="next-step-go">
-    {% if next_step.status == 'draft' %}Continue{% else %}Proceed{% endif %}
-    <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  </span>
-</a>
-{% else %}
-<div class="next-step is-done">
-  <span class="next-step-label">All stages submitted</span>
-  <span class="next-step-title">Your Board of Studies record is complete</span>
-  <span class="next-step-blurb">
-    The Office of Academics has everything for {{ year }}. Nothing further is needed.
-  </span>
-</div>
-{% endif %}
-
-{# The submission in a container that starts tilted back and straightens
-   as it scrolls into view (after Aceternity UI's container scroll). #}
-<section class="cs" id="cs">
-  <div class="cs-title">
-    <span class="cs-kicker">Board of Studies · {{ year }}</span>
-    <h2>Your submission,<br><span class="cs-big">stage by stage</span></h2>
-  </div>
-  <div class="cs-card">
-    <div class="cs-screen">
-<div class="grid grid-4 mb-2">
-  <div class="stat frame frame-navy">
-    <div class="n">{{ progress.done }}</div><div class="l">Stages submitted</div>
-    <div class="sub">of {{ progress.total }}</div>
-  </div>
-  <div class="stat frame frame-orange">
-    <div class="n">{{ board|selectattr('can_open')|list|length }}</div><div class="l">Open now</div>
-    <div class="sub">ready to fill</div>
-  </div>
-  <div class="stat frame frame-navy">
-    <div class="n">{{ programmes|length }}</div><div class="l">Programmes</div>
-    <div class="sub">{{ 'entered' if programmes else 'not yet entered' }}</div>
-  </div>
-  <div class="stat frame frame-orange">
-    <div class="n">{{ board|sum(attribute='errors') }}</div><div class="l">Open errors</div>
-    <div class="sub">across all stages</div>
-  </div>
+{% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned',
+                'open': 'Yet to start', 'locked': 'Locked', 'optional': 'Optional'} %}
+<div class="erp-tiles">
+  <div class="erp-tile t-navy"><b>{{ progress.done }}/{{ progress.total }}</b><span>Stages submitted</span></div>
+  <div class="erp-tile t-teal"><b>{{ programmes|length }}</b><span>Programmes</span></div>
+  <div class="erp-tile t-green"><b>{{ prog_rows|selectattr('done')|list|length }}</b><span>Programmes complete</span></div>
+  <div class="erp-tile t-amber"><b>{{ board|sum(attribute='errors') }}</b><span>Errors to fix</span></div>
 </div>
 
-{# One framed panel per group, navy and orange in turn, the group's name on
-   the tab across its top edge. #}
-{% set ns = namespace(group=None, n=0) %}
-<div class="stage-list stage-frames">
-  {% for s in board %}
-    {% if s.group != ns.group %}
-      {% if ns.group is not none %}</div></section>{% endif %}
-      {% set ns.group = s.group %}
-      {% set ns.n = ns.n + 1 %}
-      {% set in_group = board|selectattr('group', 'equalto', s.group)|list %}
-      <section class="frame frame-{{ 'navy' if ns.n % 2 else 'orange' }} stage-frame">
-        <h3 class="frame-tab">{{ s.group }}
-          <span class="frame-tab-n">{{ in_group|selectattr('status', 'equalto', 'submitted')|list|length }}/{{ in_group|length }}</span>
-        </h3>
-        <div class="stage-frame-rows">
-    {% endif %}
-    <div class="stage-row {{ s.status }}">
-      <span class="stage-num frame-num">{{ '%02d' % loop.index }}</span>
-      <div class="stage-info">
-        <strong>{{ s.title }}</strong>
-        <span>{{ s.blurb }}</span>
-        {% if s.source_templates %}
-        <span class="small note-gold">
-          Replaces {{ s.source_templates|length }} template{{ 's' if s.source_templates|length > 1 }}
-        </span>
-        {% endif %}
-      </div>
-      <div class="stage-actions">
-        {% if s.errors %}<span class="pill pill-err">{{ s.errors }} to fix</span>{% endif %}
-        {% if s.warnings and not s.errors %}<span class="pill pill-warn">{{ s.warnings }} to check</span>{% endif %}
-
-        {% if s.status == 'submitted' %}
-          <span class="pill pill-ok">Submitted</span>
-          <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">View</a>
-        {% elif s.status == 'locked' %}
-          {# "Locked" on its own reads like a fault — name what opens it. #}
-          <span class="pill pill-lock">Locked</span>
-          <span class="small muted stage-why">Opens once the stage above is submitted</span>
-        {% elif s.status == 'returned' %}
-          <span class="pill pill-err">Returned</span>
-          <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Correct</a>
-        {% elif s.status == 'draft' %}
-          <span class="pill pill-warn">In progress</span>
-          <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Continue</a>
-        {% else %}
-          <a class="btn btn-gold btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Start</a>
-        {% endif %}
-      </div>
-    </div>
-  {% endfor %}
-  {% if ns.group is not none %}</div></section>{% endif %}
-</div>
-    </div>
-  </div>
+<section class="panel">
+  <div class="panel-head"><h3>Stages</h3>
+    {% if next_step %}<a class="btn btn-sm btn-gold spacer-left" href="{{ url_for('dept.stage', stage_key=next_step.key) }}">
+      {{ 'Continue' if next_step.status == 'draft' else 'Correct' if next_step.status == 'returned' else 'Next Stage' }}: {{ next_step.title }} →</a>{% endif %}</div>
+  <table class="erp-table">
+    <thead><tr><th class="num">#</th><th>Stage</th><th>Group</th><th>Status</th><th class="num">Errors</th><th></th></tr></thead>
+    <tbody>
+    {% for s in board %}
+      <tr>
+        <td class="num">{{ loop.index }}</td>
+        <td><a href="{{ url_for('dept.stage', stage_key=s.key) }}"><strong>{{ s.title }}</strong></a></td>
+        <td class="muted">{{ s.group }}</td>
+        <td><span class="st st-{{ s.status }}">{{ words.get(s.status, s.status) }}</span></td>
+        <td class="num">{{ s.errors or '—' }}</td>
+        <td class="act"><a class="btn btn-sm {{ 'btn-ghost' if s.status == 'submitted' else '' }}"
+               href="{{ url_for('dept.stage', stage_key=s.key) }}">{{ 'View' if s.status == 'submitted' else 'Correct' if s.status == 'returned' else 'Continue' if s.status == 'draft' else 'Start' }}</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
 </section>
+
+{% if prog_rows %}
+<section class="panel">
+  <div class="panel-head"><h3>Programmes</h3>
+    <span class="erp-legend"><i class="dot st-submitted"></i>Completed <i class="dot st-draft"></i>In progress
+      <i class="dot st-open"></i>Yet to start <i class="dot st-optional"></i>Optional</span></div>
+  <table class="erp-table erp-dots">
+    <thead><tr><th>Code</th><th>Programme</th><th>Level</th>
+      {% for h in prog_heads %}<th class="c">{{ h }}</th>{% endfor %}<th></th></tr></thead>
+    <tbody>
+    {% for p in prog_rows %}
+      <tr>
+        <td class="mono">{{ p.code }}</td>
+        <td class="clip">{{ p.name }}</td>
+        <td>{{ p.level }}</td>
+        {% for st in p.steps %}<td class="c"><a href="{{ st.url }}" title="{{ st.label }} — {{ words.get(st.status, st.status) }}"><i class="dot st-{{ st.status }}"></i></a></td>{% endfor %}
+        <td class="act"><a class="btn btn-sm btn-ghost" href="{{ p.url }}">Open</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -209,26 +149,5 @@
 <script>
   document.getElementById("btn-all").addEventListener("click", () => window.SubmitAll.open({
     record: {{ url_for('dept.api_record')|tojson }}, submit: {{ url_for('dept.api_submit_all')|tojson }} }));
-</script>
-<script>
-  (function () {
-    var box = document.getElementById("cs");
-    if (!box) return;
-    var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var card = box.querySelector(".cs-card"), title = box.querySelector(".cs-title");
-    function tick() {
-      // 0 when the container's top meets the bottom of the window, 1 once
-      // it is a third of the way up
-      var r = box.getBoundingClientRect(), vh = window.innerHeight;
-      var p = still ? 1 : Math.min(1, Math.max(0, (vh - r.top) / (vh * 0.75)));
-      var small = window.innerWidth < 760;
-      var from = small ? 0.8 : 1.05, to = small ? 0.95 : 1;
-      card.style.transform = "rotateX(" + (20 * (1 - p)).toFixed(2) + "deg) scale(" + (from + (to - from) * p).toFixed(3) + ")";
-      title.style.transform = "translateY(" + (-40 * p).toFixed(1) + "px)";
-    }
-    window.addEventListener("scroll", tick, { passive: true });
-    window.addEventListener("resize", tick);
-    tick();
-  })();
 </script>
 {% endblock %}

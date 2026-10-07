@@ -62,7 +62,7 @@ def create_app(config_object=Config):
 
     @app.context_processor
     def _inject():
-        from .schema import GROUP_ORDER, STAGES
+        from .schema import GROUP_ORDER, STAGE_BY_KEY, STAGES
         user = session.get("user") or {}
         unread, batch_info = 0, None
         if user.get("role") == "admin":
@@ -72,12 +72,25 @@ def create_app(config_object=Config):
                 batch_info = batches()
             except Exception:
                 unread = 0
+        dept_nav = None
+        if user.get("role") == "department" and user.get("dept_code"):
+            # the department's menu: its stages, each with where it stands
+            try:
+                from .workflow import get_or_create_submission, stage_board
+                sub = get_or_create_submission(user["dept_code"], database.settings().get("academic_year")
+                                               or app.config["ACADEMIC_YEAR"])
+                dept_nav = [{"key": s["key"], "title": s["title"], "status": s["status"]}
+                            for s in stage_board(sub)]
+            except Exception:
+                dept_nav = None
         return {
+            "dept_nav": dept_nav,
             "updates_unread": unread,
             "batch_info": batch_info,
             "current_user": session.get("user"),
             "app_settings": database.settings(),
             "STAGES": STAGES,
+            "STAGE_BY_KEY": STAGE_BY_KEY,
             "GROUP_ORDER": GROUP_ORDER,
             "CAMPUSES": app.config["CAMPUSES"],
             "PLACES": app.config["PLACES"],
