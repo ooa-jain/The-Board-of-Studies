@@ -181,6 +181,9 @@ def _bootstrap(app):
             "created_at": now(),
         })
         app.logger.info("Bootstrap admin created: %s", app.config["ADMIN_USERNAME"])
+    # the Office was renamed: an admin still carrying the old default name follows
+    d.users.update_many({"role": "admin", "name": "Office of Academics"},
+                        {"$set": {"name": app.config["ADMIN_NAME"]}})
 
     if not d.rules.find_one({"_id": "ugc"}):
         d.rules.insert_one({

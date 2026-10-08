@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% import "admin/_charts.html" as cx %}
+{% block title %}Analysis · Board of Studies {{ year|ay }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+
+{% block content %}
+{% set t = pic.totals %}
+{% set n = t.departments %}
+<div class="ad ar">
+  <header class="ad-head">
+    <div class="ad-title">
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Analysis</div>
+      <h1>Analysis | Board of Studies {{ year|ay }}</h1>
+      <p class="ar-made">Every department, stage and programme as of {{ made.strftime('%d %b %Y, %H:%M') }}</p>
+    </div>
+    <div class="ad-actions ar-noprint">
+      <button class="btn btn-gold" type="button" onclick="window.print()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg>
+        Print / Save as PDF</button>
+      <a class="btn btn-ghost" href="{{ url_for('admin.sheets_excel') }}">Download Excel</a>
+      <a class="btn btn-ghost" href="{{ url_for('admin.analysis') }}">Department detail</a>
+    </div>
+  </header>
+
+  {# ---------------------------------------------------------- findings -#}
+  <section class="ad-card ar-findings">
+    <div class="ad-card-head"><h2>Key findings</h2></div>
+    <ol>
+      {% for f in findings %}<li>{{ f }}</li>{% endfor %}
+    </ol>
+  </section>
+
+  {# ------------------------------------------------------------- tiles -#}
+  <section class="ad-kpis" aria-label="Totals">
+    <div class="ad-kpi"><span class="ad-kpi-l">Stages completed</span><b>{{ t.percent }}%</b>
+      <span class="ad-meter"><i style="width:{{ t.percent }}%"></i></span>
+      <small>{{ t.stages_done }} of {{ t.stages_total }}</small></div>
+    <div class="ad-kpi"><span class="ad-kpi-l">Departments completed</span><b>{{ t.complete }}<em>/{{ n }}</em></b>
+      <small>{{ t.in_progress }} in progress · {{ t.returned }} sent back</small></div>
+    <div class="ad-kpi"><span class="ad-kpi-l">Not started</span><b>{{ t.untouched }}</b>
+      <small>{{ t.never_in }} never signed in{% if t.no_login %} · {{ t.no_login }} no login{% endif %}</small></div>
+    <div class="ad-kpi"><span class="ad-kpi-l">Programmes completed</span><b>{{ pic.programmes.complete }}<em>/{{ pic.programmes.total }}</em></b>
+      <small>{{ pic.programmes.started }} started</small></div>
+    <div class="ad-kpi"><span class="ad-kpi-l">Documents uploaded</span><b>{{ pic.files }}</b>
+      <small>{{ pic.attention.bad_files }} to check</small></div>
+  </section>
+
+  <div class="ar-grid">
+    <section class="ad-card">
+      <div class="ad-card-head"><h2>Stage by stage</h2><span class="ad-sub">all {{ n }} departments</span></div>
+      {{ cx.status_legend() }}
+      {{ cx.stage_bars(pic.stages, n) }}
+    </section>
+
+    <section class="ad-card">
+      <div class="ad-card-head"><h2>Programmes</h2><span class="ad-sub">every step submitted</span></div>
+      {% if pic.programmes.total %}
+      <div class="ar-levels">
+        {% for lv in pic.programmes.levels %}
+        {% set pct = (lv.complete * 100 / lv.total)|round|int %}
+        <div class="ar-level">
+          <span class="ar-level-n">{{ lv.level }}</span>
+          <div class="ar-level-b">
+            <div class="cx-track" tabindex="0" data-tip="{{ lv.complete }}|{{ lv.level }} programmes completed|{{ lv.started - lv.complete }} started, {{ lv.total - lv.started }} not started, of {{ lv.total }}">
+              {% if lv.complete %}<span class="cx-seg s-done" style="width:{{ (lv.complete * 100 / lv.total)|round(2) }}%"></span>{% endif %}
+              {% if lv.started - lv.complete %}<span class="cx-seg s-prog" style="width:{{ ((lv.started - lv.complete) * 100 / lv.total)|round(2) }}%"></span>{% endif %}
+            </div>
+            <small>{{ lv.complete }} completed · {{ lv.started - lv.complete }} in progress · {{ lv.total - lv.started }} not started</small>
+          </div>
+          <span class="ar-level-v"><b>{{ lv.complete }}</b>/{{ lv.total }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if pic.programmes.revision is not none %}
+      <p class="ar-note">Course Revision reports an average syllabus change of <b>{{ pic.programmes.revision }}%</b>
+        across {{ pic.programmes.revised }} programme{{ 's' if pic.programmes.revised != 1 }}.</p>
+      {% endif %}
+      {% else %}
+      <p class="ad-empty">No programmes mapped yet — departments add them in Department Information.</p>
+      {% endif %}
+    </section>
+
+    <section class="ad-card">
+      <div class="ad-card-head"><h2>By campus</h2><span class="ad-sub">share of stages completed</span></div>
+      {{ cx.ranked(pic.by_campus) }}
+    </section>
+
+    <section class="ad-card">
+      <div class="ad-card-head"><h2>By school</h2><span class="ad-sub">share of stages completed</span></div>
+      {{ cx.ranked(pic.by_school) }}
+    </section>
+  </div>
+
+  {# --------------------------------------------------- department ranking -#}
+  <section class="ad-card ad-flush">
+    <div class="ad-card-head"><h2>Departments, ranked</h2><span class="ad-sub">stages completed, then programmes</span></div>
+    <div class="ad-table-wrap">
+      <table class="ad-table">
+        <thead><tr><th class="c">#</th><th>Department</th><th>Campus</th><th class="ad-col-bar">Stages completed</th>
+          <th class="c">Programmes</th><th class="c">Avg. revision</th><th>Status</th><th>Last signed in</th></tr></thead>
+        <tbody>
+        {% for r in ranked %}
+        {% set revs = r.programmes|selectattr('revision', 'ne', none)|map(attribute='revision')|list %}
+        <tr>
+          <td class="c muted ad-td-n">{{ loop.index }}</td>
+          <td><a class="ad-dept" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">{{ r.dept.dept_name }}</a>
+            <small>{{ r.dept.dept_code }} · {{ r.dept.school or '—' }}</small></td>
+          <td class="ad-td-campus">{{ r.dept.campus or '—' }}</td>
+          <td class="ad-col-bar"><span class="ad-meter"><i style="width:{{ r.percent }}%"></i></span>
+            <small>{{ r.done }}/{{ r.total }} · {{ r.percent }}%</small></td>
+          <td class="c ad-td-prog" data-label="Programmes">{{ r.prog_done }}/{{ r.programmes|length }}</td>
+          <td class="c ad-td-rev" data-label="Avg. revision">{{ ((revs|sum) / (revs|length))|round(1) ~ '%' if revs else '—' }}</td>
+          <td class="ad-td-state"><span class="ad-state s-{{ r.state }}">{{ r.label }}</span></td>
+          <td class="muted nowrap ad-td-last" data-label="Last signed in">{{ r.last_login.strftime('%d %b, %H:%M') if r.last_login else 'Never' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/admin-charts.js') }}"></script>{% endblock %}

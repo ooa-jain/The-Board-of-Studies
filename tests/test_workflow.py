@@ -836,7 +836,8 @@ def test_the_admin_gets_the_console_not_a_department_panel(app, client):
     body = client.get("/", follow_redirects=True).get_data(as_text=True)
     assert 'name="password"' not in body
     assert "Board of Studies" in body and "Latest from departments" in body
-    assert "stages completed" not in body
+    # not a department's home: no Continue card, no stage-by-stage form list
+    assert 'class="resume-card"' not in body and "stages-table" not in body
 
 
 def test_the_analysis_tells_each_department_apart(app, client):

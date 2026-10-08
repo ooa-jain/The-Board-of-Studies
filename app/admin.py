@@ -37,47 +37,11 @@ def _actor():
 # dashboard
 # ---------------------------------------------------------------------------
 
-@bp.route("/")
-@admin_required
-def dashboard():
-    db = get_db()
-    year = _year()
-    departments = list(db.departments.find({"active": True}).sort("dept_name", 1))
-    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
-
-    rows, counts = [], {"not_started": 0, "in_progress": 0, "complete": 0}
-    for d in departments:
-        sub = subs.get(d["dept_code"])
-        p = progress(sub) if sub else {"done": 0, "total": len(STAGES), "percent": 0}
-        if not sub:
-            state = "not_started"
-        elif p["done"] == p["total"]:
-            state = "complete"
-        else:
-            state = "in_progress"
-        counts[state] += 1
-        rows.append({"dept": d, "progress": p, "state": state,
-                     "updated_at": (sub or {}).get("updated_at")})
-
-    by_campus = {}
-    for d in departments:
-        c = d.get("campus", "—")
-        by_campus.setdefault(c, {"total": 0, "complete": 0})
-        by_campus[c]["total"] += 1
-    for r in rows:
-        if r["state"] == "complete":
-            by_campus[r["dept"].get("campus", "—")]["complete"] += 1
-
-    stage_counts = []
-    for s in STAGES:
-        done = sum(1 for sub in subs.values() if compute_status(sub, s["key"]) == "submitted")
-        stage_counts.append({"title": s["title"], "key": s["key"], "done": done,
-                             "total": len(departments)})
-
-    # activity over the last fortnight, for the chart: every update a day
+def _activity(db, days_back=14):
+    """Updates from departments, a day at a time, for the last fortnight."""
     from datetime import timedelta
     today = now().replace(hour=0, minute=0, second=0, microsecond=0)
-    days = [today - timedelta(days=i) for i in range(13, -1, -1)]
+    days = [today - timedelta(days=i) for i in range(days_back - 1, -1, -1)]
     per_day = {d.date(): {"all": 0, "submitted": 0} for d in days}
     for n in db.notifications.find({"at": {"$gte": days[0]}}, {"at": 1, "event": 1}):
         k = n["at"].date()
@@ -85,30 +49,156 @@ def dashboard():
             per_day[k]["all"] += 1
             if n.get("event") == "submitted":
                 per_day[k]["submitted"] += 1
-    series = [{"label": d.strftime("%d %b"), "day": d.strftime("%a")[:2], **per_day[d.date()]} for d in days]
-    peak = max([x["all"] for x in series] + [1])
-    w, h = 560, 150
-    pts = [(round(i * w / (len(series) - 1), 1), round(h - 12 - (x["all"] / peak) * (h - 34), 1))
-           for i, x in enumerate(series)]
-    line = "M" + " L".join(f"{x},{y}" for x, y in pts)
-    area = line + f" L{w},{h} L0,{h} Z"
-    best = max(range(len(series)), key=lambda i: series[i]["all"])
-    chart = {"series": series, "line": line, "area": area, "w": w, "h": h,
-             "best": {"x": pts[best][0], "y": pts[best][1], **series[best]},
-             "total": sum(x["all"] for x in series),
-             "submitted": sum(x["submitted"] for x in series)}
+    series = [{"label": d.strftime("%a %d %b"), "day": d.strftime("%a")[:2], "date": d.strftime("%d"),
+               **per_day[d.date()]} for d in days]
+    peak = max([x["all"] for x in series] + [0])
+    return {"series": series, "peak": peak, "total": sum(x["all"] for x in series),
+            "submitted": sum(x["submitted"] for x in series)}
+
+
+def _picture(db, year):
+    """The whole institution in one reading — for the home and for the
+    one-click analysis, so the two can never disagree."""
+    departments = list(db.departments.find({"active": True})
+                       .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department"})}
+    from .workflow import programme_progress
+    rows = []
+    for d in departments:
+        sub = subs.get(d["dept_code"])
+        r = department_analysis(d, sub, users.get(d["dept_code"]))
+        r["programmes"] = programme_progress(sub or {}, d)
+        r["prog_done"] = sum(1 for p in r["programmes"] if p["complete"])
+        rows.append(r)
+    totals = institution_analysis(rows)
+    stages = stage_analysis([r["board"] for r in rows])
+    for st in stages:
+        st["in_progress"] = st.get("draft", 0)
+        st["not_started"] = st.get("open", 0) + st.get("locked", 0)
+
+    progs = [p for r in rows for p in r["programmes"]]
+    levels = []
+    for lv in ("UG", "PG"):
+        mine = [p for p in progs if (p["level"] or "").upper().startswith(lv)]
+        if mine:
+            levels.append({"level": lv, "total": len(mine),
+                           "complete": sum(1 for p in mine if p["complete"]),
+                           "started": sum(1 for p in mine if p["started"])})
+    revs = [p["revision"] for p in progs if p["revision"] is not None]
+    programmes = {"total": len(progs), "complete": sum(1 for p in progs if p["complete"]),
+                  "started": sum(1 for p in progs if p["started"]), "levels": levels,
+                  "revision": round(sum(revs) / len(revs), 1) if revs else None,
+                  "revised": len(revs)}
+
+    def group(key):
+        out = {}
+        for r in rows:
+            g = out.setdefault(r["dept"].get(key) or "—", {"name": r["dept"].get(key) or "—", "departments": 0,
+                                                          "complete": 0, "done": 0, "total": 0})
+            g["departments"] += 1
+            g["complete"] += 1 if r["state"] == "complete" else 0
+            g["done"] += r["done"]
+            g["total"] += r["total"]
+        for g in out.values():
+            g["percent"] = round(g["done"] * 100 / g["total"]) if g["total"] else 0
+        return sorted(out.values(), key=lambda g: (-g["percent"], g["name"]))
 
     attention = {"comments": db.comments.count_documents({"academic_year": year, "status": "open"}),
-                 "returned": sum(1 for sub in subs.values() for s in STAGES
-                                 if compute_status(sub, s["key"]) == "returned"),
+                 "returned": sum(r["returned"] for r in rows),
                  "bad_files": db.files.count_documents({"academic_year": year, "$or": [
                      {"keyword_match.status": "miss"}, {"keyword_match.looks_like": {"$exists": True}}]})}
+    attention["total"] = attention["comments"] + attention["returned"] + attention["bad_files"]
+    files = db.files.count_documents({"academic_year": year})
+    return {"rows": rows, "totals": totals, "stages": stages, "programmes": programmes,
+            "by_campus": group("campus"), "by_school": group("school"), "attention": attention,
+            "files": files, "activity": _activity(db)}
 
-    return render_template("admin/dashboard.html", rows=rows, counts=counts,
-                           by_campus=by_campus, stage_counts=stage_counts,
-                           year=year, total=len(departments), chart=chart, attention=attention,
-                           stages_done=sum(x["done"] for x in stage_counts),
+
+_STATE_RANK = {"complete": 5, "in_progress": 4, "returned": 3, "not_started": 2, "never_in": 1, "no_login": 0}
+
+
+def _ahead(r):
+    """How far a department has got: stages completed, then programmes
+    completed, then work begun (half-filled stages, programmes started)."""
+    return (r["percent"], r["prog_done"], r["half"] + r["returned"],
+            sum(1 for p in r["programmes"] if p["started"]), _STATE_RANK.get(r["state"], 0))
+
+
+def _findings(pic):
+    """What the numbers say, in sentences, most pressing first."""
+    t, rows, out = pic["totals"], pic["rows"], []
+    n = t["departments"]
+    if not n:
+        return ["No departments yet — import them to begin."]
+    out.append(f"{t['percent']}% of all stages are completed — {t['stages_done']} of {t['stages_total']} "
+               f"across {n} department{'s' if n != 1 else ''}.")
+    if t["complete"]:
+        out.append(f"{t['complete']} of {n} departments have completed every stage.")
+    idle = [r["dept"]["dept_name"] for r in rows if r["state"] in ("not_started", "never_in", "no_login")]
+    if idle:
+        names = ", ".join(idle[:4]) + (f" and {len(idle) - 4} more" if len(idle) > 4 else "")
+        out.append(f"{len(idle)} department{'s have' if len(idle) != 1 else ' has'} filed nothing yet: {names}.")
+    if t["returned"]:
+        out.append(f"{t['returned']} department{'s have' if t['returned'] != 1 else ' has'} a stage sent back for correction.")
+    stages = pic["stages"]
+    if stages:
+        slow = min(stages, key=lambda s: (s["submitted"], -s["n"]))
+        fast = max(stages, key=lambda s: (s["submitted"], -s["n"]))
+        if fast["submitted"] != slow["submitted"]:
+            out.append(f"Slowest stage: {slow['title']} — {slow['submitted']} of {n} completed. "
+                       f"Furthest along: {fast['title']} — {fast['submitted']} of {n}.")
+        elif not fast["submitted"]:
+            busy = max(s["in_progress"] for s in stages)
+            out.append("No stage has been completed by any department yet"
+                       + (f"; {busy} department{'s are' if busy != 1 else ' is'} filling stages now." if busy else "."))
+    lead = max(rows, key=_ahead)
+    if lead["state"] not in ("not_started", "never_in", "no_login"):
+        progs = len(lead["programmes"])
+        started = sum(1 for p in lead["programmes"] if p["started"])
+        out.append(f"Furthest ahead: {lead['dept']['dept_name']} — {lead['done']} of {lead['total']} stages completed"
+                   + (f", {lead['prog_done']} of {progs} programmes completed ({started} started)." if progs else "."))
+    pr = pic["programmes"]
+    if pr["total"]:
+        lv = " · ".join(f"{x['level']} {x['complete']} of {x['total']}" for x in pr["levels"])
+        out.append(f"Programmes completed: {pr['complete']} of {pr['total']}" + (f" ({lv})." if lv else "."))
+    if pr["revision"] is not None:
+        out.append(f"Average syllabus change reported in Course Revision: {pr['revision']}% "
+                   f"across {pr['revised']} programme{'s' if pr['revised'] != 1 else ''}.")
+    camp = pic["by_campus"]
+    if len(camp) > 1 and camp[0]["percent"] != camp[-1]["percent"]:
+        out.append(f"By campus, {camp[0]['name']} leads at {camp[0]['percent']}%; "
+                   f"{camp[-1]['name']} trails at {camp[-1]['percent']}%.")
+    a = pic["attention"]
+    if a["total"]:
+        out.append(f"Needs attention: {a['bad_files']} file{'s' if a['bad_files'] != 1 else ''} to check, "
+                   f"{a['returned']} sent back, {a['comments']} open comment{'s' if a['comments'] != 1 else ''}.")
+    return out
+
+
+@bp.route("/")
+@admin_required
+def dashboard():
+    db = get_db()
+    year = _year()
+    pic = _picture(db, year)
+    # the departments furthest behind come first: they are the ones to chase
+    rows = sorted(pic["rows"], key=lambda r: (_ahead(r), r["dept"].get("dept_name", "")))
+    return render_template("admin/dashboard.html", year=year, pic=pic, rows=rows,
                            latest=list(db.notifications.find().sort("at", -1).limit(8)))
+
+
+@bp.route("/analysis/report")
+@admin_required
+def analysis_report():
+    """Analysis in one click: everything on one page, in charts and in
+    sentences, ready to print or save as PDF."""
+    db = get_db()
+    year = _year()
+    pic = _picture(db, year)
+    ranked = sorted(pic["rows"], key=lambda r: tuple(-x for x in _ahead(r)) + (r["dept"].get("dept_name", ""),))
+    return render_template("admin/analysis_report.html", year=year, pic=pic, ranked=ranked,
+                           findings=_findings(pic), made=now())
 
 
 # ---------------------------------------------------------------------------

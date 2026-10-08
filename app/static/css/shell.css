@@ -295,3 +295,47 @@ body.has-side .wrap { max-width: none !important; }
   color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; text-decoration: none !important; white-space: nowrap; }
 .acc-tpl:hover { background: #dbeafe; }
 .acc-head .acc-tpl + .acc-chip { margin-left: 0; }
+.ov-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---- phones and small screens: nothing wider than the screen ---- */
+/* an absolutely placed label inside a table stays inside the table's scroller */
+.table-wrap, .rt-wrap, .ad-table-wrap { position: relative; }
+/* document cards never ask for more than the card has */
+.docs-files { grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)) !important; }
+/* the calendar's seven columns shrink with the card */
+.cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
+@media (max-width: 760px) {
+  .cal-grid { gap: 3px !important; }
+  .cal-day { border-radius: 8px !important; font-size: 12px; }
+  .cal-head .cal-title, .cal-head h2 { font-size: 1.1rem; }
+  /* pill tabs scroll sideways in one row instead of wrapping into a blob */
+  .pill-tabs { flex-wrap: nowrap !important; overflow-x: auto; max-width: 100%; border-radius: 12px !important;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .pill-tabs::-webkit-scrollbar { display: none; }
+  .pill-tabs a, .pill-tabs button { flex: none; white-space: nowrap; }
+  /* wide data tables scroll inside their card rather than squeezing every word */
+  .rt-wrap > table, .table-wrap > table.sheet-table { min-width: 720px; }
+  .erp-legend { flex-wrap: wrap; row-gap: 4px; }
+  .page-head .head-aside { width: 100%; }
+}
+.lg { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.erp-legend .lg .dot { margin-left: 6px; }
+/* the syllabus sheet on a narrow screen: long labels wrap, label above field */
+.sh-block .sh-lab { white-space: normal; }
+@media (max-width: 760px) {
+  .sh-line { flex-wrap: wrap; justify-content: flex-start; gap: 4px 8px; }
+  .sh-line .sh-in { max-width: none; flex: 1 1 100%; }
+  .sh-lab { white-space: normal; }
+  table.sheet td, table.sheet th { padding: 6px 8px; }
+  .panel-head { flex-wrap: wrap; row-gap: 8px; }
+  .lv-tabs { margin-left: 0; flex-wrap: wrap; }
+}
+/* the save bar on a phone: the note and Save draft share a line, Submit below */
+@media (max-width: 760px) {
+  .savebar .wrap { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding-top: 8px; padding-bottom: 8px; }
+  .savebar .save-note { width: auto !important; font-size: 12px; }
+  .savebar .spacer { display: none; }
+  .savebar #btn-save-draft, .savebar .demo-fill { grid-column: 2; padding: 6px 12px; font-size: 12.5px; }
+  .savebar #btn-submit, .savebar a.btn-gold { grid-column: 1 / -1; }
+  .savebar .demo-fill { grid-column: 1 / -1; }
+}

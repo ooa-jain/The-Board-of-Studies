@@ -78,13 +78,13 @@ body.erp table.data tbody tr:hover, .erp-table tbody tr:hover { background: #eef
 .st { font-weight: 700; font-size: 12px; }
 .st-submitted { color: var(--erp-green); }
 .st-draft { color: #1d4ed8; }
-.st-open, .st-locked { color: var(--erp-red); }
+.st-open, .st-locked { color: #6b7280; }
 .st-returned { color: #b42318; }
 .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle;
   background: var(--erp-grey); box-shadow: inset 0 -1px 0 rgba(0,0,0,.12); }
 .dot.st-submitted { background: var(--erp-green); }
 .dot.st-draft { background: var(--erp-amber); }
-.dot.st-open, .dot.st-locked { background: var(--erp-red); }
+.dot.st-open, .dot.st-locked { background: #c4cad4; }
 .dot.st-returned { background: #7a1c14; }
 .erp-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--erp-muted); }
 .erp-legend .dot { width: 9px; height: 9px; margin-left: 8px; }

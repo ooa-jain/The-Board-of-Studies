@@ -20,7 +20,7 @@ class Config:
 
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "ooa.admin")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ChangeThisOnFirstLogin!")
-    ADMIN_NAME = os.getenv("ADMIN_NAME", "Office of Academics")
+    ADMIN_NAME = os.getenv("ADMIN_NAME", "Office of Academic Affairs")
 
     ACADEMIC_YEAR = os.getenv("ACADEMIC_YEAR", "2027-28")
 

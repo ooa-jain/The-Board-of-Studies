@@ -15,8 +15,8 @@
 
   <section class="login-copy">
     <img class="login-logo" alt="JAIN (Deemed-to-be University)"
-         src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
-    <span class="login-kicker">Board of Studies · {{ app_settings.academic_year if app_settings else '' }}</span>
+         src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+    <span class="login-kicker">Board of Studies | {{ app_settings.academic_year|ay if app_settings else '' }}</span>
     <h1>BoS Academic Portal</h1>
     <p class="login-lede">Your record, stage by stage — fill each one, tick it off, and it goes to the
       Office of Academic Affairs.</p>
@@ -55,6 +55,11 @@
   </section>
 
   <section class="login-stage" aria-hidden="true">
+    <div class="login-stage-cap">
+      <span class="lsc-k">How it works</span>
+      <b>Every stage, ticked off — then on to the Office.</b>
+      <span class="lsc-steps"><i>1</i>Pre-BoS <i>2</i>BoS Documents <i>3</i>Curriculum</span>
+    </div>
     <div class="login-scene" id="login-scene">
       {% set panels = [
         ('blue', 'Pre-BoS', ['DIAC composition', 'DPAC composition', 'Minutes of the meeting']),

@@ -269,6 +269,7 @@ def department_analysis(dept, submission, user=None):
         "last_login": (user or {}).get("last_login"),
         "updated_at": (submission or {}).get("updated_at"),
         "sealed": (submission or {}).get("status") == "sealed",
+        "board": board,
     }
 
 
@@ -316,6 +317,33 @@ def stage_analysis(rows_of_boards):
             "n": i + 1, **tally,
             "percent": round(tally["submitted"] * 100 / total),
         })
+    return out
+
+
+def programme_progress(submission: dict, department: dict | None = None) -> list:
+    """Each programme of a department and how far it has got: its steps
+    (Curriculum, the batch syllabi, Course Revision) submitted of all, and
+    the average syllabus change its Course Revision reports."""
+    if not (submission or {}).get("_id"):
+        return []
+    stage_def = next(s for s in STAGES if s.get("parts"))
+    keys = parts_for(stage_def)
+    out = []
+    for p in programmes_of(submission, department):
+        code = p["programme_code"]
+        statuses = [part_status(submission, code, k) for k in keys]
+        rev = (programme_stage_state(submission, code, "prog_revision").get("data") or {}).get("courses") or []
+        changes = []
+        for r in rev:
+            try:
+                changes.append(float((r or {}).get("avg_change")))
+            except (TypeError, ValueError):
+                pass
+        out.append({"code": code, "name": p.get("programme_name") or code, "level": p.get("level") or "",
+                    "done": sum(1 for x in statuses if x == "submitted"), "total": len(keys),
+                    "complete": all(x == "submitted" for x in statuses),
+                    "started": any(x != "open" for x in statuses),
+                    "revision": round(sum(changes) / len(changes), 1) if changes else None})
     return out
 
 

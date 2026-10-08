@@ -11,7 +11,7 @@
   <div class="wrap">
     <div>
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Overview</div>
-      <h1>Overview — {{ year|ay }}</h1>
+      <h1>Overview | {{ year|ay }}</h1>
 {% if batch_info %}
 <div class="batch-strip">
   <span class="bs-label">Current batch</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
@@ -20,8 +20,9 @@
 </div>
 {% endif %}
     </div>
-    <div class="spacer head-aside">
-      <a class="btn" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>
+    <div class="spacer head-aside ov-actions">
+      <a class="btn btn-gold" href="{{ url_for('admin.analysis_report') }}">Analysis in one click</a>
+      <a class="btn btn-ghost" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>
     </div>
   </div>
   <div class="wrap">

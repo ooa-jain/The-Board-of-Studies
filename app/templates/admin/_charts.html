@@ -1,0 +1,72 @@
+{# Charts for the Office's pages, drawn in plain HTML so they reflow on a
+   phone. Each mark carries a data-tip read by js/admin-charts.js (hover and
+   keyboard focus); every value is also on the page as text, so the tooltip
+   only ever adds. #}
+
+{# Status colours, as everywhere on the portal: completed, in progress, sent
+   back — and not started as the grey track they sit on. #}
+{% macro status_legend() -%}
+<div class="cx-legend" aria-hidden="true">
+  <span><i class="cx-key k-done"></i>Completed</span>
+  <span><i class="cx-key k-prog"></i>In progress</span>
+  <span><i class="cx-key k-back"></i>Sent back</span>
+  <span><i class="cx-key k-none"></i>Not started</span>
+</div>
+{%- endmacro %}
+
+{# Each stage, across every department: one stacked bar. #}
+{% macro stage_bars(stages, n) -%}
+<div class="cx-stages" role="list">
+  {% for s in stages %}
+  {% set parts = [('done', s.submitted, 'Completed'), ('prog', s.in_progress, 'In progress'),
+                  ('back', s.returned, 'Sent back')] %}
+  <div class="cx-srow" role="listitem"
+       aria-label="{{ s.title }}: {{ s.submitted }} completed, {{ s.in_progress }} in progress, {{ s.returned }} sent back, {{ s.not_started }} not started, of {{ n }}">
+    <div class="cx-slabel"><span class="cx-sn">{{ s.n }}</span>{{ s.title }}</div>
+    <div class="cx-track">
+      {% for cls, v, word in parts if v %}
+      <span class="cx-seg s-{{ cls }}" style="width:{{ (v * 100 / (n or 1))|round(2) }}%" tabindex="0"
+            data-tip="{{ v }}|{{ word }} · {{ s.title }}|{{ (v * 100 / (n or 1))|round|int }}% of {{ n }} departments"></span>
+      {% endfor %}
+      {% if s.not_started %}
+      <span class="cx-seg s-none" style="width:{{ (s.not_started * 100 / (n or 1))|round(2) }}%" tabindex="0"
+            data-tip="{{ s.not_started }}|Not started · {{ s.title }}|{{ (s.not_started * 100 / (n or 1))|round|int }}% of {{ n }} departments"></span>
+      {% endif %}
+    </div>
+    <div class="cx-sval"><b>{{ s.submitted }}</b>/{{ n }}</div>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{# Updates a day, the last fortnight: one column a day. #}
+{% macro activity(a) -%}
+{% set top = a.peak if a.peak > 0 else 1 %}
+<div class="cx-cols" style="--cols:{{ a.series|length }}">
+  <div class="cx-grid" aria-hidden="true"><i></i><i></i><i></i></div>
+  {% for d in a.series %}
+  <div class="cx-col" tabindex="0"
+       data-tip="{{ d.all }}|update{{ 's' if d.all != 1 }} · {{ d.label }}|{{ d.submitted }} submission{{ 's' if d.submitted != 1 }}"
+       aria-label="{{ d.label }}: {{ d.all }} updates, {{ d.submitted }} submissions">
+    <span class="cx-bar{{ ' is-zero' if not d.all }}" style="height:{{ (d.all * 100 / top)|round(1) if d.all else 0 }}%">
+      {% if d.all and d.all == a.peak %}<em class="cx-cap">{{ d.all }}</em>{% endif %}
+    </span>
+    <span class="cx-day">{{ d.day }}<small>{{ d.date }}</small></span>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{# A ranked list of percentages: campuses, schools, departments. #}
+{% macro ranked(items, label_key='name') -%}
+<div class="cx-rank" role="list">
+  {% for it in items %}
+  <div class="cx-rrow" role="listitem" tabindex="0"
+       data-tip="{{ it.percent }}%|{{ it[label_key] }}|{{ it.done }} of {{ it.total }} stages completed{% if it.note %} · {{ it.note }}{% endif %}">
+    <span class="cx-rlabel" title="{{ it[label_key] }}">{{ it[label_key] }}</span>
+    <span class="cx-rtrack"><i style="width:{{ it.percent }}%"></i></span>
+    <span class="cx-rval">{{ it.percent }}%</span>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
