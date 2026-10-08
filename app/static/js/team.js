@@ -73,6 +73,9 @@
     for (let i = 0; i < 10; i++) out += abc[n[i] % abc.length];
     out += "23456789"[n[10] % 8] + sym[n[11] % sym.length];
     pw.value = out;
+    // a suggested password is shown, so it can be read out or noted down
+    const eye = pw.parentNode.querySelector(".pw-eye");
+    if (pw.type === "password" && eye) eye.click();
     pw.select();
   });
 

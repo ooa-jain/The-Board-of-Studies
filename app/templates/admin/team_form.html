@@ -43,7 +43,8 @@
         <label class="check"><input type="radio" name="pw_mode" value="type" {{ 'checked' if v.pw_mode == 'type' }}>
           I will type one</label>
         <div class="pw-wrap tm-pw-typed" {% if v.pw_mode != 'type' %}hidden{% endif %}>
-          <input type="text" name="password" id="tm-password" minlength="10" placeholder="At least 10 characters" spellcheck="false">
+          <input type="password" name="password" id="tm-password" minlength="10" placeholder="At least 10 characters"
+                 spellcheck="false" autocomplete="new-password">
           <button class="btn btn-ghost btn-sm" type="button" id="tm-gen">Suggest one</button>
         </div>
         <span class="help">They are asked to set their own password the first time they sign in.</span>

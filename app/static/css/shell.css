@@ -466,3 +466,14 @@ body.has-side .wrap { max-width: none !important; }
 .tm-pw .check { display: flex; align-items: flex-start; gap: 8px; text-align: left; }
 .tm-pw .check input { flex: none; margin: 3px 0 0; }
 .tm-form input[type=radio], .tm-form input[type=checkbox], .tm-links input[type=radio] { width: auto; min-height: 0; }
+
+/* ---- an eye on every password box (js/pw-show.js) ---- */
+.pw-eye-wrap { position: relative; display: block; }
+.pw-eye-wrap > input { width: 100%; padding-right: 44px; }
+.pw-eye { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: grid; place-items: center;
+  width: 34px; height: 34px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #5b6474; cursor: pointer; }
+.pw-eye:hover { background: #eef1f6; color: #0e2a5c; }
+.pw-eye:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+.pw-eye[aria-pressed="true"] { color: #0e2a5c; }
+.pw-eye svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tm-pw-typed .pw-eye-wrap { flex: 1; min-width: 0; }
