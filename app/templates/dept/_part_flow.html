@@ -39,13 +39,13 @@
     <span class="pmap-pill">
       <span class="pmap-ico">{{ icon('existing') }}</span>
       <span class="pmap-n">{{ n }}</span>
-      <span class="pmap-title">{{ 'Existing' if zigzag else 'Existing Batch' }}</span>
+      <span class="pmap-title" title="Earlier batches">Batch of</span>
       <span class="pmap-twigs">
         {% for ob in older %}
         <a class="pmap-twig is-{{ ob.status }}{{ ' is-here' if ob.key == here }}"
            href="{{ url_for('dept.stage', stage_key=ob.key, programme_code=code) }}"
            {% if ob.key == here %}aria-current="page"{% endif %}
-           title="Syllabus {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}"><i class="pmap-dot"></i>{{ short(ob.tag) }}</a>
+           title="Syllabus — Batch of {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}"><i class="pmap-dot"></i>{{ short(ob.tag) }}</a>
         {% endfor %}
       </span>
     </span>
@@ -59,7 +59,7 @@
        title="{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}">
       <span class="pmap-ico">{{ icon(kind) }}</span>
       <span class="pmap-n">{{ n }}</span>
-      <span class="pmap-title">{% if kind == 'current' %}{{ 'Current' if zigzag else 'Current Batch' }}{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
+      <span class="pmap-title"{% if kind == 'current' %} title="The current batch"{% endif %}>{% if kind == 'current' %}Batch of{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
       {% if part.tag %}<span class="pmap-tag">{{ short(part.tag) }}</span>{% endif %}
       {% if part.status == 'submitted' and not zigzag %}<span class="pmap-done">✓ Submitted</span>{% endif %}
       <i class="pmap-dot" aria-hidden="true"></i>

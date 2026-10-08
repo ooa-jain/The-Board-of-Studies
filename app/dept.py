@@ -224,7 +224,7 @@ def dashboard():
     prog_rows, prog_heads = [], []
     for p in programmes_of(sub, dept):
         steps = _programme_steps(sub, p["programme_code"])
-        prog_heads = prog_heads or [st["label"].replace("Existing Batch ", "").replace("Current Batch ", "Current ")
+        prog_heads = prog_heads or [st["label"] + (" · current" if st["key"] == "prog_syllabus" else "")
                                     for st in steps]
         # an earlier batch not begun is optional, not overdue
         shown = [{**st, "status": "optional" if st["optional"] and st["status"] == "open" else st["status"]}
@@ -385,6 +385,7 @@ def stage(stage_key, programme_code=None):
                            parts=_parts_nav(sub, stage_def, programme),
                            prog_tree=_programme_tree(sub, dept, programme),
                            all_revisions_done=_all_revisions_done(sub, dept),
+                           suggest_phrases=_suggest_phrases(sub, dept),
                            board=board, groups=grouped_board(board))
 
 
@@ -536,8 +537,8 @@ def _syllabus_index(sub, stage_key, programme):
                     "title": str(r.get("course_title") or "").strip()}
                    for r in (data.get("courses") or []) if isinstance(r, dict) and r.get("course_code")]
         out.append({"key": k, "current": k == "prog_syllabus",
-                    "label": "Current batch " + batches()["current"] if k == "prog_syllabus"
-                             else "Batch " + (sd.get("batch") or ""),
+                    "label": "Batch of " + batches()["current"] + " (current)" if k == "prog_syllabus"
+                             else "Batch of " + (sd.get("batch") or ""),
                     "url": url_for("dept.stage", stage_key=k, programme_code=code),
                     "courses": courses})
     return out
@@ -677,6 +678,15 @@ def drive_fill():
     for key, part in (sub.get("stages") or {}).items():
         if part.get("data"):
             people.keep(dept["dept_code"], _year(), key, None, part["data"], _person())
+    # the Office sees it as an update, one per stage (the programmes under Curriculum)
+    name = (_person() or {}).get("name", "")
+    for key in STAGE_KEYS:
+        parts = [d for d in done if d.startswith(STAGE_BY_KEY[key]["title"])] if key != "curriculum" \
+            else [d for d in done if " · " in d]
+        if parts:
+            notify_record(dept, "saved", stage_key=key, person=name, actor=_me()["username"],
+                          changes=[{"section": "Drive folder", "field": "Imported",
+                                    "before": "", "after": f"{len(parts)} part{'s' if len(parts) != 1 else ''} filled from the Drive folder"}])
     flash(f"Data imported from your Drive folder into {len(done)} stages and programme parts. "
           "Anything the folder did not have is marked “to be confirmed” — add it manually during "
           "the relevant stage.", "success")
@@ -812,6 +822,30 @@ def _level_counts(rows):
     return out
 
 
+def _suggest_phrases(sub, dept):
+    """Whole titles to offer while typing: every programme in the university's
+    catalogue, and the course titles this department has already used."""
+    from . import catalogue
+    from .workflow import programme_stage_state
+    out = [r.get("programme_name") for r in catalogue.load()]
+    for p in programmes_of(sub, dept):
+        code = p["programme_code"]
+        out.append(p.get("programme_name"))
+        cur = programme_stage_state(sub, code, "prog_curriculum").get("data") or {}
+        out += [(r or {}).get("course_title") for r in cur.get("semester_structure") or [] if isinstance(r, dict)]
+        syl = programme_stage_state(sub, code, "prog_syllabus").get("data") or {}
+        out += [(r or {}).get("course_title") for r in syl.get("courses") or [] if isinstance(r, dict)]
+    seen, phrases = set(), []
+    for t in out:
+        t = " ".join(str(t or "").split())
+        # a cell may hold several titles: "Python / Python Lab"
+        for one in [x.strip() for x in t.split(" / ")] if " / " in t else [t]:
+            if 3 < len(one) < 200 and one.lower() not in seen:
+                seen.add(one.lower())
+                phrases.append(one)
+    return phrases[:3000]
+
+
 def _note_place(dept, stage_key, programme_code=None):
     """Where the department was last working, so its home can take it back
     there."""
@@ -863,9 +897,9 @@ def _step_label(key, cfg=None):
     if key == "prog_curriculum":
         return "Curriculum"
     if key == "prog_syllabus":
-        return f"Current Batch {batches(cfg)['current']}".strip()
+        return f"Batch of {batches(cfg)['current']}".strip()
     if d.get("existing_batch"):
-        return f"Existing Batch {d.get('batch', '')}".strip()
+        return f"Batch of {d.get('batch', '')}".strip()
     if key == "prog_revision":
         return "Course Revision"
     return d["title"]

@@ -581,9 +581,9 @@ def test_each_step_says_where_it_goes_and_the_last_reviews_the_programme(app, cl
     code = _signed_in_department(app, client)
     client.post("/department/drive/fill")
     cur = client.get("/department/stage/prog_curriculum/MCAREG").get_data(as_text=True)
-    assert "Submit Curriculum &amp; go to Current Batch" in cur
+    assert "Submit Curriculum &amp; go to Batch of 2026–2027" in cur
     syl = client.get("/department/stage/prog_syllabus/MCAREG").get_data(as_text=True)
-    assert "Submit Current Batch" in syl and "go to Existing Batch" in syl
+    assert "Submit Batch of 2026–2027 &amp; go to Batch of 2024–2025" in syl
     from app.workflow import batches
     with app.test_request_context():
         older = [b["key"] for b in batches()["existing"]]

@@ -466,7 +466,7 @@ PROGRAMME_SYLLABUS = {
     "key": "prog_syllabus",
     "parent": "curriculum",
     "group": "Stage 3 · Curriculum",
-    "title": "Current Batch Syllabus",
+    "title": "Syllabus — current batch",
     # shows the current batch (Admin > Settings) beside the title
     "batch": "current",
     "blurb": "",
@@ -637,7 +637,7 @@ def batch_start(label) -> int | None:
 
 
 def _batch_part(start: int) -> dict:
-    part = _plain_syllabus(batch_key(start), f"Syllabus {batch_label(start)}", "")
+    part = _plain_syllabus(batch_key(start), f"Syllabus — Batch of {batch_label(start)}", "")
     part.update({"batch": batch_label(start), "existing_batch": True, "optional": False})
     return part
 

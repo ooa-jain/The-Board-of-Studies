@@ -41,7 +41,6 @@
       [/^master of commerce\b/i, "MCM"], [/^bachelor of commerce\b/i, "BCM"],
       [/^master of technology\b/i, "MTE"], [/^bachelor of technology\b/i, "BTE"],
       [/^master of arts\b/i, "MA"], [/^bachelor of arts\b/i, "BA"],
-      [/^master of ([a-z]+)/i, null], [/^bachelor of ([a-z]+)/i, null],
     ];
     function tidy(raw) {
       let t = String(raw || "").replace(/\s+/g, " ").trim();
@@ -72,8 +71,14 @@
       if (!name) return "";
       let deg = "";
       for (const [re, c] of DEGREE) {
-        const m = name.match(re);
-        if (m) { deg = c || ((name[0] === "M" ? "M" : "B") + m[1].slice(0, 2)).toUpperCase(); break; }
+        if (re.test(name)) { deg = c; break; }
+      }
+      if (!deg) {
+        // any other degree: M or B, then the initials of what it is of —
+        // Master of Computer Science -> MCS, Bachelor of Fine Arts -> BFA
+        const m = name.match(/^(master|bachelor)\s+of\s+(.+?)(?:\s+(?:in|with)\s+|\s*\(|$)/i);
+        if (m) deg = (m[1][0] + m[2].split(/\s+/).filter(w => w && !SMALL.has(w.toLowerCase()))
+                                   .map(w => /^[A-Z]{2,4}$/.test(w) ? w : w[0]).join("").slice(0, 3)).toUpperCase();
       }
       if (!deg) deg = name.split(" ").filter(w => !SMALL.has(w.toLowerCase())).slice(0, 3)
                           .map(w => w[0]).join("").toUpperCase();
@@ -1586,7 +1591,7 @@
     if (!best) {
       a.className = "syl-chip is-none";
       a.textContent = "+ Add";
-      a.title = "No syllabus has this course code yet — opens the Current Batch Syllabus";
+      a.title = "No syllabus has this course code yet — opens the current batch's syllabus";
       if (cur) a.href = cur.url;
       return a;
     }

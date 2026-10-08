@@ -7,7 +7,8 @@
 <section class="panel">
   <div class="panel-head"><h3>Departments × stages</h3>
     <span class="erp-legend"><span class="lg"><i class="dot st-submitted"></i>Completed</span> <span class="lg"><i class="dot st-draft"></i>In progress</span>
-      <span class="lg"><i class="dot st-open"></i>Not started</span> <span class="lg"><i class="dot st-returned"></i>Returned</span></span></div>
+      <span class="lg"><i class="dot st-open"></i>Not started</span> <span class="lg"><i class="dot st-returned"></i>Returned</span>
+      <span class="lg"><i class="dot st-open is-upd"></i>Updated since you last looked</span></span></div>
   <div class="table-wrap">
     <table class="erp-table erp-dots">
       <thead><tr><th>Department</th><th>Code</th><th>Campus</th>
@@ -17,11 +18,13 @@
       {% for r in rows %}
       {% set done = r.cells|selectattr('status', 'equalto', 'submitted')|list|length %}
       <tr>
-        <td class="clip"><a href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}"><strong>{{ r.dept.dept_name }}</strong></a></td>
+        <td class="clip"><a href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}"><strong>{{ r.dept.dept_name }}</strong></a>
+          {% if r.updates %}<span class="upd-tag" title="{{ r.updates.count }} update{{ 's' if r.updates.count != 1 }} since you last looked — latest {{ r.updates.latest.strftime('%d %b, %H:%M') }}">Updated · {{ r.updates.count }}</span>{% endif %}</td>
         <td class="mono">{{ r.dept.dept_code }}</td>
         <td class="muted">{{ r.dept.campus }}</td>
         {% for c in r.cells %}
-        <td class="c"><i class="dot st-{{ c.status }}" title="{{ STAGES[loop.index0].title }} — {{ words.get(c.status, c.status) }}{% if c.timing.took %} · {{ c.timing.took }}{% endif %}"></i></td>
+        {% set fresh = r.updates and c.key in r.updates.stages %}
+        <td class="c"><i class="dot st-{{ c.status }}{{ ' is-upd' if fresh }}" title="{{ STAGES[loop.index0].title }} — {{ words.get(c.status, c.status) }}{% if fresh %} · updated since you last looked{% endif %}{% if c.timing.took %} · {{ c.timing.took }}{% endif %}"></i></td>
         {% endfor %}
         <td class="c"><strong>{{ done }}/{{ r.cells|length }}</strong></td>
         <td class="c">{% if r.comments %}<span class="st st-returned">{{ r.comments }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>

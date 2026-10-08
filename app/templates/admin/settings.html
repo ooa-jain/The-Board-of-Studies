@@ -30,7 +30,7 @@
           <label for="current_batch">Current batch</label>
           <input type="text" id="current_batch" name="current_batch" required
                  value="{{ batches.current|replace('–', '-') }}" placeholder="2026-2027">
-          <span class="help">Departments fill the <strong>Current Batch Syllabus</strong> for this
+          <span class="help">Departments fill the syllabus for the <strong>current batch</strong> (“Batch of …”) for this
             batch; it is shown as a tag beside the syllabus everywhere.</span>
         </div>
         <div class="field">
@@ -43,8 +43,8 @@
             up the Curriculum stage. Removing a year hides it; what was filled in is kept.</span>
         </div>
         <p class="batch-now small">
-          Now: <span class="batch-tag is-current">Current batch · {{ batches.current }}</span>
-          {% for b in batches.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}
+          Now: <span class="batch-tag is-current">Current: Batch of {{ batches.current }}</span>
+          {% for b in batches.existing %}<span class="batch-tag">Batch of {{ b.label }}</span>{% endfor %}
         </p>
       </fieldset>
       <div class="field">

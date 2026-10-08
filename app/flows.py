@@ -23,7 +23,7 @@ NODES = [
     {"key": "pre_bos", "title": "Pre-BoS", "group": "Stage 1"},
     {"key": "bos_documents", "title": "BoS Documents", "group": "Stage 2"},
     {"key": "prog_curriculum", "title": "Curriculum", "group": "Stage 3"},
-    {"key": "prog_syllabus", "title": "Current Batch Syllabus", "group": "Stage 3"},
+    {"key": "prog_syllabus", "title": "Syllabus — current batch", "group": "Stage 3"},
     {"key": "prog_revision", "title": "Course Revision", "group": "Stage 3"},
     {"key": "checks", "title": "Checks & summaries", "group": "Worked out"},
 ]

@@ -14,8 +14,8 @@
       <h1>Overview | {{ year|ay }}</h1>
 {% if batch_info %}
 <div class="batch-strip">
-  <span class="bs-label">Current batch</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
-  {% if batch_info.existing %}<span class="bs-label">Existing batches</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
+  <span class="bs-label">Current: Batch of</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
+  {% if batch_info.existing %}<span class="bs-label">Earlier: Batch of</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
   <a class="bs-change" href="{{ url_for('admin.app_settings') }}#current_batch">Change</a>
 </div>
 {% endif %}

@@ -134,6 +134,13 @@ def _merge(earlier, later):
 # ---------------------------------------------------------------------------
 
 def stage_title(stage_key):
+    if stage_key == "prog_syllabus":
+        # the current batch's syllabus, named by its year
+        try:
+            from .workflow import batches
+            return f"Syllabus — Batch of {batches()['current']}"
+        except Exception:
+            pass
     return (STAGE_BY_KEY.get(stage_key) or {}).get("title", stage_key or "")
 
 

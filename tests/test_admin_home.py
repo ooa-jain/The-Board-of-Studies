@@ -42,3 +42,42 @@ def test_the_sign_in_page_is_light_with_the_scene_as_its_picture(app, client):
     page = client.get("/").get_data(as_text=True)
     assert "img/jain-logo.png" in page and "jain-logo-light.png" not in page
     assert "login-stage-cap" in page and "Every stage, ticked off" in page
+
+
+def test_a_department_s_changes_carry_a_red_tag_until_the_office_marks_them_seen(app, client):
+    u, p = make_department(app)
+    dept = client
+    login(dept, u, p)
+    dept.post("/department/api/dept_info/save", json=DEPT_INFO_OK)
+    dept.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    office = app.test_client()
+    _admin(app, office)
+    grid = office.get("/admin/submissions").get_data(as_text=True)
+    assert 'class="upd-tag"' in grid and "dot st-submitted is-upd" in grid
+    assert 'class="upd-tag"' in office.get("/admin/").get_data(as_text=True)
+    page = office.get("/admin/submissions/COM").get_data(as_text=True)
+    assert "since you last looked" in page and "Mark as seen" in page
+    # seen: the tags go
+    office.post("/admin/submissions/COM/seen")
+    page = office.get("/admin/submissions/COM").get_data(as_text=True)
+    assert "upd-banner" not in page
+    assert 'class="upd-tag"' not in office.get("/admin/submissions").get_data(as_text=True)
+
+
+def test_titles_are_offered_while_typing(app, client):
+    """The stage page carries the titles to suggest — the university's
+    programmes, the department's courses — and the widget is loaded."""
+    u, p = make_department(app)
+    login(client, u, p)
+    page = client.get("/department/stage/dept_info").get_data(as_text=True)
+    assert "js/suggest.js" in page and "window.SUGGEST_PHRASES" in page
+    assert "Bachelor of Commerce (Honours / Honours with Research)" in page
+
+
+def test_short_forms_expand_to_full_words():
+    """CS is Computer Science or Cyber Security; comm is Commerce or Communication."""
+    import re
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "app" / "static" / "js" / "suggest.js").read_text()
+    assert re.search(r'cs: \["Computer Science", "Cyber Security"', js)
+    assert re.search(r'comm: \["Commerce", "Communication"', js)

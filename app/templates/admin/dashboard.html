@@ -17,8 +17,8 @@
       <h1>Board of Studies | {{ year|ay }}</h1>
       {% if batch_info %}
       <div class="batch-strip">
-        <span class="bs-label">Current batch</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
-        {% if batch_info.existing %}<span class="bs-label">Existing batches</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
+        <span class="bs-label">Current: Batch of</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
+        {% if batch_info.existing %}<span class="bs-label">Earlier: Batch of</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
         <a class="bs-change" href="{{ url_for('admin.app_settings') }}#current_batch">Change</a>
       </div>
       {% endif %}
@@ -98,8 +98,9 @@
             {% for r in rows %}
               <tr>
                 <td><a class="ad-dept" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">{{ r.dept.dept_name }}</a>
+                  {% if r.updates %}<span class="upd-tag" title="Since you last looked — latest {{ r.updates.latest.strftime('%d %b, %H:%M') }}">Updated · {{ r.updates.count }}</span>{% endif %}
                   <small>{{ r.dept.dept_code }} · {{ r.dept.campus or '—' }}</small></td>
-                <td class="c ad-td-dots"><span class="ad-dots">{% for s in r.board %}<i class="dot st-{{ s.status }}" title="{{ s.title }} — {{ words.get(s.status, s.status) }}"></i>{% endfor %}</span></td>
+                <td class="c ad-td-dots"><span class="ad-dots">{% for s in r.board %}{% set fresh = r.updates and s.key in r.updates.stages %}<i class="dot st-{{ s.status }}{{ ' is-upd' if fresh }}" title="{{ s.title }} — {{ words.get(s.status, s.status) }}{{ ' · updated since you last looked' if fresh }}"></i>{% endfor %}</span></td>
                 <td class="ad-col-bar"><span class="ad-meter" aria-label="{{ r.done }} of {{ r.total }} stages"><i style="width:{{ r.percent }}%"></i></span>
                   <small>{{ r.done }}/{{ r.total }} stages</small></td>
                 <td class="c ad-td-prog" data-label="Programmes">{{ r.prog_done }}/{{ r.programmes|length }}</td>

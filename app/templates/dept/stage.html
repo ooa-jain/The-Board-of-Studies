@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_art.html" as art %}
-{% block title %}{{ stage.title }}{% endblock %}
+{% block title %}{% if batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}{% endblock %}
 
 {% block header %}
 <div class="page-head">
@@ -13,10 +13,10 @@
         {% else %}{{ stage.group }}{% endif %}
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
-      <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{{ stage.title }}</h1>
+      <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{% if batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}</h1>
       {% if batch_tag %}
       <span class="batch-tag{{ ' is-current' if stage.batch == 'current' }}">
-        {{ 'Current batch' if stage.batch == 'current' else 'Existing batch' }} · {{ batch_tag }}
+        Batch of {{ batch_tag }}{{ ' · current batch' if stage.batch == 'current' else ' · earlier batch' }}
       </span>
       {% endif %}
       {% if stage.blurb %}<p>{{ stage.blurb }}</p>{% endif %}
@@ -192,6 +192,8 @@
 {% endblock %}
 
 {% block scripts %}
+{# titles to offer while typing: the university's programmes, this department's courses #}
+<script>window.SUGGEST_PHRASES = {{ (suggest_phrases or [])|tojson }};</script>
 <script id="stage-def" type="application/json">{{ stage|tojson }}</script>
 <script id="stage-data" type="application/json">{{ data|tojson }}</script>
 <script id="credit-def" type="application/json">{{ (credit_matrix or {})|tojson }}</script>

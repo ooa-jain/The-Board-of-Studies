@@ -9,7 +9,7 @@
         <a href="{{ url_for('admin.submissions') }}">Submissions</a> <span>›</span>
         {{ dept.campus }} <span>›</span> {{ dept.school }}
       </div>
-      <h1>{{ dept.dept_name }}</h1>
+      <h1>{{ dept.dept_name }}{% if updates %} <span class="upd-tag upd-tag-lg">Updated · {{ updates.count }}</span>{% endif %}</h1>
       <p>{{ dept.dept_code }}{% if dept.place %} · {{ dept.place }}{% endif %}</p>
     </div>
     <div class="spacer" style="text-align:right">
@@ -34,6 +34,26 @@
 {% endblock %}
 
 {% block content %}
+{% if updates %}
+{# what changed since the Office last looked; Mark as seen clears the tags #}
+<section class="upd-banner" aria-label="Updated since you last looked">
+  <div class="upd-banner-head">
+    <span class="upd-tag">Updated</span>
+    <strong>{{ updates.count }} change{{ 's' if updates.count != 1 }} since you last looked</strong>
+    <span class="small muted">— since {{ updates.since.strftime('%d %b, %H:%M') }}</span>
+    <form method="post" action="{{ url_for('admin.mark_seen', dept_code=dept.dept_code) }}" class="spacer">
+      <button class="btn btn-ghost btn-sm" type="submit">Mark as seen</button>
+    </form>
+  </div>
+  <ul class="upd-list">
+    {% for n in updates.notes %}
+    <li><span class="upd-when">{{ n.at.strftime('%d %b, %H:%M') }}</span>
+      <span class="upd-what">{{ n.text.split(' — ', 1)[1] if ' — ' in n.text else n.text }}{% if n.person %} <span class="muted">· {{ n.person }}</span>{% endif %}</span></li>
+    {% endfor %}
+    {% if updates.count > updates.notes|length %}<li class="muted small">and {{ updates.count - updates.notes|length }} more — <a href="{{ url_for('admin.updates', dept=dept.dept_code, show='unread') }}">see them all</a></li>{% endif %}
+  </ul>
+</section>
+{% endif %}
 {% macro kw_tags(m) %}{% for w in m.expected or [] %}{% set hit = w in (m.found or []) %}<span class="kw-tag{{ ' is-hit' if hit }}" title="{{ w }}">{{ (m.seen[(m.found).index(w)] if hit and m.seen else w.split('/')[0]|trim) }}</span> {% endfor %}{% endmacro %}
 {% if dept.demo %}
 <div class="demo-strip">
@@ -100,7 +120,7 @@
             {% if not f.thumb %}<span class="file-drawn"><span class="file-ext">{{ f.name.rsplit('.',1)[-1]|upper }}</span></span>{% endif %}
           </a>
           <div class="file-meta">
-            <span class="doc-label">{{ f.label }}</span>
+            <span class="doc-label">{{ f.label }}{% if updates and f.uploaded_at and updates.files_since and f.uploaded_at >= updates.files_since %} <span class="upd-tag">New</span>{% endif %}</span>
             <strong class="file-name">{{ f.name }}</strong>
             <span class="file-facts">{% if f.size %}{{ (f.size / 1024)|round|int }} KB{% endif %}{% if f.uploaded_at %} · {{ f.uploaded_at.strftime('%d %b %Y') }}{% endif %}</span>
             <div class="file-acts">
@@ -158,6 +178,7 @@
         <span class="small muted">{{ s.blurb }}</span>
       </div>
       <span class="spacer flex">
+        {% if updates and s.key in updates.stages %}<span class="upd-tag" title="Changed since you last looked">Updated</span>{% endif %}
         {% if s.errors %}<span class="pill pill-err">{{ s.errors }} errors</span>{% endif %}
         {% if s.warnings %}<span class="pill pill-warn">{{ s.warnings }} warnings</span>{% endif %}
         {% if s.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
@@ -237,9 +258,10 @@
         <button type="button" class="pmap-pill" {% if st.data %}data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=skey, programme=code) }}"{% else %}disabled{% endif %}
                 title="{{ words.get(st.status, 'Not started') }}{% if st.summary and st.summary.errors %} · {{ st.summary.errors }} errors{% endif %}">
           <span class="pmap-n">{{ loop.index }}</span>
-          <span class="pmap-title">{% if skey == 'prog_syllabus' %}Current Batch{% elif sd.existing_batch %}Batch {{ sd.batch }}{% elif skey == 'prog_revision' %}Revision{% else %}{{ sd.title or skey }}{% endif %}</span>
+          <span class="pmap-title">{% if skey == 'prog_syllabus' %}Batch of {{ batches.current }}{% elif sd.existing_batch %}Batch of {{ sd.batch }}{% elif skey == 'prog_revision' %}Revision{% else %}{{ sd.title or skey }}{% endif %}</span>
           <i class="pmap-dot" aria-hidden="true"></i>
           <span class="pmap-tag">{{ words.get(st.status, 'Not started') }}</span>
+          {% if updates and (code, skey) in updates.parts %}<span class="upd-tag">Updated</span>{% endif %}
         </button>
       </li>
       {% endfor %}

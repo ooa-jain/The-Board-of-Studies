@@ -1160,9 +1160,11 @@ def test_batches_come_from_settings_and_show_as_parts(app, client):
 def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, client):
     _through_bos_documents(app, client)
     page = client.get("/department/stage/prog_syllabus_b2024/BCMREG").get_data(as_text=True)
-    assert "Syllabus 2024–2025" in page and "Existing batch" in page
+    # batches are named "Batch of" with their years
+    assert "Syllabus — Batch of 2024–2025" in page and "earlier batch" in page
     cur = client.get("/department/stage/prog_syllabus/BCMREG").get_data(as_text=True)
-    assert "Current Batch Syllabus" in cur and "Current batch" in cur and "2026–2027" in cur
+    assert "Syllabus — Batch of 2026–2027" in cur and "current batch" in cur
+    assert "Current Batch" not in cur and "Existing Batch" not in cur
     # the menu lists the earlier batches under the programme
     assert "/department/stage/prog_syllabus_b2025/BCMREG" in cur
     from app.schema import STAGE_BY_KEY

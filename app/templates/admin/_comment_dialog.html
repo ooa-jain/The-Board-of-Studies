@@ -8,7 +8,7 @@
       <select id="c-stage" name="stage" required>
         {% for s in STAGES %}{% if not s.parts %}<option value="{{ s.key }}">{{ s.title }}</option>{% endif %}{% endfor %}
         <option value="prog_curriculum">Curriculum (programme)</option>
-        <option value="prog_syllabus">Current Batch Syllabus (programme)</option>
+        <option value="prog_syllabus">Syllabus — current batch (programme)</option>
         <option value="prog_revision">Course Revision (programme)</option>
       </select>
     </div>

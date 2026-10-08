@@ -37,6 +37,36 @@ def _actor():
 # dashboard
 # ---------------------------------------------------------------------------
 
+def _unread_updates(dept_codes=None):
+    """What each department changed since the Office last looked (its unread
+    updates): how many, which stages and programme parts, since when, and
+    the latest few — for the red "Updated" tags."""
+    q = {"read": False}
+    if dept_codes is not None:
+        q["dept_code"] = {"$in": list(dept_codes)}
+    out = {}
+    for n in get_db().notifications.find(q).sort("at", -1):
+        d = out.setdefault(n["dept_code"], {"count": 0, "stages": set(), "parts": set(), "since": None,
+                                            "latest": n.get("at"), "notes": []})
+        d["count"] += 1
+        stage = n.get("stage") or ""
+        parent = (STAGE_BY_KEY.get(stage) or {}).get("parent")
+        if n.get("programme_code") and stage:
+            d["parts"].add((n["programme_code"], stage))
+        if stage:
+            d["stages"].add(parent or stage)
+        first = n.get("first_at") or n.get("at")
+        if first and (d["since"] is None or first < d["since"]):
+            d["since"] = first
+        if len(d["notes"]) < 6:
+            d["notes"].append(n)
+    from datetime import timedelta
+    for d in out.values():
+        # a file is stored a moment before its update is written
+        d["files_since"] = d["since"] - timedelta(minutes=5) if d["since"] else None
+    return out
+
+
 def _activity(db, days_back=14):
     """Updates from departments, a day at a time, for the last fortnight."""
     from datetime import timedelta
@@ -184,6 +214,9 @@ def dashboard():
     pic = _picture(db, year)
     # the departments furthest behind come first: they are the ones to chase
     rows = sorted(pic["rows"], key=lambda r: (_ahead(r), r["dept"].get("dept_name", "")))
+    upd = _unread_updates()
+    for r in rows:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
     return render_template("admin/dashboard.html", year=year, pic=pic, rows=rows,
                            latest=list(db.notifications.find().sort("at", -1).limit(8)))
 
@@ -618,7 +651,12 @@ def pack_load(key):
 def submissions():
     """Overview → Monitor: every department, stage by stage."""
     data = analysis_sheets(_year())
-    rows = sorted(data["stages"], key=lambda r: (-sum(c["status"] == "submitted" for c in r["cells"]),
+    upd = _unread_updates()
+    for r in data["stages"]:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
+    # departments with something new since the Office last looked come first
+    rows = sorted(data["stages"], key=lambda r: (not r["updates"],
+                                                 -sum(c["status"] == "submitted" for c in r["cells"]),
                                                  r["dept"].get("dept_name", "")))
     return render_template("admin/submissions.html", rows=rows, year=_year(), STAGES=STAGES)
 
@@ -633,13 +671,25 @@ def submission_detail(dept_code):
     # from Department Information once saved, else the catalogue it starts from
     prog_names = {p["programme_code"]: p.get("programme_name") or p["programme_code"]
                   for p in programmes_of(sub, dept)}
+    updates = _unread_updates([dept_code]).get(dept_code)
     return render_template("admin/submission_detail.html", dept=dept, submission=sub,
-                           prog_names=prog_names,
+                           prog_names=prog_names, updates=updates,
                            board=stage_board(sub), progress=progress(sub),
                            year=year, STAGE_BY_KEY=STAGE_BY_KEY,
                            documents=_documents(dept_code, sub, year),
                            batches=batches(),
                            summaries=True)
+
+
+@bp.route("/submissions/<dept_code>/seen", methods=["POST"])
+@admin_required
+def mark_seen(dept_code):
+    """The Office has looked: the department's updates are read, and the red
+    tags go until it changes something again."""
+    n = get_db().notifications.update_many({"dept_code": dept_code, "read": False},
+                                           {"$set": {"read": True, "read_at": now()}}).modified_count
+    audit(_actor(), "updates.seen", f"{dept_code}: {n}")
+    return redirect(url_for("admin.submission_detail", dept_code=dept_code))
 
 
 # ---------------------------------------------------------------------------
