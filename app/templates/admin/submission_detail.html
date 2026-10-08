@@ -41,9 +41,11 @@
     <span class="upd-tag">Updated</span>
     <strong>{{ updates.count }} change{{ 's' if updates.count != 1 }} since you last looked</strong>
     <span class="small muted">— since {{ updates.since.strftime('%d %b, %H:%M') }}</span>
+    {% if can('overview', 'edit') %}
     <form method="post" action="{{ url_for('admin.mark_seen', dept_code=dept.dept_code) }}" class="spacer">
       <button class="btn btn-ghost btn-sm" type="submit">Mark as seen</button>
     </form>
+    {% endif %}
   </div>
   <ul class="upd-list">
     {% for n in updates.notes %}
@@ -197,7 +199,8 @@
         {% if s.returned_note %}<span style="color:var(--err)">Returned: {{ s.returned_note }}</span>{% endif %}
         <span class="spacer"></span>
 
-        {% if s.status == 'locked' %}
+        {% if not can('overview', 'edit') %}
+        {% elif s.status == 'locked' %}
         <form method="post" action="{{ url_for('admin.submission_unlock', dept_code=dept.dept_code, stage_key=s.key) }}">
           <button class="btn btn-ghost btn-sm" type="submit">Open this stage anyway</button>
         </form>
@@ -271,6 +274,7 @@
 {% endfor %}
 {% endif %}
 
+{% if can('departments', 'delete') %}
 <details class="card danger-zone mt-2">
   <summary>Delete all of this department's data</summary>
   <div class="card-body">
@@ -283,6 +287,7 @@
     </form>
   </div>
 </details>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

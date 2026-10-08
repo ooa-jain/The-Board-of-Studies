@@ -47,7 +47,7 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9H5zM2.5 18h19M9 18l.5-1.5h5L15 18"/></svg>
     <span class="side-text">Developer Preview</span><i class="side-dot st-draft"></i></summary>
   <div class="side-dev-body">All stages are open for testing. Checks and saving work as usual.
-    {% if current_user and current_user.role == 'admin' %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}
+    {% if current_user and current_user.role == 'admin' and can('settings', 'edit') %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}
     {% if current_user and current_user.role == 'department' %}
     {% if dept_drive %}
     <div class="side-dev-drive">
@@ -74,7 +74,7 @@
 {%- endmacro %}
 <aside class="admin-side">
   <div class="side-head">
-    <a class="side-brand" href="{{ url_for('admin.dashboard') }}" title="BoS Academic Portal">
+    <a class="side-brand" href="{{ admin_home() }}" title="BoS Academic Portal">
       <img class="side-logo" alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
       <img class="side-roundel" alt="" src="{{ url_for('static', filename='img/favicon-180.png') }}" width="180" height="180">
       <span class="side-brand-text">BoS Academic Portal<small>Office of Academic Affairs</small></span>
@@ -90,20 +90,21 @@
   <nav class="side-nav" id="topnav" aria-label="Admin">
     <button class="side-close" type="button" aria-label="Close the menu" data-side-close>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-    {{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}
-    {{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep) }}
-    {{ side_link(url_for('admin.submissions'), 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.analysis', 'admin.submission_detail', 'admin.programme_report') or (ep == 'admin.sheets' and tab not in ('documents', 'comments'))) }}
-    {{ side_link(url_for('admin.sheets', tab='documents'), 'Documents', 'M7 3h8l4 4v14H7zM14 3v5h5', ep == 'admin.sheets' and tab == 'documents') }}
-    {{ side_link(url_for('admin.sheets', tab='comments'), 'Comments', 'M4 5h16v11H9l-5 4z', ep == 'admin.sheets' and tab == 'comments') }}
-    {{ side_link(url_for('admin.calendar'), 'Calendar', 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 3v4M16 3v4', ep == 'admin.calendar') }}
-    {{ side_link(url_for('admin.flow'), 'Flow 3D', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM10 9l5 3-5 3z', ep == 'admin.flow') }}
+    {# each person sees only the sections their access gives them #}
+    {% if can('home') %}{{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}{% endif %}
+    {% if can('departments') %}{{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep) }}{% endif %}
+    {% if can('overview') %}{{ side_link(url_for('admin.submissions'), 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.analysis', 'admin.submission_detail', 'admin.programme_report') or (ep == 'admin.sheets' and tab not in ('documents', 'comments'))) }}{% endif %}
+    {% if can('documents') %}{{ side_link(url_for('admin.sheets', tab='documents'), 'Documents', 'M7 3h8l4 4v14H7zM14 3v5h5', ep == 'admin.sheets' and tab == 'documents') }}{% endif %}
+    {% if can('comments') %}{{ side_link(url_for('admin.sheets', tab='comments'), 'Comments', 'M4 5h16v11H9l-5 4z', ep == 'admin.sheets' and tab == 'comments') }}{% endif %}
+    {% if can('calendar') %}{{ side_link(url_for('admin.calendar'), 'Calendar', 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 3v4M16 3v4', ep == 'admin.calendar') }}{% endif %}
+    {% if can('flow') %}{{ side_link(url_for('admin.flow'), 'Flow 3D', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM10 9l5 3-5 3z', ep == 'admin.flow') }}{% endif %}
     <span class="side-sep"></span>
-    <a class="side-link nav-bell{{ ' is-on' if ep == 'admin.updates' }}" href="{{ url_for('admin.updates') }}"
+    {% if can('updates') %}<a class="side-link nav-bell{{ ' is-on' if ep == 'admin.updates' }}" href="{{ url_for('admin.updates') }}"
        data-updates-url="{{ url_for('admin.updates_json') }}" title="Updates">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span class="side-text">Updates</span>
       <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
-    </a>
-    {{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log')) }}
+    </a>{% endif %}
+    {% if can('settings') %}{{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log') or ep.startswith('admin.team')) }}{% endif %}
     {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>

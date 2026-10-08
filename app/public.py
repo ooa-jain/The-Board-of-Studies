@@ -36,7 +36,8 @@ def landing():
     if user.get("role") == "department" and user.get("dept_code"):
         return redirect(url_for("dept.dashboard"))
     if user.get("role") == "admin":
-        return redirect(url_for("admin.dashboard"))
+        from .access import home_url
+        return redirect(home_url())
     db = get_db()
     # somewhere behind a login sent us here; the form carries it back
     nxt = request.args.get("next")

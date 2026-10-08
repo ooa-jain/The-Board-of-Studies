@@ -170,7 +170,8 @@ def issue_department_login(db, dept, actor="system", reset=False):
 
 def _bootstrap(app):
     d = _db
-    if not d.users.find_one({"role": "admin"}):
+    # the first admin — not a team member the Office added later
+    if not d.users.find_one({"role": "admin", "team": {"$ne": True}}):
         d.users.insert_one({
             "username": app.config["ADMIN_USERNAME"],
             "password": hash_password(app.config["ADMIN_PASSWORD"]),

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Sign-in slip{% endblock %}
+{% block content %}
+{% set message -%}
+Dear {{ member.name }},
+
+You have been given access to the BoS Academic Portal (JAIN Deemed-to-be University, Office of Academic Affairs).
+
+Portal: {{ login_url }}
+Username: {{ member.username }}
+Password: {{ password }}
+
+Your access: {{ what }}
+
+Please sign in and set your own password the first time.
+{%- endset %}
+<div class="flex mb-2 no-print tm-slip-bar">
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.team') }}">← Team &amp; access</a>
+  <span class="spacer"></span>
+  <button class="btn btn-ghost btn-sm" type="button" data-print>Print</button>
+  <a class="btn btn-ghost btn-sm" href="mailto:{{ member.email or member.username }}?subject={{ 'Your access to the BoS Academic Portal'|urlencode }}&amp;body={{ message|urlencode }}">Open in email</a>
+  <button class="btn btn-sm" type="button" data-copy="{{ message }}" data-copy-label="Copied — paste it in a message">Copy as message</button>
+</div>
+
+<div class="slip">
+  <h2>BoS Academic Portal</h2>
+  <p class="slip-sub">JAIN (Deemed-to-be University) · Office of Academic Affairs · {{ year|ay }}</p>
+
+  <div class="cred-row cred-row-lead">
+    <span class="k">Name</span>
+    <span class="v v-plain">{{ member.name }}</span>
+  </div>
+  <div class="cred-row">
+    <span class="k">Access</span>
+    <span class="v v-plain">{{ what }}</span>
+  </div>
+  <div class="cred-row">
+    <span class="k">Portal</span>
+    <span class="v v-url">{{ login_url }}</span>
+  </div>
+  <div class="cred-row">
+    <span class="k">Username</span>
+    <span class="v">{{ member.username }}</span>
+    <button class="copy-btn no-print" type="button" data-copy="{{ member.username }}" aria-label="Copy the username">Copy</button>
+  </div>
+  <div class="cred-row">
+    <span class="k">Password</span>
+    <span class="v">{{ password }}</span>
+    <button class="copy-btn no-print" type="button" data-copy="{{ password }}" aria-label="Copy the password">Copy</button>
+  </div>
+
+  <div class="alert alert-warning mt-2 mb-0">
+    <span class="alert-icon" aria-hidden="true">!</span>
+    <div>
+      <strong>This password is shown once.</strong>
+      Leave this page and it cannot be seen again — use “New password” on Team &amp; access if it is lost.
+      They are asked to set their own password when they first sign in.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/copy.js') }}"></script>
+{% endblock %}

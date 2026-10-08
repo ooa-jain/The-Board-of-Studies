@@ -116,7 +116,8 @@ def login():
 
 def _home_for(user):
     if user["role"] == "admin":
-        return redirect(url_for("admin.dashboard"))
+        from .access import home_url
+        return redirect(home_url())
     return redirect(url_for("dept.dashboard"))
 
 

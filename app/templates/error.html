@@ -27,10 +27,12 @@
     <h2 class="error-h2">Where to go from here</h2>
     <ul class="error-links">
       {% if current_user and current_user.role == 'admin' %}
-        <li><a href="{{ url_for('admin.dashboard') }}">The admin dashboard</a>
+        {% if can('home') %}<li><a href="{{ url_for('admin.dashboard') }}">The admin dashboard</a>
             <span>Every department's progress for the year</span></li>
-        <li><a href="{{ url_for('admin.departments') }}">Department master</a>
-            <span>Records, logins and the credential sheet</span></li>
+        {% else %}<li><a href="{{ admin_home() }}">Your first page</a>
+            <span>The first section your access opens</span></li>{% endif %}
+        {% if can('departments') %}<li><a href="{{ url_for('admin.departments') }}">Department master</a>
+            <span>Records, logins and the credential sheet</span></li>{% endif %}
       {% elif current_user %}
         <li><a href="{{ url_for('dept.dashboard') }}">My submission</a>
             <span>Your stages, and the one to do next</span></li>

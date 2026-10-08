@@ -31,6 +31,7 @@ def create_app(config_object=Config):
 
     from .auth import bp as auth_bp
     from .admin import bp as admin_bp
+    from . import team  # noqa: F401  (Settings › Team & access, on the admin blueprint)
     from .dept import bp as dept_bp
     from .public import bp as public_bp
 
@@ -72,7 +73,8 @@ def create_app(config_object=Config):
         unread, batch_info = 0, None
         if user.get("role") == "admin":
             try:
-                unread = database.get_db().notifications.count_documents({"read": False})
+                from .access import scope_q
+                unread = database.get_db().notifications.count_documents({"read": False, **scope_q()})
                 from .workflow import batches
                 batch_info = batches()
             except Exception:
@@ -96,7 +98,9 @@ def create_app(config_object=Config):
                                       "folder": (pack.get("source") or {}).get("folder")}
             except Exception:
                 dept_nav = None
+        from .access import template_helpers
         return {
+            **template_helpers(),
             "dept_nav": dept_nav,
             "dept_drive": dept_drive,
             "updates_unread": unread,
@@ -114,10 +118,14 @@ def create_app(config_object=Config):
     # every one of them offers a way onward.
     @app.errorhandler(403)
     def _403(e):
-        return render_template(
-            "error.html", code=403, title="That page is not yours to open",
-            detail="You are signed in, but this page belongs to a different "
-                   "account. A department can only reach its own submission."), 403
+        if (session.get("user") or {}).get("role") == "admin":
+            detail = ("You are signed in, but your access does not include this page or this "
+                      "department. A Full admin can widen it in Settings › Team & access.")
+        else:
+            detail = ("You are signed in, but this page belongs to a different "
+                      "account. A department can only reach its own submission.")
+        return render_template("error.html", code=403, title="That page is not yours to open",
+                               detail=detail), 403
 
     @app.errorhandler(404)
     def _404(e):

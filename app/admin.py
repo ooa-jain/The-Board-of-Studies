@@ -10,6 +10,7 @@ from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
                    render_template, request, send_file, session, url_for)
 
 from . import ugc_rules as U
+from .access import allows, current_scope, current_user, guard_admin_request, may_see, scope_q
 from .auth import admin_required
 from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
@@ -22,6 +23,8 @@ from .workflow import (compute_status, department_analysis, get_or_create_submis
                        stage_analysis, return_stage, stage_board, unlock_stage, batches)
 
 bp = Blueprint("admin", __name__)
+# every admin page checks the signed-in person's sections and departments
+bp.before_request(guard_admin_request)
 
 
 def _year():
@@ -41,9 +44,10 @@ def _unread_updates(dept_codes=None):
     """What each department changed since the Office last looked (its unread
     updates): how many, which stages and programme parts, since when, and
     the latest few — for the red "Updated" tags."""
-    q = {"read": False}
+    q = {"read": False, **scope_q()}
     if dept_codes is not None:
-        q["dept_code"] = {"$in": list(dept_codes)}
+        mine = current_scope()
+        q["dept_code"] = {"$in": [c for c in dept_codes if mine is None or c in mine]}
     out = {}
     for n in get_db().notifications.find(q).sort("at", -1):
         d = out.setdefault(n["dept_code"], {"count": 0, "stages": set(), "parts": set(), "since": None,
@@ -73,7 +77,7 @@ def _activity(db, days_back=14):
     today = now().replace(hour=0, minute=0, second=0, microsecond=0)
     days = [today - timedelta(days=i) for i in range(days_back - 1, -1, -1)]
     per_day = {d.date(): {"all": 0, "submitted": 0} for d in days}
-    for n in db.notifications.find({"at": {"$gte": days[0]}}, {"at": 1, "event": 1}):
+    for n in db.notifications.find({"at": {"$gte": days[0]}, **scope_q()}, {"at": 1, "event": 1}):
         k = n["at"].date()
         if k in per_day:
             per_day[k]["all"] += 1
@@ -89,10 +93,10 @@ def _activity(db, days_back=14):
 def _picture(db, year):
     """The whole institution in one reading — for the home and for the
     one-click analysis, so the two can never disagree."""
-    departments = list(db.departments.find({"active": True})
+    departments = list(db.departments.find({"active": True, **scope_q()})
                        .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
-    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
-    users = {u.get("dept_code"): u for u in db.users.find({"role": "department"})}
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year, **scope_q()})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department", **scope_q()})}
     from .workflow import programme_progress
     rows = []
     for d in departments:
@@ -134,12 +138,12 @@ def _picture(db, year):
             g["percent"] = round(g["done"] * 100 / g["total"]) if g["total"] else 0
         return sorted(out.values(), key=lambda g: (-g["percent"], g["name"]))
 
-    attention = {"comments": db.comments.count_documents({"academic_year": year, "status": "open"}),
+    attention = {"comments": db.comments.count_documents({"academic_year": year, "status": "open", **scope_q()}),
                  "returned": sum(r["returned"] for r in rows),
-                 "bad_files": db.files.count_documents({"academic_year": year, "$or": [
+                 "bad_files": db.files.count_documents({"academic_year": year, **scope_q(), "$or": [
                      {"keyword_match.status": "miss"}, {"keyword_match.looks_like": {"$exists": True}}]})}
     attention["total"] = attention["comments"] + attention["returned"] + attention["bad_files"]
-    files = db.files.count_documents({"academic_year": year})
+    files = db.files.count_documents({"academic_year": year, **scope_q()})
     return {"rows": rows, "totals": totals, "stages": stages, "programmes": programmes,
             "by_campus": group("campus"), "by_school": group("school"), "attention": attention,
             "files": files, "activity": _activity(db)}
@@ -218,7 +222,7 @@ def dashboard():
     for r in rows:
         r["updates"] = upd.get(r["dept"]["dept_code"])
     return render_template("admin/dashboard.html", year=year, pic=pic, rows=rows,
-                           latest=list(db.notifications.find().sort("at", -1).limit(8)))
+                           latest=list(db.notifications.find(scope_q()).sort("at", -1).limit(8)))
 
 
 @bp.route("/analysis/report")
@@ -243,7 +247,7 @@ def analysis_report():
 def flow():
     """How one department's data moves from stage to stage, in 3D. The
     department — and a programme of it — is chosen in the side panel."""
-    departments = list(get_db().departments.find({"active": True}).sort("dept_name", 1))
+    departments = list(get_db().departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
     return render_template("admin/flow.html", year=_year(), departments=departments)
 
 
@@ -298,10 +302,10 @@ def analysis():
                                stages=stages, year=year, demo=True,
                                filters={"state": None, "q": ""})
 
-    departments = list(db.departments.find({"active": True})
+    departments = list(db.departments.find({"active": True, **scope_q()})
                        .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
-    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
-    users = {u.get("dept_code"): u for u in db.users.find({"role": "department"})}
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year, **scope_q()})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department", **scope_q()})}
 
     rows = [department_analysis(d, subs.get(d["dept_code"]), users.get(d["dept_code"]))
             for d in departments]
@@ -334,7 +338,7 @@ def analysis():
 @admin_required
 def departments():
     db = get_db()
-    q = {}
+    q = scope_q()
     place = request.args.get("place")
     campus = request.args.get("campus")
     school = request.args.get("school")
@@ -364,7 +368,7 @@ def departments():
                            schools=sorted(x for x in db.departments.distinct("school") if x),
                            campuses=campuses,
                            places=current_app.config["PLACES"],
-                           total=db.departments.count_documents({}),
+                           total=db.departments.count_documents(scope_q()),
                            filters={"place": place, "campus": campus,
                                     "school": school, "q": search})
 
@@ -508,7 +512,7 @@ def bulk_credentials():
     """Generate logins for every active department that has none."""
     db = get_db()
     made = 0
-    for dept in list(db.departments.find({"active": True, "username": {"$exists": False}})):
+    for dept in list(db.departments.find({"active": True, "username": {"$exists": False}, **scope_q()})):
         issue_department_login(db, dept, actor=_actor())
         made += 1
     audit(_actor(), "credentials.bulk", detail={"count": made})
@@ -525,7 +529,7 @@ def bulk_credentials():
 def credential_sheet():
     """Printable sheet of every credential still in the clear."""
     db = get_db()
-    depts = list(db.departments.find({"initial_password": {"$exists": True}})
+    depts = list(db.departments.find({"initial_password": {"$exists": True}, **scope_q()})
                  .sort([("campus", 1), ("dept_name", 1)]))
     return render_template("admin/credential_sheet.html", departments=depts,
                            login_url=url_for("auth.login", _external=True), year=_year())
@@ -630,6 +634,8 @@ def import_commit():
 @admin_required
 def pack_load(key):
     """Fill a department from its Drive documents, already turned into portal data."""
+    if current_scope() is not None:
+        abort(403)                       # it may add a department: for those who see them all
     try:
         report = load_pack(key, _year(), _actor(), replace=request.form.get("replace") == "on")
     except KeyError:
@@ -850,14 +856,16 @@ def submission_review(dept_code, stage_key):
         "summary": state.get("summary") or {},
         "returned_note": state.get("returned_note") or "",
         "dept_name": dept.get("dept_name", dept_code), "dept_code": dept_code,
-        "comment_url": url_for("admin.comment_add"),
+        "comment_url": url_for("admin.comment_add") if allows(current_user(), "comments", "edit") else "",
         "comments": [{"text": c["text"], "at": c["at"].strftime("%d %b %Y"), "status": c.get("status"),
                       "reply": c.get("reply", "")}
                      for c in db.comments.find({"dept_code": dept_code, "academic_year": _year(),
                                                 "stage": stage_key, "programme_code": prog}).sort("at", -1)],
         "programme": prog, "programme_name": pname,
-        "return_url": url_for("admin.submission_return", dept_code=dept_code, stage_key=stage_key),
-        "unlock_url": url_for("admin.submission_unlock", dept_code=dept_code, stage_key=stage_key),
+        "return_url": url_for("admin.submission_return", dept_code=dept_code, stage_key=stage_key)
+        if allows(current_user(), "overview", "edit") else "",
+        "unlock_url": url_for("admin.submission_unlock", dept_code=dept_code, stage_key=stage_key)
+        if allows(current_user(), "overview", "edit") else "",
     })
 
 
@@ -1001,7 +1009,7 @@ def audit_log():
 @bp.route("/export/institution.xlsx")
 @admin_required
 def export_institution():
-    buf = institution_excel(_year())
+    buf = institution_excel(_year(), current_scope())
     audit(_actor(), "export.institution")
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Repository-{_year()}.xlsx",
@@ -1106,7 +1114,7 @@ def export_department_word(dept_code):
 # ---------------------------------------------------------------------------
 
 def _updates_query(args):
-    q = {}
+    q = scope_q()
     if args.get("dept"):
         q["dept_code"] = args["dept"]
     if args.get("event"):
@@ -1131,12 +1139,12 @@ def updates():
             order.append(d)
         days[d].append(n)
     depts = sorted({(n["dept_code"], n.get("dept_name", "")) for n in
-                    db.notifications.find({}, {"dept_code": 1, "dept_name": 1})}, key=lambda x: x[1])
-    counts = {k: db.notifications.count_documents({"event": k}) for k in EVENTS}
+                    db.notifications.find(scope_q(), {"dept_code": 1, "dept_name": 1})}, key=lambda x: x[1])
+    counts = {k: db.notifications.count_documents({"event": k, **scope_q()}) for k in EVENTS}
     return render_template("admin/updates.html", days=[(d, days[d]) for d in order],
                            events=EVENTS, depts=depts, counts=counts, args=request.args,
-                           unread=db.notifications.count_documents({"read": False}),
-                           total=db.notifications.count_documents({}))
+                           unread=db.notifications.count_documents({"read": False, **scope_q()}),
+                           total=db.notifications.count_documents(scope_q()))
 
 
 @bp.post("/updates/read")
@@ -1147,11 +1155,11 @@ def updates_read():
     one = request.form.get("id")
     if one:
         try:
-            db.notifications.update_one({"_id": ObjectId(one)}, {"$set": {"read": True}})
+            db.notifications.update_one({"_id": ObjectId(one), **scope_q()}, {"$set": {"read": True}})
         except Exception:
             abort(400)
     else:
-        db.notifications.update_many({"read": False}, {"$set": {"read": True}})
+        db.notifications.update_many({"read": False, **scope_q()}, {"$set": {"read": True}})
     if request.accept_mimetypes.best == "application/json" or request.is_json:
         return jsonify({"ok": True})
     return redirect(request.referrer or url_for("admin.updates"))
@@ -1162,7 +1170,7 @@ def updates_read():
 def updates_json():
     """For the bell: how many are unread, and any newer than `after`."""
     db = get_db()
-    q = {"read": False}
+    q = {"read": False, **scope_q()}
     after = request.args.get("after")
     items = []
     if after:
@@ -1171,7 +1179,7 @@ def updates_json():
             items = [{"id": str(n["_id"]), "text": n["text"], "event": n["event"],
                       "at": n["at"].isoformat(),
                       "link": url_for("admin.submission_detail", dept_code=n["dept_code"])}
-                     for n in db.notifications.find({"at": {"$gt": since}}).sort("at", 1).limit(5)]
+                     for n in db.notifications.find({"at": {"$gt": since}, **scope_q()}).sort("at", 1).limit(5)]
         except ValueError:
             pass
     return jsonify({"unread": db.notifications.count_documents(q), "items": items,
@@ -1311,7 +1319,7 @@ def keywords():
         b["stats"] = stats
 
     status = request.args.get("status", "")
-    q = {"academic_year": _year(), "keyword_match": {"$exists": True}}
+    q = {"academic_year": _year(), "keyword_match": {"$exists": True}, **scope_q()}
     if status:
         q["keyword_match.status"] = status
     names = {d["dept_code"]: d.get("dept_name", "") for d in db.departments.find({}, {"dept_code": 1, "dept_name": 1})}
@@ -1442,10 +1450,10 @@ def _doc_state(val):
 def analysis_sheets(year):
     from .workflow import programme_stage_state, programmes_of, stage_timing
     db = get_db()
-    depts = list(db.departments.find({"active": True}).sort("dept_name", 1))
-    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
+    depts = list(db.departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year, **scope_q()})}
     open_comments = {}
-    for c in db.comments.find({"academic_year": year, "status": "open"}):
+    for c in db.comments.find({"academic_year": year, "status": "open", **scope_q()}):
         open_comments[c["dept_code"]] = open_comments.get(c["dept_code"], 0) + 1
     stages, progs, docs = [], [], []
     for d in depts:
@@ -1478,7 +1486,7 @@ def analysis_sheets(year):
             state, why = _doc_state((val or {}).get(field))
             drow["cells"].append({"label": label, "state": state, "why": why, "stage": stage})
         docs.append(drow)
-    comments = list(db.comments.find({"academic_year": year}).sort("at", -1).limit(500))
+    comments = list(db.comments.find({"academic_year": year, **scope_q()}).sort("at", -1).limit(500))
     names = {d["dept_code"]: d.get("dept_name", "") for d in depts}
     return {"stages": stages, "programmes": progs, "documents": docs, "comments": comments,
             "names": names, "doc_labels": [x[3] for x in BOS_DOCS]}
@@ -1551,14 +1559,14 @@ def comment_add():
     f = request.form
     code, stage = (f.get("dept") or "").strip(), (f.get("stage") or "").strip()
     text = (f.get("text") or "").strip()
-    dept = db.departments.find_one({"dept_code": code})
+    dept = db.departments.find_one({"dept_code": code}) if may_see(code) else None
     if not dept or stage not in STAGE_BY_KEY or not text:
         flash("Choose a department and a stage, and write the comment.", "error")
         return redirect(request.referrer or url_for("admin.sheets"))
     prog = (f.get("programme") or "").strip()
     doc = {"dept_code": code, "academic_year": _year(), "stage": stage, "programme_code": prog,
            "text": text[:2000], "by": _actor(), "at": now(), "status": "open", "reopened": False}
-    if f.get("reopen") == "on":
+    if f.get("reopen") == "on" and allows(current_user(), "overview", "edit"):
         from .workflow import programme_stage_state
         sub = get_or_create_submission(code, _year())
         if prog:
@@ -1583,7 +1591,8 @@ def comment_add():
 def comment_close(cid):
     from bson import ObjectId
     try:
-        get_db().comments.update_one({"_id": ObjectId(cid)}, {"$set": {"status": "closed", "closed_at": now()}})
+        get_db().comments.update_one({"_id": ObjectId(cid), **scope_q()},
+                                     {"$set": {"status": "closed", "closed_at": now()}})
     except Exception:
         abort(400)
     return redirect(request.referrer or url_for("admin.sheets", tab="comments"))
@@ -1626,11 +1635,11 @@ def calendar():
     end = datetime(last.year, last.month, last.day) + timedelta(days=1)
 
     days = {}
-    for n in db.notifications.find({"at": {"$gte": start, "$lt": end}}, {"at": 1, "event": 1}):
+    for n in db.notifications.find({"at": {"$gte": start, "$lt": end}, **scope_q()}, {"at": 1, "event": 1}):
         d = days.setdefault(n["at"].date(), {"total": 0, "events": {}})
         d["total"] += 1
         d["events"][n["event"]] = d["events"].get(n["event"], 0) + 1
-    for c in db.comments.find({"at": {"$gte": start, "$lt": end}}, {"at": 1}):
+    for c in db.comments.find({"at": {"$gte": start, "$lt": end}, **scope_q()}, {"at": 1}):
         d = days.setdefault(c["at"].date(), {"total": 0, "events": {}})
         d["total"] += 1
         d["events"]["comment"] = d["events"].get("comment", 0) + 1
@@ -1643,8 +1652,10 @@ def calendar():
     items, comments = [], []
     if chosen:
         a = datetime(chosen.year, chosen.month, chosen.day)
-        items = list(db.notifications.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}}).sort("at", -1))
-        comments = list(db.comments.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}}).sort("at", -1))
+        items = list(db.notifications.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}, **scope_q()})
+                     .sort("at", -1))
+        comments = list(db.comments.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}, **scope_q()})
+                        .sort("at", -1))
     prev_m = (first - timedelta(days=1)).strftime("%Y-%m")
     next_m = (last + timedelta(days=1)).strftime("%Y-%m")
     names = {d["dept_code"]: d.get("dept_name", "") for d in db.departments.find({}, {"dept_code": 1, "dept_name": 1})}

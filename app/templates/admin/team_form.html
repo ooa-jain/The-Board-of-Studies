@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit access' if member else 'Add a person' }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Settings <span>›</span>
+        <a href="{{ url_for('admin.team') }}">Team &amp; access</a> <span>›</span> {{ member.name if member else 'Add a person' }}</div>
+      <h1>{{ 'Edit access — ' ~ member.name if member else 'Add a person' }}</h1>
+      <p>{{ 'Changes apply from their next click.' if member else
+            'Their email is their username. They get a password now and set their own at the first sign-in.' }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set levels = [('none', 'None'), ('view', 'View'), ('edit', 'Edit')] %}
+<form method="post" class="tm-form" id="tm-form" autocomplete="off">
+
+  {# --------------------------------------------------------------- who -#}
+  <section class="card tm-card">
+    <div class="card-head"><h3><span class="tm-step">1</span> Who</h3></div>
+    <div class="card-body tm-who">
+      <div class="field">
+        <label for="tm-name">Name</label>
+        <input id="tm-name" name="name" value="{{ v.name }}" required maxlength="80" placeholder="e.g. Dr. Priya Rao">
+      </div>
+      <div class="field">
+        <label for="tm-email">Email — their username</label>
+        {% if member %}
+        <input id="tm-email" value="{{ member.username }}" disabled>
+        {% else %}
+        <input id="tm-email" name="email" type="email" value="{{ v.email }}" required placeholder="name@jainuniversity.ac.in">
+        {% endif %}
+      </div>
+      {% if not member %}
+      <fieldset class="field tm-pw">
+        <legend>Password</legend>
+        <label class="check"><input type="radio" name="pw_mode" value="generate" {{ 'checked' if v.pw_mode != 'type' }}>
+          Make one for me <span class="muted">— 12 characters, shown once after saving</span></label>
+        <label class="check"><input type="radio" name="pw_mode" value="type" {{ 'checked' if v.pw_mode == 'type' }}>
+          I will type one</label>
+        <div class="pw-wrap tm-pw-typed" {% if v.pw_mode != 'type' %}hidden{% endif %}>
+          <input type="text" name="password" id="tm-password" minlength="10" placeholder="At least 10 characters" spellcheck="false">
+          <button class="btn btn-ghost btn-sm" type="button" id="tm-gen">Suggest one</button>
+        </div>
+        <span class="help">They are asked to set their own password the first time they sign in.</span>
+      </fieldset>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ------------------------------------------------------------- what -#}
+  <section class="card tm-card">
+    <div class="card-head"><h3><span class="tm-step">2</span> What they can do</h3></div>
+    <div class="card-body">
+      <div class="tm-presets" role="radiogroup" aria-label="Start from">
+        {% for k, p in presets.items() %}
+        <label class="tm-preset{{ ' is-on' if v.preset == k }}">
+          <input type="radio" name="preset" value="{{ k }}" {{ 'checked' if v.preset == k }}
+                 data-sections='{{ (p.sections or {})|tojson }}' data-delete="{{ '1' if p.delete else '' }}">
+          <strong>{{ p.label }}</strong><small>{{ p.help }}</small>
+        </label>
+        {% endfor %}
+        <label class="tm-preset{{ ' is-on' if v.preset == 'custom' }}">
+          <input type="radio" name="preset" value="custom" {{ 'checked' if v.preset == 'custom' }}>
+          <strong>Custom</strong><small>Choose section by section below.</small>
+        </label>
+      </div>
+
+      <div class="tm-matrix-wrap" {% if v.preset == 'full' %}hidden{% endif %}>
+        <div class="table-wrap">
+          <table class="data tm-matrix">
+            <thead><tr><th>Section of the menu</th>{% for lv, label in levels %}<th class="c">{{ label }}</th>{% endfor %}</tr></thead>
+            <tbody>
+            {% for k, label, help in sections %}
+              <tr>
+                <td><strong>{{ label }}</strong><small>{{ help }}</small></td>
+                {% for lv, lvl in levels %}
+                <td class="c"><label class="tm-radio" title="{{ label }}: {{ lvl }}">
+                  <input type="radio" name="sec_{{ k }}" value="{{ lv }}" {{ 'checked' if v.sections[k] == lv }}
+                         aria-label="{{ label }}: {{ lvl }}"><i></i></label></td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted">None hides the section from their menu. View lets them open and download it.
+          Edit also lets them change it — add comments, send stages back, mark updates seen, issue logins.</p>
+        <label class="check tm-delete"><input type="checkbox" name="delete" {{ 'checked' if v.delete }}>
+          <span><strong>Can delete</strong> — in the sections where they have Edit: delete a department's data,
+            remove connectors or the demo department. Leave it off unless it is needed.</span></label>
+      </div>
+      <p class="tm-full-note small" {% if v.preset != 'full' %}hidden{% endif %}>A Full admin can do everything,
+        sees every department, and manages this team.</p>
+    </div>
+  </section>
+
+  {# ------------------------------------------------------ departments -#}
+  <section class="card tm-card tm-scope-card" {% if v.preset == 'full' %}hidden{% endif %}>
+    <div class="card-head"><h3><span class="tm-step">3</span> Departments they see</h3></div>
+    <div class="card-body">
+      <div class="tm-scope-mode">
+        <label class="tm-opt{{ ' is-on' if v.scope != 'selected' }}"><input type="radio" name="scope" value="all" {{ 'checked' if v.scope != 'selected' }}>
+          <span><strong>All departments</strong><small>Including those added later.</small></span></label>
+        <label class="tm-opt{{ ' is-on' if v.scope == 'selected' }}"><input type="radio" name="scope" value="selected" {{ 'checked' if v.scope == 'selected' }}>
+          <span><strong>Only the ones I choose</strong><small>Everything else — the home, the Overview, updates, the calendar,
+            downloads — shows only these.</small></span></label>
+      </div>
+
+      <div class="tm-scope" {% if v.scope != 'selected' %}hidden{% endif %}>
+        {% if campuses %}
+        <div class="tm-group">
+          <span class="tm-group-l">Whole campus <small>takes in departments added to it later</small></span>
+          <div class="tm-chips">{% for c in campuses %}
+            <label class="tm-chip"><input type="checkbox" name="campuses" value="{{ c }}" {{ 'checked' if c in v.campuses }}><span>{{ c }}</span></label>
+          {% endfor %}</div>
+        </div>
+        {% endif %}
+        {% if schools %}
+        <div class="tm-group">
+          <span class="tm-group-l">Whole school <small>takes in departments added to it later</small></span>
+          <div class="tm-chips">{% for sc in schools %}
+            <label class="tm-chip"><input type="checkbox" name="schools" value="{{ sc }}" {{ 'checked' if sc in v.schools }}><span>{{ sc }}</span></label>
+          {% endfor %}</div>
+        </div>
+        {% endif %}
+        <div class="tm-group">
+          <span class="tm-group-l">Departments <small><b id="tm-count">{{ v.codes|length }}</b> chosen</small></span>
+          <div class="tm-dept-tools">
+            <input type="search" id="tm-find" placeholder="Find a department, school or code" aria-label="Find a department">
+            <button class="btn btn-ghost btn-sm" type="button" id="tm-all">Choose all shown</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="tm-none">Clear shown</button>
+          </div>
+          <div class="tm-depts" id="tm-depts">
+            {% for d in depts %}
+            <label class="tm-dept" data-find="{{ (d.dept_name ~ ' ' ~ d.dept_code ~ ' ' ~ (d.school or '') ~ ' ' ~ (d.campus or ''))|lower }}"
+                   data-school="{{ d.school or '' }}" data-campus="{{ d.campus or '' }}">
+              <input type="checkbox" name="codes" value="{{ d.dept_code }}" {{ 'checked' if d.dept_code in v.codes }}>
+              <span><strong>{{ d.dept_name }}</strong><small>{{ d.dept_code }} · {{ d.school or '—' }} · {{ d.campus or '—' }}</small></span>
+              <em class="tm-via" hidden>with its school / campus</em>
+            </label>
+            {% else %}
+            <p class="muted small">No departments yet — import them first.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="tm-save">
+    <a class="btn btn-ghost" href="{{ url_for('admin.team') }}">Cancel</a>
+    <button class="btn">{{ 'Save access' if member else 'Add and show the password' }}</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/team.js') }}"></script>{% endblock %}

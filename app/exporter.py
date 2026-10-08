@@ -553,9 +553,13 @@ class _NoLinks:
 # Excel — the whole institution
 # ---------------------------------------------------------------------------
 
-def institution_excel(year: str) -> io.BytesIO:
+def institution_excel(year: str, dept_codes=None) -> io.BytesIO:
+    """Every department's status; dept_codes (when given) keeps it to those."""
     db = get_db()
-    depts = list(db.departments.find({"active": True})
+    q = {"active": True}
+    if dept_codes is not None:
+        q["dept_code"] = {"$in": sorted(dept_codes)}
+    depts = list(db.departments.find(q)
                  .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
     subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
 

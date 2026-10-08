@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Team & access{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Settings <span>›</span> Team &amp; access</div>
+      <h1>Team &amp; access</h1>
+      <p>The people in the Office who sign in to this side of the portal: what each may view or change,
+         and which departments they see.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "admin/_tabs.html" %}
+{% set seen = {'none': '', 'view': 'View', 'edit': 'Edit'} %}
+
+<section class="card tm-card">
+  <div class="card-head tm-head">
+    <h3>People <span class="muted small">{{ people|length + first|length }}</span></h3>
+    <a class="btn btn-sm" href="{{ url_for('admin.team_new') }}">+ Add a person</a>
+  </div>
+  <div class="tm-list">
+    {% for u in first + people %}
+    {% set full = not u.team or u.full %}
+    <div class="tm-row{{ ' is-off' if u.off }}">
+      <span class="tm-av" aria-hidden="true">{{ (u.name or u.username)[:1]|upper }}</span>
+      <div class="tm-main">
+        <div class="tm-name"><strong>{{ u.name or u.username }}</strong>
+          {% if u.is_me %}<span class="pill">You</span>{% endif %}
+          {% if not u.team %}<span class="pill pill-gold">First admin</span>{% endif %}
+          {% if u.off %}<span class="pill pill-err">Turned off</span>{% endif %}
+          {% if u.team and u.must_change and not u.off %}<span class="pill pill-warn" title="They sign in with the password they were given, then set their own">Own password not set yet</span>{% endif %}
+        </div>
+        <div class="small muted mono">{{ u.username }}</div>
+        <div class="tm-what">{{ u.summary }}</div>
+        {% if not full %}
+        <div class="tm-secs">
+          {% for k, label, _ in sections %}{% set lv = ((u.access or {}).sections or {}).get(k) or 'none' %}{% if lv != 'none' %}
+          <span class="tm-sec is-{{ lv }}">{{ label }} · {{ seen[lv] }}</span>{% endif %}{% endfor %}
+          {% if (u.access or {}).delete %}<span class="tm-sec is-delete">Can delete</span>{% endif %}
+        </div>
+        {% endif %}
+        <div class="small muted">Last signed in: {{ u.last_login.strftime('%d %b %Y, %H:%M') if u.last_login else 'never' }}</div>
+      </div>
+      {% if u.team %}
+      <div class="tm-acts">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.team_edit', username=u.username) }}">Edit access</a>
+        <form method="post" action="{{ url_for('admin.team_password', username=u.username) }}"
+              onsubmit="return confirm('Make a new password for {{ (u.name or u.username)|e }}? The old one stops working.')">
+          <button class="btn btn-ghost btn-sm">New password</button></form>
+        {% if not u.is_me %}
+        <form method="post" action="{{ url_for('admin.team_toggle', username=u.username) }}">
+          <button class="btn btn-ghost btn-sm">{{ 'Turn on' if u.off else 'Turn off' }}</button></form>
+        <form method="post" action="{{ url_for('admin.team_delete', username=u.username) }}"
+              onsubmit="return confirm('Remove {{ (u.name or u.username)|e }} from the portal? They will not be able to sign in.')">
+          <button class="btn btn-ghost btn-sm is-danger">Remove</button></form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if not people %}
+    <p class="tm-empty">Only you so far. <a href="{{ url_for('admin.team_new') }}">Add a person</a> — say, someone who
+      should only see the reports of one school, or only add comments.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card tm-card" id="links">
+  <div class="card-head"><h3>Links in downloaded Excel and Word files</h3></div>
+  <div class="card-body">
+    <p class="small muted mt-0">Every document, curriculum and syllabus in a download has a link that opens it in the browser.
+      Choose who may open those links.</p>
+    <form method="post" action="{{ url_for('admin.team_links') }}" class="tm-links">
+      <label class="tm-opt{{ ' is-on' if share_links != 'team' }}">
+        <input type="radio" name="share_links" value="anyone" {{ 'checked' if share_links != 'team' }}>
+        <span><strong>Anyone with the link</strong>
+          <small>Like a Drive link set to “anyone with the link” — whoever the file is sent to can open them.</small></span>
+      </label>
+      <label class="tm-opt{{ ' is-on' if share_links == 'team' }}">
+        <input type="radio" name="share_links" value="team" {{ 'checked' if share_links == 'team' }}>
+        <span><strong>Only people signed in to the portal</strong>
+          <small>The link asks them to sign in first, and opens only for the team members who may see that department —
+            and for the department itself.</small></span>
+      </label>
+      <button class="btn btn-sm">Save</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

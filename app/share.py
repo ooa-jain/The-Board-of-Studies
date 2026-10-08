@@ -2,7 +2,10 @@
 Share links — what the Excel and Word downloads link to.
 
 Like a Drive "anyone with the link" share: the link opens a document or a
-programme report without signing in. Each link carries a code signed with the
+programme report without signing in — unless the Office has set the links
+to "signed-in team only" (Settings › Team & access), when it opens only for
+someone signed in who may see that department: the Office's team within
+their departments, or the department itself. Each link carries a code signed with the
 portal's SECRET_KEY naming exactly one file (or one programme's report), so
 it cannot be edited to reach anything else; changing SECRET_KEY withdraws
 every link at once.
@@ -57,7 +60,28 @@ def _read(token, kind):
         abort(404)
     if not isinstance(data, list) or not data or data[0] != kind:
         abort(404)
+    _gate(data[1])
     return data[1:]
+
+
+def _gate(dept_code):
+    """With the links set to the signed-in team only: sign in first, then
+    open it only for those who may see the department."""
+    from flask import redirect, session
+    from .db import settings
+    if settings().get("share_links") != "team":
+        return
+    u = session.get("user") or {}
+    if not u:
+        abort(redirect(url_for("auth.login", next=request.full_path.rstrip("?"))))
+    if u.get("role") == "department":
+        if u.get("dept_code") != dept_code:
+            abort(403)
+        return
+    from .access import allows, current_user, may_see
+    if not (allows(current_user(), "overview", "view") or allows(current_user(), "documents", "view")) \
+            or not may_see(dept_code):
+        abort(403)
 
 
 def _file(token):

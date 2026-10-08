@@ -40,7 +40,8 @@
 
       const body = Review.build(j.stage, j.data, {});
       const foot = el("div", "rv-admin-acts");
-      if (j.status === "submitted") {
+      // the links are left out for someone whose access does not reach them
+      if (j.status === "submitted" && j.return_url) {
         const f = el("form");
         f.method = "post";
         f.action = j.return_url;
@@ -80,11 +81,11 @@
       const cb = el("input"); cb.type = "checkbox"; cb.name = "reopen"; cb.checked = j.status === "submitted";
       lab.appendChild(cb);
       lab.appendChild(el("span", null, " open it again for them"));
-      cf.appendChild(lab);
+      if (j.return_url) cf.appendChild(lab);
       const cbtn = el("button", "btn", "Send comment");
       cbtn.type = "submit";
       cf.appendChild(cbtn);
-      foot.appendChild(cf);
+      if (j.comment_url) foot.appendChild(cf);
 
       const row = el("div", "rv-actions");
       const copy = el("button", "btn btn-ghost", "Download a copy");

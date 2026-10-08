@@ -12,9 +12,11 @@
          <a href="{{ url_for('admin.connectors') }}">connectors</a>.</p>
     </div>
     <div class="spacer head-aside">
+      {% if can('updates', 'edit') %}
       <form method="post" action="{{ url_for('admin.updates_read') }}">
         <button class="btn btn-ghost btn-sm" {% if not unread %}disabled{% endif %}>Mark all {{ unread }} as read</button>
       </form>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -82,7 +84,7 @@
           </table>
           {% endif %}
         </div>
-        {% if not n.read %}
+        {% if not n.read and can('updates', 'edit') %}
         <form method="post" action="{{ url_for('admin.updates_read') }}" class="upd-read">
           <input type="hidden" name="id" value="{{ n._id }}">
           <button class="btn btn-ghost btn-sm" title="Mark as read">Read</button>

@@ -19,19 +19,19 @@
       <div class="batch-strip">
         <span class="bs-label">Current: Batch of</span><span class="batch-tag is-current">{{ batch_info.current }}</span>
         {% if batch_info.existing %}<span class="bs-label">Earlier: Batch of</span>{% for b in batch_info.existing %}<span class="batch-tag">{{ b.label }}</span>{% endfor %}{% endif %}
-        <a class="bs-change" href="{{ url_for('admin.app_settings') }}#current_batch">Change</a>
+        {% if can('settings', 'edit') %}<a class="bs-change" href="{{ url_for('admin.app_settings') }}#current_batch">Change</a>{% endif %}
       </div>
       {% endif %}
     </div>
     <div class="ad-actions">
-      <form class="ad-search" method="get" action="{{ url_for('admin.departments') }}" role="search">
+      {% if can('departments') %}<form class="ad-search" method="get" action="{{ url_for('admin.departments') }}" role="search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
         <input name="q" placeholder="Find a department" aria-label="Find a department">
-      </form>
+      </form>{% endif %}
       <a class="btn btn-gold ad-analysis" href="{{ url_for('admin.analysis_report') }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         Analysis</a>
-      <a class="btn btn-ghost" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>
+      {% if can('overview') %}<a class="btn btn-ghost" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>{% endif %}
     </div>
   </header>
 
@@ -108,7 +108,7 @@
                 <td class="act"><a class="btn btn-sm btn-ghost" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a></td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="muted">No departments yet. <a href="{{ url_for('admin.import_departments') }}">Import them</a>.</td></tr>
+              <tr><td colspan="6" class="muted">No departments yet.{% if can('departments', 'edit') %} <a href="{{ url_for('admin.import_departments') }}">Import them</a>.{% endif %}</td></tr>
             {% endfor %}
             </tbody>
           </table>
@@ -164,8 +164,8 @@
       </section>
 
       <div class="ad-more">
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.import_departments') }}">Import departments</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.flow') }}">Flow 3D</a>
+        {% if can('departments', 'edit') %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.import_departments') }}">Import departments</a>{% endif %}
+        {% if can('flow') %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.flow') }}">Flow 3D</a>{% endif %}
       </div>
     </aside>
   </div>

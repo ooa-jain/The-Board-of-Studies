@@ -25,8 +25,8 @@
         {% if c.timing.took %}<div class="small muted">{{ c.timing.took }}</div>{% endif %}</td>
       {% endfor %}
       <td>{% if r.comments %}<span class="sh-pill is-returned">{{ r.comments }} open</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td><button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ r.dept.dept_code }}"
-                  data-name="{{ r.dept.dept_name }}">Comment</button></td>
+      <td>{% if can('comments', 'edit') %}<button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ r.dept.dept_code }}"
+                  data-name="{{ r.dept.dept_name }}">Comment</button>{% endif %}</td>
     </tr>
     {% else %}<tr><td colspan="9" class="empty">No departments yet.</td></tr>{% endfor %}
     </tbody>
@@ -51,8 +51,8 @@
       {% for k in ('prog_curriculum', 'prog_syllabus', 'prog_revision') %}
       <td><span class="sh-pill is-{{ p.parts[k] }}">{{ words.get(p.parts[k], p.parts[k]) }}</span></td>
       {% endfor %}
-      <td><button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ p.dept.dept_code }}"
-                  data-name="{{ p.dept.dept_name }}" data-programme="{{ p.code }}" data-pname="{{ p.name }}">Comment</button></td>
+      <td>{% if can('comments', 'edit') %}<button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ p.dept.dept_code }}"
+                  data-name="{{ p.dept.dept_name }}" data-programme="{{ p.code }}" data-pname="{{ p.name }}">Comment</button>{% endif %}</td>
     </tr>
     {% else %}<tr><td colspan="12" class="empty">No programmes filed yet.</td></tr>{% endfor %}
     </tbody>
@@ -68,8 +68,8 @@
       {% for c in r.cells %}
       <td class="sh-doc" title="{{ c.why }}">{% if c.state == 'ok' %}<span class="sh-dot is-ok">✓</span>{% elif c.state == 'warn' %}<span class="sh-dot is-warn">!</span>{% elif c.state == 'bad' %}<span class="sh-dot is-bad">✕</span>{% else %}<span class="muted">—</span>{% endif %}</td>
       {% endfor %}
-      <td><button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ r.dept.dept_code }}"
-                  data-name="{{ r.dept.dept_name }}" data-stage="bos_documents">Comment</button></td>
+      <td>{% if can('comments', 'edit') %}<button class="btn btn-ghost btn-sm" type="button" data-comment data-dept="{{ r.dept.dept_code }}"
+                  data-name="{{ r.dept.dept_name }}" data-stage="bos_documents">Comment</button>{% endif %}</td>
     </tr>
     {% else %}<tr><td colspan="12" class="empty">No departments yet.</td></tr>{% endfor %}
     </tbody>
@@ -91,7 +91,7 @@
       <td>{{ c.text }}</td>
       <td class="small">{{ c.reply or '—' }}</td>
       <td><span class="sh-pill is-{{ 'submitted' if c.status != 'open' else 'returned' }}">{{ {'open': 'Open', 'done': 'Done by department', 'closed': 'Closed'}.get(c.status, c.status) }}</span></td>
-      <td>{% if c.status != 'closed' %}<form method="post" action="{{ url_for('admin.comment_close', cid=c._id) }}"><button class="btn btn-ghost btn-sm">Close</button></form>{% endif %}</td>
+      <td>{% if c.status != 'closed' and can('comments', 'edit') %}<form method="post" action="{{ url_for('admin.comment_close', cid=c._id) }}"><button class="btn btn-ghost btn-sm">Close</button></form>{% endif %}</td>
     </tr>
     {% else %}<tr><td colspan="7" class="empty">No comments yet. Use Comment on any row of the other sheets.</td></tr>{% endfor %}
     </tbody>

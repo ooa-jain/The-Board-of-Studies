@@ -6,9 +6,9 @@
   ('admin.connectors', 'Connectors'),
   ('admin.rules', 'Credit rules'),
   ('admin.audit_log', 'Audit log'),
-] %}
+] + ([('admin.team', 'Team & access')] if is_full_admin() else []) %}
 <nav class="admin-tabs" aria-label="Settings sections">
   {% for ep, label in tabs %}
-  <a href="{{ url_for(ep) }}" {% if request.endpoint == ep %}aria-current="page" class="is-on"{% endif %}>{{ label }}</a>
+  <a href="{{ url_for(ep) }}" {% if request.endpoint == ep or (ep == 'admin.team' and request.endpoint.startswith('admin.team')) %}aria-current="page" class="is-on"{% endif %}>{{ label }}</a>
   {% endfor %}
 </nav>
