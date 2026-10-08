@@ -368,7 +368,14 @@ def stage(stage_key, programme_code=None):
                 np_ = _next_programme(sub, dept, programme["programme_code"])
                 next_step = np_ and {**np_, "label": "the next programme"}
     _note_place(dept, stage_key, (programme or {}).get("programme_code"))
-    return render_template("dept/stage.html", calc=calc, fill=fill, stage=stage_def, dept=dept, submission=sub,
+    # a PG programme fills the PG Course Matrix: its own course groups and wording
+    from .schema import for_level, pg_groups
+    deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
+           else {}).get("degree_level") or (programme or {}).get("degree_level")
+    page_stage = for_level(stage_def, deg)
+    if stage_key == "prog_curriculum":
+        data = pg_groups(data, deg)
+    return render_template("dept/stage.html", calc=calc, fill=fill, stage=page_stage, dept=dept, submission=sub,
                            final=final, record=record, syllabi=syllabi, comments=comments,
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back,

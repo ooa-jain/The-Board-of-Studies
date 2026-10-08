@@ -1738,7 +1738,7 @@
     if (!fixed && !CTX.readonly) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add row");
       add.type = "button";
-      add.addEventListener("click", () => { rows(section.key).push({}); draw(); touch(); });
+      add.addEventListener("click", () => { rows(section.key).push(freshRow(section)); draw(); touch(); });
       foot.appendChild(add);
     }
     foot.appendChild(count);
@@ -2081,7 +2081,7 @@
         add.innerHTML = ICON.plus;
         add.appendChild(el("span", null, `Add ${NOUN}`));
         add.addEventListener("click", () => {
-          data.push({});
+          data.push(freshRow(section));
           sel = data.length - 1;
           tab = TABS[0].key;
           draw();
@@ -2313,6 +2313,20 @@
     return true;
   }
 
+  // a PG programme fills the PG Course Matrix (STAGE.level is "PG")
+  const IS_PG = STAGE.level === "PG";
+  const freshRow = section => (IS_PG && section && section.key === "semester_structure")
+    ? { cia: 60, ese: 40, total_marks: 100 } : {};
+  // the PG Course Matrix's SUMMARY columns
+  const PG_GROUPS = [
+    ["Generic Core", "Generic Core"],
+    ["Generic Elective", "Generic Elective"],
+    ["Specialisation Core", "Specialisation Core"],
+    ["Specialisation Elective", "Specialisation Elective"],
+    ["Open Elective", "Open Elective"],
+    ["Research / Thesis / Project / Patent", "Research / Thesis / Project / Patent"],
+  ];
+
   // the columns of the template's "Classification of Credits" table
   const DIST_GROUPS = [
     ["Major (Core)", "Major"],
@@ -2364,8 +2378,32 @@
         (num(r.credits) === 0 && r.nep_category !== NC_AUDIT)).length || "";
       const audit = rows => rows.filter(r => r.nep_category === NC_AUDIT).length || "";
 
-      // --- classification of credits
-      if (wants("classification")) {
+      // --- classification of credits: the PG Course Matrix's SUMMARY for a PG programme
+      if (wants("classification") && IS_PG) {
+        const t = el("table", "cd-table");
+        const hr = el("tr");
+        ["Semester", ...PG_GROUPS.map(g => g[1]), "Mandatory Non-Credit", "Total Credits"]
+          .forEach(x => hr.appendChild(el("th", x === "Semester" ? null : "num", x)));
+        const th = el("thead");
+        th.appendChild(hr);
+        t.appendChild(th);
+        const tb = el("tbody");
+        const pgLine = (label, rows, cls) => {
+          const tr = el("tr", cls || "");
+          tr.appendChild(el("td", null, label));
+          PG_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
+            fmt(sumBy(rows.filter(r => r.nep_category === cat), r => num(r.credits))))));
+          tr.appendChild(el("td", "num", String(nc(rows))));
+          tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
+          tb.appendChild(tr);
+        };
+        sems(all).forEach(sem => pgLine(String(sem), all.filter(r => num(r.semester) === sem)));
+        pgLine("TOTAL", all, "total");
+        t.appendChild(tb);
+        const w = el("div", "rt-wrap");
+        w.appendChild(t);
+        box.appendChild(w);
+      } else if (wants("classification")) {
       const t1 = el("table", "cd-table");
       const h = el("tr");
       ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total Credits",
@@ -2453,6 +2491,7 @@
 
     // --- UGC Table 2, from the same courses (only this programme's track)
     function ugcCheck(all) {
+      if (IS_PG) return;              // UGC Table 2 is for UG programmes
       const side = document.getElementById("credit-tally");
       if (!CREDIT || !CREDIT.rows || !CREDIT.rows.length) {
         box.appendChild(el("p", "small muted",

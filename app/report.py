@@ -234,9 +234,13 @@ def programme_context(db, dept, year, programme_code, links):
                       "errors": (st.get("summary") or {}).get("errors", 0),
                       "documents": _documents(k, st.get("data") or {}, links)})
     cur = (stored.get("prog_curriculum") or {}).get("data") or {}
+    # a PG programme in the PG Course Matrix's terms: its course groups and items 1 to 13
+    from .schema import for_level, pg_groups
+    deg = (cur.get("details") or {}).get("degree_level") or programme.get("degree_level")
+    cur = pg_groups(cur, deg)
     # in the template's own order, items 1 to 12
     profile = [(f["label"], (cur.get(sec["key"]) or {}).get(f["name"]))
-               for sec in STAGE_BY_KEY["prog_curriculum"]["sections"]
+               for sec in for_level(STAGE_BY_KEY["prog_curriculum"], deg)["sections"]
                if sec["key"] in ("details", "profile") for f in sec["fields"]
                if not f.get("hidden") and f.get("type") != "fixed"
                and (cur.get(sec["key"]) or {}).get(f["name"]) not in (None, "")]

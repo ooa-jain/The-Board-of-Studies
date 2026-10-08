@@ -55,6 +55,47 @@ NEP_CATEGORIES = [
     "Mandatory Non-Credit Audit Course",
 ]
 
+# a PG programme's course groups, as the PG Course Matrix classifies credits
+PG_CATEGORIES = [
+    "Generic Core",
+    "Generic Elective",
+    "Specialisation Core",
+    "Specialisation Elective",
+    "Open Elective",
+    "Research / Thesis / Project / Patent",
+    "Mandatory Non-Credit Course",
+]
+
+
+def pg_category(value, credits=None, title=""):
+    """A course group in a PG programme's own terms: a UG / NEP group (or a
+    pack's own word for it) becomes the PG classification it stands for."""
+    v = str(value or "").strip()
+    if v in PG_CATEGORIES:
+        return v
+    # the group's own words decide; a course's title only when it has no group
+    low = (v or str(title or "")).lower()
+    try:
+        none = float(credits) == 0
+    except (TypeError, ValueError):
+        none = False
+    if "non-credit" in low or "non credit" in low or "audit" in low:
+        return "Mandatory Non-Credit Course"
+    if any(w in low for w in ("research", "thesis", "dissertation", "project", "patent", "internship")):
+        return "Research / Thesis / Project / Patent"
+    if not v:
+        return ""
+    if "special" in v.lower() or v == "Minor Stream":
+        return "Specialisation Elective" if "elective" in v.lower() else "Specialisation Core"
+    if "open" in v.lower() or v == "Multidisciplinary":
+        return "Open Elective"
+    if "elective" in v.lower() or "dse" in v.lower():
+        return "Generic Elective"
+    if none and v:
+        return "Mandatory Non-Credit Course"
+    return "Generic Core" if v else ""
+
+
 # course groups that carry no credits; counted in their own columns
 NON_CREDIT_GROUPS = ["Mandatory Non-Credit Course", "Mandatory Non-Credit Audit Course"]
 
@@ -173,6 +214,29 @@ DEFAULT_REGULATIONS = {
              "Honours / Honours with Research degree at the end of semester 8.",
 }
 
+
+
+# the PG Course Matrix's own wording where it differs from the UG template
+PG_REGULATIONS = {
+    "selection_procedure": "Jain Entrance Test (JET) / Personal Interview.",
+    "pattern": "Semester",
+    "assessment": "The courses will have 60% Continuous Assessment and 40% Term End (University) "
+                  "examination. However, some courses (not more than 10% of the total programme "
+                  "credits) may have 100% Continuous Assessment.",
+    "passing": "The assessment of the student for each examination is done based on performance. "
+               "Maximum Grade Point (GP) is 10 corresponding to O (Outstanding). For all courses, a "
+               "student is required to pass both Continuous Assessment and Term End examinations "
+               "separately with a minimum Grade Point corresponding to Grade P. Students securing "
+               "less than the minimum marks in any head of passing will be declared FAIL. The "
+               "University awards the degree to the student who has achieved the minimum CGPA, out "
+               "of a maximum of 10 CGPA, for the Programme.",
+    "award": "The Master's degree will be awarded at the end of the final semester examination, "
+             "taking into consideration the performance in all semester examinations, after "
+             "obtaining a minimum of 4.00 CGPA out of 10 CGPA.",
+    "fee": "As notified by the University for the academic year — Academic fee p.a., Institute "
+           "deposit and Total, for Indian students (in INR), and for NRI / PIO / OCI and foreign "
+           "nationals (in US$).",
+}
 
 
 # --------------------------------------------------------------------------
@@ -675,6 +739,87 @@ STAGE_BY_KEY = {s["key"]: s for s in STAGES + PARTS + BATCH_PARTS}
 PART_KEYS = [p["key"] for p in PARTS]
 
 GROUP_ORDER = [s["group"] for s in STAGES]
+
+
+def is_pg(degree_level) -> bool:
+    """PG and PG Diploma programmes fill the PG Course Matrix."""
+    return programme_level(degree_level) in ("PG", "PGD") if degree_level else False
+
+
+def for_level(stage: dict, degree_level) -> dict:
+    """The Curriculum form as a programme of this level fills it. A PG
+    programme classifies credits as the PG Course Matrix does (Generic Core …
+    Research / Thesis / Project / Patent), has no Honours tracks or minors,
+    states its fee, and opens with the PG wording; a UG programme is as it was."""
+    if not stage or stage.get("key") != "prog_curriculum" or not is_pg(degree_level):
+        return stage
+    import copy
+    s = copy.deepcopy(stage)
+    s["level"] = "PG"
+    s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
+    for sec in s["sections"]:
+        if sec["key"] == "semester_structure":
+            sec["columns"] = [c for c in sec["columns"] if c["name"] != "track"]
+            for c in sec["columns"]:
+                if c["name"] == "nep_category":
+                    c["label"] = "Category"
+                    c["options"] = PG_CATEGORIES
+                    c["width"] = "200px"
+                elif c["name"] == "semester":
+                    c["max"], c["choices"] = 4, [1, 2, 3, 4]
+            sec["help"] = ("One row per course, with its category as the PG Course Matrix classifies "
+                           "credits. Electives vary by programme: list each elective a student may "
+                           "choose as its own row, in its semester and category, so the choice is "
+                           "clear to the students.")
+        elif sec["key"] == "credit_classification":
+            sec["title"] = "Summary — credits by classification"
+            sec["help"] = ("Generic Core, Generic Elective, Specialisation Core, Specialisation Elective, "
+                           "Open Elective, and Research / Thesis / Project / Patent — worked out from the "
+                           "programme structure.")
+        elif sec["key"] == "credit_distribution":
+            sec["title"] = "Credits by assessment"
+            sec["help"] = "Worked out from the programme structure."
+            sec["rules"] = [r for r in sec.get("rules", []) if not r.startswith("ugc_")]
+        elif sec["key"] == "profile":
+            fields = []
+            for f in sec["fields"]:
+                if f["name"] in PG_REGULATIONS:
+                    f["prefill_text"] = PG_REGULATIONS[f["name"]]
+                if f["name"] == "eligibility":
+                    f["placeholder"] = ("For example: A bachelor's degree in the discipline or an allied "
+                                        "one, with a minimum of 50% marks, from a recognised university.")
+                if f["name"] == "assessment":
+                    f["label"] = "11. Assessment"
+                elif f["name"] == "passing":
+                    f["label"] = "12. Standard of passing"
+                elif f["name"] == "award":
+                    f["label"] = "13. Award of degree / diploma / certificate"
+                fields.append(f)
+                if f["name"] == "course_specialisation":
+                    fields.append({"name": "fee", "label": "10. Fee", "type": "textarea", "rows": 3,
+                                   "wide": True, "prefill_text": PG_REGULATIONS["fee"],
+                                   "help": "Academic fee p.a., Institute deposit and Total — for Indian "
+                                           "students, NRI / PIO / OCI and foreign nationals."})
+            sec["fields"] = fields
+            sec["help"] = "Items 1 to 13, as in the PG Course Matrix. The standard wording is filled in — change only what differs."
+    return s
+
+
+def pg_groups(data: dict, degree_level) -> dict:
+    """A PG programme's structure with every course group in PG terms."""
+    if not is_pg(degree_level) or not isinstance(data, dict):
+        return data
+    rows = data.get("semester_structure")
+    if not isinstance(rows, list):
+        return data
+    out = []
+    for r in rows:
+        if isinstance(r, dict):
+            r = dict(r)
+            r["nep_category"] = pg_category(r.get("nep_category"), r.get("credits"), r.get("course_title"))
+            r.pop("track", None)
+        out.append(r)
+    return {**data, "semester_structure": out}
 
 
 def programme_level(degree_level: str) -> str:

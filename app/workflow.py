@@ -423,13 +423,19 @@ def save_draft(dept_code, academic_year, stage_key, data, programme_code=None):
     )
 
 
-def apply_defaults(stage_key, data):
+def apply_defaults(stage_key, data, programme=None):
     """The standard wording a department sees as grey placeholder text
     ("prefill_text"), and item 9 worked out from the programme's name and
     specialisation ("derive_from"), stand in for any box left empty. Applied
-    when checking and submitting, so leaving a box empty means accepting it."""
-    stage = STAGE_BY_KEY.get(stage_key) or {}
+    when checking and submitting, so leaving a box empty means accepting it.
+    A PG programme's Curriculum takes the PG wording and course groups."""
+    from .schema import for_level, pg_groups
     data = dict(data or {})
+    deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
+        or (programme or {}).get("degree_level")
+    stage = for_level(STAGE_BY_KEY.get(stage_key) or {}, deg)
+    if stage_key == "prog_curriculum":
+        data = pg_groups(data, deg)
 
     def read(ref):
         sec, name = ref.split(".", 1)
@@ -454,7 +460,7 @@ def apply_defaults(stage_key, data):
 
 
 def validate_only(submission, stage_key, data, programme=None):
-    data = apply_defaults(stage_key, data)
+    data = apply_defaults(stage_key, data, programme)
     issues, summary = validate_stage(stage_key, data, _ctx_for(submission, stage_key, programme))
     return issues, summary
 
@@ -463,7 +469,7 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
     """Validate and, if clean, lock the stage and unlock the next one."""
     db = get_db()
     submission = get_or_create_submission(dept_code, academic_year)
-    data = apply_defaults(stage_key, data)
+    data = apply_defaults(stage_key, data, programme)
     issues, summary = validate_stage(stage_key, data, _ctx_for(submission, stage_key, programme))
 
     programme_code = (programme or {}).get("programme_code")

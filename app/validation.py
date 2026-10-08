@@ -410,7 +410,7 @@ def r_ugc_research_or_lieu(data, ctx, sk):
     return out
 
 
-LONG_COURSES = ("Research Project / Dissertation", "Summer Internship")
+LONG_COURSES = ("Research Project / Dissertation", "Summer Internship", "Research / Thesis / Project / Patent")
 
 
 def r_ltpe_credit_arithmetic(data, ctx, sk):
@@ -705,6 +705,12 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
 
     issues = []
     data = data or {}
+    # a PG programme's Curriculum is the PG Course Matrix: its own course groups
+    from .schema import for_level, pg_groups
+    deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
+        or ctx.get("degree_level")
+    stage = for_level(stage, deg)
+    data = pg_groups(data, deg) if stage_key == "prog_curriculum" else data
 
     for section in stage.get("sections", []):
         sk = section["key"]

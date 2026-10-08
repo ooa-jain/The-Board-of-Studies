@@ -128,18 +128,21 @@ def _pg_courses(prefix):
         for i in range(count):
             title = PG_TOPICS[n % len(PG_TOPICS)]
             n += 1
-            rows.append({"semester": sem, "track": "All semesters",
-                         "nep_category": "Major (Core)" if i < 3 else "Discipline Specific Elective (DSE)",
-                         "course_code": f"26{prefix}{sem}{'C' if i < 3 else 'E'}{i + 1:02d}",
+            # the PG Course Matrix's classifications
+            group = ("Generic Core" if i < 2 else "Specialisation Core" if i < 4
+                     else "Generic Elective" if sem == 1 else "Specialisation Elective")
+            rows.append({"semester": sem,
+                         "nep_category": group,
+                         "course_code": f"26{prefix}{sem}{'C' if 'Core' in group else 'E'}{i + 1:02d}",
                          "course_title": title, "l": 4, "t": 0, "p": 0, "e": 0, "credits": 4,
-                         "cia": 50, "ese": 50, "total_marks": 100})
+                         "cia": 60, "ese": 40, "total_marks": 100})
         if sem < 4:
-            rows.append({"semester": sem, "track": "All semesters", "nep_category": "Skill Enhancement Courses (SEC)",
+            rows.append({"semester": sem, "nep_category": "Open Elective" if sem == 3 else "Generic Core",
                          "course_code": f"26{prefix}{sem}S01", "course_title": f"Skill Lab {sem}",
                          "l": 3, "t": 0, "p": 0, "e": 0, "credits": 3, "cia": 100, "ese": 0, "total_marks": 100})
-    rows.append({"semester": 4, "track": "All semesters", "nep_category": "Research Project / Dissertation",
+    rows.append({"semester": 4, "nep_category": "Research / Thesis / Project / Patent",
                  "course_code": f"26{prefix}4P01", "course_title": "Project / Internship",
-                 "l": 2, "t": 0, "p": 4, "e": 12, "credits": 8, "cia": 50, "ese": 50, "total_marks": 100})
+                 "l": 2, "t": 0, "p": 4, "e": 12, "credits": 8, "cia": 60, "ese": 40, "total_marks": 100})
     return rows
 
 
@@ -180,8 +183,9 @@ def _is_submitted(sub, code, part):
     return programme_stage_state(sub, code, part).get("status") == "submitted"
 
 
-def _major_from_syllabus(courses):
-    """The programme's major courses as the Drive's syllabus lists them."""
+def _major_from_syllabus(courses, pg=False):
+    """The programme's major courses as the Drive's syllabus lists them (a PG
+    programme assesses 60 / 40)."""
     rows = []
     for c in courses:
         credits = int(float(c.get("credits") or 3))
@@ -190,7 +194,8 @@ def _major_from_syllabus(courses):
                      "nep_category": "Major (Core)", "course_code": c["course_code"],
                      "course_title": c.get("course_title") or "", "l": 0 if lab else credits, "t": 0,
                      "p": credits * 2 if lab else 0, "e": 0, "credits": credits,
-                     "cia": 100 if lab else 50, "ese": 0 if lab else 50, "total_marks": 100})
+                     "cia": 100 if lab else (60 if pg else 50), "ese": 0 if lab else (40 if pg else 50),
+                     "total_marks": 100})
     return rows
 
 
@@ -207,9 +212,14 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
         rows = _ug_courses(prefix) if ug else _pg_courses(prefix)
         if syllabus_courses:
             # the syllabus is the Drive's: its courses are the major, the rest fills the scheme
-            rows = _major_from_syllabus(syllabus_courses) + [r for r in rows
-                                                            if r["nep_category"] != "Major (Core)"]
+            rows = _major_from_syllabus(syllabus_courses, pg=not ug) + [
+                r for r in rows if r["nep_category"] not in ("Major (Core)", "Generic Core", "Specialisation Core")]
         data["semester_structure"] = rows
+    if not ug:
+        # a PG programme's groups in the PG Course Matrix's terms, whatever the pack called them
+        from .schema import pg_groups
+        data = pg_groups(data, details["degree_level"])
+        details = data["details"]
     profile = data.setdefault("profile", {})
     prog_name = programme.get("programme_name") or code
     profile.setdefault("objective",

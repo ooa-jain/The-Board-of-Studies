@@ -325,14 +325,16 @@ def _credits(rows):
     return sum(_num(r.get("credits")) or 0 for r in rows)
 
 
-def _profile_table(doc, cur, width):
+def _profile_table(doc, cur, width, degree_level=None):
+    from .schema import PG_REGULATIONS, for_level, is_pg
     prof = cur.get("profile") or {}
     details = cur.get("details") or {}
     t = doc.add_table(rows=0, cols=3)
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
-    fields = next(s for s in STAGE_BY_KEY["prog_curriculum"]["sections"]
+    fields = next(s for s in for_level(STAGE_BY_KEY["prog_curriculum"], degree_level)["sections"]
                   if s["key"] == "profile")["fields"]
+    defaults = {**DEFAULT_REGULATIONS, **(PG_REGULATIONS if is_pg(degree_level) else {})}
     for n, f in enumerate(fields, start=1):
         label = re.sub(r"^\d+\.\s*", "", f["label"])
         row = t.add_row().cells
@@ -353,8 +355,8 @@ def _profile_table(doc, cur, width):
         if f["name"] == "course_specialisation" and not value:
             value = " — ".join(x for x in (details.get("programme_name"),
                                           details.get("specialisation")) if x)
-        if value in (None, "") and f["name"] in DEFAULT_REGULATIONS:
-            value = DEFAULT_REGULATIONS[f["name"]]
+        if value in (None, "") and f["name"] in defaults:
+            value = defaults[f["name"]]
         if f["name"] == "objective":
             items = _lines(value)
             value = "\n".join(f"{i}. {x}" for i, x in enumerate(items, start=1))
@@ -445,12 +447,12 @@ def _structure_table(doc, rows, width):
     _widths(t, [width * x for x in (0.12, 0.40, 0.08, 0.07, 0.11, 0.11, 0.11)])
 
 
-def _summary_table(doc, rows, width):
+def _summary_table(doc, rows, width, title="SUMMARY"):
     base, blocks = _blocks(rows)
     t = doc.add_table(rows=0, cols=5)
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
-    _band(t, "SUMMARY", GREEN, size=10)
+    _band(t, title, GREEN, size=10)
     heads = ["Semester", "100% Continuous Assessment Credits",
              "Term End (University) Examination Credits", "Total Credits", "Total Marks"]
     hr = t.add_row().cells
@@ -497,11 +499,87 @@ def _minors_table(doc, minors, width):
     _widths(t, [width * 0.18, width * 0.09, width * 0.14, width * 0.45, width * 0.09])
 
 
+PG_SUMMARY = [
+    ("Generic Core", "Generic Core"),
+    ("Generic Elective", "Generic Elective"),
+    ("Specialisation Core", "Specialisation Core"),
+    ("Specialisation Elective", "Specialisation Elective"),
+    ("Open Elective", "Open Elective"),
+    ("Research / Thesis / Project / Patent", "RESEARCH / THESIS / PROJECT / PATENT"),
+]
+
+
+def _pg_summary_table(doc, rows, width):
+    """The PG Course Matrix's SUMMARY: credits by classification, by semester."""
+    heads = ["Semester"] + [h for _, h in PG_SUMMARY] + ["Mandatory Non-Credit", "TOTAL CREDITS"]
+    t = doc.add_table(rows=0, cols=len(heads))
+    _borders(t)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _band(t, "SUMMARY", GREEN, size=10)
+    hr = t.add_row().cells
+    for i, h in enumerate(heads):
+        _write(hr[i], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _shade(hr[i], GREEN)
+    nc = lambda rs: len([r for r in rs if r.get("nep_category") == NC_COURSE]) or ""
+
+    def line(label, rs, bold=False):
+        cells = t.add_row().cells
+        vals = ([label] + [_fmt(_credits([r for r in rs if r.get("nep_category") == g])) for g, _ in PG_SUMMARY]
+                + [str(nc(rs)), _fmt(_credits(rs))])
+        for i, v in enumerate(vals):
+            _write(cells[i], v, bold=bold, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+
+    for s in _sems(rows):
+        line(str(s), [r for r in rows if _num(r.get("semester")) == s])
+    line("TOTAL", rows, bold=True)
+    _widths(t, [width / len(heads)] * len(heads))
+
+
+def _pg_semester_tables(doc, rows, width):
+    """One table a semester: Course Code, Course Title, Category, Credits and
+    the marks — as the PG Course Matrix lays them out."""
+    roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+    order = {c: n for n, c in enumerate([g for g, _ in PG_SUMMARY] + [NC_COURSE])}
+    for s in _sems(rows):
+        rs = sorted([r for r in rows if _num(r.get("semester")) == s],
+                    key=lambda r: (order.get(r.get("nep_category"), 99), str(r.get("course_code") or "")))
+        t = doc.add_table(rows=0, cols=7)
+        _borders(t)
+        t.alignment = WD_TABLE_ALIGNMENT.CENTER
+        head = t.add_row()
+        # the head row repeats if the semester runs onto the next page
+        head._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
+        hr = head.cells
+        for i, h in enumerate(("Course Code", "Course Title", "Category", "Credits",
+                               "Continuous Assessment Marks", "Term End Examination Marks", "Total Marks")):
+            _write(hr[i], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+            _shade(hr[i], GREEN)
+        _band(t, f"SEMESTER {roman[int(s) - 1] if 0 < int(s) <= 8 else s}", NAVY, color="FFFFFF")
+        for r in rs:
+            cells = t.add_row().cells
+            vals = [r.get("course_code") or "", r.get("course_title") or "", r.get("nep_category") or "",
+                    _fmt(r.get("credits")), _fmt(r.get("cia")), _fmt(r.get("ese")),
+                    _fmt(r.get("total_marks") or ((_num(r.get("cia")) or 0) + (_num(r.get("ese")) or 0)) or "")]
+            for i, v in enumerate(vals):
+                _write(cells[i], v, size=9, align=None if i in (0, 1, 2) else WD_ALIGN_PARAGRAPH.CENTER)
+        tot = t.add_row().cells
+        _write(tot[0], "Total", bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _write(tot[3], _fmt(_credits(rs)), bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _write(tot[6], _fmt(sum(_num(r.get("total_marks")) or 0 for r in rs)), bold=True,
+               size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _widths(t, [width * x for x in (0.12, 0.36, 0.16, 0.07, 0.10, 0.10, 0.09)])
+        doc.add_paragraph()
+
+
 def curriculum_docx(db, dept_code, year, programme_code):
     rec = programme_record(db, dept_code, year, programme_code)
     if not rec:
         return None
     _dept, prog, cur, _ = rec
+    from .schema import is_pg, pg_groups
+    deg = (cur.get("details") or {}).get("degree_level") or prog.get("degree_level")
+    if is_pg(deg):
+        return _pg_curriculum_docx(prog, pg_groups(cur, deg), deg)
     name, spec, batch = _title_line(prog, cur)
     doc = _letterhead(_version_line(name, batch))
     sec = doc.sections[0]
@@ -537,6 +615,42 @@ def curriculum_docx(db, dept_code, year, programme_code):
         _page_break(doc)
         _minors_table(doc, minors, width)
     doc.core_properties.title = _title(f"{name} — Curriculum {batch}".strip())
+    return _save(doc)
+
+
+def _pg_curriculum_docx(prog, cur, deg):
+    """A PG programme's curriculum in the PG Course Matrix's layout: the
+    profile (1–13), the SUMMARY by classification, a table a semester, and
+    the credits by assessment."""
+    name, spec, batch = _title_line(prog, cur)
+    doc = _letterhead(_version_line(name, batch))
+    sec = doc.sections[0]
+    width = int(sec.page_width - sec.left_margin - sec.right_margin)
+    _para(doc, "Jain (Deemed-to-be University), Bangalore", bold=True, size=15)
+    _para(doc, name, bold=True, size=14)
+    if spec:
+        _para(doc, spec, size=14)
+    _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=14, after=6)
+    _profile_table(doc, cur, width, deg)
+
+    rows = [r for r in (cur.get("semester_structure") or [])
+            if isinstance(r, dict) and _num(r.get("semester")) is not None]
+    _page_break(doc)
+    _para(doc, "Jain (Deemed-to-be University), Bangalore", bold=True, size=13)
+    _para(doc, name, bold=True, size=12)
+    _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=12, after=6)
+    if rows:
+        _pg_summary_table(doc, rows, width)
+        _para(doc, "The classifications defined for assigning credits: Generic Core, Generic Elective, "
+                   "Specialisation Core, Specialisation Elective, Open Elective, and Research / Thesis / "
+                   "Project / Patent. Electives vary by programme; each elective a student may choose is "
+                   "listed in its semester.", size=8.5, align=WD_ALIGN_PARAGRAPH.LEFT)
+        _page_break(doc)
+        _pg_semester_tables(doc, rows, width)
+        _summary_table(doc, rows, width, title="CREDITS BY ASSESSMENT")
+    else:
+        _para(doc, "No courses entered yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+    doc.core_properties.title = _title(f"{name} — Programme Structure {batch}".strip())
     return _save(doc)
 
 

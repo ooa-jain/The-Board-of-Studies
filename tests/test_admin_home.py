@@ -81,3 +81,27 @@ def test_short_forms_expand_to_full_words():
     js = (Path(__file__).resolve().parents[1] / "app" / "static" / "js" / "suggest.js").read_text()
     assert re.search(r'cs: \["Computer Science", "Cyber Security"', js)
     assert re.search(r'comm: \["Commerce", "Communication"', js)
+
+
+def test_a_pg_curriculum_is_the_pg_course_matrix_and_ug_stays_as_it_was():
+    """PG: Generic Core … Research / Thesis / Project / Patent, no Honours
+    tracks or minors, a Fee item, 60 / 40; UG unchanged."""
+    from app.schema import PG_CATEGORIES, STAGE_BY_KEY, for_level, pg_category, pg_groups
+    base = STAGE_BY_KEY["prog_curriculum"]
+    assert for_level(base, "UG - 4 Year (Honours with Research)") is base
+    pg = for_level(base, "PG - 2 Year")
+    keys = [s["key"] for s in pg["sections"]]
+    assert "minors" not in keys and pg["level"] == "PG"
+    struct = next(s for s in pg["sections"] if s["key"] == "semester_structure")
+    cols = {c["name"]: c for c in struct["columns"]}
+    assert "track" not in cols and cols["nep_category"]["options"] == PG_CATEGORIES
+    prof = next(s for s in pg["sections"] if s["key"] == "profile")
+    assert "fee" in [f["name"] for f in prof["fields"]]
+    assert "60% Continuous Assessment" in next(f for f in prof["fields"] if f["name"] == "assessment")["prefill_text"]
+    # a UG group saved for a PG programme reads as its PG classification
+    assert pg_category("Major (Core)") == "Generic Core"
+    assert pg_category("Discipline Specific Elective (DSE)") == "Generic Elective"
+    assert pg_category("Research Project / Dissertation") == "Research / Thesis / Project / Patent"
+    assert pg_category("Major (Core)", 4, "Project Management") == "Generic Core"
+    data = pg_groups({"semester_structure": [{"nep_category": "Multidisciplinary", "track": "All semesters"}]}, "PG - 2 Year")
+    assert data["semester_structure"][0] == {"nep_category": "Open Elective"}
