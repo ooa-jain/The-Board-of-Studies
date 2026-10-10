@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Motion{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+
+{% block content %}
+<div class="ad mo">
+  <header class="ad-head">
+    <div class="ad-title">
+      <span class="ad-kicker"><a href="{{ url_for('admin.dashboard') }}">Home</a> › Motion</span>
+      <h1>The year so far, in motion</h1>
+      <p class="mo-lede">A short animated explainer of where every department stands — under a minute. Play it here,
+        or download it as a video for a meeting or a message. It is drawn from the portal's records as of
+        <time data-local datetime="{{ data.made }}">{{ made.strftime('%d %b %Y, %H:%M') }} UTC</time>
+        · {{ data.scope }}.</p>
+    </div>
+    <div class="ad-actions">
+      <a class="btn btn-ghost" href="{{ url_for('admin.motion') }}" title="Count again from the records now">Refresh the numbers</a>
+      <button class="btn btn-gold" type="button" id="mo-record">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        Download video</button>
+    </div>
+  </header>
+
+  <section class="mo-stage">
+    <div class="mo-frame">
+      <canvas id="mo-canvas" width="1920" height="1080" role="img"
+              aria-label="Animated summary of the Board of Studies {{ data.year }}: {{ data.totals.stages_done }} of {{ data.totals.stages_total }} stages completed across {{ data.totals.departments }} departments"></canvas>
+      <button class="mo-big-play" type="button" id="mo-big" aria-label="Play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg></button>
+      <div class="mo-rec" id="mo-rec" hidden><i></i><span>Recording — keep this tab open</span></div>
+    </div>
+    <div class="mo-controls">
+      <button class="mo-btn" type="button" id="mo-play" aria-label="Play">
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg></button>
+      <button class="mo-btn" type="button" id="mo-restart" aria-label="Start again">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5"/></svg></button>
+      <input type="range" id="mo-seek" min="0" max="1000" value="0" step="1" aria-label="Position in the animation">
+      <span class="mo-time" id="mo-time">0:00 / 0:40</span>
+    </div>
+    <nav class="mo-scenes" id="mo-scenes" aria-label="Scenes"></nav>
+    <p class="mo-note small muted" id="mo-note">The video downloads as MP4 where the browser can make one (recent Chrome and Edge),
+      otherwise as WebM, which plays in Chrome, Edge, Firefox and VLC.</p>
+  </section>
+
+  <details class="mo-script">
+    <summary>Everything the animation says, as text</summary>
+    <ol>
+      <li>Board of Studies {{ data.year }} — {{ data.scope }}.</li>
+      <li>{{ data.totals.stages_done }} of {{ data.totals.stages_total }} stages completed ({{ data.totals.percent }}%) across
+        {{ data.totals.departments }} departments; {{ data.totals.complete }} completed every stage, {{ data.totals.untouched }} not started.</li>
+      <li>Stage by stage: {% for s in data.stages %}{{ s.title }} {{ s.done }} completed, {{ s.prog }} in progress, {{ s.back }} sent back{{ '; ' if not loop.last else '.' }}{% endfor %}</li>
+      <li>Programmes completed: {{ data.programmes.complete }} of {{ data.programmes.total }}{% for lv in data.programmes.levels %} · {{ lv.level }} {{ lv.complete }}/{{ lv.total }}{% endfor %}.</li>
+      <li>By campus: {% for c in data.campus %}{{ c.name }} {{ c.percent }}%{{ ', ' if not loop.last else '.' }}{% else %}no departments yet.{% endfor %}</li>
+      <li>Last 14 days: {{ data.activity|sum(attribute='all') }} updates, {{ data.activity|sum(attribute='submitted') }} submissions.</li>
+      {% for f in data.findings %}<li>{{ f }}</li>{% endfor %}
+    </ol>
+  </details>
+</div>
+<script>window.MOTION_DATA = {{ data|tojson }};</script>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/motion.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-live.js') }}"></script>{% endblock %}

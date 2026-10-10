@@ -50,7 +50,7 @@ PRESETS = {
 
 # admin endpoint -> (section, what it needs). A tuple of two needs is (GET, POST).
 ENDPOINTS = {
-    "dashboard": ("home", "view"), "analysis_report": ("home", "view"),
+    "dashboard": ("home", "view"), "analysis_report": ("home", "view"), "motion": ("home", "view"),
     "departments": ("departments", "view"),
     "department_form": ("departments", "edit"), "department_toggle": ("departments", "edit"),
     "generate_credentials": ("departments", "edit"), "credential_slip": ("departments", "edit"),

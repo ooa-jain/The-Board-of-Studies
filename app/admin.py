@@ -210,6 +210,82 @@ def _findings(pic):
     return out
 
 
+def _sources(pic, year, made):
+    """Where every number on the home comes from: the rule it counts by, the
+    records it reads, when — and the departments behind it, so any figure
+    can be checked rather than taken on trust."""
+    rows, t = pic["rows"], pic["totals"]
+    scoped = current_scope() is not None
+    whose = "the departments you can see" if scoped else "every active department"
+    when = made.strftime("%d %b %Y, %H:%M")
+    yr = str(year).replace("-", "\u2013")         # as it is printed: 2027–28
+
+    def names(items, note=None, limit=8):
+        items = list(items)
+        out = [{"name": r["dept"].get("dept_name") or r["dept"]["dept_code"], "code": r["dept"]["dept_code"],
+                "note": note(r) if note else ""} for r in items[:limit]]
+        return {"list": out, "more": max(0, len(items) - limit)}
+
+    by_state = lambda *st: [r for r in rows if r["state"] in st]
+    progs = [(r, p) for r in rows for p in r["programmes"]]
+    files_by = {}
+    for f in get_db().files.find({"academic_year": year, **scope_q(), "$or": [
+            {"keyword_match.status": "miss"}, {"keyword_match.looks_like": {"$exists": True}}]}, {"dept_code": 1}):
+        files_by[f["dept_code"]] = files_by.get(f["dept_code"], 0) + 1
+    comments_by = {}
+    for c in get_db().comments.find({"academic_year": year, "status": "open", **scope_q()}, {"dept_code": 1}):
+        comments_by[c["dept_code"]] = comments_by.get(c["dept_code"], 0) + 1
+    att = [r for r in rows if r["returned"] or files_by.get(r["dept"]["dept_code"]) or comments_by.get(r["dept"]["dept_code"])]
+
+    def att_note(r):
+        c = r["dept"]["dept_code"]
+        bits = [f"{r['returned']} sent back" if r["returned"] else "",
+                f"{files_by[c]} file{'s' if files_by[c] != 1 else ''}" if files_by.get(c) else "",
+                f"{comments_by[c]} comment{'s' if comments_by[c] != 1 else ''}" if comments_by.get(c) else ""]
+        return ", ".join(b for b in bits if b)
+
+    return {
+        "when": when,
+        "departments": {
+            "rule": f"Counts {whose} in the department master (inactive ones are left out). "
+                    "Completed: all stages submitted. Not started: no stage submitted or begun, or not signed in yet.",
+            "reads": f"Department master · {t['departments']} record{'s' if t['departments'] != 1 else ''}",
+            "behind": names(by_state("not_started", "never_in", "no_login"), lambda r: r["label"]),
+            "behind_label": "Not started"},
+        "stages": {
+            "rule": f"Each department has {rows[0]['total'] if rows else 0} stages for {yr}. A stage counts once the "
+                    "department has submitted it; a stage of programmes counts when every programme's part is submitted.",
+            "reads": f"Submissions for {yr} · {t['stages_done']} of {t['stages_total']} stages",
+            "behind": names(sorted(rows, key=lambda r: -r["done"]), lambda r: f"{r['done']}/{r['total']}"),
+            "behind_label": "Most completed first"},
+        "programmes": {
+            "rule": "Programmes listed in each department's Department Information (the university catalogue until it is "
+                    "saved). Completed: its Curriculum, every batch's Syllabus and its Course Revision are all submitted.",
+            "reads": f"Submissions for {yr} · {pic['programmes']['total']} programme{'s' if pic['programmes']['total'] != 1 else ''}",
+            "behind": {"list": [{"name": p["name"], "code": r["dept"]["dept_code"],
+                                 "note": f"{p['done']}/{p['total']} steps"} for r, p in progs if p["complete"]][:8],
+                       "more": max(0, sum(1 for _, p in progs if p["complete"]) - 8)},
+            "behind_label": "Completed"},
+        "attention": {
+            "rule": "Files whose keyword check failed or that look like a different document, stages sent back for "
+                    "correction, and comments still open.",
+            "reads": f"Files, submissions and comments for {yr}",
+            "behind": names(att, att_note), "behind_label": "Departments with something to look at"},
+        "updates": {
+            "rule": "Every save, upload and submission a department made in the last 14 days, as recorded when it happened. "
+                    "Unread: not yet marked as seen by the Office.",
+            "reads": f"Updates log · {pic['activity']['total']} in 14 days",
+            "behind": None},
+        "stage_chart": {"rule": "One bar per stage: how many departments have it completed, in progress, sent back or "
+                                "not started.", "reads": f"Submissions for {yr}"},
+        "campus_chart": {"rule": "Stages completed as a share of all stages of the campus's departments.",
+                         "reads": f"Department master + submissions for {yr}"},
+        "table": {"rule": "Each department's stages, progress and programmes, furthest behind first.",
+                  "reads": f"Department master + submissions for {yr}"},
+        "latest": {"rule": "The newest updates from departments, as they were recorded.", "reads": "Updates log"},
+    }
+
+
 @bp.route("/")
 @admin_required
 def dashboard():
@@ -221,7 +297,9 @@ def dashboard():
     upd = _unread_updates()
     for r in rows:
         r["updates"] = upd.get(r["dept"]["dept_code"])
-    return render_template("admin/dashboard.html", year=year, pic=pic, rows=rows,
+    made = now()
+    return render_template("admin/dashboard.html", year=year, pic=pic, rows=rows, made=made,
+                           src=_sources(pic, year, made),
                            latest=list(db.notifications.find(scope_q()).sort("at", -1).limit(8)))
 
 
@@ -236,6 +314,39 @@ def analysis_report():
     ranked = sorted(pic["rows"], key=lambda r: tuple(-x for x in _ahead(r)) + (r["dept"].get("dept_name", ""),))
     return render_template("admin/analysis_report.html", year=year, pic=pic, ranked=ranked,
                            findings=_findings(pic), made=now())
+
+
+@bp.route("/motion")
+@admin_required
+def motion():
+    """Motion: the year so far as a short animated explainer — title, stages,
+    programmes, campuses, the last fortnight, what the numbers say — to play
+    here or download as a video for a meeting. Drawn from the same reading as
+    the home, so the two never disagree; every scene says where it came from."""
+    db = get_db()
+    year = _year()
+    pic = _picture(db, year)
+    made = now()
+    t = pic["totals"]
+    scope = current_scope()
+    data = {
+        "year": str(year).replace("-", "\u2013"),
+        "made": made.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "scope": "All departments" if scope is None
+                 else f"Your {t['departments']} department{'s' if t['departments'] != 1 else ''}",
+        "totals": {k: t[k] for k in ("departments", "complete", "untouched", "stages_done", "stages_total", "percent")},
+        "stages": [{"title": st["title"], "done": st["submitted"], "prog": st["in_progress"], "back": st["returned"],
+                    "none": st["not_started"]} for st in pic["stages"]],
+        "programmes": {"total": pic["programmes"]["total"], "complete": pic["programmes"]["complete"],
+                       "levels": pic["programmes"]["levels"]},
+        "campus": [{"name": c["name"], "percent": c["percent"], "done": c["done"], "total": c["total"]}
+                   for c in pic["by_campus"]][:6],
+        "activity": [{"day": d["day"], "date": d["date"], "all": d["all"], "submitted": d["submitted"]}
+                     for d in pic["activity"]["series"]],
+        "attention": pic["attention"],
+        "findings": _findings(pic)[:4],
+    }
+    return render_template("admin/motion.html", year=year, data=data, made=made)
 
 
 # ---------------------------------------------------------------------------

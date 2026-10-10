@@ -105,3 +105,35 @@ def test_a_pg_curriculum_is_the_pg_course_matrix_and_ug_stays_as_it_was():
     assert pg_category("Major (Core)", 4, "Project Management") == "Generic Core"
     data = pg_groups({"semester_structure": [{"nep_category": "Multidisciplinary", "track": "All semesters"}]}, "PG - 2 Year")
     assert data["semester_structure"][0] == {"nep_category": "Open Elective"}
+
+
+def test_the_home_is_live_and_every_number_says_where_it_comes_from(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    client.get("/logout")
+    _admin(app, client)
+    page = client.get("/admin/").get_data(as_text=True)
+    assert 'id="ad-live"' in page and "js/admin-live.js" in page and "data-src-toggle" in page
+    assert page.count('class="ad-src"') >= 8
+    assert "How it is counted" in page and "as of" in page
+    # the departments behind a number, by name
+    assert "Most completed first" in page and "Department of Commerce" in page
+    assert 'href="/admin/motion"' in page
+
+
+def test_motion_plays_the_year_from_the_same_numbers(app, client):
+    import json, re
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
+    client.get("/logout")
+    _admin(app, client)
+    page = client.get("/admin/motion").get_data(as_text=True)
+    assert "js/motion.js" in page and 'id="mo-canvas"' in page and "Download video" in page
+    data = json.loads(re.search(r"window.MOTION_DATA = (\{.*?\});</script>", page, re.S).group(1))
+    assert data["totals"]["departments"] == 1 and data["totals"]["stages_done"] == 1
+    assert data["year"] == "2027–28" and data["scope"] == "All departments"
+    assert data["stages"][0]["done"] == 1 and data["findings"]
+    # the same words, as text, for anyone who cannot watch it
+    assert "Everything the animation says, as text" in page

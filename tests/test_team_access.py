@@ -206,3 +206,21 @@ def test_a_department_cannot_reach_the_team_pages(app, client):
     login(client, u, p)
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
     assert client.get("/admin/team").status_code == 403
+
+
+def test_motion_and_the_live_home_keep_to_a_person_s_departments(app, client):
+    import json, re
+    _two_departments(app)
+    _admin(app, client)
+    pw, _ = _add(app, client, "one@jainuniversity.ac.in", codes=["COM"])
+    me = _sign_in_fresh(app, "one@jainuniversity.ac.in", pw)
+    page = me.get("/admin/motion").get_data(as_text=True)
+    data = json.loads(re.search(r"window.MOTION_DATA = (\{.*?\});</script>", page, re.S).group(1))
+    assert data["totals"]["departments"] == 1 and data["scope"] == "Your 1 department"
+    home = me.get("/admin/").get_data(as_text=True)
+    assert "Department of English" not in home and "the departments you can see" in home
+    # no Home, no Motion
+    pw2, _ = _add(app, client, "nohome@jainuniversity.ac.in", preset="custom", scope="all",
+                  sections={"departments": "view"})
+    other = _sign_in_fresh(app, "nohome@jainuniversity.ac.in", pw2)
+    assert other.get("/admin/motion").status_code == 403

@@ -8,7 +8,23 @@
 {% set n = t.departments %}
 {% set icons = {'submitted': '✓', 'saved': '✎', 'uploaded': '⇪', 'keyword_miss': '!', 'programme': '≡', 'password': '⚿'} %}
 {% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started', 'locked': 'Not started'} %}
-<div class="ad">
+{% set asof = made.strftime('%Y-%m-%dT%H:%M:%SZ') %}
+{# where a number comes from: the rule, the records, when, and who is behind it #}
+{% macro src_note(sx) -%}
+<div class="ad-src">
+  <p><b>How it is counted</b> {{ sx.rule }}</p>
+  <p class="ad-src-reads"><b>Reads</b> {{ sx.reads }} · as of <time data-local datetime="{{ asof }}">{{ src.when }} UTC</time></p>
+  {% if sx.behind and sx.behind.list %}
+  <details class="ad-src-behind"><summary>{{ sx.behind_label }} · {{ sx.behind.list|length + sx.behind.more }}</summary>
+    <ul>{% for b in sx.behind.list %}
+      <li>{% if can('overview') %}<a href="{{ url_for('admin.submission_detail', dept_code=b.code) }}">{{ b.name }}</a>{% else %}{{ b.name }}{% endif %}
+        {% if b.note %}<small>{{ b.note }}</small>{% endif %}</li>{% endfor %}
+      {% if sx.behind.more %}<li class="muted">and {{ sx.behind.more }} more</li>{% endif %}
+    </ul></details>
+  {% endif %}
+</div>
+{%- endmacro %}
+<div class="ad" id="ad-live" data-live="60">
 
   {# ------------------------------------------------------------ the head -#}
   <header class="ad-head">
@@ -28,6 +44,16 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
         <input name="q" placeholder="Find a department" aria-label="Find a department">
       </form>{% endif %}
+      <div class="ad-livebar" role="group" aria-label="Live data">
+        <span class="ad-live-dot" aria-hidden="true"></span>
+        <span class="ad-live-txt">Live · as of <time data-local datetime="{{ asof }}">{{ src.when }} UTC</time></span>
+        <button class="ad-live-btn" type="button" data-live-now title="Count again now">Refresh</button>
+        <button class="ad-live-btn" type="button" data-src-toggle aria-pressed="false"
+                title="Show how each number is counted and the departments behind it">Sources</button>
+      </div>
+      <a class="btn btn-ghost ad-motion" href="{{ url_for('admin.motion') }}" title="The year so far as a short animation, to play or download as a video">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM10 9l5 3-5 3z"/></svg>
+        Motion</a>
       <a class="btn btn-gold ad-analysis" href="{{ url_for('admin.analysis_report') }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         Analysis</a>
@@ -37,33 +63,48 @@
 
   {# ------------------------------------------------------------ the tiles -#}
   <section class="ad-kpis" aria-label="At a glance">
-    <a class="ad-kpi" href="{{ url_for('admin.departments') }}">
-      <span class="ad-kpi-l">Departments</span>
-      <b>{{ n }}</b>
-      <small>{{ t.complete }} completed · {{ t.untouched }} not started</small>
-    </a>
-    <a class="ad-kpi" href="{{ url_for('admin.submissions') }}">
-      <span class="ad-kpi-l">Stages completed</span>
-      <b>{{ t.stages_done }}<em>/{{ t.stages_total }}</em></b>
-      <span class="ad-meter" role="progressbar" aria-valuenow="{{ t.percent }}" aria-valuemin="0" aria-valuemax="100"
-            aria-label="Stages completed"><i style="width:{{ t.percent }}%"></i></span>
-      <small>{{ t.percent }}% of all stages</small>
-    </a>
-    <a class="ad-kpi" href="{{ url_for('admin.sheets', tab='programmes') }}">
-      <span class="ad-kpi-l">Programmes completed</span>
-      <b>{{ pic.programmes.complete }}<em>/{{ pic.programmes.total }}</em></b>
-      <small>{% for lv in pic.programmes.levels %}{{ lv.level }} {{ lv.complete }}/{{ lv.total }}{{ ' · ' if not loop.last }}{% else %}None mapped yet{% endfor %}</small>
-    </a>
-    <a class="ad-kpi{{ ' is-alert' if pic.attention.total }}" href="#attention">
-      <span class="ad-kpi-l">Needs attention</span>
-      <b>{{ pic.attention.total }}</b>
-      <small>{{ pic.attention.bad_files }} files · {{ pic.attention.returned }} sent back · {{ pic.attention.comments }} comments</small>
-    </a>
-    <a class="ad-kpi" href="{{ url_for('admin.updates') }}">
-      <span class="ad-kpi-l">Updates · 14 days</span>
-      <b>{{ pic.activity.total }}</b>
-      <small>{{ pic.activity.submitted }} submission{{ 's' if pic.activity.submitted != 1 }} · {{ updates_unread }} unread</small>
-    </a>
+    <div class="ad-kpi-w">
+      <a class="ad-kpi" href="{{ url_for('admin.departments') }}">
+        <span class="ad-kpi-l">Departments</span>
+        <b>{{ n }}</b>
+        <small>{{ t.complete }} completed · {{ t.untouched }} not started</small>
+      </a>
+      {{ src_note(src.departments) }}
+    </div>
+    <div class="ad-kpi-w">
+      <a class="ad-kpi" href="{{ url_for('admin.submissions') }}">
+        <span class="ad-kpi-l">Stages completed</span>
+        <b>{{ t.stages_done }}<em>/{{ t.stages_total }}</em></b>
+        <span class="ad-meter" role="progressbar" aria-valuenow="{{ t.percent }}" aria-valuemin="0" aria-valuemax="100"
+              aria-label="Stages completed"><i style="width:{{ t.percent }}%"></i></span>
+        <small>{{ t.percent }}% of all stages</small>
+      </a>
+      {{ src_note(src.stages) }}
+    </div>
+    <div class="ad-kpi-w">
+      <a class="ad-kpi" href="{{ url_for('admin.sheets', tab='programmes') }}">
+        <span class="ad-kpi-l">Programmes completed</span>
+        <b>{{ pic.programmes.complete }}<em>/{{ pic.programmes.total }}</em></b>
+        <small>{% for lv in pic.programmes.levels %}{{ lv.level }} {{ lv.complete }}/{{ lv.total }}{{ ' · ' if not loop.last }}{% else %}None mapped yet{% endfor %}</small>
+      </a>
+      {{ src_note(src.programmes) }}
+    </div>
+    <div class="ad-kpi-w">
+      <a class="ad-kpi{{ ' is-alert' if pic.attention.total }}" href="#attention">
+        <span class="ad-kpi-l">Needs attention</span>
+        <b>{{ pic.attention.total }}</b>
+        <small>{{ pic.attention.bad_files }} files · {{ pic.attention.returned }} sent back · {{ pic.attention.comments }} comments</small>
+      </a>
+      {{ src_note(src.attention) }}
+    </div>
+    <div class="ad-kpi-w">
+      <a class="ad-kpi" href="{{ url_for('admin.updates') }}">
+        <span class="ad-kpi-l">Updates · 14 days</span>
+        <b>{{ pic.activity.total }}</b>
+        <small>{{ pic.activity.submitted }} submission{{ 's' if pic.activity.submitted != 1 }} · {{ updates_unread }} unread</small>
+      </a>
+      {{ src_note(src.updates) }}
+    </div>
   </section>
 
   <div class="ad-grid">
@@ -74,6 +115,7 @@
           <h2>Progress by stage</h2>
           <a href="{{ url_for('admin.submissions') }}">Departments × stages →</a>
         </div>
+        {{ src_note(src.stage_chart) }}
         {{ cx.status_legend() }}
         {{ cx.stage_bars(pic.stages, n) }}
       </section>
@@ -84,6 +126,7 @@
           <h2>Departments <span class="ad-sub">furthest behind first</span></h2>
           <a href="{{ url_for('admin.departments') }}">All departments →</a>
         </div>
+        <div class="ad-src-pad">{{ src_note(src.table) }}</div>
         <div class="ad-table-wrap">
           <table class="ad-table">
             <thead><tr>
@@ -120,6 +163,7 @@
       {# ---------------------------------------------------------- activity -#}
       <section class="ad-card">
         <div class="ad-card-head"><h2>Updates · last 14 days</h2><a href="{{ url_for('admin.updates') }}">View all →</a></div>
+        {{ src_note(src.updates) }}
         {% if pic.activity.total %}
         {{ cx.activity(pic.activity) }}
         {% else %}
@@ -141,12 +185,14 @@
       {# ----------------------------------------------------------- campus -#}
       <section class="ad-card">
         <div class="ad-card-head"><h2>By campus</h2><span class="ad-sub">stages completed</span></div>
+        {{ src_note(src.campus_chart) }}
         {% if pic.by_campus %}{{ cx.ranked(pic.by_campus) }}{% else %}<p class="ad-empty">No departments yet.</p>{% endif %}
       </section>
 
       {# ------------------------------------------------------------ latest -#}
       <section class="ad-card ad-flush">
         <div class="ad-card-head"><h2>Latest from departments</h2><a href="{{ url_for('admin.updates') }}">All →</a></div>
+        <div class="ad-src-pad">{{ src_note(src.latest) }}</div>
         <ul class="ad-feed">
           {% for e in latest %}
           <li class="{{ 'is-unread' if not e.read }}">
@@ -172,4 +218,5 @@
 </div>
 {% endblock %}
 
-{% block scripts %}<script src="{{ url_for('static', filename='js/admin-charts.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/admin-charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-live.js') }}"></script>{% endblock %}
