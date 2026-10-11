@@ -5836,6 +5836,63 @@ html[data-theme="dark"] .fx-files a:hover {
   background: #0e182a;
   text-decoration: none;
 }
+html[data-theme="dark"] .erp-place {
+  border: 1px solid #2e3542;
+  background: #181b21;
+}
+html[data-theme="dark"] .erp-place a {
+  color: #aab1bf;
+  text-decoration: none !important;
+}
+html[data-theme="dark"] .erp-place a:hover {
+  color: #a6c1f2;
+  background: #121519;
+}
+html[data-theme="dark"] .erp-place a[aria-current="true"] {
+  background: #1e55b8;
+  color: #ffffff;
+}
+html[data-theme="dark"] .fx-ask {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: #cad2e1;
+  box-shadow: 0 24px 48px -20px rgba(16, 24, 40, 0.5);
+}
+html[data-theme="dark"] .fx-ask::backdrop {
+  background: rgba(43, 90, 171, 0.45);
+}
+html[data-theme="dark"] .fx-ask h3 {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-opt {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: inherit;
+}
+html[data-theme="dark"] .fx-opt:hover,
+html[data-theme="dark"] .fx-opt:focus-visible {
+  border-color: #2563eb;
+  background: #0d1426;
+  outline: none;
+}
+html[data-theme="dark"] .fx-opt strong {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-opt small {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-ico b {
+  color: #ffffff;
+}
+html[data-theme="dark"] .fx-ico b + b {
+  box-shadow: -2px 0 0 #121519;
+}
+html[data-theme="dark"] .fx-ico .x {
+  background: #2caa65;
+}
+html[data-theme="dark"] .fx-ico .w {
+  background: #2b579a;
+}
 
 /* ---- admin.css ---- */
 html[data-theme="dark"] .ad {

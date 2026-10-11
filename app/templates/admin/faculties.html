@@ -25,7 +25,7 @@
       {% if g.returned %}<span class="fx-bad"><b>{{ g.returned }}</b> sent back</span>{% endif %}
     </span>
   </a>
-  <a class="fx-zip" href="{{ zip_href }}" data-zip title="Every department's Excel and Word, in a folder for each school">
+  <a class="fx-zip" href="{{ zip_href }}" data-zip data-zip-name="{{ g.name }}" title="Every department's Excel and Word, in a folder for each school">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
     Download ZIP</a>
 </article>
@@ -57,7 +57,7 @@
   <div><span class="fx-kicker">Faculty</span><h2>{{ fac.name }}</h2>
     <p class="muted">{{ fac.schools|length }} school{{ 's' if fac.schools|length != 1 }} · {{ fac.departments }} department{{ 's' if fac.departments != 1 }} ·
       {{ fac.percent }}% of stages completed · {{ fac.prog_done }}/{{ fac.programmes }} programmes completed</p></div>
-  <a class="btn btn-gold fx-zip-big" href="{{ url_for('admin.export_group', faculty=fac.name) }}" data-zip>
+  <a class="btn btn-gold fx-zip-big" href="{{ url_for('admin.export_group', faculty=fac.name) }}" data-zip data-zip-name="{{ fac.name }}">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
     Download the faculty (ZIP)</a>
 </div>
@@ -75,7 +75,7 @@
   <div><span class="fx-kicker">School · {{ fac.name }}</span><h2>{{ school.name }}</h2>
     <p class="muted">{{ school.departments }} department{{ 's' if school.departments != 1 }} · {{ school.percent }}% of stages completed ·
       {{ school.prog_done }}/{{ school.programmes }} programmes completed</p></div>
-  <a class="btn btn-gold fx-zip-big" href="{{ url_for('admin.export_group', faculty=fac.name, school=school.name) }}" data-zip>
+  <a class="btn btn-gold fx-zip-big" href="{{ url_for('admin.export_group', faculty=fac.name, school=school.name) }}" data-zip data-zip-name="{{ school.name }}">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
     Download the school (ZIP)</a>
 </div>
@@ -123,6 +123,25 @@
 </section>
 {% endif %}
 
+<dialog class="fx-ask" id="fx-ask" aria-labelledby="fx-ask-title">
+  <form method="dialog">
+    <h3 id="fx-ask-title">Download <span id="fx-ask-name"></span></h3>
+    <p class="small muted">A ZIP with a folder for each school and every department's files in it. What should it hold?</p>
+    <div class="fx-ask-opts">
+      <button class="fx-opt" value="all" autofocus>
+        <span class="fx-ico"><b class="x">X</b><b class="w">W</b></span>
+        <span><strong>Excel and Word</strong><small>Both files for every department, and the summary sheets</small></span></button>
+      <button class="fx-opt" value="xlsx">
+        <span class="fx-ico"><b class="x">X</b></span>
+        <span><strong>Excel only</strong><small>Each department's Excel, and the summary sheets</small></span></button>
+      <button class="fx-opt" value="docx">
+        <span class="fx-ico"><b class="w">W</b></span>
+        <span><strong>Word only</strong><small>Each department's Word report</small></span></button>
+    </div>
+    <div class="fx-ask-foot"><button class="btn btn-ghost btn-sm" value="cancel">Cancel</button></div>
+  </form>
+</dialog>
+
 <div class="fx-wait" id="fx-wait" hidden role="status">
   <span class="fx-spin" aria-hidden="true"></span>
   <span>Making the ZIP — every department's Excel and Word. A whole faculty can take a minute; it downloads when ready.</span>
@@ -131,13 +150,28 @@
 
 {% block scripts %}
 <script>
-  // a ZIP takes a while: say so, and clear the note once the download has begun
-  document.addEventListener("click", function (e) {
-    var a = e.target.closest("[data-zip]");
-    if (!a) return;
-    var w = document.getElementById("fx-wait");
-    w.hidden = false;
-    setTimeout(function () { w.hidden = true; }, 25000);
-  });
+  // a download asks first: Excel and Word, Excel only, or Word only; then,
+  // as a ZIP takes a while, it says so until the download has begun
+  (function () {
+    var ask = document.getElementById("fx-ask"), wait = document.getElementById("fx-wait"), href = null;
+    function go(kind) {
+      if (!href) return;
+      wait.hidden = false;
+      setTimeout(function () { wait.hidden = true; }, 25000);
+      window.location.href = href + (href.indexOf("?") >= 0 ? "&" : "?") + "kind=" + encodeURIComponent(kind);
+    }
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest("[data-zip]");
+      if (!a) return;
+      e.preventDefault();
+      href = a.getAttribute("href");
+      document.getElementById("fx-ask-name").textContent = a.getAttribute("data-zip-name") || "";
+      if (ask && ask.showModal) { ask.returnValue = ""; ask.showModal(); }
+      else go("all");
+    });
+    if (ask) ask.addEventListener("close", function () {
+      if (ask.returnValue && ask.returnValue !== "cancel") go(ask.returnValue);
+    });
+  })();
 </script>
 {% endblock %}

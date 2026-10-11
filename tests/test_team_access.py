@@ -117,6 +117,8 @@ def test_only_the_sections_given_show_in_the_menu(app, client):
     assert me.get("/admin/sheets?tab=programmes").status_code == 200
     # View on Departments: cannot issue a login
     assert me.post("/admin/departments/COM/credentials").status_code == 403
+    # the place switch in the top bar is everyone's
+    assert me.get("/admin/place?to=Kochi&next=/admin/departments").status_code == 302
 
 
 def test_delete_needs_its_own_tick(app, client):

@@ -312,7 +312,18 @@
 {% if side_shell %}
 <div class="erp-bar">
   <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
-  <span class="erp-bar-mid">Board of Studies{% if app_settings and app_settings.academic_year %} | {{ app_settings.academic_year|ay }}{% endif %}</span>
+  {% if admin_shell %}
+  {# which place every page shows: all, or one city — remembered until changed #}
+  {% set here = current_place() %}
+  {% set back = request.full_path if request.method == 'GET' else url_for('admin.dashboard') %}
+  <nav class="erp-place" aria-label="Show departments in">
+    <a href="{{ url_for('admin.set_place', to='', next=back) }}"{% if not here %} aria-current="true"{% endif %}>All</a>
+    {% for pl in PLACES %}
+    <a href="{{ url_for('admin.set_place', to=pl, next=back) }}"{% if here == pl %} aria-current="true"{% endif %}>{{ pl }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+  <span class="erp-bar-mid">Board of Studies{% if app_settings and app_settings.academic_year %} | {{ app_settings.academic_year|ay }}{% endif %}{% if admin_shell and current_place() %} · {{ current_place() }}{% endif %}</span>
   <span class="erp-bar-end">{{ theme_toggle() }}</span>
 </div>
 {% else %}

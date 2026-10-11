@@ -615,3 +615,31 @@ body.has-side .wrap { max-width: none !important; }
 .fx-files a { padding: 1px 8px; border: 1px solid #d0d5dd; border-radius: 5px; font-size: 11.5px; font-weight: 600; color: #1d4ed8; background: #fff; }
 .fx-files a:hover { background: #eef4ff; text-decoration: none; }
 .fx-table td.act { white-space: nowrap; }
+
+/* ---- the place switch in the top bar: All · Bangalore · Kochi ---- */
+.erp-place { display: inline-flex; flex: none; padding: 2px; gap: 2px; border: 1px solid #e4e7ec; border-radius: 999px; background: #f4f5f7; }
+.erp-place a { padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #5b6474; text-decoration: none !important;
+  white-space: nowrap; }
+.erp-place a:hover { color: #0e2a5c; background: #fff; }
+.erp-place a[aria-current="true"] { background: #0e2a5c; color: #fff; }
+@media (max-width: 900px) { .erp-place a { padding: 3px 9px; } }
+@media (max-width: 480px) { .erp-bar-mid { font-size: 10.5px; letter-spacing: .03em; } }
+/* the question before a ZIP: Excel and Word, Excel only, Word only */
+.fx-ask { width: min(460px, calc(100vw - 32px)); padding: 0; border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; color: #1f2937;
+  box-shadow: 0 24px 48px -20px rgba(16, 24, 40, .5); }
+.fx-ask::backdrop { background: rgba(9, 19, 36, .45); }
+.fx-ask form { padding: 20px; }
+.fx-ask h3 { margin: 0 0 4px; font-size: 17px; color: #0e2a5c; }
+.fx-ask p { margin: 0 0 14px; }
+.fx-ask-opts { display: grid; gap: 8px; }
+.fx-opt { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid #e4e7ec; border-radius: 10px;
+  background: #fff; font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.fx-opt:hover, .fx-opt:focus-visible { border-color: #2563eb; background: #f5f8ff; outline: none; }
+.fx-opt strong { display: block; font-size: 14px; color: #0e2a5c; }
+.fx-opt small { display: block; font-size: 12px; color: #5b6474; }
+.fx-ico { display: inline-flex; flex: none; width: 52px; justify-content: center; }
+.fx-ico b { display: grid; place-items: center; width: 24px; height: 28px; border-radius: 4px; color: #fff; font-size: 13px; }
+.fx-ico b + b { margin-left: -6px; box-shadow: -2px 0 0 #fff; }
+.fx-ico .x { background: #1d6f42; }
+.fx-ico .w { background: #2b579a; }
+.fx-ask-foot { display: flex; justify-content: flex-end; margin-top: 12px; }

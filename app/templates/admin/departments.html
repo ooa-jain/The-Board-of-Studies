@@ -106,7 +106,7 @@
    campus row to the campuses that city actually has. #}
 <div class="filter-bar">
   <nav class="place-toggle" aria-label="Filter by city">
-    <a href="{{ url_for('admin.departments', q=filters.q or None, school=filters.school or None) }}"
+    <a href="{{ url_for('admin.departments', place='', q=filters.q or None, school=filters.school or None) }}"
        {% if not filters.place %}aria-current="true"{% endif %}>All</a>
     {% for pl in places %}
     <a href="{{ url_for('admin.departments', place=pl, q=filters.q or None, school=filters.school or None) }}"

@@ -81,6 +81,8 @@ ENDPOINTS = {
     "keywords": ("settings", ("view", "edit")), "keywords_reset": ("settings", "edit"),
     "keywords_recheck": ("settings", "edit"),
 }
+# open to every admin, whatever their sections: the place they are looking at
+OPEN_TO_ALL = {"set_place"}
 # Overview's sheet tabs belong to the menu item that opens them
 SHEET_TABS = {"documents": "documents", "comments": "comments"}
 
@@ -130,9 +132,48 @@ def scope_codes(user: dict | None, db=None):
     return codes
 
 
+def current_place():
+    """The place chosen in the top bar (Bangalore, Kochi …), or None for all."""
+    from flask import current_app
+    p = (session.get("place") or "").strip()
+    return p if p in current_app.config.get("PLACES", []) else None
+
+
+def place_of(dept: dict) -> str:
+    """A department's place: as recorded; else the city its campus names
+    (Kochi Campus → Kochi); else the first place, where most departments are."""
+    from flask import current_app
+    places = current_app.config.get("PLACES", [])
+    if dept.get("place") in places:
+        return dept["place"]
+    campus = (dept.get("campus") or "").lower()
+    return next((pl for pl in places if pl.lower() in campus), places[0] if places else "")
+
+
+def codes_in_place(place: str) -> set:
+    from .db import get_db
+    return {d["dept_code"] for d in get_db().departments.find({}, {"dept_code": 1, "place": 1, "campus": 1})
+            if place_of(d) == place}
+
+
+def view_scope():
+    """The departments a page lists: the person's own, narrowed to the place
+    chosen in the top bar. (Opening one department is decided by may_see —
+    the place is a view, not a permission.)"""
+    if "view_scope" not in g:
+        codes = current_scope()
+        place = current_place()
+        if place:
+            here = codes_in_place(place)
+            codes = here if codes is None else (set(codes) & here)
+        g.view_scope = codes
+    return g.view_scope
+
+
 def scope_q(field: str = "dept_code"):
-    """A database filter for the current user's departments ({} for all)."""
-    codes = current_scope()
+    """A database filter for the departments a page lists ({} for all): the
+    person's own, in the place chosen in the top bar."""
+    codes = view_scope()
     return {} if codes is None else {field: {"$in": sorted(codes)}}
 
 
@@ -212,7 +253,9 @@ def guard_admin_request():
         flash("Please set your own password before you carry on.", "info")
         return redirect(url_for("auth.change_password"))
     ep = (request.endpoint or "").split(".", 1)[-1]
-    if ep.startswith("team"):
+    if ep in OPEN_TO_ALL:
+        pass
+    elif ep.startswith("team"):
         if not is_full(me):
             abort(403)
     elif ep == "sheets":
@@ -260,4 +303,5 @@ def template_helpers():
     menu and the pages."""
     def can(section, need="view"):
         return allows(current_user(), section, need)
-    return {"can": can, "is_full_admin": lambda: is_full(current_user()), "admin_home": home_url}
+    return {"can": can, "is_full_admin": lambda: is_full(current_user()), "admin_home": home_url,
+            "current_place": current_place}

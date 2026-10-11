@@ -10,7 +10,8 @@ from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
                    render_template, request, send_file, session, url_for)
 
 from . import ugc_rules as U
-from .access import allows, current_scope, current_user, guard_admin_request, may_see, scope_q
+from .access import (allows, current_place, current_scope, current_user, guard_admin_request, may_see,
+                     scope_q, view_scope)
 from .auth import admin_required
 from .db import audit, get_db, issue_department_login, now, rules_doc
 from .exporter import (department_excel, institution_excel, submission_word)
@@ -216,7 +217,8 @@ def _sources(pic, year, made):
     can be checked rather than taken on trust."""
     rows, t = pic["rows"], pic["totals"]
     scoped = current_scope() is not None
-    whose = "the departments you can see" if scoped else "every active department"
+    place = current_place()
+    whose = ("the departments you can see" if scoped else "every active department") + (f" in {place}" if place else "")
     when = made.strftime("%d %b %Y, %H:%M")
     yr = str(year).replace("-", "\u2013")         # as it is printed: 2027–28
 
@@ -332,8 +334,9 @@ def motion():
     data = {
         "year": str(year).replace("-", "\u2013"),
         "made": made.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "scope": "All departments" if scope is None
-                 else f"Your {t['departments']} department{'s' if t['departments'] != 1 else ''}",
+        "scope": (("All departments" if scope is None
+                   else f"Your {t['departments']} department{'s' if t['departments'] != 1 else ''}")
+                  + (f" · {current_place()}" if current_place() else "")),
         "totals": {k: t[k] for k in ("departments", "complete", "untouched", "stages_done", "stages_total", "percent")},
         "stages": [{"title": st["title"], "done": st["submitted"], "prog": st["in_progress"], "back": st["returned"],
                     "none": st["not_started"]} for st in pic["stages"]],
@@ -347,6 +350,22 @@ def motion():
         "findings": _findings(pic)[:4],
     }
     return render_template("admin/motion.html", year=year, data=data, made=made)
+
+
+@bp.route("/place")
+@admin_required
+def set_place():
+    """The place switch in the top bar: every page, count and download then
+    shows that place's departments (or all of them), until it is changed."""
+    to = (request.args.get("to") or "").strip()
+    if to in current_app.config["PLACES"]:
+        session["place"] = to
+    else:
+        session.pop("place", None)
+    nxt = request.args.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("admin.dashboard")
+    return redirect(nxt)
 
 
 # ---------------------------------------------------------------------------
@@ -449,13 +468,20 @@ def analysis():
 @admin_required
 def departments():
     db = get_db()
-    q = scope_q()
-    place = request.args.get("place")
+    # the person's own departments; the place is this page's own choice below
+    # (it starts at the one chosen in the top bar)
+    mine = current_scope()
+    q = {} if mine is None else {"dept_code": {"$in": sorted(mine)}}
+    place = request.args.get("place") if "place" in request.args else current_place()
     campus = request.args.get("campus")
     school = request.args.get("school")
     search = (request.args.get("q") or "").strip()
     if place:
-        q["place"] = place
+        from .access import codes_in_place
+        here = codes_in_place(place)
+        if mine is not None:
+            here &= set(mine)
+        q["dept_code"] = {"$in": sorted(here)}
     if campus:
         q["campus"] = campus
     if school:
@@ -470,16 +496,17 @@ def departments():
 
     # only the campuses in the city being looked at: offering Kochi Campus
     # while Bangalore is selected would be a filter that can only return none
-    campuses = [c for c in current_app.config["CAMPUSES"]
-                if not place or db.departments.count_documents(
-                    {"place": place, "campus": c})]
+    if place:
+        from .access import codes_in_place
+        in_place = set(db.departments.distinct("campus", {"dept_code": {"$in": sorted(codes_in_place(place))}}))
+    campuses = [c for c in current_app.config["CAMPUSES"] if not place or c in in_place]
     return render_template("admin/departments.html", departments=depts,
                            demo=db.departments.find_one({"dept_code": "DEMO"}),
                            packs=available_packs(),
                            schools=sorted(x for x in db.departments.distinct("school") if x),
                            campuses=campuses,
                            places=current_app.config["PLACES"],
-                           total=db.departments.count_documents(scope_q()),
+                           total=db.departments.count_documents({} if mine is None else {"dept_code": {"$in": sorted(mine)}}),
                            filters={"place": place, "campus": campus,
                                     "school": school, "q": search})
 
@@ -845,11 +872,13 @@ def _safe_name(text, limit=90):
 @admin_required
 def export_group():
     """A faculty or a school as a ZIP: a folder for each school, and in it each
-    department's Excel and Word, with a summary sheet for the faculty and for
-    each school."""
+    department's Excel and Word (or only the one asked for, kind=xlsx|docx),
+    with a summary sheet for the faculty and for each school."""
     import zipfile
     db = get_db()
     year = _year()
+    kind = request.args.get("kind") if request.args.get("kind") in ("xlsx", "docx") else "all"
+    want_x, want_w = kind in ("all", "xlsx"), kind in ("all", "docx")
     fac_name, school_name = request.args.get("faculty") or "", request.args.get("school") or ""
     depts = list(db.departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
 
@@ -869,19 +898,22 @@ def export_group():
     buf = io.BytesIO()
     made, failed = 0, []
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr(f"{root}/{root} - summary.xlsx",
-                   institution_excel(year, [d["dept_code"] for d in depts], school_name or fac_name).getvalue())
+        if want_x:
+            z.writestr(f"{root}/{root} - summary.xlsx",
+                       institution_excel(year, [d["dept_code"] for d in depts], school_name or fac_name).getvalue())
         for sc in sorted(schools, key=str.lower):
             folder = root if school_name else f"{root}/{_safe_name(sc)}"
-            if not school_name:
+            if not school_name and want_x:
                 z.writestr(f"{folder}/{_safe_name(sc)} - summary.xlsx",
                            institution_excel(year, [d["dept_code"] for d in schools[sc]], sc).getvalue())
             for d in schools[sc]:
                 name = _safe_name(f"{d['dept_code']} - {d.get('dept_name') or ''}")
                 links = ShareLinks(d["dept_code"], year)
                 try:
-                    z.writestr(f"{folder}/{name}.xlsx", department_excel(d["dept_code"], year, links).getvalue())
-                    z.writestr(f"{folder}/{name}.docx", submission_word(d["dept_code"], year, links).getvalue())
+                    if want_x:
+                        z.writestr(f"{folder}/{name}.xlsx", department_excel(d["dept_code"], year, links).getvalue())
+                    if want_w:
+                        z.writestr(f"{folder}/{name}.docx", submission_word(d["dept_code"], year, links).getvalue())
                     made += 1
                 except Exception as e:           # one department's trouble does not cost the rest
                     current_app.logger.exception("Export of %s failed", d["dept_code"])
@@ -891,9 +923,10 @@ def export_group():
                                "Download them from the department's record, or tell the portal team.\n")
     buf.seek(0)
     audit(_actor(), "export.school" if school_name else "export.faculty", school_name or fac_name,
-          {"departments": made, "failed": failed})
+          {"departments": made, "failed": failed, "kind": kind})
+    what = {"all": "", "xlsx": "-Excel", "docx": "-Word"}[kind]
     return send_file(buf, as_attachment=True, mimetype="application/zip",
-                     download_name=f"BoS-{root.replace(' ', '-')}-{year}.zip")
+                     download_name=f"BoS-{root.replace(' ', '-')}{what}-{year}.zip")
 
 
 @bp.route("/submissions/<dept_code>")
@@ -1238,7 +1271,7 @@ def audit_log():
 @bp.route("/export/institution.xlsx")
 @admin_required
 def export_institution():
-    buf = institution_excel(_year(), current_scope())
+    buf = institution_excel(_year(), view_scope())
     audit(_actor(), "export.institution")
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Repository-{_year()}.xlsx",
