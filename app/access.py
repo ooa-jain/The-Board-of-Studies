@@ -23,7 +23,7 @@ SECTIONS = [
     ("documents", "Documents", "Uploaded documents and their summaries"),
     ("comments", "Comments", "Comments to departments"),
     ("calendar", "Calendar", "What happened, day by day"),
-    ("flow", "Flow 3D", "How a department's data flows"),
+    ("flow", "Data Flow", "How a department's data flows"),
     ("updates", "Updates", "Changes from departments as they happen"),
     ("settings", "Settings", "Portal settings, credit rules, keywords, connectors, audit log"),
 ]

@@ -765,7 +765,7 @@ def submission_word(dept_code: str, year: str, links=None) -> io.BytesIO:
 
 
 # ---------------------------------------------------------------------------
-# Excel — one department's data mapping (Admin > Flow 3D)
+# Excel — one department's data mapping (Admin > Data Flow)
 # ---------------------------------------------------------------------------
 
 def flow_mapping_excel(data: dict, per_programme: list, year: str) -> io.BytesIO:

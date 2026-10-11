@@ -11,8 +11,15 @@
   if (!D || !cv) return;
   const ctx = cv.getContext("2d");
   const W = 1920, H = 1080, M = 120;
-  const C = { navy: "#0e2a5c", blue: "#2563eb", green: "#16a34a", red: "#dc2626", amber: "#2563eb",
-              grey: "#e4e7ec", ink: "#1f2937", muted: "#5b6474", line: "#eef0f3", soft: "#f5f7fb" };
+  // the colours follow the page: light, or dark (and so does a downloaded video)
+  const LIGHT = { navy: "#0e2a5c", blue: "#2563eb", green: "#16a34a", red: "#dc2626", amber: "#2563eb",
+                  grey: "#e4e7ec", ink: "#1f2937", muted: "#5b6474", line: "#eef0f3", soft: "#f5f7fb",
+                  bg: "#ffffff", head: "#0e2a5c", veil: "255,255,255" };
+  const DARK = { navy: "#3b6fd8", blue: "#3b82f6", green: "#22c55e", red: "#f87171", amber: "#3b82f6",
+                 grey: "#263042", ink: "#e5e9f0", muted: "#9aa4b5", line: "#1f2836", soft: "#1b2331",
+                 bg: "#0f141c", head: "#c7d6f5", veil: "15,20,28" };
+  const pal = () => document.documentElement.getAttribute("data-theme") === "dark" ? DARK : LIGHT;
+  let C = pal();
   const FONT = '"Roboto", "Inter", "Segoe UI", system-ui, sans-serif';
   const asOf = (() => {
     try {
@@ -69,7 +76,7 @@
   const n0 = (x) => Math.round(x).toLocaleString();
   function heading(s, local, sub) {
     const a = at(local, 0, 600);
-    text(s, M, 230 - 20 * (1 - a), 72, C.navy, 700, "left", a);
+    text(s, M, 230 - 20 * (1 - a), 72, C.head, 700, "left", a);
     if (sub) text(sub, M, 290 - 20 * (1 - a), 34, C.muted, 400, "left", a);
   }
 
@@ -81,7 +88,7 @@
       ctx.globalAlpha = a;
       spaced("OFFICE OF ACADEMIC AFFAIRS", M, 380 - 20 * (1 - a), 30, C.blue, 700, 6);
       ctx.globalAlpha = 1;
-      text("Board of Studies", M, 540 - 30 * (1 - b), 140, C.navy, 800, "left", b);
+      text("Board of Studies", M, 540 - 30 * (1 - b), 140, C.head, 800, "left", b);
       text(D.year, M, 700 - 30 * (1 - c), 140, C.blue, 800, "left", c);
       rrect(M, 760, 520 * at(l, 1300, 900), 10, 5, C.navy);
       text("Where every department stands", M, 850, 46, C.muted, 400, "left", at(l, 1600, 700));
@@ -96,11 +103,11 @@
         ctx.strokeStyle = C.green;
         ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (T.percent / 100) * p); ctx.stroke();
       }
-      text(n0(T.percent * p) + "%", cx, cy + 30, 120, C.navy, 800, "center");
+      text(n0(T.percent * p) + "%", cx, cy + 30, 120, C.head, 800, "center");
       text("of all stages completed", cx, cy + 90, 32, C.muted, 400, "center");
       const rows = [
-        [n0(T.stages_done * at(l, 900, 1500)) + " of " + n0(T.stages_total), "stages completed", C.navy],
-        [n0(n * at(l, 1300, 1200)), "department" + (n === 1 ? "" : "s"), C.navy],
+        [n0(T.stages_done * at(l, 900, 1500)) + " of " + n0(T.stages_total), "stages completed", C.head],
+        [n0(n * at(l, 1300, 1200)), "department" + (n === 1 ? "" : "s"), C.head],
         [n0(T.complete * at(l, 1700, 1200)), "completed every stage", C.green],
         [n0(T.untouched * at(l, 2100, 1200)), "not started yet", T.untouched ? C.red : C.muted],
       ];
@@ -127,7 +134,7 @@
         const y = 440 + i * gap, a = at(l, 500 + i * 300, 600), g = at(l, 800 + i * 300, 1400);
         ctx.globalAlpha = a;
         rrect(M, y - 4, 52, 52, 12, C.soft);
-        text(String(i + 1), M + 26, y + 34, 30, C.navy, 700, "center");
+        text(String(i + 1), M + 26, y + 34, 30, C.head, 700, "center");
         const label = wrap(s.title, x0 - M - 110, 36, 600)[0];
         text(label, M + 76, y + 36, 36, C.ink, 600);
         rrect(x0, y, tw, 44, 22, C.grey);
@@ -136,7 +143,7 @@
           const w = n ? tw * v / n * g : 0;
           if (w > 0) { rrect(sx, y, w, 44, 22, col); sx += w; }
         });
-        text(n0(s.done * g) + "/" + n, x0 + tw + 30, y + 36, 38, C.navy, 800);
+        text(n0(s.done * g) + "/" + n, x0 + tw + 30, y + 36, 38, C.head, 800);
         ctx.globalAlpha = 1;
       });
     } },
@@ -149,7 +156,7 @@
         return;
       }
       const g = at(l, 400, 1600);
-      text(n0(P.complete * g), M, 560, 180, C.navy, 800);
+      text(n0(P.complete * g), M, 560, 180, C.head, 800);
       font(180, 800);
       const w0 = ctx.measureText(n0(P.complete * g)).width;
       text("/ " + P.total, M + w0 + 20, 560, 80, C.muted, 700);
@@ -157,10 +164,10 @@
       (P.levels || []).forEach((lv, i) => {
         const y = 760 + i * 120, a = at(l, 900 + i * 400, 700), gg = at(l, 1100 + i * 400, 1400);
         ctx.globalAlpha = a;
-        text(lv.level, M, y + 34, 44, C.navy, 800);
+        text(lv.level, M, y + 34, 44, C.head, 800);
         rrect(M + 140, y, 1100, 44, 22, C.grey);
         rrect(M + 140, y, 1100 * (lv.total ? lv.complete / lv.total : 0) * gg, 44, 22, C.green);
-        text(n0(lv.complete * gg) + " of " + lv.total, M + 1280, y + 34, 38, C.navy, 700);
+        text(n0(lv.complete * gg) + " of " + lv.total, M + 1280, y + 34, 38, C.head, 700);
         ctx.globalAlpha = 1;
       });
     } },
@@ -175,7 +182,7 @@
         text(wrap(c.name, 520, 38, 600)[0], M, y + 36, 38, C.ink, 600);
         rrect(700, y, 1000, 44, 22, C.grey);
         rrect(700, y, 1000 * c.percent / 100 * g, 44, 22, i === 0 && c.percent ? C.navy : C.blue);
-        text(n0(c.percent * g) + "%", 1740, y + 36, 40, C.navy, 800);
+        text(n0(c.percent * g) + "%", 1740, y + 36, 40, C.head, 800);
         ctx.globalAlpha = 1;
       });
     } },
@@ -193,7 +200,7 @@
         if (hs > 0) rrect(bx, base - hs, bw, hs, 10, C.green);
         text(d.day, bx + bw / 2, base + 42, 26, C.muted, 600, "center");
         text(d.date, bx + bw / 2, base + 74, 24, C.muted, 400, "center");
-        if (d.all && d.all === peak) text(String(d.all), bx + bw / 2, base - h - 16, 30, C.navy, 800, "center", g);
+        if (d.all && d.all === peak) text(String(d.all), bx + bw / 2, base - h - 16, 30, C.head, 800, "center", g);
       });
       if (!all) text("No saves, uploads or submissions in these 14 days.", W / 2, 640, 40, C.muted, 400, "center", at(l, 400, 700));
       ctx.globalAlpha = at(l, 600, 600);
@@ -218,7 +225,7 @@
     } },
     { key: "end", label: "End", dur: 3800, draw(l) {
       const a = at(l, 0, 700), b = at(l, 500, 700);
-      text("Board of Studies " + D.year, W / 2, 470, 96, C.navy, 800, "center", a);
+      text("Board of Studies " + D.year, W / 2, 470, 96, C.head, 800, "center", a);
       rrect(W / 2 - 160 * a, 520, 320 * a, 8, 4, C.blue);
       text("Office of Academic Affairs · JAIN (Deemed-to-be University)", W / 2, 620, 40, C.muted, 400, "center", b);
       text("Every figure counted from the portal's records as of " + asOf, W / 2, 690, 32, C.muted, 400, "center", b);
@@ -230,17 +237,17 @@
   // ------------------------------------------------------------- one frame
   function frame(t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = C.bg;
     ctx.fillRect(0, 0, W, H);
     rrect(0, 0, W, 12, 0, C.navy);
     const i = Math.max(0, scenes.findIndex((s) => t < s.start + s.dur));
     const sc = scenes[i === -1 ? scenes.length - 1 : i], local = Math.min(t, total) - sc.start;
     // the frame around every scene: who, where it stands, where it came from
-    spaced("BOS ACADEMIC PORTAL", M, 84, 24, C.navy, 700, 3);
+    spaced("BOS ACADEMIC PORTAL", M, 84, 24, C.head, 700, 3);
     scenes.forEach((s, k) => rrect(W - M - (scenes.length - k) * 34, 66, 22, 8, 4, k <= i ? C.navy : C.grey));
     ctx.fillStyle = C.line; ctx.fillRect(M, H - 108, W - 2 * M, 2);
     text("Source: BoS Academic Portal records · as of " + asOf + " · " + D.scope, M, H - 58, 26, C.muted, 400);
-    text(D.year, W - M, H - 58, 26, C.navy, 700, "right");
+    text(D.year, W - M, H - 58, 26, C.head, 700, "right");
     // fade between scenes
     const fadeIn = clamp(local / 350), fadeOut = sc.key === "end" ? 1 : clamp((sc.dur - local) / 350);
     ctx.save();
@@ -248,7 +255,7 @@
     sc.draw(local);
     ctx.restore();
     const veil = 1 - Math.min(fadeIn, fadeOut);
-    if (veil > 0) { ctx.fillStyle = "rgba(255,255,255," + veil + ")"; ctx.fillRect(0, 100, W, H - 220); }
+    if (veil > 0) { ctx.fillStyle = "rgba(" + C.veil + "," + veil + ")"; ctx.fillRect(0, 100, W, H - 220); }
     return i;
   }
 
@@ -341,6 +348,9 @@
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && recording) note.textContent = "Recording pauses while this tab is hidden — keep it in front until it finishes.";
   });
+
+  // the page switched light / dark: the animation follows
+  window.addEventListener("themechange", () => { C = pal(); render(); });
 
   // first frame once the fonts are in, so the text is drawn in them
   render();

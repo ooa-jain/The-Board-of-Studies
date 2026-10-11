@@ -1,0 +1,46 @@
+/* ==========================================================================
+   Light and dark. The dark colours of every page come from dark.css, made
+   by tools/make_dark_css.py from the light stylesheets; this file is the
+   switch itself, the circle it opens with, and what the generator cannot
+   know (pictures, a few hand-tuned surfaces).
+   ========================================================================== */
+
+/* ---- the switch: a pill with a knob that carries a sun or a moon ---- */
+.theme-toggle { display: inline-flex; align-items: center; flex: none; padding: 0; border: 0; background: none;
+  cursor: pointer; border-radius: 999px; -webkit-tap-highlight-color: transparent; }
+.theme-toggle:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.tt-track { position: relative; display: block; width: 46px; height: 26px; border-radius: 999px; background: #e4e7ec;
+  border: 1px solid #d0d5dd; transition: background .35s ease, border-color .35s ease; }
+.tt-knob { position: absolute; top: 2px; left: 2px; display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 50%; background: #fff; color: #b45309; box-shadow: 0 1px 3px rgba(16, 24, 40, .25);
+  transition: transform .35s cubic-bezier(.65, 0, .35, 1), background .35s ease, color .35s ease; }
+.tt-knob svg { position: absolute; width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round; transition: opacity .25s ease, transform .35s ease; }
+.tt-moon { opacity: 0; transform: rotate(-60deg) scale(.6); }
+.theme-toggle[aria-pressed="true"] .tt-track { background: #111827; border-color: #374151; }
+.theme-toggle[aria-pressed="true"] .tt-knob { transform: translateX(20px); background: #f8fafc; color: #1e3a8a; }
+.theme-toggle[aria-pressed="true"] .tt-sun { opacity: 0; transform: rotate(60deg) scale(.6); }
+.theme-toggle[aria-pressed="true"] .tt-moon { opacity: 1; transform: none; }
+.theme-toggle:hover .tt-track { border-color: #98a2b3; }
+@media (prefers-reduced-motion: reduce) { .tt-track, .tt-knob, .tt-knob svg { transition: none; } }
+
+/* where it sits: the right end of the top bar, or floating on pages without one */
+.erp-bar-end { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+.erp-bar-mid + .erp-bar-end { margin-left: 0; }
+.theme-float { position: fixed; top: 14px; right: 16px; z-index: 120; padding: 6px; border-radius: 999px;
+  background: rgba(255, 255, 255, .85); box-shadow: 0 6px 18px -10px rgba(16, 24, 40, .45); backdrop-filter: blur(8px); }
+html[data-theme="dark"] .theme-float { background: rgba(17, 22, 32, .85); }
+@media print { .theme-toggle, .theme-float { display: none !important; } }
+
+/* ---- the circle the new look opens out of ---- */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.theme-turning * { transition: none !important; }
+
+/* ---- what the generator cannot know ---- */
+/* the university's own light logo, made for dark grounds (js/theme.js swaps it too) */
+html[data-theme="dark"] img[src*="/img/jain-logo.png"] { content: url("../img/jain-logo-light.png"); }
+html[data-theme="dark"] ::selection { background: #1e40af; color: #fff; }
+html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { color-scheme: dark; }
+html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder { color: #7d8799; }
+/* a document shown as a page keeps its white paper */
+html[data-theme="dark"] .gen-doc, html[data-theme="dark"] .share-doc .gen-doc { color-scheme: light; }

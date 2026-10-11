@@ -3,7 +3,7 @@
 The portal asks for most things once and carries them forward. This module is
 the list of those carries — the "data flows" — with, for one department (and
 optionally one of its programmes), the actual value flowing along each one.
-Admin > Flow 3D draws it; Admin > Flow 3D > Excel prints it.
+Admin > Data Flow draws it (2D tree and 3D); its Excel prints it.
 
 A flow is one field (or one worked-out figure) moving from a source stage to
 one or more target stages:

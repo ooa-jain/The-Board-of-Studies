@@ -477,3 +477,90 @@ body.has-side .wrap { max-width: none !important; }
 .pw-eye[aria-pressed="true"] { color: #0e2a5c; }
 .pw-eye svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tm-pw-typed .pw-eye-wrap { flex: 1; min-width: 0; }
+
+/* ---- Data Flow: the 2D / 3D switch, and the 2D tree ---- */
+.flow-stage { display: flex; flex-direction: column; }
+.flow-views { position: absolute; top: 12px; left: 12px; z-index: 3; display: inline-flex; padding: 3px; gap: 2px;
+  background: #fff; border: 1px solid #e4e7ec; border-radius: 8px; box-shadow: 0 4px 12px -8px rgba(16, 24, 40, .3); }
+.flow-views button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0;
+  border-radius: 6px; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #5b6474; cursor: pointer; }
+.flow-views button:hover { color: #0e2a5c; background: #f4f5f7; }
+.flow-views button[aria-pressed="true"] { background: #0e2a5c; color: #fff; }
+.flow-views svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.flow-stage[data-view="2d"] .flow-canvas, .flow-stage[data-view="2d"] .flow-toolbar,
+.flow-stage[data-view="2d"] .flow-tip { display: none !important; }
+.flow-stage[data-view="3d"] .flow-tree { display: none; }
+.flow-no3d { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 24px; text-align: center; color: #5b6474; }
+.flow-key i.fk-copied, .flow-list li > i.fk-copied { background: #0f2440; }
+.flow-key i.fk-worked-out { background: #6b7280; }
+.flow-key i.fk-offered { background: #2563eb; }
+.fk-pill { font-weight: 700; }
+.fk-pill.fk-copied { background: #e8edf6; color: #0f2440; }
+.fk-pill.fk-worked-out { background: #eef0f3; color: #4b5563; }
+.fk-pill.fk-offered { background: #e6efff; color: #1d4ed8; }
+.flow-map-table tr[data-id] { cursor: pointer; }
+.flow-map-table tr.is-on td { background: #eef4ff; }
+
+.flow-tree { min-height: 420px; padding: 64px 20px 24px; overflow-x: auto; }
+.flow-tree:empty { display: none; }
+.flow-stage[data-view="2d"] .flow-empty { position: static; min-height: 420px; }
+.ft-tree, .ft-tree ul { list-style: none; margin: 0; padding: 0; }
+.ft-tree li { display: flex; align-items: center; position: relative; }
+.ft-tree li > ul { display: flex; flex-direction: column; position: relative; margin-left: 30px; }
+/* the lines: from a node to its children's bar, and from the bar to each child */
+.ft-tree li > ul::before { content: ""; position: absolute; left: -30px; top: 50%; width: 30px; border-top: 2px solid #cfd6e2; }
+.ft-tree ul > li { padding: 5px 0 5px 22px; }
+.ft-tree ul > li::before { content: ""; position: absolute; left: 0; top: 50%; width: 22px; border-top: 2px solid #cfd6e2; }
+.ft-tree ul > li::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; border-left: 2px solid #cfd6e2; }
+.ft-tree ul > li:first-child::after { top: 50%; }
+.ft-tree ul > li:last-child::after { bottom: 50%; }
+.ft-tree ul > li:only-child::after { display: none; }
+.ft-tree li.on-path > ul::before, .ft-tree li.on-path::before { border-color: #2563eb; }
+/* the department sits at the top; a spine runs down from it to every stage */
+.ft-tree > .ft-root { display: block; }
+.ft-tree > .ft-root > ul { margin: 10px 0 0 22px; }
+.ft-tree > .ft-root > ul::before { display: none; }
+.ft-tree > .ft-root > ul > li:first-child::after { top: -10px; }
+.ft-tree > .ft-root > ul > li:only-child::after { display: block; top: -10px; bottom: 50%; }
+
+.ft-node { flex: none; position: relative; z-index: 1; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px;
+  border: 1px solid #e4e7ec; border-radius: 10px; background: #fff; text-align: left; transition: opacity .2s, box-shadow .2s, border-color .2s; }
+.ft-dept { display: inline-flex; min-width: 220px; max-width: 420px; background: #0e2a5c; border-color: #0e2a5c; color: #fff; }
+.ft-dept strong { font-size: 15px; line-height: 1.25; color: #fff; }
+.ft-dept small { color: #c9d6ee; font-size: 12px; }
+.ft-stage { width: 190px; border-left: 4px solid #2563eb; }
+.ft-stage strong { font-size: 14px; color: #0e2a5c; }
+.ft-group { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #5b6474; }
+.ft-stage.is-from { border-color: #0e2a5c; box-shadow: 0 0 0 3px rgba(14, 42, 92, .14); }
+.ft-stage.is-to { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .16); }
+.ft-field { width: 290px; font: inherit; color: #1f2937; cursor: pointer; }
+.ft-field:hover { border-color: #93b4f5; }
+.ft-field:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.ft-field-head { display: flex; align-items: center; gap: 8px; }
+.ft-field-head strong { flex: 1; font-size: 13.5px; color: #0e2a5c; }
+.ft-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #0f2440; }
+.ft-how { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; background: #e8edf6; color: #0f2440; }
+.h-worked .ft-dot { background: #6b7280; } .h-worked .ft-how { background: #eef0f3; color: #4b5563; }
+.h-offered .ft-dot { background: #2563eb; } .h-offered .ft-how { background: #e6efff; color: #1d4ed8; }
+.ft-value { font-size: 12.5px; color: #374151; font-weight: 600; }
+.ft-to { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.ft-arrow { color: #5b6474; font-weight: 700; }
+.ft-chip { padding: 2px 8px; border-radius: 999px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 11.5px; font-weight: 600; }
+.ft-note { max-width: 300px; font-size: 12.5px; color: #5b6474; background: #f8fafc; border-style: dashed; }
+.ft-field.is-on { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .18); }
+.flow-tree.has-pick .ft-field:not(.is-on), .flow-tree.has-pick .ft-note { opacity: .45; }
+.flow-tree.has-pick .ft-stage:not(.is-from):not(.is-to) { opacity: .6; }
+
+/* phones: the tree reads top to bottom instead */
+@media (max-width: 900px) {
+  .flow-tree { padding: 60px 12px 16px; }
+  .ft-tree li { display: block; }
+  .ft-tree li > ul { margin-left: 14px; }
+  .ft-tree li > ul::before { display: none; }
+  .ft-tree ul > li { padding: 6px 0 6px 18px; }
+  .ft-tree ul > li::before { top: 26px; width: 16px; }
+  .ft-tree ul > li:first-child::after { top: 0; }
+  .ft-tree ul > li:last-child::after { bottom: auto; height: 26px; }
+  .ft-tree ul > li:only-child::after { display: block; bottom: auto; height: 26px; }
+  .ft-node, .ft-field, .ft-stage, .ft-dept, .ft-note { width: auto; max-width: none; min-width: 0; }
+}

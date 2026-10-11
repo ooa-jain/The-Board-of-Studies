@@ -109,7 +109,7 @@ def test_only_the_sections_given_show_in_the_menu(app, client):
     page = me.get("/admin/departments").get_data(as_text=True)
     for shown in ('title="Departments"', 'title="Overview"'):
         assert shown in page, shown
-    for hidden in ('title="Home"', 'title="Calendar"', 'title="Flow 3D"', 'title="Comments"', 'title="Settings"'):
+    for hidden in ('title="Home"', 'title="Calendar"', 'title="Data Flow"', 'title="Comments"', 'title="Settings"'):
         assert hidden not in page, hidden
     assert me.get("/admin/").status_code == 403
     assert me.get("/admin/calendar").status_code == 403

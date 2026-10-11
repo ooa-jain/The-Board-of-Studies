@@ -1,14 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Flow 3D{% endblock %}
+{% block title %}Data Flow{% endblock %}
 
 {% block header %}
 <div class="page-head">
   <div class="wrap">
     <div>
-      <div class="crumbs">Office of Academic Affairs <span>›</span> Flow 3D</div>
+      <div class="crumbs">Office of Academic Affairs <span>›</span> Data Flow</div>
       <h1>How a department's data flows — {{ year|ay }}</h1>
       <p>Choose a department — and one of its programmes — to see what it enters once and every
-        stage the portal carries it to. Drag to turn, scroll to zoom, hover a line for its value.</p>
+        stage the portal carries it to. The 2D tree reads from left to right; click a field to follow it.
+        In 3D, drag to turn, scroll to zoom and hover a line for its value.</p>
     </div>
   </div>
 </div>
@@ -16,11 +17,16 @@
 
 {% block content %}
 <div class="flow-layout">
-  <div class="flow-stage card">
-    <div id="flow-canvas" class="flow-canvas" role="img"
-         aria-label="Three-dimensional map of where a department's data is entered and used again">
-      <span class="flow-loading sk" id="flow-loading" aria-label="Building the view"></span>
+  <div class="flow-stage card" id="flow-stage" data-view="2d">
+    <div class="flow-views" role="group" aria-label="View">
+      <button type="button" data-view-btn="2d" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h5v4H4zM15 3h5v4h-5zM15 10h5v4h-5zM15 17h5v4h-5zM9 7h3v12h3M12 12h3M12 5h3"/></svg>2D tree</button>
+      <button type="button" data-view-btn="3d" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>3D</button>
     </div>
+    <div id="flow-tree" class="flow-tree" aria-label="Tree of where a department's data is entered and used again"></div>
+    <div id="flow-canvas" class="flow-canvas" role="img"
+         aria-label="Three-dimensional map of where a department's data is entered and used again"></div>
     <div class="flow-empty" id="flow-empty">
       <strong>Choose a department</strong>
       <span>Pick one in the panel on the right to draw its data map.</span>
@@ -28,7 +34,7 @@
     <div class="flow-tip" id="flow-tip" hidden></div>
     <div class="flow-toolbar">
       <button class="btn btn-ghost btn-sm" type="button" id="flow-reset">Reset view</button>
-      <button class="btn btn-ghost btn-sm" type="button" id="flow-all" aria-pressed="false">Show all flows</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-all" aria-pressed="false">Name every flow</button>
       <button class="btn btn-ghost btn-sm" type="button" id="flow-spin" aria-pressed="false">Rotate</button>
     </div>
   </div>
@@ -65,9 +71,9 @@
       <div class="card-head"><h3 class="card-title-sm">Key</h3></div>
       <div class="card-body tight small">
         <ul class="flow-key">
-          <li><i style="background:#0f2440"></i> Copied — filled in as it is</li>
-          <li><i style="background:#6b7280"></i> Worked out — calculated from it</li>
-          <li><i style="background:#2563eb"></i> Offered — “Fill in all” in one click</li>
+          <li><i class="fk-copied"></i> Copied — filled in as it is</li>
+          <li><i class="fk-worked-out"></i> Worked out — calculated from it</li>
+          <li><i class="fk-offered"></i> Offered — “Fill in all” in one click</li>
         </ul>
       </div>
     </div>
@@ -90,7 +96,7 @@
   </div>
 </section>
 
-<noscript><div class="alert alert-error">The 3D view needs JavaScript.</div></noscript>
+<noscript><div class="alert alert-error">The map needs JavaScript; the table above lists every flow.</div></noscript>
 {% endblock %}
 
 {% block scripts %}
@@ -100,5 +106,6 @@
   window.FLOW_URL = {{ url_for('admin.flow_data')|tojson }};
   window.FLOW_XLSX = {{ url_for('admin.flow_excel')|tojson }};
 </script>
+<script src="{{ url_for('static', filename='js/flow-tree.js') }}"></script>
 <script src="{{ url_for('static', filename='js/flow3d.js') }}"></script>
 {% endblock %}
