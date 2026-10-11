@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Overview · Faculties{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block header %}{% set ov_tab = 'faculties' %}{% include "admin/_overview_head.html" %}{% endblock %}
+
+{% block content %}
+{% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started', 'locked': 'Not started'} %}
+
+{# one card: a faculty or a school, its numbers, a way in and a download #}
+{% macro group_card(g, kind, href, zip_href) -%}
+<article class="fx-card">
+  <a class="fx-main" href="{{ href }}">
+    <span class="fx-kicker">{{ kind }}</span>
+    <strong class="fx-name">{{ g.name }}</strong>
+    {% if g.updates %}<span class="upd-tag">Updated · {{ g.updates }}</span>{% endif %}
+    <span class="fx-meter" role="progressbar" aria-valuenow="{{ g.percent }}" aria-valuemin="0" aria-valuemax="100"
+          aria-label="Stages completed"><i style="width:{{ g.percent }}%"></i></span>
+    <span class="fx-pct"><b>{{ g.percent }}%</b> of stages completed · {{ g.done }}/{{ g.total }}</span>
+    <span class="fx-facts">
+      {% if g.schools is defined %}<span><b>{{ g.schools|length }}</b> school{{ 's' if g.schools|length != 1 }}</span>{% endif %}
+      <span><b>{{ g.departments }}</b> department{{ 's' if g.departments != 1 }}</span>
+      <span><b>{{ g.prog_done }}</b>/{{ g.programmes }} programmes</span>
+      <span><b>{{ g.complete }}</b> complete</span>
+      {% if g.untouched %}<span class="fx-warn"><b>{{ g.untouched }}</b> not started</span>{% endif %}
+      {% if g.returned %}<span class="fx-bad"><b>{{ g.returned }}</b> sent back</span>{% endif %}
+    </span>
+  </a>
+  <a class="fx-zip" href="{{ zip_href }}" data-zip title="Every department's Excel and Word, in a folder for each school">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+    Download ZIP</a>
+</article>
+{%- endmacro %}
+
+<nav class="fx-trail" aria-label="Where you are">
+  <a href="{{ url_for('admin.faculties') }}"{% if not fac %} aria-current="page"{% endif %}>All faculties</a>
+  {% if fac %}<span>›</span><a href="{{ url_for('admin.faculties', faculty=fac.name) }}"{% if not school %} aria-current="page"{% endif %}>{{ fac.name }}</a>{% endif %}
+  {% if school %}<span>›</span><span aria-current="page">{{ school.name }}</span>{% endif %}
+</nav>
+
+{% if not fac %}
+{# ------------------------------------------------------------- faculties -#}
+<div class="fx-head">
+  <div><h2>Faculties</h2>
+    <p class="muted">{{ tree|length }} facult{{ 'ies' if tree|length != 1 else 'y' }} · choose one for its schools, then a school for its departments.</p></div>
+</div>
+<div class="fx-grid">
+  {% for f in tree %}
+  {{ group_card(f, 'Faculty', url_for('admin.faculties', faculty=f.name), url_for('admin.export_group', faculty=f.name)) }}
+  {% else %}
+  <p class="empty">No departments yet.</p>
+  {% endfor %}
+</div>
+
+{% elif not school %}
+{# --------------------------------------------------------------- schools -#}
+<div class="fx-head">
+  <div><span class="fx-kicker">Faculty</span><h2>{{ fac.name }}</h2>
+    <p class="muted">{{ fac.schools|length }} school{{ 's' if fac.schools|length != 1 }} · {{ fac.departments }} department{{ 's' if fac.departments != 1 }} ·
+      {{ fac.percent }}% of stages completed · {{ fac.prog_done }}/{{ fac.programmes }} programmes completed</p></div>
+  <a class="btn btn-gold fx-zip-big" href="{{ url_for('admin.export_group', faculty=fac.name) }}" data-zip>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+    Download the faculty (ZIP)</a>
+</div>
+<p class="fx-zipnote small muted">The ZIP holds a folder for each school, and in it every department's Excel and Word,
+  with a summary sheet for the faculty and for each school.</p>
+<div class="fx-grid">
+  {% for sc in fac.schools %}
+  {{ group_card(sc, 'School', url_for('admin.faculties', faculty=fac.name, school=sc.name), url_for('admin.export_group', faculty=fac.name, school=sc.name)) }}
+  {% endfor %}
+</div>
+
+{% else %}
+{# ----------------------------------------------------------- departments -#}
+<div class="fx-head">
+  <div><span class="fx-kicker">School · {{ fac.name }}</span><h2>{{ school.name }}</h2>
+    <p class="muted">{{ school.departments }} department{{ 's' if school.departments != 1 }} · {{ school.percent }}% of stages completed ·
+      {{ school.prog_done }}/{{ school.programmes }} programmes completed</p></div>
+  <a class="btn btn-gold fx-zip-big" href="{{ url_for('admin.export_group', faculty=fac.name, school=school.name) }}" data-zip>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+    Download the school (ZIP)</a>
+</div>
+<section class="panel">
+  <div class="panel-head"><h3>Departments</h3>
+    <span class="erp-legend"><span class="lg"><i class="dot st-submitted"></i>Completed</span> <span class="lg"><i class="dot st-draft"></i>In progress</span>
+      <span class="lg"><i class="dot st-open"></i>Not started</span> <span class="lg"><i class="dot st-returned"></i>Sent back</span></span></div>
+  <div class="table-wrap">
+    <table class="erp-table erp-dots fx-table">
+      <thead><tr><th>Department</th><th>Code</th><th>Campus</th>
+        {% for s in STAGES %}<th class="c">{{ s.title }}</th>{% endfor %}
+        <th class="c">Done</th><th class="c">Programmes</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in school.rows %}
+      <tr>
+        <td><a href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}"><strong>{{ r.dept.dept_name }}</strong></a>
+          {% if r.updates %}<span class="upd-tag">Updated · {{ r.updates.count }}</span>{% endif %}
+          <span class="fx-files">
+            <a href="{{ url_for('admin.export_department', dept_code=r.dept.dept_code) }}" title="The department's record as Excel">Excel</a>
+            <a href="{{ url_for('admin.export_department_word', dept_code=r.dept.dept_code) }}" title="The department's record as Word">Word</a>
+          </span>
+          {% if r.programmes %}
+          <details class="fx-progs"><summary>{{ r.programmes|length }} programme{{ 's' if r.programmes|length != 1 }}</summary>
+            <ul>{% for p in r.programmes %}
+              <li><span class="fx-plevel">{{ (p.level or '')[:2] or '—' }}</span>
+                <a href="{{ url_for('admin.programme_report', dept_code=r.dept.dept_code, programme_code=p.code) }}">{{ p.name }}</a>
+                <small class="mono">{{ p.code }}</small>
+                <span class="fx-psteps{{ ' is-done' if p.complete }}">{{ p.done }}/{{ p.total }} steps</span></li>
+            {% endfor %}</ul></details>
+          {% endif %}</td>
+        <td class="mono">{{ r.dept.dept_code }}</td>
+        <td class="muted">{{ r.dept.campus }}</td>
+        {% for s in r.board %}<td class="c"><i class="dot st-{{ s.status }}" title="{{ s.title }} — {{ words.get(s.status, s.status) }}"></i></td>{% endfor %}
+        <td class="c"><strong>{{ r.done }}/{{ r.total }}</strong></td>
+        <td class="c">{{ r.prog_done }}/{{ r.programmes|length }}</td>
+        <td><span class="ad-state s-{{ r.state }}">{{ r.label }}</span></td>
+        <td class="act">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<div class="fx-wait" id="fx-wait" hidden role="status">
+  <span class="fx-spin" aria-hidden="true"></span>
+  <span>Making the ZIP — every department's Excel and Word. A whole faculty can take a minute; it downloads when ready.</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // a ZIP takes a while: say so, and clear the note once the download has begun
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("[data-zip]");
+    if (!a) return;
+    var w = document.getElementById("fx-wait");
+    w.hidden = false;
+    setTimeout(function () { w.hidden = true; }, 25000);
+  });
+</script>
+{% endblock %}

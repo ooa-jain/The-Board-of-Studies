@@ -553,8 +553,9 @@ class _NoLinks:
 # Excel — the whole institution
 # ---------------------------------------------------------------------------
 
-def institution_excel(year: str, dept_codes=None) -> io.BytesIO:
-    """Every department's status; dept_codes (when given) keeps it to those."""
+def institution_excel(year: str, dept_codes=None, title=None) -> io.BytesIO:
+    """Every department's status; dept_codes (when given) keeps it to those,
+    and title names the group (a faculty, a school) on the sheet."""
     db = get_db()
     q = {"active": True}
     if dept_codes is not None:
@@ -566,7 +567,7 @@ def institution_excel(year: str, dept_codes=None) -> io.BytesIO:
     wb = Workbook()
     ws = wb.active
     ws.title = "Status"
-    ws["A1"] = f"BoS Academic Portal — institution status, {year}"
+    ws["A1"] = f"BoS Academic Portal — {title or 'institution'} status, {year}"
     ws["A1"].font = Font(bold=True, size=14, color=NAVY)
 
     header = ["Place", "Campus", "School", "Department", "Code", "Progress"] + \

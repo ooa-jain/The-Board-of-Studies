@@ -60,6 +60,7 @@ ENDPOINTS = {
     "demo_department_remove": ("departments", "delete"),
     "wipe_department": ("departments", "delete"),
     "submissions": ("overview", "view"), "analysis": ("overview", "view"),
+    "faculties": ("overview", "view"), "export_group": ("overview", "view"),
     "submission_detail": ("overview", "view"), "submission_review": ("overview", "view"),
     "mark_seen": ("overview", "edit"), "submission_return": ("overview", "edit"),
     "submission_unlock": ("overview", "edit"),

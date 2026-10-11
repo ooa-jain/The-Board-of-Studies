@@ -5734,6 +5734,108 @@ html[data-theme="dark"] .ft-field.is-on {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
+html[data-theme="dark"] .fx-trail {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-trail a {
+  color: #a6baf2;
+}
+html[data-theme="dark"] .fx-trail [aria-current="page"] {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-head h2 {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-kicker {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-zip-big svg,
+html[data-theme="dark"] .fx-zip svg {
+  fill: none;
+  stroke: currentColor;
+}
+html[data-theme="dark"] .fx-card {
+  background: #121519;
+  border: 1px solid #2e3542;
+}
+html[data-theme="dark"] .fx-card:hover {
+  border-color: #343e53;
+  box-shadow: 0 10px 24px -18px rgba(16, 24, 40, 0.45);
+}
+html[data-theme="dark"] .fx-main {
+  color: inherit;
+  text-decoration: none !important;
+}
+html[data-theme="dark"] .fx-name {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-meter {
+  background: #20252e;
+}
+html[data-theme="dark"] .fx-meter i {
+  background: #16a34a;
+}
+html[data-theme="dark"] .fx-pct {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-pct b {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-facts {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-facts b {
+  color: #cad2e1;
+}
+html[data-theme="dark"] .fx-warn b {
+  color: #f8a96d;
+}
+html[data-theme="dark"] .fx-bad b {
+  color: #ed8078;
+}
+html[data-theme="dark"] .fx-zip {
+  border-top: 1px solid #2a303c;
+  background: #0f1924;
+  color: #a6baf2;
+  text-decoration: none !important;
+}
+html[data-theme="dark"] .fx-zip:hover {
+  background: #0e182a;
+}
+html[data-theme="dark"] .fx-progs summary {
+  color: #a6baf2;
+}
+html[data-theme="dark"] .fx-progs li small {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-plevel {
+  background: #161d29;
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .fx-psteps {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .fx-psteps.is-done {
+  color: #7ce9a5;
+}
+html[data-theme="dark"] .fx-wait {
+  background: #1e55b8;
+  color: #ffffff;
+  box-shadow: 0 16px 32px -16px rgba(16, 24, 40, 0.6);
+}
+html[data-theme="dark"] .fx-spin {
+  border: 2px solid rgba(36, 41, 50, 0.35);
+  border-top-color: #242932;
+}
+html[data-theme="dark"] .fx-files a {
+  border: 1px solid #373e4c;
+  color: #a6baf2;
+  background: #121519;
+}
+html[data-theme="dark"] .fx-files a:hover {
+  background: #0e182a;
+  text-decoration: none;
+}
 
 /* ---- admin.css ---- */
 html[data-theme="dark"] .ad {

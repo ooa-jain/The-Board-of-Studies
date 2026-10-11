@@ -115,7 +115,7 @@
     {# each person sees only the sections their access gives them #}
     {% if can('home') %}{{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}{% endif %}
     {% if can('departments') %}{{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep) }}{% endif %}
-    {% if can('overview') %}{{ side_link(url_for('admin.submissions'), 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.analysis', 'admin.submission_detail', 'admin.programme_report') or (ep == 'admin.sheets' and tab not in ('documents', 'comments'))) }}{% endif %}
+    {% if can('overview') %}{{ side_link(url_for('admin.submissions'), 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.faculties', 'admin.analysis', 'admin.submission_detail', 'admin.programme_report') or (ep == 'admin.sheets' and tab not in ('documents', 'comments'))) }}{% endif %}
     {% if can('documents') %}{{ side_link(url_for('admin.sheets', tab='documents'), 'Documents', 'M7 3h8l4 4v14H7zM14 3v5h5', ep == 'admin.sheets' and tab == 'documents') }}{% endif %}
     {% if can('comments') %}{{ side_link(url_for('admin.sheets', tab='comments'), 'Comments', 'M4 5h16v11H9l-5 4z', ep == 'admin.sheets' and tab == 'comments') }}{% endif %}
     {% if can('calendar') %}{{ side_link(url_for('admin.calendar'), 'Calendar', 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 3v4M16 3v4', ep == 'admin.calendar') }}{% endif %}

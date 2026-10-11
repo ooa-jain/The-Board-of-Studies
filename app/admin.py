@@ -778,6 +778,124 @@ def submissions():
     return render_template("admin/submissions.html", rows=rows, year=_year(), STAGES=STAGES)
 
 
+NO_FACULTY, NO_SCHOOL = "Faculty not set", "School not set"
+
+
+def _sum(rows):
+    """What a group of departments adds up to."""
+    done, total = sum(r["done"] for r in rows), sum(r["total"] for r in rows)
+    progs = [p for r in rows for p in r["programmes"]]
+    return {"departments": len(rows), "done": done, "total": total,
+            "percent": round(done * 100 / total) if total else 0,
+            "complete": sum(1 for r in rows if r["state"] == "complete"),
+            "untouched": sum(1 for r in rows if r["state"] in ("not_started", "never_in", "no_login")),
+            "returned": sum(1 for r in rows if r["returned"]),
+            "programmes": len(progs), "prog_done": sum(1 for p in progs if p["complete"]),
+            "updates": sum((r.get("updates") or {}).get("count", 0) for r in rows)}
+
+
+def _faculty_tree(rows):
+    """Faculty → school → departments, each level with its totals, in name order."""
+    tree = {}
+    for r in rows:
+        f = (r["dept"].get("faculty") or "").strip() or NO_FACULTY
+        sc = (r["dept"].get("school") or "").strip() or NO_SCHOOL
+        tree.setdefault(f, {}).setdefault(sc, []).append(r)
+    out = []
+    for f in sorted(tree, key=lambda x: (x == NO_FACULTY, x.lower())):
+        schools = []
+        for sc in sorted(tree[f], key=lambda x: (x == NO_SCHOOL, x.lower())):
+            depts = sorted(tree[f][sc], key=lambda r: r["dept"].get("dept_name", ""))
+            schools.append({"name": sc, "rows": depts, **_sum(depts)})
+        every = [r for x in schools for r in x["rows"]]
+        out.append({"name": f, "schools": schools, **_sum(every)})
+    return out
+
+
+@bp.route("/faculties")
+@admin_required
+def faculties():
+    """Overview → Faculties: every faculty; click one for its schools, a
+    school for its departments and all their data. Each level downloads as
+    a ZIP of every department's Excel and Word, folder by folder."""
+    db = get_db()
+    year = _year()
+    pic = _picture(db, year)
+    upd = _unread_updates()
+    for r in pic["rows"]:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
+    tree = _faculty_tree(pic["rows"])
+    fac_name, school_name = request.args.get("faculty"), request.args.get("school")
+    fac = next((f for f in tree if f["name"] == fac_name), None) if fac_name else None
+    school = next((x for x in fac["schools"] if x["name"] == school_name), None) if fac and school_name else None
+    if (fac_name and not fac) or (school_name and not school):
+        flash("That faculty or school has no departments you can see.", "info")
+        return redirect(url_for("admin.faculties"))
+    return render_template("admin/faculties.html", year=year, tree=tree, fac=fac, school=school,
+                           STAGES=STAGES)
+
+
+def _safe_name(text, limit=90):
+    """A name a file or folder can carry on any computer."""
+    text = re.sub(r'[\\/:*?"<>|\r\n\t]+', " ", str(text or "")).strip(" .")
+    return re.sub(r"\s+", " ", text)[:limit].strip() or "Untitled"
+
+
+@bp.route("/export/group.zip")
+@admin_required
+def export_group():
+    """A faculty or a school as a ZIP: a folder for each school, and in it each
+    department's Excel and Word, with a summary sheet for the faculty and for
+    each school."""
+    import zipfile
+    db = get_db()
+    year = _year()
+    fac_name, school_name = request.args.get("faculty") or "", request.args.get("school") or ""
+    depts = list(db.departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
+
+    def fac_of(d):
+        return (d.get("faculty") or "").strip() or NO_FACULTY
+
+    def school_of(d):
+        return (d.get("school") or "").strip() or NO_SCHOOL
+
+    depts = [d for d in depts if fac_of(d) == fac_name and (not school_name or school_of(d) == school_name)]
+    if not depts:
+        abort(404)
+    root = _safe_name(school_name or fac_name)
+    schools = {}
+    for d in depts:
+        schools.setdefault(school_of(d), []).append(d)
+    buf = io.BytesIO()
+    made, failed = 0, []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"{root}/{root} - summary.xlsx",
+                   institution_excel(year, [d["dept_code"] for d in depts], school_name or fac_name).getvalue())
+        for sc in sorted(schools, key=str.lower):
+            folder = root if school_name else f"{root}/{_safe_name(sc)}"
+            if not school_name:
+                z.writestr(f"{folder}/{_safe_name(sc)} - summary.xlsx",
+                           institution_excel(year, [d["dept_code"] for d in schools[sc]], sc).getvalue())
+            for d in schools[sc]:
+                name = _safe_name(f"{d['dept_code']} - {d.get('dept_name') or ''}")
+                links = ShareLinks(d["dept_code"], year)
+                try:
+                    z.writestr(f"{folder}/{name}.xlsx", department_excel(d["dept_code"], year, links).getvalue())
+                    z.writestr(f"{folder}/{name}.docx", submission_word(d["dept_code"], year, links).getvalue())
+                    made += 1
+                except Exception as e:           # one department's trouble does not cost the rest
+                    current_app.logger.exception("Export of %s failed", d["dept_code"])
+                    failed.append(d["dept_code"])
+                    z.writestr(f"{folder}/{name} - could not be made.txt",
+                               f"The Excel and Word for {d.get('dept_name')} could not be made: {e.__class__.__name__}: {e}\n"
+                               "Download them from the department's record, or tell the portal team.\n")
+    buf.seek(0)
+    audit(_actor(), "export.school" if school_name else "export.faculty", school_name or fac_name,
+          {"departments": made, "failed": failed})
+    return send_file(buf, as_attachment=True, mimetype="application/zip",
+                     download_name=f"BoS-{root.replace(' ', '-')}-{year}.zip")
+
+
 @bp.route("/submissions/<dept_code>")
 @admin_required
 def submission_detail(dept_code):
