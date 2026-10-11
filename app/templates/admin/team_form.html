@@ -113,6 +113,12 @@
       </div>
 
       <div class="tm-scope" {% if v.scope != 'selected' %}hidden{% endif %}>
+        <div class="tm-group">
+          <span class="tm-group-l">Whole city <small>every department there, and any added later</small></span>
+          <div class="tm-chips">{% for pl in places %}
+            <label class="tm-chip"><input type="checkbox" name="places" value="{{ pl }}" {{ 'checked' if pl in v.places }}><span>{{ pl }}</span></label>
+          {% endfor %}</div>
+        </div>
         {% if campuses %}
         <div class="tm-group">
           <span class="tm-group-l">Whole campus <small>takes in departments added to it later</small></span>
@@ -139,10 +145,10 @@
           <div class="tm-depts" id="tm-depts">
             {% for d in depts %}
             <label class="tm-dept" data-find="{{ (d.dept_name ~ ' ' ~ d.dept_code ~ ' ' ~ (d.school or '') ~ ' ' ~ (d.campus or ''))|lower }}"
-                   data-school="{{ d.school or '' }}" data-campus="{{ d.campus or '' }}">
+                   data-school="{{ d.school or '' }}" data-campus="{{ d.campus or '' }}" data-place="{{ d.place_now }}">
               <input type="checkbox" name="codes" value="{{ d.dept_code }}" {{ 'checked' if d.dept_code in v.codes }}>
               <span><strong>{{ d.dept_name }}</strong><small>{{ d.dept_code }} · {{ d.school or '—' }} · {{ d.campus or '—' }}</small></span>
-              <em class="tm-via" hidden>with its school / campus</em>
+              <em class="tm-via" hidden>with its city / school / campus</em>
             </label>
             {% else %}
             <p class="muted small">No departments yet — import them first.</p>

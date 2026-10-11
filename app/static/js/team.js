@@ -2,7 +2,7 @@
 
    A preset fills the section table; touching the table makes it Custom.
    Full admin hides the table and the departments (they see everything).
-   The department list filters as you type; a whole school or campus marks
+   The department list filters as you type; a whole city, school or campus marks
    the departments it already takes in. */
 (function () {
   "use strict";
@@ -91,10 +91,11 @@
   function recount() {
     const schools = new Set($$('input[name="schools"]:checked').map((x) => x.value));
     const campuses = new Set($$('input[name="campuses"]:checked').map((x) => x.value));
+    const places = new Set($$('input[name="places"]:checked').map((x) => x.value));
     let n = 0;
     rows.forEach((row) => {
       const box = row.querySelector("input");
-      const via = schools.has(row.dataset.school) || campuses.has(row.dataset.campus);
+      const via = schools.has(row.dataset.school) || campuses.has(row.dataset.campus) || places.has(row.dataset.place);
       row.classList.toggle("is-via", via);
       row.querySelector(".tm-via").hidden = !via;
       if (box.checked || via) n++;
@@ -102,7 +103,7 @@
     if (count) count.textContent = n;
   }
   form.addEventListener("change", (e) => {
-    if (e.target.matches('input[name="codes"], input[name="schools"], input[name="campuses"]')) recount();
+    if (e.target.matches('input[name="codes"], input[name="schools"], input[name="campuses"], input[name="places"]')) recount();
   });
 
   const find = document.getElementById("tm-find");

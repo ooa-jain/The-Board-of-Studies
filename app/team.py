@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-from flask import abort, flash, redirect, render_template, request, session, url_for
+from flask import abort, current_app, flash, redirect, render_template, request, session, url_for
 
 from .access import PRESETS, SECTIONS, SECTION_KEYS, summary
 from .admin import _actor, _year, bp
@@ -34,6 +34,9 @@ def _options():
     db = get_db()
     depts = list(db.departments.find({}, {"dept_code": 1, "dept_name": 1, "school": 1, "campus": 1, "active": 1})
                  .sort([("campus", 1), ("school", 1), ("dept_name", 1)]))
+    from .access import place_of
+    for d in depts:
+        d["place_now"] = place_of(d)
     schools = sorted({d.get("school") for d in depts if d.get("school")})
     campuses = sorted({d.get("campus") for d in depts if d.get("campus")})
     return depts, schools, campuses
@@ -48,7 +51,8 @@ def _values(member=None, form=None):
                 "sections": {k: form.get("sec_" + k) or "none" for k in SECTION_KEYS},
                 "delete": form.get("delete") == "on", "pw_mode": form.get("pw_mode") or "generate",
                 "scope": form.get("scope") or "all", "codes": set(form.getlist("codes")),
-                "schools": set(form.getlist("schools")), "campuses": set(form.getlist("campuses"))}
+                "schools": set(form.getlist("schools")), "campuses": set(form.getlist("campuses")),
+                "places": set(form.getlist("places"))}
     if member:
         acc = member.get("access") or {}
         secs = {k: (acc.get("sections") or {}).get(k) or "none" for k in SECTION_KEYS}
@@ -59,17 +63,20 @@ def _values(member=None, form=None):
         return {"name": member.get("name", ""), "email": member["username"], "preset": preset,
                 "sections": secs, "delete": bool(acc.get("delete")), "pw_mode": "generate",
                 "scope": "all" if sc.get("all", True) else "selected", "codes": set(sc.get("codes") or []),
-                "schools": set(sc.get("schools") or []), "campuses": set(sc.get("campuses") or [])}
+                "schools": set(sc.get("schools") or []), "campuses": set(sc.get("campuses") or []),
+                "places": set(sc.get("places") or [])}
     viewer = PRESETS["viewer"]
     return {"name": "", "email": "", "preset": "viewer",
             "sections": {k: viewer["sections"].get(k) or "none" for k in SECTION_KEYS}, "delete": False,
-            "pw_mode": "generate", "scope": "all", "codes": set(), "schools": set(), "campuses": set()}
+            "pw_mode": "generate", "scope": "all", "codes": set(), "schools": set(), "campuses": set(),
+            "places": set()}
 
 
 def _form(member=None, form=None):
     depts, schools, campuses = _options()
     return render_template("admin/team_form.html", member=member, v=_values(member, form), depts=depts,
-                           schools=schools, campuses=campuses, presets=PRESETS, sections=SECTIONS)
+                           schools=schools, campuses=campuses, places=current_app.config["PLACES"],
+                           presets=PRESETS, sections=SECTIONS)
 
 
 def _read_form(f, editing=None):
@@ -92,8 +99,9 @@ def _read_form(f, editing=None):
     scope = {"all": every,
              "codes": [] if every else sorted(set(f.getlist("codes"))),
              "schools": [] if every else sorted(set(f.getlist("schools"))),
-             "campuses": [] if every else sorted(set(f.getlist("campuses")))}
-    if not full and not every and not (scope["codes"] or scope["schools"] or scope["campuses"]):
+             "campuses": [] if every else sorted(set(f.getlist("campuses"))),
+             "places": [] if every else [pl for pl in current_app.config["PLACES"] if pl in f.getlist("places")]}
+    if not full and not every and not (scope["codes"] or scope["schools"] or scope["campuses"] or scope["places"]):
         return None, "Choose the departments they may see — or choose “All departments”."
     rec = {"name": name, "full": full,
            "access": {"sections": sections, "delete": f.get("delete") == "on"},

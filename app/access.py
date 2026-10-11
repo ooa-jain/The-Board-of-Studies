@@ -122,6 +122,9 @@ def scope_codes(user: dict | None, db=None):
         from .db import get_db
         db = get_db()
     codes = set(sc.get("codes") or [])
+    if sc.get("places"):
+        codes |= {d["dept_code"] for d in db.departments.find({}, {"dept_code": 1, "place": 1, "campus": 1})
+                  if place_of(d) in sc["places"]}
     ors = []
     if sc.get("schools"):
         ors.append({"school": {"$in": sc["schools"]}})
@@ -132,11 +135,27 @@ def scope_codes(user: dict | None, db=None):
     return codes
 
 
+def my_places():
+    """The places the signed-in person has departments in — the choices the
+    top-bar switch offers (none when there is only one to choose)."""
+    if "my_places" not in g:
+        from flask import current_app
+        from .db import get_db
+        places = current_app.config.get("PLACES", [])
+        mine = current_scope()
+        if mine is None:
+            g.my_places = list(places)
+        else:
+            have = {place_of(d) for d in get_db().departments.find({"dept_code": {"$in": sorted(mine)}},
+                                                                   {"place": 1, "campus": 1})}
+            g.my_places = [pl for pl in places if pl in have]
+    return g.my_places
+
+
 def current_place():
     """The place chosen in the top bar (Bangalore, Kochi …), or None for all."""
-    from flask import current_app
     p = (session.get("place") or "").strip()
-    return p if p in current_app.config.get("PLACES", []) else None
+    return p if p in my_places() else None
 
 
 def place_of(dept: dict) -> str:
@@ -224,6 +243,8 @@ def summary(user: dict) -> str:
         whom = "all departments"
     else:
         parts = []
+        if sc.get("places"):
+            parts.append(", ".join(sc["places"]))
         if sc.get("schools"):
             parts.append(", ".join(sc["schools"]))
         if sc.get("campuses"):
@@ -304,4 +325,4 @@ def template_helpers():
     def can(section, need="view"):
         return allows(current_user(), section, need)
     return {"can": can, "is_full_admin": lambda: is_full(current_user()), "admin_home": home_url,
-            "current_place": current_place}
+            "current_place": current_place, "my_places": my_places}

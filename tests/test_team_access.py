@@ -226,3 +226,38 @@ def test_motion_and_the_live_home_keep_to_a_person_s_departments(app, client):
                   sections={"departments": "view"})
     other = _sign_in_fresh(app, "nohome@jainuniversity.ac.in", pw2)
     assert other.get("/admin/motion").status_code == 403
+
+
+def test_a_whole_city_is_one_choice_and_the_switch_keeps_to_it(app, client):
+    _two_departments(app)                                  # COM and ENG
+    make_department(app, code="KOC", name="Department of Commerce Kochi")
+    from app.db import get_db
+    with app.app_context():
+        get_db().departments.update_many({}, {"$set": {"place": "Bangalore"}})
+        get_db().departments.update_one({"dept_code": "KOC"}, {"$set": {"place": "Kochi"}})
+    _admin(app, client)
+    form = client.get("/admin/team/new").get_data(as_text=True)
+    assert 'name="places" value="Kochi"' in form and "Whole city" in form
+    from werkzeug.datastructures import MultiDict
+    from app.access import PRESETS, SECTION_KEYS
+    data = MultiDict([("name", "Kochi Desk"), ("email", "kochi@jainuniversity.ac.in"), ("preset", "reviewer"),
+                      ("scope", "selected"), ("pw_mode", "type"), ("password", "KochiDesk2026!"), ("places", "Kochi")]
+                     + [("sec_" + k, PRESETS["reviewer"]["sections"].get(k) or "none") for k in SECTION_KEYS])
+    r = client.post("/admin/team/new", data=data)
+    assert r.status_code == 302
+    slip = client.get(r.location).get_data(as_text=True)
+    assert "Reviewer · Kochi" in slip
+    me = _sign_in_fresh(app, "kochi@jainuniversity.ac.in", "KochiDesk2026!")
+    home = me.get("/admin/").get_data(as_text=True)
+    assert "Department of Commerce Kochi" in home and "Department of English" not in home
+    # one city only: no switch to offer
+    assert 'class="erp-place"' not in home
+    assert me.get("/admin/submissions/COM").status_code == 403
+    assert me.get("/admin/submissions/KOC").status_code == 200
+    # a department added in Kochi later is theirs too
+    make_department(app, code="KO2", name="Department of English Kochi")
+    with app.app_context():
+        get_db().departments.update_one({"dept_code": "KO2"}, {"$set": {"place": "Kochi"}})
+    assert me.get("/admin/submissions/KO2").status_code == 200
+    # the Office (all places) still has the switch
+    assert 'class="erp-place"' in client.get("/admin/").get_data(as_text=True)

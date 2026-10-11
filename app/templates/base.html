@@ -312,13 +312,13 @@
 {% if side_shell %}
 <div class="erp-bar">
   <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
-  {% if admin_shell %}
+  {% if admin_shell and my_places()|length > 1 %}
   {# which place every page shows: all, or one city — remembered until changed #}
   {% set here = current_place() %}
   {% set back = request.full_path if request.method == 'GET' else url_for('admin.dashboard') %}
   <nav class="erp-place" aria-label="Show departments in">
     <a href="{{ url_for('admin.set_place', to='', next=back) }}"{% if not here %} aria-current="true"{% endif %}>All</a>
-    {% for pl in PLACES %}
+    {% for pl in my_places() %}
     <a href="{{ url_for('admin.set_place', to=pl, next=back) }}"{% if here == pl %} aria-current="true"{% endif %}>{{ pl }}</a>
     {% endfor %}
   </nav>
