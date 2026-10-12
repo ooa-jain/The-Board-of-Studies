@@ -424,20 +424,25 @@ def add_programme():
     """From Curriculum: "add a new UG / PG programme". Department Information
     holds the programme list, so go there — reopened if it was already
     submitted — with a new row started, and come back to Curriculum after."""
-    level = "PG" if request.args.get("level") == "PG" else "UG"
+    # no level: reopened only to change the list (add or remove), from the
+    # submitted Department Information page itself
+    level = {"PG": "PG", "UG": "UG"}.get(request.args.get("level"), "")
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
     if sub.get("status") == "sealed":
         flash("This record is complete and sealed. Ask the Office of Academic Affairs to reopen "
               "Department Information before adding a programme.", "error")
-        return redirect(url_for("dept.stage", stage_key="curriculum"))
+        return redirect(url_for("dept.stage", stage_key="curriculum" if level else "dept_info"))
     if stage_state(sub, "dept_info").get("status") == "submitted":
         get_db().submissions.update_one(
             {"dept_code": dept["dept_code"], "academic_year": _year()},
             {"$set": {"stages.dept_info.status": "draft", "updated_at": now()},
              "$unset": {"stages.dept_info.returned_note": ""}})
         audit(_me()["username"], "stage.reopened", f"{dept['dept_code']}/dept_info",
-              {"why": f"add a new {level} programme"})
+              {"why": f"add a new {level} programme" if level else "add or remove programmes"})
+    if not level:
+        flash("Department Information is open again: add or remove programmes, then submit it again.", "info")
+        return redirect(url_for("dept.stage", stage_key="dept_info"))
     return redirect(url_for("dept.stage", stage_key="dept_info", add=level, back="curriculum"))
 
 

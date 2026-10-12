@@ -213,6 +213,7 @@
     summaries: true,
     add_level: {{ add_level|tojson }},
     skip_to: {{ (skip_to or None)|tojson }},
+    sealed: {{ (submission.status == 'sealed')|tojson }},
     back_to: {{ back_to|tojson }},
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
@@ -225,6 +226,7 @@
       sample:   {{ (url_for('dept.api_sample', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_sample', stage_key=stage.key))|tojson }},
       dashboard:{{ url_for('dept.dashboard')|tojson }},
       dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }},
+      edit_programmes:{{ url_for('dept.add_programme')|tojson }},
       stage:    {{ url_for('dept.stage', stage_key='__stage__')|tojson }}
     }
   };

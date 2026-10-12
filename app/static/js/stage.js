@@ -3080,6 +3080,16 @@
     bar.appendChild(search);
     wrap.appendChild(bar);
 
+    // submitted: the list can still change — reopen it to add or remove
+    if (CTX.readonly && CTX.key === "dept_info" && !CTX.sealed && CTX.urls.edit_programmes) {
+      const re = el("div", "pl-reopen");
+      re.appendChild(el("span", null, "Submitted. Need to add or remove a programme?"));
+      const a = el("a", "btn btn-sm", "Add or remove programmes");
+      a.href = CTX.urls.edit_programmes;
+      re.appendChild(a);
+      wrap.appendChild(re);
+    }
+
     // one panel per degree group, side by side
     const cols = el("div", "pl-cols");
     wrap.appendChild(cols);
@@ -4074,6 +4084,8 @@
   }
 
   function check(cb) {
+    // a submitted (read-only) stage has nothing to check
+    if (CTX.readonly) return;
     const btn = document.getElementById("btn-check");
     if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
     checksLoading();

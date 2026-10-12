@@ -4887,6 +4887,11 @@ html[data-theme="dark"] .home-next {
 html[data-theme="dark"] .home-prog {
   color: #afb8ca;
 }
+html[data-theme="dark"] .pl-reopen {
+  border: 1px solid #2e3542;
+  background: #181b21;
+  color: #afb8ca;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
