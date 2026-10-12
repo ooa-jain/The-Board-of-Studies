@@ -3787,6 +3787,8 @@
       sum.appendChild(el("span", "acc-caret", "›"));
       d.appendChild(sum);
       const body = el("div", "acc-body");
+      // the row's own "Template" button is enough: no second link inside
+      if (f.template) b.querySelectorAll(".tpl-link").forEach(x => x.remove());
       b.replaceWith(d);
       body.appendChild(b);
       d.appendChild(body);
