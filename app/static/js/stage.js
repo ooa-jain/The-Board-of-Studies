@@ -3141,6 +3141,8 @@
 
       if (row.source === "new") {
         const grid = el("div", "pl-new");
+        // a UG panel offers UG only, a PG panel its PG kinds only
+        const degs = (tabs.find(t => t.key === tabOf(row)) || {}).degrees || section.degrees || [];
         if (!row.year_introduced) row.year_introduced = String(Math.min(2027, Math.max(2024, new Date().getFullYear())));
         const codeBox = input(row, "programme_code",
           { name: "programme_code", label: "Programme code", type: "text", required: true,
@@ -3148,7 +3150,7 @@
         grid.appendChild(codeBox);
         grid.appendChild(input(row, "degree",
           { name: "degree", label: "Degree", type: "select", required: true,
-            options: section.degrees || [] }));
+            options: degs }));
         grid.appendChild(input(row, "year_introduced",
           { name: "year_introduced", label: "Since (year introduced)", type: "select", required: true,
             options: ["2024", "2025", "2026", "2027"] }));
@@ -3171,7 +3173,7 @@
             if (code) { codeIn.value = code; row.programme_code = code; }
           }
           const lv = ProgName.level(tidy);
-          if (lv && (section.degrees || []).includes(lv) && row.degree !== lv && !row._degreeByHand) {
+          if (lv && degs.includes(lv) && row.degree !== lv && !row._degreeByHand) {
             row.degree = lv;
             const sel = grid.querySelector(".pl-in-degree select");
             if (sel) sel.value = lv;
@@ -4184,10 +4186,60 @@
     submitLabel(btn);
     saveNote.textContent = "Not submitted — there are answers still to fix";
     saveNote.className = "save-note save-note-bad";
+    const errs = (j.issues || []).filter(i => i.level === "error");
+    if (errs.length && window.Review) { missingDialog(errs); return; }
     alertIssues(j.issues || [], j.summary || {}, j.error);
-    const first = (j.issues || []).find(i => i.level === "error");
+    const first = errs[0];
     if (first) focusIssue(first);
     else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /* Submit found gaps: list them, each a link to its box. The department
+     fills them now, or keeps this stage as a draft and goes on to the next —
+     it is listed as still to submit there, with a link back. */
+  function missingDialog(errs) {
+    const body = el("div", "miss");
+    body.appendChild(el("p", "miss-lede",
+      "This stage is not submitted yet. Please fill in the following, then submit again:"));
+    const ul = el("ul", "miss-list");
+    let ctl = null;
+    errs.slice(0, 12).forEach(i => {
+      const li = el("li");
+      const a = el("button", "miss-go", i.message);
+      a.type = "button";
+      a.addEventListener("click", () => { ctl.close(); focusIssue(i); });
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+    if (errs.length > 12) body.appendChild(el("p", "miss-more", `…and ${errs.length - 12} more in the Checks panel.`));
+    const foot = el("div", "rv-actions");
+    const fill = el("button", "btn btn-gold", "Fill them now");
+    fill.type = "button";
+    foot.appendChild(el("span", "spacer"));
+    if (CTX.skip_to && CTX.skip_to.url) {
+      const skip = el("button", "btn btn-ghost", `Save draft & go to ${CTX.skip_to.label || "the next stage"} →`);
+      skip.type = "button";
+      skip.addEventListener("click", () => {
+        skip.disabled = true;
+        dirty = true;
+        // remembered for this browser tab: the reminder on the next pages
+        try {
+          const list = JSON.parse(sessionStorage.getItem("bos-skipped") || "[]").filter(u => u !== location.pathname);
+          list.push(location.pathname);
+          sessionStorage.setItem("bos-skipped", JSON.stringify(list));
+        } catch (_) { /* no storage: no reminder */ }
+        save().then(() => { dirty = false; window.location = CTX.skip_to.url; });
+      });
+      foot.appendChild(skip);
+    }
+    foot.appendChild(fill);
+    ctl = Review.modal({
+      title: `${errs.length} thing${errs.length === 1 ? "" : "s"} still to fill`,
+      sub: reviewTitle(),
+      body, foot
+    });
+    fill.addEventListener("click", () => { ctl.close(); focusIssue(errs[0]); });
   }
 
   function unreachable(btn) {
@@ -4370,6 +4422,24 @@
       else if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
       if (target) target.classList.add("is-flash");
     }, 400);
+  }
+  // stages left as a draft with "Save draft & go": a reminder on the pages
+  // after, each a link back, until it is submitted
+  if (!CTX.readonly && window.Toast) {
+    let skipped = [];
+    try { skipped = JSON.parse(sessionStorage.getItem("bos-skipped") || "[]"); } catch (_) { skipped = []; }
+    const rec = CTX.record || [];
+    const left = rec.filter(r => r.url && skipped.includes(r.url) && r.status !== "submitted" && r.status !== "now");
+    try {
+      sessionStorage.setItem("bos-skipped", JSON.stringify(skipped.filter(u =>
+        !rec.some(r => r.url === u && r.status === "submitted"))));
+    } catch (_) { /* fine */ }
+    if (left.length) {
+      window.Toast.warning(`Please fill and submit ${left.length === 1 ? "this stage" : "these stages"} — click to go there.`,
+                           { title: "Still to submit", timeout: 12000 });
+      left.slice(0, 4).forEach(r => window.Toast.warning(`${r.title} — click here to go`,
+        { onClick: () => { window.location = r.url; }, timeout: 12000 }));
+    }
   }
   const allBtn = document.getElementById("btn-all");
   if (allBtn) allBtn.addEventListener("click", () => openAll());

@@ -4800,3 +4800,13 @@ html.intro-open, html.intro-open body { overflow: hidden; }
 .deg-pick.has-pick .deg-pick-opt:not(.is-on) { opacity: .45; filter: blur(.6px) grayscale(1); }
 .deg-pick.has-pick .deg-pick-opt:not(.is-on):hover:not(:disabled) { opacity: 1; filter: none; }
 .deg-pick-opt:disabled { cursor: default; }
+
+/* Submit found gaps: what is still to fill, each a link to its box */
+.miss-lede { margin: 0 0 10px; color: var(--ink); }
+.miss-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.miss-go { display: block; width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--ink); font: inherit; font-size: .88rem; text-align: left; cursor: pointer; position: relative; }
+.miss-go::before { content: "!"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px;
+  border-radius: 50%; background: #b23a2a; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
+.miss-go:hover, .miss-go:focus-visible { border-color: var(--gold-500); background: var(--gold-100); outline: none; }
+.miss-more { margin: 8px 0 0; font-size: .82rem; color: var(--ink-faint); }

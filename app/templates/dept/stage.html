@@ -217,6 +217,7 @@
     fill: {{ fill|tojson }},
     summaries: true,
     add_level: {{ add_level|tojson }},
+    skip_to: {{ (skip_to or None)|tojson }},
     back_to: {{ back_to|tojson }},
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},

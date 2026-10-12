@@ -375,7 +375,18 @@ def stage(stage_key, programme_code=None):
     page_stage = for_level(stage_def, deg)
     if stage_key == "prog_curriculum":
         data = pg_groups(data, deg)
+    # where "go to the next stage" leads when this one is left as a draft
+    if next_step and next_step.get("url"):
+        skip_to = {"url": next_step["url"], "label": next_step.get("label") or next_step.get("title") or ""}
+    elif not stage_def.get("parent"):
+        later = [k for k in STAGE_KEYS[STAGE_KEYS.index(stage_key) + 1:]
+                 if not STAGE_BY_KEY[k].get("parent")] if stage_key in STAGE_KEYS else []
+        skip_to = ({"url": url_for("dept.stage", stage_key=later[0]), "label": STAGE_BY_KEY[later[0]]["title"]}
+                   if later else None)
+    else:
+        skip_to = None
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=page_stage, dept=dept, submission=sub,
+                           skip_to=skip_to,
                            final=final, record=record, syllabi=syllabi, comments=comments,
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back,
@@ -568,6 +579,8 @@ def _final_step(sub, dept, stage_key, programme_code=None):
                     record.append({"title": f"{p.get('programme_name') or p['programme_code']} · "
                                             f"{STAGE_BY_KEY[part]['title']}",
                                    "status": "now" if here else (st.get("status") or "open"),
+                                   "url": url_for("dept.stage", stage_key=part,
+                                                  programme_code=p["programme_code"]),
                                    "at": to_ist(st["submitted_at"]).strftime("%d %b %Y") if st.get("submitted_at") else ""})
                     if not here and st.get("status") != "submitted":
                         final = False
@@ -578,6 +591,7 @@ def _final_step(sub, dept, stage_key, programme_code=None):
         here = k == stage_key
         status = compute_status(sub, k)
         record.append({"title": sd["title"], "status": "now" if here else status,
+                       "url": url_for("dept.stage", stage_key=k),
                        "at": to_ist(st["submitted_at"]).strftime("%d %b %Y") if st.get("submitted_at") else ""})
         if not here and status != "submitted":
             final = False

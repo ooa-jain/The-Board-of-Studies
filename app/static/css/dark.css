@@ -4859,6 +4859,27 @@ html[data-theme="dark"] .deg-pick-opt.is-on .deg-pick-dot {
   background: #121519;
   box-shadow: inset 0 0 0 3px #0f2440;
 }
+html[data-theme="dark"] .miss-lede {
+  color: #ced8e6;
+}
+html[data-theme="dark"] .miss-go {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: #ced8e6;
+}
+html[data-theme="dark"] .miss-go::before {
+  background: #b23a2a;
+  color: #ffffff;
+}
+html[data-theme="dark"] .miss-go:hover,
+html[data-theme="dark"] .miss-go:focus-visible {
+  border-color: #2563eb;
+  background: #161d29;
+  outline: none;
+}
+html[data-theme="dark"] .miss-more {
+  color: #aab2c1;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
