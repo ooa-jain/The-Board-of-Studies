@@ -4777,3 +4777,15 @@ html.intro-open, html.intro-open body { overflow: hidden; }
 .pmap-node.is-submitted.is-here > .pmap-pill { box-shadow: 0 0 0 3px rgba(47,138,85,.18); }
 .pmap-done { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #2f8a55; color: #fff; }
 .pmap-twig.is-submitted { background: #e6f4ea; color: #1f6b44; }
+
+/* UG programme structure: after semester 6, end at 3 years or go on to 4 */
+.after-six { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); }
+.after-six-h { display: block; font-size: .86rem; color: var(--ink); margin-bottom: 8px; }
+.after-six-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.after-six-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
+  font: inherit; font-size: .86rem; font-weight: 600; cursor: pointer; text-align: left; }
+.after-six-opt small { font-weight: 400; font-size: .74rem; color: var(--ink-faint); }
+.after-six-opt:hover:not(:disabled) { border-color: var(--gold-500); }
+.after-six-opt.is-on { border-color: var(--gold-500); background: var(--gold-100); box-shadow: inset 0 0 0 1px var(--gold-500); }
+.after-six-opt:disabled { cursor: default; }

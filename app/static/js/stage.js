@@ -1527,6 +1527,37 @@
       });
   }
 
+  // A UG programme: semesters 1–6 are the 3-year degree; after semester 6 it
+  // ends there, or goes on to 4-year Honours or Honours with Research.
+  function renderAfterSix(block) {
+    const opts = [["UG - 3 Year", "End at 3 years", "6 semesters"],
+                  ["UG - 4 Year (Honours)", "4-year Honours", "Semesters 7 and 8"],
+                  ["UG - 4 Year (Honours with Research)", "4-year Honours with Research", "Semesters 7 and 8"]];
+    state.details = state.details || {};
+    const cur = state.details.degree_level;
+    const bar = el("div", "after-six");
+    bar.appendChild(el("strong", "after-six-h", "After semester 6"));
+    const row = el("div", "after-six-opts");
+    opts.forEach(([val, label, sub]) => {
+      const b = el("button", "after-six-opt" + (cur === val ? " is-on" : ""));
+      b.type = "button";
+      b.appendChild(el("span", null, label));
+      b.appendChild(el("small", null, sub));
+      b.disabled = !!CTX.readonly;
+      b.addEventListener("click", () => {
+        if (cur === val) return;
+        state.details.degree_level = val;
+        dirty = true;
+        reloadAfterSave = true;
+        clearTimeout(saveTimer);
+        save();
+      });
+      row.appendChild(b);
+    });
+    bar.appendChild(row);
+    block.appendChild(bar);
+  }
+
   // Running totals under any table with credit columns.
   function renderTotals(section, data, box) {
     const creditCols = (section.columns || []).filter(c => /credits$/.test(c.name));
@@ -3832,6 +3863,7 @@
         renderRowCards(section, block);
       } else if (section.type === "table") {
         renderTable(section, block);
+        if (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG) renderAfterSix(block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
       } else if (section.type === "revision_summary") {

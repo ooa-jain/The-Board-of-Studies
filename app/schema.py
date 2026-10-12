@@ -439,7 +439,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "semester_structure",
             "title": "Programme structure — semester scheme",
-            "help": "One row per course. Choose the programme's degree above — 3-year, 4-year Honours or 4-year Honours with Research — and list its courses semester by semester.",
+            "help": "One row per course, semester by semester. After semester 6, choose below whether the programme ends as a 3-year degree or goes on to 4-year Honours or 4-year Honours with Research.",
             "type": "table",
             "min_rows": 1,
             "columns": [
@@ -747,9 +747,20 @@ def for_level(stage: dict, degree_level) -> dict:
     programme classifies credits as the PG Course Matrix does (Generic Core …
     Research / Thesis / Project / Patent), has no Honours tracks or minors,
     states its fee, and opens with the PG wording; a UG programme is as it was."""
-    if not stage or stage.get("key") != "prog_curriculum" or not is_pg(degree_level):
+    if not stage or stage.get("key") != "prog_curriculum":
         return stage
     import copy
+    if degree_level == "UG - 3 Year":
+        # a 3-year degree runs for six semesters
+        s = copy.deepcopy(stage)
+        for sec in s["sections"]:
+            if sec["key"] == "semester_structure":
+                for c in sec["columns"]:
+                    if c["name"] == "semester":
+                        c["max"], c["choices"] = 6, list(range(1, 7))
+        return s
+    if not is_pg(degree_level):
+        return stage
     s = copy.deepcopy(stage)
     s["level"] = "PG"
     s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
