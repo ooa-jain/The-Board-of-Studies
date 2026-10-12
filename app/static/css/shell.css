@@ -644,15 +644,9 @@ body.has-side .wrap { max-width: none !important; }
 .fx-ico .w { background: #2b579a; }
 .fx-ask-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
 
-/* ---- grey standard wording: soft and blurred until looked at; an "i" reads it in full ---- */
-.field input::placeholder, .field textarea::placeholder { color: transparent; text-shadow: 0 0 3px rgba(91, 100, 116, .6); opacity: .75; }
-.field input:focus::placeholder, .field textarea:focus::placeholder { color: rgba(91, 100, 116, .55); text-shadow: none; opacity: 1; }
-.field { position: relative; }
+/* ---- placeholders: soft grey; the "i" shows the sample wording in the box ---- */
+.field input::placeholder, .field textarea::placeholder { color: rgba(91, 100, 116, .5); opacity: 1; }
 .hint-i { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 6px; padding: 0; border: 1px solid #9aa3b2; border-radius: 50%;
   background: #fff; color: #5b6474; font: italic 700 10px/1 Georgia, serif; cursor: pointer; vertical-align: 1px; }
 .hint-i:hover, .hint-i:focus-visible { border-color: #2563eb; color: #2563eb; outline: none; }
-.hint-card { position: absolute; z-index: 40; left: 0; right: 0; top: 100%; margin-top: 4px; padding: 10px 12px; border: 1px solid #c7d2e5; border-radius: 8px;
-  background: #f8faff; box-shadow: 0 14px 28px -16px rgba(16, 24, 40, .45); font-size: 13px; line-height: 1.45; color: #1f2937; max-height: 260px; overflow: auto; }
-.hint-card[hidden] { display: none; }
-.hint-card b { display: block; margin-bottom: 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #5b6474; }
-.hint-card span { white-space: pre-line; }
+.hint-i[aria-pressed="true"] { border-color: #2563eb; background: #2563eb; color: #fff; }

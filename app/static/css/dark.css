@@ -5936,13 +5936,7 @@ html[data-theme="dark"] .fx-ico .w {
 }
 html[data-theme="dark"] .field input::placeholder,
 html[data-theme="dark"] .field textarea::placeholder {
-  color: transparent;
-  text-shadow: 0 0 3px rgba(91, 100, 116, 0.6);
-}
-html[data-theme="dark"] .field input:focus::placeholder,
-html[data-theme="dark"] .field textarea:focus::placeholder {
-  color: rgba(170, 177, 191, 0.55);
-  text-shadow: none;
+  color: rgba(170, 177, 191, 0.5);
 }
 html[data-theme="dark"] .hint-i {
   border: 1px solid #98a1b4;
@@ -5955,14 +5949,10 @@ html[data-theme="dark"] .hint-i:focus-visible {
   color: #608df0;
   outline: none;
 }
-html[data-theme="dark"] .hint-card {
-  border: 1px solid #2e3d56;
-  background: #0c1324;
-  box-shadow: 0 14px 28px -16px rgba(16, 24, 40, 0.45);
-  color: #cad2e1;
-}
-html[data-theme="dark"] .hint-card b {
-  color: #aab1bf;
+html[data-theme="dark"] .hint-i[aria-pressed="true"] {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
 }
 
 /* ---- admin.css ---- */
