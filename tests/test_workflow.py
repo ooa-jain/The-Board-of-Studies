@@ -1174,7 +1174,7 @@ def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, cli
 def test_course_revision_is_the_revision_template(app, client):
     from app.schema import STAGE_BY_KEY
     rev = STAGE_BY_KEY["prog_revision"]
-    assert [x["key"] for x in rev["sections"]] == ["header", "revision_summary", "courses", "revision_log"]
+    assert [x["key"] for x in rev["sections"]] == ["header", "revision_summary", "courses"]
     cols = [c["name"] for x in rev["sections"] if x["key"] == "courses" for c in x["columns"]]
     for want in ("course_code", "course_title", "semester", "year_previous", "year_latest",
                  "prev_code", "prev_title", "modules", "avg_change"):

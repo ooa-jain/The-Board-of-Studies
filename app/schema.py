@@ -570,17 +570,6 @@ PROGRAMME_SYLLABUS = {
             ],
             "rules": ["course_codes_known", "bloom_verbs_present"],
         },
-        {
-            # the syllabus as the department keeps it, beside the sheets above
-            "key": "syllabus_file",
-            "title": "Syllabus document",
-            "type": "fields",
-            "fields": [
-                {"name": "document", "label": "Syllabus document (Word or PDF)", "type": "file",
-                 "wide": True, "accept": ".pdf,.docx,.doc",
-                 "help": "Optional. The whole syllabus as one file."},
-            ],
-        },
     ],
 }
 
@@ -656,16 +645,6 @@ PROGRAMME_REVISION = {
                 {"name": "prev_title", "label": "Previous subject / course title", "type": "text"},
                 {"name": "modules", "label": "Modules", "type": "module_compare", "required": True},
                 {"name": "avg_change", "label": "Average percentage on revision", "type": "readonly"},
-            ],
-        },
-        {
-            "key": "revision_log",
-            "title": "Course Revision Log",
-            "help": "Optional: the department's own revision log workbook, if it keeps one.",
-            "type": "fields",
-            "fields": [
-                {"name": "revision_log", "label": "Course Revision Log (Excel)", "type": "file",
-                 "wide": True, "accept": ".xlsx,.xls,.pdf,.docx"},
             ],
         },
     ],
