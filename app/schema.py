@@ -439,15 +439,12 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "semester_structure",
             "title": "Programme structure — semester scheme",
-            "help": "One row per course. In a 4-year programme, mark semester 7 and 8 courses Honours or Honours with Research.",
+            "help": "One row per course. Choose the programme's degree above — 3-year, 4-year Honours or 4-year Honours with Research — and list its courses semester by semester.",
             "type": "table",
             "min_rows": 1,
             "columns": [
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
                  "min": 1, "max": 8, "choices": SEMESTERS, "width": "64px"},
-                {"name": "track", "label": "Applies to", "type": "select", "options": TRACKS,
-                 "width": "112px", "help": "Leave as All semesters except for semester 7 and 8 "
-                                           "courses that differ between the two tracks."},
                 {"name": "nep_category", "label": "Course group", "type": "select", "required": True,
                  "options": NEP_CATEGORIES},
                 {"name": "course_code", "label": "Course code", "type": "text",
@@ -758,7 +755,7 @@ def for_level(stage: dict, degree_level) -> dict:
     s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
     for sec in s["sections"]:
         if sec["key"] == "semester_structure":
-            sec["columns"] = [c for c in sec["columns"] if c["name"] != "track"]
+            sec["columns"] = list(sec["columns"])
             for c in sec["columns"]:
                 if c["name"] == "nep_category":
                     c["label"] = "Category"

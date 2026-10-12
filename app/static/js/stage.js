@@ -1248,6 +1248,32 @@
     return zone;
   }
 
+  /** A small "i" by a label whose box shows grey wording: hover or press it, or
+      click into the box, and the whole wording is read in a card beside it. */
+  function addHint(wrap, lab, input, def) {
+    const text = (def.placeholder || "").trim();
+    if (!text || def.type === "file" || !input || !("placeholder" in input)) return;
+    const btn = el("button", "hint-i", "i");
+    btn.type = "button";
+    btn.setAttribute("aria-label", "Show the standard wording");
+    const card = el("div", "hint-card");
+    card.hidden = true;
+    card.setAttribute("role", "note");
+    card.appendChild(el("b", null, "Standard wording"));
+    card.appendChild(el("span", null, text));
+    lab.appendChild(btn);
+    wrap.appendChild(card);
+    const show = () => { card.hidden = false; };
+    const hide = () => { if (!pinned && document.activeElement !== input) card.hidden = true; };
+    let pinned = false;
+    btn.addEventListener("click", e => { e.preventDefault(); pinned = !pinned; card.hidden = !pinned; });
+    btn.addEventListener("mouseenter", show);
+    btn.addEventListener("mouseleave", hide);
+    input.addEventListener("focus", show);
+    input.addEventListener("blur", () => { pinned = false; card.hidden = true; });
+    card.addEventListener("mousedown", e => e.preventDefault());
+  }
+
   function fieldBlock(def, value, onChange) {
     const wrap = el("div", "field" + (def.type === "textarea" || def.wide ? " wide" : ""));
     wrap.dataset.field = def.name;
@@ -1308,6 +1334,7 @@
       wrap.appendChild(input);
     }
     wrap._input = input;
+    addHint(wrap, lab, input, def);
     if (def.help) {
       const help = el("span", "help", def.help);
       help.id = `f-${def.name}-help`;

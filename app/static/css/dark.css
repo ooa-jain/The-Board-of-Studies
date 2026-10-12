@@ -5893,6 +5893,36 @@ html[data-theme="dark"] .fx-ico .x {
 html[data-theme="dark"] .fx-ico .w {
   background: #2b579a;
 }
+html[data-theme="dark"] .field input::placeholder,
+html[data-theme="dark"] .field textarea::placeholder {
+  color: transparent;
+  text-shadow: 0 0 3px rgba(91, 100, 116, 0.6);
+}
+html[data-theme="dark"] .field input:focus::placeholder,
+html[data-theme="dark"] .field textarea:focus::placeholder {
+  color: rgba(170, 177, 191, 0.55);
+  text-shadow: none;
+}
+html[data-theme="dark"] .hint-i {
+  border: 1px solid #98a1b4;
+  background: #121519;
+  color: #aab1bf;
+}
+html[data-theme="dark"] .hint-i:hover,
+html[data-theme="dark"] .hint-i:focus-visible {
+  border-color: #2563eb;
+  color: #608df0;
+  outline: none;
+}
+html[data-theme="dark"] .hint-card {
+  border: 1px solid #2e3d56;
+  background: #0c1324;
+  box-shadow: 0 14px 28px -16px rgba(16, 24, 40, 0.45);
+  color: #cad2e1;
+}
+html[data-theme="dark"] .hint-card b {
+  color: #aab1bf;
+}
 
 /* ---- admin.css ---- */
 html[data-theme="dark"] .ad {
