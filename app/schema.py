@@ -378,26 +378,25 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "profile",
             "title": "Regulations — programme profile",
-            "help": "Items 1 to 12. The standard wording is filled in — change only what differs.",
+            "help": "Please provide the relevant details for all 12 sections as requested.",
             "type": "fields",
             "fields": [
                 {"name": "objective", "label": "1. Objective", "type": "textarea", "required": True,
                  "rows": 5, "min_items": 2, "wide": True,
-                 "help": "Two to six objectives, one per line, each beginning with a Bloom's "
-                         "taxonomy action verb."},
+                 "help": "Please provide 2–6 learning objectives, aligned with Bloom’s Taxonomy."},
                 {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
                  "required": True, "min": 6, "max": 72},
-                {"name": "intake", "label": "3. Intake", "type": "integer", "required": True,
+                {"name": "intake", "label": "3. Student Intake", "type": "integer", "required": True,
                  "min": 1, "max": 2000},
                 {"name": "reservation_policy", "label": "4. Reservation", "type": "fixed", "wide": True,
                  "prefill_text": DEFAULT_REGULATIONS["reservation_policy"],
                  "fixed_table": [
-                     {"head": "I. Within the sanctioned Intake",
+                     {"head": "I. Within the sanctioned Student Intake",
                       "items": ["a) SC (In Percentage)", "b) ST (In Percentage)",
                                 "c) Differently abled (In Percentage)",
                                 "d) Defence (In Percentage)"],
                       "note": DEFAULT_REGULATIONS["reservation_policy"]},
-                     {"head": "II. Over and above the sanctioned Intake",
+                     {"head": "II. Over and above the sanctioned Student Intake",
                       "items": ["a) Kashmiri Migrants (In Seats)",
                                 "International Students (In Percentage)"],
                       "note": DEFAULT_REGULATIONS["reservation_policy"]},
@@ -433,7 +432,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "credit_classification",
             "title": "Classification of Credits and Number of Non-Credit Courses",
-            "help": "Worked out from the programme structure — nothing to type.",
+            "help": "The Credit table will be automatically populated based on the courses added to the programme structure below.",
             "type": "credit_distribution",
             "show": "classification",
         },
@@ -773,9 +772,7 @@ def for_level(stage: dict, degree_level) -> dict:
                            "clear to the students.")
         elif sec["key"] == "credit_classification":
             sec["title"] = "Summary — credits by classification"
-            sec["help"] = ("Generic Core, Generic Elective, Specialisation Core, Specialisation Elective, "
-                           "Open Elective, and Research / Thesis / Project / Patent — worked out from the "
-                           "programme structure.")
+            sec["help"] = "The Credit table will be automatically populated based on the courses added to the programme structure below."
         elif sec["key"] == "credit_distribution":
             sec["title"] = "Credits by assessment"
             sec["help"] = "Worked out from the programme structure."
@@ -801,7 +798,7 @@ def for_level(stage: dict, degree_level) -> dict:
                                    "help": "Academic fee p.a., Institute deposit and Total — for Indian "
                                            "students, NRI / PIO / OCI and foreign nationals."})
             sec["fields"] = fields
-            sec["help"] = "Items 1 to 13, as in the PG Course Matrix. The standard wording is filled in — change only what differs."
+            sec["help"] = "Please provide the relevant details for all 13 sections as requested."
     return s
 
 

@@ -2357,9 +2357,9 @@
       const all = (Array.isArray(state.semester_structure) ? state.semester_structure : [])
         .filter(r => num(r.semester) !== null);
       if (!all.length) {
-        box.appendChild(el("p", "pl-empty", SHOW === "classification"
-          ? "Add courses to the programme structure below and this table fills itself."
-          : "Add courses to the programme structure above and this table fills itself."));
+        // the section's own line already says the table fills itself; no second bar
+        if (SHOW !== "classification") box.appendChild(el("p", "pl-empty",
+          "The Credit table will be automatically populated based on the courses added to the programme structure above."));
         return;
       }
       const track = r => r.track || "All semesters";
