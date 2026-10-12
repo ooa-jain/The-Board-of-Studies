@@ -4880,6 +4880,13 @@ html[data-theme="dark"] .miss-go:focus-visible {
 html[data-theme="dark"] .miss-more {
   color: #aab2c1;
 }
+html[data-theme="dark"] .home-next {
+  border: 1px solid #2e3542;
+  background: #121519;
+}
+html[data-theme="dark"] .home-prog {
+  color: #afb8ca;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

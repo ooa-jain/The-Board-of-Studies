@@ -209,6 +209,17 @@ def _part(sub, stage_key, programme_code=None):
 @bp.route("/")
 @department_required
 def dashboard():
+    return render_template("dept/dashboard.html", **_dashboard_ctx())
+
+
+@bp.route("/progress")
+@department_required
+def progress_page():
+    """Every stage and programme, with what is done and what is left."""
+    return render_template("dept/progress.html", **_dashboard_ctx())
+
+
+def _dashboard_ctx():
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
     open_comments = list(get_db().comments.find({"dept_code": dept["dept_code"], "academic_year": _year(),
@@ -232,7 +243,7 @@ def dashboard():
         prog_rows.append({"code": p["programme_code"], "name": p["programme_name"], "level": p.get("level") or "",
                           "steps": shown, "url": steps[0]["url"] if steps else "#",
                           "done": all(st["status"] == "submitted" for st in steps if not st["optional"])})
-    return render_template("dept/dashboard.html", dept=dept, submission=sub, open_comments=open_comments,
+    return dict(dept=dept, submission=sub, open_comments=open_comments, person=_person(),
                            prog_rows=prog_rows, prog_heads=prog_heads,
                            drive=drive and {"title": drive["title"],
                                             "folder": (drive.get("source") or {}).get("folder"),

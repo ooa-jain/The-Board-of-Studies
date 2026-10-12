@@ -4810,3 +4810,10 @@ html.intro-open, html.intro-open body { overflow: hidden; }
   border-radius: 50%; background: #b23a2a; color: #fff; font-size: 11px; font-weight: 700; line-height: 16px; text-align: center; }
 .miss-go:hover, .miss-go:focus-visible { border-color: var(--gold-500); background: var(--gold-100); outline: none; }
 .miss-more { margin: 8px 0 0; font-size: .82rem; color: var(--ink-faint); }
+
+/* Department Home: a welcome, where to continue, and a link to the progress page */
+.home-head h1 { margin-bottom: 4px; }
+.home-next { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  margin: 16px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.home-prog { display: flex; align-items: center; gap: 12px; font-size: .88rem; color: var(--ink-soft); }
+.home-prog .bar { width: 180px; }

@@ -496,7 +496,7 @@ def test_the_dashboard_continues_where_you_left_off(app, client):
     card = body.split('class="resume-card"')[1].split("</a>")[0]
     assert "/department/stage/bos_documents" in card and "where you left off" in card
     # Versions and Password live in the menu only
-    head = body.split('class="page-head"')[1].split("</div>\n</div>")[0]
+    head = body.split('class="page-head')[1].split("</div>\n</div>")[0]
     assert ">Versions</a>" not in head and ">Password</a>" not in head
 
 
