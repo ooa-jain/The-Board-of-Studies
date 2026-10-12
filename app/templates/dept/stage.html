@@ -19,12 +19,7 @@
         Batch of {{ batch_tag }}{{ ' · current batch' if stage.batch == 'current' else ' · earlier batch' }}
       </span>
       {% endif %}
-      {% if stage.blurb %}<p>{{ stage.blurb }}</p>{% endif %}
-      {% if stage.source_templates %}
-      <p class="small note-gold">
-        Replaces: {{ stage.source_templates|join(' · ') }}
-      </p>
-      {% endif %}
+      {% if stage.blurb and stage.key != 'pre_bos' %}<p>{{ stage.blurb }}</p>{% endif %}
       {% if stage.samples %}
       <p class="small sample-links">
         {% for d in stage.samples %}
