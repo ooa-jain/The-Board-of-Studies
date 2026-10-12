@@ -148,7 +148,7 @@
               {% else %}<span class="muted">—</span>{% endif %}
             </td>
             <td class="small muted nowrap">
-              {% if r.last_login %}{{ r.last_login.strftime('%d %b, %H:%M') }}
+              {% if r.last_login %}{{ (r.last_login|ist).strftime('%d %b, %H:%M') }}
               {% else %}Never{% endif %}
             </td>
           </tr>

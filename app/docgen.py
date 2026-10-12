@@ -25,6 +25,8 @@ import copy
 import io
 import re
 from datetime import datetime
+
+from .db import now_ist
 from pathlib import Path
 
 from docx import Document
@@ -290,7 +292,7 @@ def _title_line(prog, cur):
 
 
 def _version_line(name, batch):
-    return f"{name} {batch}_v1_{datetime.now().strftime('%d/%m/%Y')}".replace("  ", " ")
+    return f"{name} {batch}_v1_{now_ist().strftime('%d/%m/%Y')}".replace("  ", " ")
 
 
 # ---------------------------------------------------------------------------

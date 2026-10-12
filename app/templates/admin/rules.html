@@ -26,7 +26,7 @@
   <div class="card">
     <div class="card-head"><h3>Minimum credits by category</h3>
       <span class="spacer small muted">Last updated
-        {{ doc.updated_at.strftime('%d %b %Y') if doc.updated_at }} by {{ doc.updated_by }}</span></div>
+        {{ (doc.updated_at|ist).strftime('%d %b %Y') if doc.updated_at }} by {{ doc.updated_by }}</span></div>
     <div class="card-body" style="padding:0">
       <table class="credits">
         <thead>

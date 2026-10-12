@@ -84,7 +84,7 @@
     <tbody>
     {% for c in comments %}
     <tr>
-      <td class="small mono">{{ c.at.strftime('%d %b %H:%M') }}</td>
+      <td class="small mono">{{ (c.at|ist).strftime('%d %b %H:%M') }}</td>
       <td class="small">{{ names.get(c.dept_code, c.dept_code) }}</td>
       <td class="small">{{ STAGE_BY_KEY.get(c.stage, {}).get('title', c.stage) }}{% if c.programme_code %} · {{ c.programme_code }}{% endif %}
         {% if c.reopened %}<div><span class="sh-pill is-returned">opened again</span></div>{% endif %}</td>

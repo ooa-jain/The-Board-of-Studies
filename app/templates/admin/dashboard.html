@@ -13,7 +13,7 @@
 {% macro src_note(sx) -%}
 <div class="ad-src">
   <p><b>How it is counted</b> {{ sx.rule }}</p>
-  <p class="ad-src-reads"><b>Reads</b> {{ sx.reads }} · as of <time data-local datetime="{{ asof }}">{{ src.when }} UTC</time></p>
+  <p class="ad-src-reads"><b>Reads</b> {{ sx.reads }} · as of <time data-local datetime="{{ asof }}">{{ src.when }} IST</time></p>
   {% if sx.behind and sx.behind.list %}
   <details class="ad-src-behind"><summary>{{ sx.behind_label }} · {{ sx.behind.list|length + sx.behind.more }}</summary>
     <ul>{% for b in sx.behind.list %}
@@ -46,7 +46,7 @@
       </form>{% endif %}
       <div class="ad-livebar" role="group" aria-label="Live data">
         <span class="ad-live-dot" aria-hidden="true"></span>
-        <span class="ad-live-txt">Live · as of <time data-local datetime="{{ asof }}">{{ src.when }} UTC</time></span>
+        <span class="ad-live-txt">Live · as of <time data-local datetime="{{ asof }}">{{ src.when }} IST</time></span>
         <button class="ad-live-btn" type="button" data-live-now title="Count again now">Refresh</button>
         <button class="ad-live-btn" type="button" data-src-toggle aria-pressed="false"
                 title="Show how each number is counted and the departments behind it">Sources</button>
@@ -139,7 +139,7 @@
             {% for r in rows %}
               <tr>
                 <td><a class="ad-dept" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">{{ r.dept.dept_name }}</a>
-                  {% if r.updates %}<span class="upd-tag" title="Since you last looked — latest {{ r.updates.latest.strftime('%d %b, %H:%M') }}">Updated · {{ r.updates.count }}</span>{% endif %}
+                  {% if r.updates %}<span class="upd-tag" title="Since you last looked — latest {{ (r.updates.latest|ist).strftime('%d %b, %H:%M') }}">Updated · {{ r.updates.count }}</span>{% endif %}
                   <small>{{ r.dept.dept_code }} · {{ r.dept.campus or '—' }}</small></td>
                 <td class="c ad-td-dots"><span class="ad-dots">{% for s in r.board %}{% set fresh = r.updates and s.key in r.updates.stages %}<i class="dot st-{{ s.status }}{{ ' is-upd' if fresh }}" title="{{ s.title }} — {{ words.get(s.status, s.status) }}{{ ' · updated since you last looked' if fresh }}"></i>{% endfor %}</span></td>
                 <td class="ad-col-bar"><span class="ad-meter" aria-label="{{ r.done }} of {{ r.total }} stages"><i style="width:{{ r.percent }}%"></i></span>
@@ -197,7 +197,7 @@
               <span class="ad-av" aria-hidden="true">{{ icons.get(e.event, '•') }}</span>
               <span class="ad-feed-w"><b>{{ (e.dept_name or e.dept_code)|replace('Department of ', '') }}</b>
                 <small>{{ e.text.split(' — ', 1)[1] if ' — ' in e.text else e.text }}</small></span>
-              <time>{{ e.at.strftime('%d %b, %H:%M') }}</time>
+              <time>{{ (e.at|ist).strftime('%d %b, %H:%M') }}</time>
             </a>
           </li>
           {% else %}

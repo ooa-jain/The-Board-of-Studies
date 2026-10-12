@@ -13,7 +13,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from . import ugc_rules as U
-from .db import get_db
+from .db import get_db, to_ist
 from .schema import STAGES
 from .workflow import compute_status, programmes_of, progress
 
@@ -55,7 +55,7 @@ def _flat(value):
             return str(value["name"])
         return "; ".join(f"{k}: {_flat(v)}" for k, v in value.items())
     if isinstance(value, datetime):
-        return value.strftime("%d %b %Y %H:%M")
+        return to_ist(value).strftime("%d %b %Y %H:%M")
     return str(value)
 
 

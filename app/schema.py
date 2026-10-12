@@ -307,7 +307,7 @@ BOS_DOCUMENTS = {
             "title": "BoS documents",
             # one row per document, opened with a click to upload
             "display": "accordion",
-            "help": "Click a document to upload it.",
+            "help": "Kindly select and upload the relevant document.",
             "type": "fields",
             "fields": [
                 {"name": "bos_composition", "label": "Composition of BoS Members", "type": "file", "template": "templates/Composition_of_BoS_Members.docx",

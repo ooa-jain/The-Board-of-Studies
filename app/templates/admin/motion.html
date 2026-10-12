@@ -10,7 +10,7 @@
       <h1>The year so far, in motion</h1>
       <p class="mo-lede">A short animated explainer of where every department stands — under a minute. Play it here,
         or download it as a video for a meeting or a message. It is drawn from the portal's records as of
-        <time data-local datetime="{{ data.made }}">{{ made.strftime('%d %b %Y, %H:%M') }} UTC</time>
+        <time data-local datetime="{{ data.made }}">{{ (made|ist).strftime('%d %b %Y, %H:%M') }} IST</time>
         · {{ data.scope }}.</p>
     </div>
     <div class="ad-actions">

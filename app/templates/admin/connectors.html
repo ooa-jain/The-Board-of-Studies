@@ -31,7 +31,7 @@
           <div class="conn-events">{% for e in c.events %}<span class="kw-tag is-hit">{{ events[e][0] }}</span>{% endfor %}
             {% if c.departments %}<span class="small muted"> · only {{ c.departments }}</span>{% endif %}</div>
           <div class="small {{ 'conn-ok' if c.last_ok else 'conn-bad' if c.last_at else 'muted' }}">
-            {% if c.last_at %}Last: {{ c.last_status }} · {{ c.last_at.strftime('%d %b %H:%M') }}{% else %}Not used yet{% endif %}
+            {% if c.last_at %}Last: {{ c.last_status }} · {{ (c.last_at|ist).strftime('%d %b %H:%M') }}{% else %}Not used yet{% endif %}
             · sent {{ c.sent or 0 }}{% if c.failed %}, failed {{ c.failed }}{% endif %}
           </div>
         </div>

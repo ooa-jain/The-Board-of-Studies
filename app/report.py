@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from .db import now_ist, to_ist
+
 from .schema import STAGE_BY_KEY, STAGES
 from .workflow import compute_status, part_status, prefill_for, programmes_of, progress
 
@@ -89,7 +91,7 @@ def _text(v, limit=240):
     elif isinstance(v, dict):
         s = "; ".join(f"{k}: {_text(x, limit)}" for k, x in v.items() if not _blank(x))
     elif isinstance(v, datetime):
-        s = v.strftime("%d %b %Y")
+        s = to_ist(v).strftime("%d %b %Y")
     else:
         s = str(v)
     s = " ".join(s.split())
@@ -154,7 +156,7 @@ def build(db, dept_code, year, links=None):
             ("Faculty", dept.get("faculty")), ("School", dept.get("school")),
             ("Campus", dept.get("campus")), ("Academic year", year),
             ("Progress", f"{p['done']} of {p['total']} stages submitted"),
-            ("Report generated", datetime.now().strftime("%d %b %Y, %H:%M"))]
+            ("Report generated", now_ist().strftime("%d %b %Y, %H:%M"))]
 
     stages = []
     for s in STAGES:

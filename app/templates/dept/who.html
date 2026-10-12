@@ -11,7 +11,7 @@
     {% if others %}
     <div class="who-alert" role="status">
       <strong>Already signed in on this login{{ ' now' }}:</strong>
-      <ul>{% for p in others %}<li>{{ p.name }} <span class="muted">({{ p.email }}) · active {{ p.last_seen.strftime('%H:%M') }}</span></li>{% endfor %}</ul>
+      <ul>{% for p in others %}<li>{{ p.name }} <span class="muted">({{ p.email }}) · active {{ (p.last_seen|ist).strftime('%H:%M') }}</span></li>{% endfor %}</ul>
       <span class="small">You can both work — but not on the same stage at the same time, or one will overwrite the other. Add your name and e-mail to carry on.</span>
     </div>
     {% endif %}

@@ -11,7 +11,7 @@
     <div class="ad-title">
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Analysis</div>
       <h1>Analysis | Board of Studies {{ year|ay }}</h1>
-      <p class="ar-made">Every department, stage and programme as of {{ made.strftime('%d %b %Y, %H:%M') }}</p>
+      <p class="ar-made">Every department, stage and programme as of {{ (made|ist).strftime('%d %b %Y, %H:%M') }}</p>
     </div>
     <div class="ad-actions ar-noprint">
       <button class="btn btn-gold" type="button" onclick="window.print()">
@@ -109,7 +109,7 @@
           <td class="c ad-td-prog" data-label="Programmes">{{ r.prog_done }}/{{ r.programmes|length }}</td>
           <td class="c ad-td-rev" data-label="Avg. revision">{{ ((revs|sum) / (revs|length))|round(1) ~ '%' if revs else '—' }}</td>
           <td class="ad-td-state"><span class="ad-state s-{{ r.state }}">{{ r.label }}</span></td>
-          <td class="muted nowrap ad-td-last" data-label="Last signed in">{{ r.last_login.strftime('%d %b, %H:%M') if r.last_login else 'Never' }}</td>
+          <td class="muted nowrap ad-td-last" data-label="Last signed in">{{ (r.last_login|ist).strftime('%d %b, %H:%M') if r.last_login else 'Never' }}</td>
         </tr>
         {% endfor %}
         </tbody>

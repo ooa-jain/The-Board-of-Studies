@@ -96,7 +96,7 @@
 <a class="resume-card" href="{{ resume.url }}">
   <span class="resume-kicker">{{ 'Continue ' ~ resume.where if resume.where != 'next to do' else 'Next step' }}</span>
   <span class="resume-title">{{ resume.title }}</span>
-  {% if resume.at %}<span class="resume-meta">Last opened {{ resume.at.strftime('%d %b, %H:%M') }}{% if resume.name %} by {{ resume.name }}{% endif %}</span>{% endif %}
+  {% if resume.at %}<span class="resume-meta">Last opened {{ (resume.at|ist).strftime('%d %b, %H:%M') }}{% if resume.name %} by {{ resume.name }}{% endif %}</span>{% endif %}
   <span class="resume-go">Continue <span aria-hidden="true">→</span></span>
 </a>
 {% endif %}

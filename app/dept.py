@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 
 from . import ugc_rules as U
 from .auth import department_required
-from .db import audit, get_db, now, rules_doc, settings
+from .db import audit, get_db, now, rules_doc, settings, to_ist
 from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
 from .report import ShareLinks
@@ -191,7 +191,7 @@ def version_restore(vid):
     _tell(dept, "saved", v["stage"], programme,
           changes=describe_changes(v["stage"], before, v.get("data") or {}))
     audit(_me()["username"], "version.restore", f"{v['stage']} {code or ''} from {v['at']}")
-    flash(f"Restored the version {who_was} saved on {v['at'].strftime('%d %b, %H:%M')}.", "success")
+    flash(f"Restored the version {who_was} saved on {to_ist(v['at']).strftime('%d %b, %H:%M')}.", "success")
     return redirect(url_for("dept.stage", stage_key=v["stage"], programme_code=code) if code
                     else url_for("dept.stage", stage_key=v["stage"]))
 
@@ -568,7 +568,7 @@ def _final_step(sub, dept, stage_key, programme_code=None):
                     record.append({"title": f"{p.get('programme_name') or p['programme_code']} · "
                                             f"{STAGE_BY_KEY[part]['title']}",
                                    "status": "now" if here else (st.get("status") or "open"),
-                                   "at": st["submitted_at"].strftime("%d %b %Y") if st.get("submitted_at") else ""})
+                                   "at": to_ist(st["submitted_at"]).strftime("%d %b %Y") if st.get("submitted_at") else ""})
                     if not here and st.get("status") != "submitted":
                         final = False
             if not progs:
@@ -578,7 +578,7 @@ def _final_step(sub, dept, stage_key, programme_code=None):
         here = k == stage_key
         status = compute_status(sub, k)
         record.append({"title": sd["title"], "status": "now" if here else status,
-                       "at": st["submitted_at"].strftime("%d %b %Y") if st.get("submitted_at") else ""})
+                       "at": to_ist(st["submitted_at"]).strftime("%d %b %Y") if st.get("submitted_at") else ""})
         if not here and status != "submitted":
             final = False
     # an optional part (an earlier batch's syllabus) is never the final step

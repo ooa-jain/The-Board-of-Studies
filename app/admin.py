@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
                    render_template, request, send_file, session, url_for)
@@ -13,7 +13,7 @@ from . import ugc_rules as U
 from .access import (allows, current_place, current_scope, current_user, guard_admin_request, may_see,
                      scope_q, view_scope)
 from .auth import admin_required
-from .db import audit, get_db, issue_department_login, now, rules_doc
+from .db import audit, get_db, issue_department_login, now, rules_doc, to_ist
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
 from .packs import available_packs, load_pack
@@ -75,11 +75,12 @@ def _unread_updates(dept_codes=None):
 def _activity(db, days_back=14):
     """Updates from departments, a day at a time, for the last fortnight."""
     from datetime import timedelta
-    today = now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = to_ist(now()).replace(hour=0, minute=0, second=0, microsecond=0)     # days are Indian days
     days = [today - timedelta(days=i) for i in range(days_back - 1, -1, -1)]
     per_day = {d.date(): {"all": 0, "submitted": 0} for d in days}
-    for n in db.notifications.find({"at": {"$gte": days[0]}, **scope_q()}, {"at": 1, "event": 1}):
-        k = n["at"].date()
+    for n in db.notifications.find({"at": {"$gte": days[0].astimezone(timezone.utc).replace(tzinfo=None)}, **scope_q()},
+                                   {"at": 1, "event": 1}):
+        k = to_ist(n["at"]).date()
         if k in per_day:
             per_day[k]["all"] += 1
             if n.get("event") == "submitted":
@@ -219,7 +220,7 @@ def _sources(pic, year, made):
     scoped = current_scope() is not None
     place = current_place()
     whose = ("the departments you can see" if scoped else "every active department") + (f" in {place}" if place else "")
-    when = made.strftime("%d %b %Y, %H:%M")
+    when = to_ist(made).strftime("%d %b %Y, %H:%M")
     yr = str(year).replace("-", "\u2013")         # as it is printed: 2027–28
 
     def names(items, note=None, limit=8):
@@ -1119,7 +1120,7 @@ def submission_review(dept_code, stage_key):
         "returned_note": state.get("returned_note") or "",
         "dept_name": dept.get("dept_name", dept_code), "dept_code": dept_code,
         "comment_url": url_for("admin.comment_add") if allows(current_user(), "comments", "edit") else "",
-        "comments": [{"text": c["text"], "at": c["at"].strftime("%d %b %Y"), "status": c.get("status"),
+        "comments": [{"text": c["text"], "at": to_ist(c["at"]).strftime("%d %b %Y"), "status": c.get("status"),
                       "reply": c.get("reply", "")}
                      for c in db.comments.find({"dept_code": dept_code, "academic_year": _year(),
                                                 "stage": stage_key, "programme_code": prog}).sort("at", -1)],
@@ -1395,7 +1396,7 @@ def updates():
     items = list(db.notifications.find(q).sort("at", -1).limit(300))
     days, order = {}, []
     for n in items:
-        d = n["at"].strftime("%A, %d %B %Y")
+        d = to_ist(n["at"]).strftime("%A, %d %B %Y")
         if d not in days:
             days[d] = []
             order.append(d)
@@ -1801,7 +1802,7 @@ def sheets_excel():
           [[r["dept"].get("dept_name")] + [(c["state"] or "—") + (f": {c['why']}" if c["state"] in ("warn", "bad") else "")
                                          for c in r["cells"]] for r in data["documents"]])
     sheet(wb.create_sheet("Comments"), ["When", "Department", "Stage", "Programme", "Comment", "By", "Status", "Reply"],
-          [[c["at"].strftime("%d %b %Y %H:%M"), data["names"].get(c["dept_code"], c["dept_code"]),
+          [[to_ist(c["at"]).strftime("%d %b %Y %H:%M"), data["names"].get(c["dept_code"], c["dept_code"]),
             STAGE_BY_KEY.get(c["stage"], {}).get("title", c["stage"]), c.get("programme_code", ""),
             c["text"], c.get("by", ""), c.get("status", ""), c.get("reply", "")] for c in data["comments"]])
     buf = io.BytesIO()
@@ -1868,7 +1869,7 @@ def comments_json():
         q["stage"] = request.args["stage"]
     if request.args.get("programme") is not None:
         q["programme_code"] = request.args.get("programme", "")
-    return jsonify([{"text": c["text"], "by": c.get("by"), "at": c["at"].strftime("%d %b %Y %H:%M"),
+    return jsonify([{"text": c["text"], "by": c.get("by"), "at": to_ist(c["at"]).strftime("%d %b %Y %H:%M"),
                      "status": c.get("status"), "reply": c.get("reply", "")}
                     for c in get_db().comments.find(q).sort("at", -1)])
 
@@ -1886,23 +1887,25 @@ def calendar():
     from datetime import date, timedelta
     from .notify import EVENTS
     db = get_db()
-    today = now().date()
+    today = to_ist(now()).date()
     try:
         y, m = (int(x) for x in (request.args.get("month") or today.strftime("%Y-%m")).split("-"))
         first = date(y, m, 1)
     except (ValueError, TypeError):
         first = today.replace(day=1)
     last = first.replace(day=cal.monthrange(first.year, first.month)[1])
-    start = datetime(first.year, first.month, 1)
-    end = datetime(last.year, last.month, last.day) + timedelta(days=1)
+    # the month and its days are Indian days; stored times are UTC
+    back = timedelta(hours=5, minutes=30)
+    start = datetime(first.year, first.month, 1) - back
+    end = datetime(last.year, last.month, last.day) + timedelta(days=1) - back
 
     days = {}
     for n in db.notifications.find({"at": {"$gte": start, "$lt": end}, **scope_q()}, {"at": 1, "event": 1}):
-        d = days.setdefault(n["at"].date(), {"total": 0, "events": {}})
+        d = days.setdefault(to_ist(n["at"]).date(), {"total": 0, "events": {}})
         d["total"] += 1
         d["events"][n["event"]] = d["events"].get(n["event"], 0) + 1
     for c in db.comments.find({"at": {"$gte": start, "$lt": end}, **scope_q()}, {"at": 1}):
-        d = days.setdefault(c["at"].date(), {"total": 0, "events": {}})
+        d = days.setdefault(to_ist(c["at"]).date(), {"total": 0, "events": {}})
         d["total"] += 1
         d["events"]["comment"] = d["events"].get("comment", 0) + 1
 
@@ -1913,7 +1916,7 @@ def calendar():
         chosen = today if first <= today <= last else None
     items, comments = [], []
     if chosen:
-        a = datetime(chosen.year, chosen.month, chosen.day)
+        a = datetime(chosen.year, chosen.month, chosen.day) - back
         items = list(db.notifications.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}, **scope_q()})
                      .sort("at", -1))
         comments = list(db.comments.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}, **scope_q()})

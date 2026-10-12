@@ -74,7 +74,7 @@
             <div class="small muted">{{ f.match.label }}</div></td>
           <td><span class="kw-pill is-{{ f.match.status }}">{{ words.get(f.match.status, '—') }}</span></td>
           <td class="small">{{ kw_tags(f.match) }}</td>
-          <td class="small muted mono">{{ f.at.strftime('%d %b %H:%M') if f.at else '' }}</td>
+          <td class="small muted mono">{{ (f.at|ist).strftime('%d %b %H:%M') if f.at else '' }}</td>
         </tr>
         {% else %}
         <tr><td colspan="5" class="empty">No files {{ 'with this result ' if status }}yet.</td></tr>

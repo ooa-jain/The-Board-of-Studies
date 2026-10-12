@@ -1,22 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Versions — who changed what{% endblock %}
+{% block title %}Version History{% endblock %}
 {% block content %}
 <div class="ver-page">
   <div class="ver-head">
     <div>
       <a class="back-link" href="{{ url_for('dept.dashboard') }}">← Back to the stages</a>
-      <h1>Versions — who changed what</h1>
-      <p class="muted">Every save on this login, by who made it, for the last {{ keep_days }} days. A person's saves
-        on one stage within a quarter of an hour are one version. Restore puts an earlier version back as the
-        draft — you can restore any stage that is not yet submitted.</p>
+      <h1>Version History – Changes and User Activity</h1>
+      <p class="muted">View all saved versions from the past {{ keep_days }} days, including who made the changes and when
+        (Indian Standard Time). Changes saved by the same user to the same section within 15 minutes are grouped into one version.
+        You can restore a previous version as a draft, provided the section has not yet been submitted.</p>
     </div>
     {% if person %}<span class="ver-me">You are <b>{{ person.name }}</b> · <a href="{{ url_for('dept.who', next=request.path) }}">not you?</a></span>{% endif %}
   </div>
 
   {% set ns = namespace(day=None) %}
   {% for v in rows if not stage or v.stage == stage %}
-    {% if v.at.strftime('%Y-%m-%d') != ns.day %}{% set ns.day = v.at.strftime('%Y-%m-%d') %}
-      <h2 class="ver-day">{{ v.at.strftime('%A %d %B') }}</h2>
+    {% if (v.at|ist).strftime('%Y-%m-%d') != ns.day %}{% set ns.day = (v.at|ist).strftime('%Y-%m-%d') %}
+      <h2 class="ver-day">{{ (v.at|ist).strftime('%A %d %B') }}</h2>
     {% endif %}
     <details class="ver-row{{ ' is-latest' if v.latest }}">
       <summary>
@@ -27,7 +27,7 @@
           <a href="{{ v.url }}">{{ v.title }}{{ ' · ' ~ v.programme_code if v.programme_code }}</a>
           <span class="muted small">· {{ v.changes|length }} change{{ 's' if v.changes|length != 1 }}{{ ' · ' ~ v.saves ~ ' saves' if v.saves > 1 }}</span>
         </span>
-        <span class="ver-time">{{ v.at.strftime('%H:%M') }}</span>
+        <span class="ver-time">{{ (v.at|ist).strftime('%H:%M') }}</span>
         {% if v.latest %}<span class="ver-badge">Current</span>
         {% elif v.locked %}<span class="ver-badge is-locked" title="Submitted — ask the Office to send it back to change it">Submitted</span>
         {% else %}

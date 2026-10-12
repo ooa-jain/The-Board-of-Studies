@@ -42,7 +42,7 @@
             {% if p.note %}<div class="small note-err">Returned: {{ p.note }}</div>{% endif %}
             {% if p.errors and p.status != 'submitted' %}<div class="small muted">{{ p.errors }} item(s) still to complete</div>{% endif %}</td>
           <td>{{ mark(p.status) }}</td>
-          <td class="small">{{ p.submitted_at.strftime('%d %b %Y, %H:%M') if p.submitted_at else '—' }}</td>
+          <td class="small">{{ (p.submitted_at|ist).strftime('%d %b %Y, %H:%M') if p.submitted_at else '—' }}</td>
           <td class="small">{% for name, url in p.documents %}<a href="{{ url }}" target="_blank" rel="noopener">{{ name }}</a>{% if not loop.last %}<br>{% endif %}{% else %}—{% endfor %}</td>
         </tr>
       {% endfor %}

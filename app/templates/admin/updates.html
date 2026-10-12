@@ -69,7 +69,7 @@
             {% if n.programme_name %}<span class="upd-tag">{{ n.programme_name }}</span>{% endif %}
             {% if n.stage_title %}<span class="upd-tag">{{ n.stage_title }}</span>{% endif %}
             {% if n.demo %}<span class="upd-tag is-demo">demo</span>{% endif %}
-            <time class="upd-time" datetime="{{ n.at.isoformat() }}">{{ n.at.strftime('%H:%M') }}{% if n.saves and n.saves > 1 %} · {{ n.saves }} saves since {{ n.first_at.strftime('%H:%M') }}{% endif %}</time>
+            <time class="upd-time" datetime="{{ n.at.isoformat() }}">{{ (n.at|ist).strftime('%H:%M') }}{% if n.saves and n.saves > 1 %} · {{ n.saves }} saves since {{ (n.first_at|ist).strftime('%H:%M') }}{% endif %}</time>
           </div>
           {% if n.event in ('uploaded', 'keyword_miss', 'password') %}
           <p class="upd-text">{{ n.text.split('. ', 1)[1] if '. ' in n.text else n.text }}</p>

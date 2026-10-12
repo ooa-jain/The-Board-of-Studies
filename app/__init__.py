@@ -61,6 +61,11 @@ def create_app(config_object=Config):
     def _load_user():
         g.user = session.get("user")
 
+    @app.template_filter("ist")
+    def _ist(value):
+        """A stored time as Indian time: {{ x.at|ist }}.strftime(...) — see db.to_ist."""
+        return database.to_ist(value)
+
     @app.template_filter("ay")
     def _academic_year(value):
         """An academic year as it is printed: 2027–28, with an en dash."""

@@ -258,7 +258,7 @@
               <b>{{ current_user.person.name }}</b><span class="small muted">{{ current_user.person.email }}</span>
               {% endif %}
               <a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Change name' if current_user.person else 'Add your name and e-mail' }}</a>
-              <a href="{{ url_for('dept.versions') }}">Versions — who changed what</a>
+              <a href="{{ url_for('dept.versions') }}">Version History</a>
               <a href="{{ url_for('auth.change_password') }}">Password</a>
             </div>
           </details>

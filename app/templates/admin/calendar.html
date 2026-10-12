@@ -49,7 +49,7 @@
     <h3>{{ chosen.strftime('%A, %d %B %Y') }}</h3>
     {% for c in comments %}
     <div class="office-comment"><div class="oc-head"><strong>Comment to {{ names.get(c.dept_code, c.dept_code) }}</strong>
-      <span class="small muted">{{ c.at.strftime('%H:%M') }} · {{ STAGE_BY_KEY.get(c.stage, {}).get('title', c.stage) }}</span></div>
+      <span class="small muted">{{ (c.at|ist).strftime('%H:%M') }} · {{ STAGE_BY_KEY.get(c.stage, {}).get('title', c.stage) }}</span></div>
       <p class="oc-text">{{ c.text }}</p></div>
     {% endfor %}
     <ol class="upd-list">
@@ -62,7 +62,7 @@
             <span class="upd-kind">{{ events[n.event][0] if n.event in events else n.event }}</span>
             {% if n.stage_title %}<span class="upd-tag">{{ n.stage_title }}</span>{% endif %}
             {% if n.person %}<span class="upd-tag is-person">by {{ n.person }}</span>{% endif %}
-            <time class="upd-time">{{ n.at.strftime('%H:%M') }}</time>
+            <time class="upd-time">{{ (n.at|ist).strftime('%H:%M') }}</time>
           </div>
           {% if n.changes %}<p class="small muted" style="margin:4px 0 0">{{ n.changes|length }} field{{ 's' if n.changes|length != 1 }}: {{ n.changes[:3]|map(attribute='field')|join(', ') }}{% if n.changes|length > 3 %}…{% endif %}</p>{% endif %}
         </div>

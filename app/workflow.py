@@ -21,7 +21,7 @@ Stage status values
 from __future__ import annotations
 
 from . import catalogue
-from .db import get_db, now, rules_doc, settings
+from .db import get_db, now, rules_doc, settings, to_ist
 from .schema import (STAGE_BY_KEY, STAGE_KEYS, STAGES, degree_years, programme_level,
                      stage_index)
 from .validation import build_context, validate_stage
@@ -809,7 +809,7 @@ def stage_timing(state):
         if mins and not days:
             parts.append(f"{mins} min")
         took = " ".join(parts) or "under a minute"
-    fmt = lambda d: d.strftime("%d %b %Y, %H:%M") if d else ""
+    fmt = lambda d: to_ist(d).strftime("%d %b %Y, %H:%M") if d else ""
     return {"started": fmt(started), "submitted": fmt(done), "took": took,
             "returned": fmt(state.get("returned_at")), "updated": fmt(state.get("updated_at"))}
 

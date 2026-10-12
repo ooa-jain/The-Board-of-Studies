@@ -40,7 +40,7 @@
   <div class="upd-banner-head">
     <span class="upd-tag">Updated</span>
     <strong>{{ updates.count }} change{{ 's' if updates.count != 1 }} since you last looked</strong>
-    <span class="small muted">— since {{ updates.since.strftime('%d %b, %H:%M') }}</span>
+    <span class="small muted">— since {{ (updates.since|ist).strftime('%d %b, %H:%M') }}</span>
     {% if can('overview', 'edit') %}
     <form method="post" action="{{ url_for('admin.mark_seen', dept_code=dept.dept_code) }}" class="spacer">
       <button class="btn btn-ghost btn-sm" type="submit">Mark as seen</button>
@@ -49,7 +49,7 @@
   </div>
   <ul class="upd-list">
     {% for n in updates.notes %}
-    <li><span class="upd-when">{{ n.at.strftime('%d %b, %H:%M') }}</span>
+    <li><span class="upd-when">{{ (n.at|ist).strftime('%d %b, %H:%M') }}</span>
       <span class="upd-what">{{ n.text.split(' — ', 1)[1] if ' — ' in n.text else n.text }}{% if n.person %} <span class="muted">· {{ n.person }}</span>{% endif %}</span></li>
     {% endfor %}
     {% if updates.count > updates.notes|length %}<li class="muted small">and {{ updates.count - updates.notes|length }} more — <a href="{{ url_for('admin.updates', dept=dept.dept_code, show='unread') }}">see them all</a></li>{% endif %}
@@ -72,7 +72,7 @@
 <details class="card mb-2 import-card">
   <summary class="card-head">
     <h3 style="margin:0;font-size:1rem">Filled from the department's Drive folder</h3>
-    <span class="spacer small muted">{{ imp.at.strftime('%d %b %Y, %H:%M') }} · {{ imp.by }} ·
+    <span class="spacer small muted">{{ (imp.at|ist).strftime('%d %b %Y, %H:%M') }} · {{ imp.by }} ·
       {{ imp.notes|length }} note{{ '' if imp.notes|length == 1 else 's' }}</span>
   </summary>
   <div class="card-body">
@@ -124,7 +124,7 @@
           <div class="file-meta">
             <span class="doc-label">{{ f.label }}{% if updates and f.uploaded_at and updates.files_since and f.uploaded_at >= updates.files_since %} <span class="upd-tag">New</span>{% endif %}</span>
             <strong class="file-name">{{ f.name }}</strong>
-            <span class="file-facts">{% if f.size %}{{ (f.size / 1024)|round|int }} KB{% endif %}{% if f.uploaded_at %} · {{ f.uploaded_at.strftime('%d %b %Y') }}{% endif %}</span>
+            <span class="file-facts">{% if f.size %}{{ (f.size / 1024)|round|int }} KB{% endif %}{% if f.uploaded_at %} · {{ (f.uploaded_at|ist).strftime('%d %b %Y') }}{% endif %}</span>
             <div class="file-acts">
               {% if f.viewable %}<a class="file-act is-view" href="{{ f.url }}?inline=1" target="_blank" rel="noopener">View</a>{% endif %}
               <a class="file-act" href="{{ f.url }}">Download</a>
@@ -195,7 +195,7 @@
     {% if state.data or s.status in ('submitted','returned','locked') %}
     <div class="card-body tight">
       <div class="flex flex-wrap small muted">
-        {% if s.submitted_at %}<span>Submitted {{ s.submitted_at.strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
+        {% if s.submitted_at %}<span>Submitted {{ (s.submitted_at|ist).strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
         {% if s.returned_note %}<span style="color:var(--err)">Returned: {{ s.returned_note }}</span>{% endif %}
         <span class="spacer"></span>
 

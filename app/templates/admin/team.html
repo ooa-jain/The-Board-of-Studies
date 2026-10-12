@@ -37,7 +37,7 @@
         </div>
         <div class="small muted mono">{{ u.username }}</div>
         <div class="tm-what">{{ u.summary }}</div>
-        <div class="small muted">Last signed in: {{ u.last_login.strftime('%d %b %Y, %H:%M') if u.last_login else 'never' }}</div>
+        <div class="small muted">Last signed in: {{ (u.last_login|ist).strftime('%d %b %Y, %H:%M') if u.last_login else 'never' }}</div>
       </div>
       {% if u.team %}
       <div class="tm-acts">

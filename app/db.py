@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import bcrypt
 from pymongo import ASCENDING, MongoClient
@@ -36,6 +36,23 @@ def get_db():
 
 def now():
     return datetime.now(timezone.utc)
+
+
+# Times are stored in UTC and shown in Indian Standard Time (UTC+5:30).
+IST = timezone(timedelta(hours=5, minutes=30), "IST")
+
+
+def to_ist(dt):
+    """A stored time as Indian time (a time with no zone is taken as UTC)."""
+    if not isinstance(dt, datetime):
+        return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(IST)
+
+
+def now_ist():
+    return datetime.now(IST)
 
 
 def _ensure_indexes():
