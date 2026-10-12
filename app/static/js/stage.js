@@ -3899,7 +3899,16 @@
           if (f.derive_from && b._input) {
             // filled from other fields on the page (item 9 from the programme
             // name and specialisation) until the department types its own
-            const read = ref => { const [sec, name] = ref.split("."); return String(((state[sec] || {})[name]) || "").trim(); };
+            const TAGS = { "UG - 3 Year": "3 Years", "UG - 4 Year (Honours)": "Honours",
+                           "UG - 4 Year (Honours with Research)": "Honours with Research" };
+            const read = ref => {
+              const [sec, name] = ref.split(".");
+              const v = String(((state[sec] || {})[name]) || "").trim();
+              const tag = TAGS[(state.details || {}).degree_level];
+              // the programme carries the degree chosen after semester 6
+              return name === "programme_name" && tag
+                ? v.replace(/\s*\((?:[^()]*hon(?:ou)?r?s[^()]*|\s*\d\s*years?\s*)\)\s*$/i, "") + ` (${tag})` : v;
+            };
             const make = () => f.derive_from.map(read).filter(Boolean).join(" — ");
             const example = f.placeholder || "";
             // worked out from the programme, shown as the placeholder; a value

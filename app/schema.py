@@ -15,6 +15,7 @@ SECTION TYPES
     table   -> a repeating grid; `columns` are field definitions, rows are
                added/removed by the user
 """
+import re
 
 # --------------------------------------------------------------------------
 # Shared option lists
@@ -833,6 +834,26 @@ def programme_level(degree_level: str) -> str:
     if d.startswith("PG Diploma"):
         return "PGD"
     return "PG" if d.startswith("PG") else "UG"
+
+
+def degree_tag(degree_level) -> str:
+    """What a UG programme's name carries: (3 Years), (Honours) or (Honours with Research)."""
+    return {"UG - 3 Year": "3 Years", "UG - 4 Year (Honours)": "Honours",
+            "UG - 4 Year (Honours with Research)": "Honours with Research"}.get(degree_level or "", "")
+
+
+_DEGREE_SUFFIX = re.compile(r"\s*\((?:[^()]*hon(?:ou)?r?s[^()]*|\s*\d\s*years?\s*)\)\s*$", re.I)
+
+
+def degree_name(name, degree_level) -> str:
+    """A UG programme's name with the degree chosen for it: any Honours /
+    years ending it already has gives way to (3 Years), (Honours) or
+    (Honours with Research)."""
+    tag = degree_tag(degree_level)
+    name = str(name or "").strip()
+    if not tag:
+        return name
+    return f"{_DEGREE_SUFFIX.sub('', name)} ({tag})"
 
 
 def degree_years(degree_level: str):

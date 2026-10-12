@@ -13,7 +13,7 @@
         {% else %}{{ stage.group }}{% endif %}
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
-      <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{% if batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}</h1>
+      <h1>{% if programme %}{{ programme.display_name or programme.programme_name }} — {% endif %}{% if batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}</h1>
       {% if batch_tag %}
       <span class="batch-tag{{ ' is-current' if stage.batch == 'current' }}">
         Batch of {{ batch_tag }}{{ ' · current batch' if stage.batch == 'current' else ' · earlier batch' }}
@@ -63,7 +63,7 @@
 {% if back_to_structure %}
 <div class="back-bar">
   <a class="back-link" href="{{ back_to_structure }}">← Programme structure — semester scheme</a>
-  <span class="back-prog"><strong>{{ programme.programme_name }}</strong> <span class="mono">{{ programme.programme_code }}</span>
+  <span class="back-prog"><strong>{{ programme.display_name or programme.programme_name }}</strong> <span class="mono">{{ programme.programme_code }}</span>
     {% if course_map %}· {{ course_map|length }} courses{% endif %}</span>
 </div>
 {% endif %}

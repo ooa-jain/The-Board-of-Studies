@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from . import catalogue
 from .db import get_db, now, rules_doc, settings, to_ist
-from .schema import (STAGE_BY_KEY, STAGE_KEYS, STAGES, degree_years, programme_level,
+from .schema import (STAGE_BY_KEY, STAGE_KEYS, STAGES, degree_name, degree_tag, degree_years, programme_level,
                      stage_index)
 from .validation import build_context, validate_stage
 
@@ -388,6 +388,8 @@ def programmes_of(submission: dict, department: dict | None = None):
         row["degree_level"] = details.get("degree_level") or _DEGREE_LEVEL.get(p.get("degree"), "")
         row["specialisation"] = details.get("specialisation", "")
         row["batch"] = details.get("batch", "")
+        row["degree_tag"] = degree_tag(row["degree_level"])
+        row["display_name"] = degree_name(row["programme_name"], row["degree_level"])
         years = degree_years(row["degree_level"])
         row["duration_years"] = years
         row["semesters"] = years * 2 if years else None
@@ -439,7 +441,10 @@ def apply_defaults(stage_key, data, programme=None):
 
     def read(ref):
         sec, name = ref.split(".", 1)
-        return str(((data.get(sec) or {}) if isinstance(data.get(sec), dict) else {}).get(name) or "").strip()
+        v = str(((data.get(sec) or {}) if isinstance(data.get(sec), dict) else {}).get(name) or "").strip()
+        if name == "programme_name":
+            return degree_name(v, (data.get("details") or {}).get("degree_level")) if isinstance(data.get("details"), dict) else v
+        return "" if name == "degree_level" else v
 
     for section in stage.get("sections", []):
         if section.get("type", "fields") != "fields":
