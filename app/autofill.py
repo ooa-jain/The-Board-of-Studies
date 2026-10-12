@@ -312,13 +312,7 @@ def _revision(sub, programme, stored, year):
         r = dict(r)
         if not [m for m in r.get("modules") or [] if str((m or {}).get("revised") or "").strip()]:
             r["modules"] = _module_rows(r.get("course_title") or "the course")
-        mods = []
-        for m in r["modules"]:
-            m = dict(m or {})
-            if m.get("pct") in (None, "") and str(m.get("revised") or "").strip():
-                # no earlier syllabus of the course: all of it is new
-                m["pct"] = 100 if not str(m.get("previous") or "").strip() else 0
-            mods.append(m)
+        mods = [dict(m or {}) for m in r["modules"]]
         r["modules"] = mods
         pcts = [float(m["pct"]) for m in mods if m.get("pct") not in (None, "")]
         if pcts and r.get("avg_change") in (None, ""):

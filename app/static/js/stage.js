@@ -283,29 +283,6 @@
   const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
                  "XI", "XII", "XIII", "XIV", "XV"];
 
-  function wordsOf(t) {
-    return String(t || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
-  }
-
-  /** How much of a module changed, from the words the two versions share in
-      order: 0 when identical, 100 when nothing carries over. */
-  function percentChange(prev, next) {
-    const a = wordsOf(prev), b = wordsOf(next);
-    if (!b.length) return null;
-    if (!a.length) return 100;
-    const n = a.length, m = b.length;
-    let row = new Array(m + 1).fill(0);
-    for (let i = 1; i <= n; i++) {
-      const cur = new Array(m + 1).fill(0);
-      for (let j = 1; j <= m; j++) {
-        cur[j] = a[i - 1] === b[j - 1] ? row[j - 1] + 1 : Math.max(row[j], cur[j - 1]);
-      }
-      row = cur;
-    }
-    const same = (2 * row[m]) / (n + m);
-    return Math.round((1 - same) * 1000) / 10;
-  }
-
   function averageChange(mods) {
     const v = (Array.isArray(mods) ? mods : [])
       .filter(m => m && String(m.revised || "").trim())
@@ -315,7 +292,7 @@
   }
 
   /** Module by module: the previous syllabus beside the revised one, and the
-      % change between them — worked out, unless the department types its own. */
+      % change between them, typed by the department. */
   function moduleCompare(def, value, onChange) {
     const mods = (Array.isArray(value) ? value : []).map(m => Object.assign({}, m));
     if (!mods.length && !CTX.readonly) mods.push({});
@@ -344,21 +321,15 @@
         const pct = el("input");
         pct.type = "text";
         pct.inputMode = "decimal";
+        // typed by the department, never worked out for it
+        if (!m.pct_manual) m.pct = null;
         pct.value = m.pct ?? "";
-        if (!m.pct_manual) {
-          pct.classList.add("is-auto");
-          if (m.pct === undefined || m.pct === null || m.pct === "") {
-            const v0 = percentChange(m.previous, m.revised);
-            if (v0 !== null) { m.pct = v0; pct.value = fmt(v0); }
-          }
-        }
-        pct.title = "Worked out from the two versions — type to use your own figure";
+        pct.placeholder = "Enter";
+        pct.title = "Type the percentage of change in this module";
         pct.addEventListener("input", () => {
           const v = pct.value.trim();
           m.pct = v === "" ? null : Number(v);
           m.pct_manual = v !== "";
-          pct.classList.toggle("is-auto", !m.pct_manual);
-          if (!m.pct_manual) recalc(m, pct);
           emit();
         });
         pctWrap.appendChild(pct);
@@ -385,7 +356,6 @@
           if (CTX.readonly) t.disabled = true;
           t.addEventListener("input", () => {
             m[k] = t.value;
-            if (!m.pct_manual) recalc(m, pct);
             emit();
           });
           f.appendChild(t);
@@ -397,11 +367,6 @@
       });
     }
 
-    function recalc(m, pct) {
-      const v = percentChange(m.previous, m.revised);
-      m.pct = v;
-      pct.value = v === null ? "" : fmt(v);
-    }
 
     if (!CTX.readonly) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
@@ -616,33 +581,20 @@
         const pct = el("input");
         pct.type = "text";
         pct.inputMode = "decimal";
+        // typed by the department, never worked out for it
+        if (!m.pct_manual) m.pct = null;
         pct.value = m.pct ?? "";
-        pct.title = "Worked out from the two versions — type to use your own figure";
-        if (!m.pct_manual) {
-          pct.classList.add("is-auto");
-          // filled in from the syllabi: work the % out straight away
-          if (m.pct === undefined || m.pct === null || m.pct === "") {
-            const v0 = percentChange(m.previous, m.revised);
-            if (v0 !== null) { m.pct = v0; pct.value = fmt(v0); }
-          }
-        }
+        pct.placeholder = "Enter";
+        pct.title = "Type the percentage of change in this module";
         if (CTX.readonly) pct.disabled = true;
-        const recalc = () => {
-          if (m.pct_manual) return;
-          const v = percentChange(m.previous, m.revised);
-          m.pct = v;
-          pct.value = v === null ? "" : fmt(v);
-        };
-        tr.appendChild(cell(box(m.previous, v => { m.previous = v; recalc(); changed(); },
+        tr.appendChild(cell(box(m.previous, v => { m.previous = v; changed(); },
                                 { multi: true, placeholder: "Leave empty for a new module" })));
-        tr.appendChild(cell(box(m.revised, v => { m.revised = v; recalc(); changed(); },
+        tr.appendChild(cell(box(m.revised, v => { m.revised = v; changed(); },
                                 { multi: true, placeholder: "Module title (hours) — content" })));
         pct.addEventListener("input", () => {
           const v = pct.value.trim();
           m.pct = v === "" ? null : Number(v);
           m.pct_manual = v !== "";
-          pct.classList.toggle("is-auto", !m.pct_manual);
-          recalc();
           changed();
         });
         const pc = el("td", "rv-pct");
@@ -3663,7 +3615,7 @@
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         add.forEach(p => data.push(JSON.parse(JSON.stringify(p))));
         draw(); touch();
-        note.textContent = `Added ${add.length} course${add.length === 1 ? "" : "s"} — the % change is worked out from the two syllabi.`;
+        note.textContent = `Added ${add.length} course${add.length === 1 ? "" : "s"} — enter the % change for each module.`;
       });
       top.appendChild(fb);
     }

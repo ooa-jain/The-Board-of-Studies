@@ -221,7 +221,7 @@ def _modules(title, previous=False):
         now_text = f"{name} ({hrs} Hrs) — {title}: {name.lower()}, with cases from Indian business."
         if previous:
             out.append({"previous": f"{name} ({hrs} Hrs) — {title}: {name.lower()}.",
-                        "revised": now_text, "pct": 30 if m % 2 else 10})
+                        "revised": now_text, "pct": 30 if m % 2 else 10, "pct_manual": True})
         else:
             out.append({"previous": "", "revised": now_text, "pct": None})
     return out

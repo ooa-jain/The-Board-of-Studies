@@ -6,9 +6,9 @@
     <div>
       <a class="back-link" href="{{ url_for('dept.dashboard') }}">← Back to the stages</a>
       <h1>Version History – Changes and User Activity</h1>
-      <p class="muted">View all saved versions from the past {{ keep_days }} days, including who made the changes and when
+      <p class="muted"><em>View all saved versions from the past {{ keep_days }} days, including who made the changes and when
         (Indian Standard Time). Changes saved by the same user to the same section within 15 minutes are grouped into one version.
-        You can restore a previous version as a draft, provided the section has not yet been submitted.</p>
+        You can restore a previous version as a draft, provided the section has not yet been submitted.</em></p>
     </div>
     {% if person %}<span class="ver-me">You are <b>{{ person.name }}</b> · <a href="{{ url_for('dept.who', next=request.path) }}">not you?</a></span>{% endif %}
   </div>
