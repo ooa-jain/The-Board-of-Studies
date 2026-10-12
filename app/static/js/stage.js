@@ -1555,7 +1555,9 @@
       row.appendChild(b);
     });
     bar.appendChild(row);
-    block.appendChild(bar);
+    // straight under the table and its "+ Add row"
+    const tot = block.querySelector(".rt-totals");
+    if (tot) block.insertBefore(bar, tot); else block.appendChild(bar);
   }
 
   // Running totals under any table with credit columns.
@@ -3880,6 +3882,8 @@
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
           if (f.hidden) return;              // kept in the record, not shown
+          // a UG degree is chosen under the programme structure, after semester 6
+          if (f.name === "degree_level" && CTX.key === "prog_curriculum" && !IS_PG) return;
           // standard wording is the placeholder: an empty box means "use it".
           // A draft that still holds the wording word for word shows it the
           // same way, so the department sees grey text it can type over.
