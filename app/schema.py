@@ -440,7 +440,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "semester_structure",
             "title": "Programme structure — semester scheme",
-            "help": "One row per course, semester by semester. After semester 6, choose below whether the programme ends as a 3-year degree or goes on to 4-year Honours or 4-year Honours with Research.",
+            "help": "One row per course, semester by semester. Choose the programme type above: a 3-year UG runs for 6 semesters; a 4-year UG (Honours, or Honours with Research) adds semesters 7 and 8.",
             "type": "table",
             "min_rows": 1,
             "columns": [

@@ -1530,22 +1530,37 @@
   // A UG programme: semesters 1–6 are the 3-year degree; after semester 6 it
   // ends there, or goes on to 4-year Honours or Honours with Research.
   function renderAfterSix(block) {
-    const opts = [["UG - 3 Year", "End at 3 years", "6 semesters"],
-                  ["UG - 4 Year (Honours)", "4-year Honours", "Semesters 7 and 8"],
-                  ["UG - 4 Year (Honours with Research)", "4-year Honours with Research", "Semesters 7 and 8"]];
+    const opts = [["UG - 3 Year", "3-Year UG", "6 semesters"],
+                  ["UG - 4 Year (Honours)", "4-Year UG (Honours)", "8 semesters"],
+                  ["UG - 4 Year (Honours with Research)", "4-Year UG (Honours with Research)", "8 semesters"]];
     state.details = state.details || {};
     const cur = state.details.degree_level;
-    const bar = el("div", "after-six");
-    bar.appendChild(el("strong", "after-six-h", "After semester 6"));
-    const row = el("div", "after-six-opts");
+    const bar = el("div", "deg-pick" + (opts.some(o => o[0] === cur) ? " has-pick" : ""));
+    const lab = el("span", "deg-pick-l", "Programme type");
+    lab.id = "deg-pick-l";
+    bar.appendChild(lab);
+    const row = el("div", "deg-pick-opts");
+    row.setAttribute("role", "radiogroup");
+    row.setAttribute("aria-labelledby", "deg-pick-l");
     opts.forEach(([val, label, sub]) => {
-      const b = el("button", "after-six-opt" + (cur === val ? " is-on" : ""));
+      const on = cur === val;
+      const b = el("button", "deg-pick-opt" + (on ? " is-on" : ""));
       b.type = "button";
-      b.appendChild(el("span", null, label));
-      b.appendChild(el("small", null, sub));
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", on ? "true" : "false");
+      b.appendChild(el("span", "deg-pick-dot"));
+      const txt = el("span", "deg-pick-t");
+      txt.appendChild(el("strong", null, label));
+      txt.appendChild(el("small", null, sub));
+      b.appendChild(txt);
       b.disabled = !!CTX.readonly;
       b.addEventListener("click", () => {
-        if (cur === val) return;
+        if (on) return;
+        row.querySelectorAll(".deg-pick-opt").forEach(x => {
+          x.classList.toggle("is-on", x === b);
+          x.setAttribute("aria-checked", x === b ? "true" : "false");
+        });
+        bar.classList.add("has-pick");
         state.details.degree_level = val;
         dirty = true;
         reloadAfterSave = true;
@@ -1555,9 +1570,10 @@
       row.appendChild(b);
     });
     bar.appendChild(row);
-    // straight under the table and its "+ Add row"
-    const tot = block.querySelector(".rt-totals");
-    if (tot) block.insertBefore(bar, tot); else block.appendChild(bar);
+    // at the top of the section, straight under its title
+    const help = block.querySelector(".section-help");
+    const first = help || block.querySelector(".rt-wrap");
+    if (first) block.insertBefore(bar, first); else block.appendChild(bar);
   }
 
   // Running totals under any table with credit columns.

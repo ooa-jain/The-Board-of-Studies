@@ -4818,28 +4818,46 @@ html[data-theme="dark"] .pmap-twig.is-submitted {
   background: #15311d;
   color: #88ddb1;
 }
-html[data-theme="dark"] .after-six {
+html[data-theme="dark"] .deg-pick-l {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .deg-pick-opts {
   border: 1px solid #2e3542;
   background: #181b21;
 }
-html[data-theme="dark"] .after-six-h {
+html[data-theme="dark"] .deg-pick-opt {
+  border: 0;
+  background: transparent;
   color: #ced8e6;
 }
-html[data-theme="dark"] .after-six-opt {
-  border: 1px solid #2e3542;
-  background: #121519;
-  color: #ced8e6;
+html[data-theme="dark"] .deg-pick-t strong {
+  color: inherit;
 }
-html[data-theme="dark"] .after-six-opt small {
+html[data-theme="dark"] .deg-pick-t small {
   color: #aab2c1;
 }
-html[data-theme="dark"] .after-six-opt:hover:not(:disabled) {
-  border-color: #2563eb;
+html[data-theme="dark"] .deg-pick-dot {
+  border: 2px solid #556076;
+  background: #121519;
 }
-html[data-theme="dark"] .after-six-opt.is-on {
-  border-color: #2563eb;
-  background: #161d29;
-  box-shadow: inset 0 0 0 1px #2563eb;
+html[data-theme="dark"] .deg-pick-opt:not(.is-on):hover:not(:disabled) {
+  background: #121519;
+}
+html[data-theme="dark"] .deg-pick-opt:focus-visible {
+  outline: 2px solid #2563eb;
+}
+html[data-theme="dark"] .deg-pick-opt.is-on {
+  background: #2962ae;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 36, 64, 0.22);
+}
+html[data-theme="dark"] .deg-pick-opt.is-on small {
+  color: rgba(255, 255, 255, 0.75);
+}
+html[data-theme="dark"] .deg-pick-opt.is-on .deg-pick-dot {
+  border-color: #242932;
+  background: #121519;
+  box-shadow: inset 0 0 0 3px #0f2440;
 }
 
 /* ---- erp.css ---- */
