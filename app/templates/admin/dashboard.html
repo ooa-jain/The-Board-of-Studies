@@ -57,7 +57,6 @@
       <a class="btn btn-gold ad-analysis" href="{{ url_for('admin.analysis_report') }}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
         Analysis</a>
-      {% if can('overview') %}<a class="btn btn-ghost" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>{% endif %}
     </div>
   </header>
 
@@ -135,7 +134,6 @@
               <th class="ad-col-bar">Progress</th>
               <th class="c">Programmes</th>
               <th>Status</th>
-              <th></th>
             </tr></thead>
             <tbody>
             {% for r in rows %}
@@ -148,10 +146,9 @@
                   <small>{{ r.done }}/{{ r.total }} stages</small></td>
                 <td class="c ad-td-prog" data-label="Programmes">{{ r.prog_done }}/{{ r.programmes|length }}</td>
                 <td class="ad-td-state"><span class="ad-state s-{{ r.state }}">{{ r.label }}</span></td>
-                <td class="act"><a class="btn btn-sm btn-ghost" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">Open</a></td>
               </tr>
             {% else %}
-              <tr><td colspan="6" class="muted">No departments yet.{% if can('departments', 'edit') %} <a href="{{ url_for('admin.import_departments') }}">Import them</a>.{% endif %}</td></tr>
+              <tr><td colspan="5" class="muted">No departments yet.{% if can('departments', 'edit') %} <a href="{{ url_for('admin.import_departments') }}">Import them</a>.{% endif %}</td></tr>
             {% endfor %}
             </tbody>
           </table>
@@ -209,10 +206,6 @@
         </ul>
       </section>
 
-      <div class="ad-more">
-        {% if can('departments', 'edit') %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.import_departments') }}">Import departments</a>{% endif %}
-        {% if can('flow') %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.flow') }}">Data Flow</a>{% endif %}
-      </div>
     </aside>
   </div>
 </div>

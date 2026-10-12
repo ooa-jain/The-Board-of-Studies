@@ -1,6 +1,6 @@
 /* Settings › Team & access › Add a person / Edit access.
 
-   A preset fills the section table; touching the table makes it Custom.
+   A ready set (Viewer, Reviewer …) is all most people need; Custom opens the section table.
    Full admin hides the table and the departments (they see everything).
    The department list filters as you type; a whole city, school or campus marks
    the departments it already takes in. */
@@ -25,7 +25,8 @@
   // ---- presets and the section table
   function applyPreset(radio) {
     const full = radio.value === "full";
-    if (matrix) matrix.hidden = full;
+    // the section-by-section table is for Custom only; a ready set is enough otherwise
+    if (matrix) matrix.hidden = radio.value !== "custom";
     if (fullNote) fullNote.hidden = !full;
     if (scopeCard) scopeCard.hidden = full;
     if (radio.value === "custom" || full) return;

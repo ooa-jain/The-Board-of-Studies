@@ -9,9 +9,10 @@
       <h1>Updates from departments</h1>
       <p>Every change a department makes — what it changed, field by field — as it happens.
          New ones also pop up on any admin page and go to your
-         <a href="{{ url_for('admin.connectors') }}">connectors</a>.</p>
+         {% if can('settings') %}<a href="{{ url_for('admin.connectors') }}">connectors</a>{% else %}connectors{% endif %}.</p>
     </div>
     <div class="spacer head-aside">
+      {% if can('calendar') %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.calendar') }}">Month view</a>{% endif %}
       {% if can('updates', 'edit') %}
       <form method="post" action="{{ url_for('admin.updates_read') }}">
         <button class="btn btn-ghost btn-sm" {% if not unread %}disabled{% endif %}>Mark all {{ unread }} as read</button>

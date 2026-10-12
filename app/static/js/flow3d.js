@@ -23,8 +23,10 @@
   const deptSel = document.getElementById("flow-dept");
   const progSel = document.getElementById("flow-prog");
   const info = document.getElementById("flow-info");
-  const list = document.getElementById("flow-list");
-  const count = document.getElementById("flow-n");
+  // the tree and the table name every flow; the old side list is gone, so
+  // these are kept off-page
+  const list = document.getElementById("flow-list") || document.createElement("ol");
+  const count = document.getElementById("flow-n") || document.createElement("span");
   const mapBody = document.getElementById("map-body");
   const mapFor = document.getElementById("map-for");
   const xlsx = document.getElementById("map-xlsx");

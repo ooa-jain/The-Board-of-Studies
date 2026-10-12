@@ -62,7 +62,10 @@ def _values(member=None, form=None):
         sc = member.get("scope") or {}
         return {"name": member.get("name", ""), "email": member["username"], "preset": preset,
                 "sections": secs, "delete": bool(acc.get("delete")), "pw_mode": "generate",
-                "scope": "all" if sc.get("all", True) else "selected", "codes": set(sc.get("codes") or []),
+                "scope": ("all" if sc.get("all", True)
+                          else f"place:{sc['places'][0]}" if len(sc.get("places") or []) == 1
+                          and not (sc.get("codes") or sc.get("schools") or sc.get("campuses"))
+                          else "selected"), "codes": set(sc.get("codes") or []),
                 "schools": set(sc.get("schools") or []), "campuses": set(sc.get("campuses") or []),
                 "places": set(sc.get("places") or [])}
     viewer = PRESETS["viewer"]
@@ -91,20 +94,32 @@ def _read_form(f, editing=None):
     if not name:
         return None, "Give the person's name, as it should show in the menu and the audit log."
     full = f.get("preset") == "full"
-    sections = {k: (f.get("sec_" + k) if f.get("sec_" + k) in ("none", "view", "edit") else "none")
-                for k in SECTION_KEYS}
+    preset = PRESETS.get(f.get("preset")) if f.get("preset") not in ("full", "custom") else None
+    if preset:
+        sections = {k: preset["sections"].get(k) or "none" for k in SECTION_KEYS}
+    else:
+        sections = {k: (f.get("sec_" + k) if f.get("sec_" + k) in ("none", "view", "edit") else "none")
+                    for k in SECTION_KEYS}
     if not full and all(v == "none" for v in sections.values()):
         return None, "Give at least one section View or Edit — otherwise there is nothing they can open."
-    every = f.get("scope") != "selected"
-    scope = {"all": every,
-             "codes": [] if every else sorted(set(f.getlist("codes"))),
-             "schools": [] if every else sorted(set(f.getlist("schools"))),
-             "campuses": [] if every else sorted(set(f.getlist("campuses"))),
-             "places": [] if every else [pl for pl in current_app.config["PLACES"] if pl in f.getlist("places")]}
+    choice = f.get("scope") or "all"
+    city = choice[6:] if choice.startswith("place:") else None
+    if city in current_app.config["PLACES"]:
+        # Bangalore only / Kochi only: every department there, and any added later
+        every = False
+        scope = {"all": False, "codes": [], "schools": [], "campuses": [], "places": [city]}
+    else:
+        every = choice != "selected"
+        scope = {"all": every,
+                 "codes": [] if every else sorted(set(f.getlist("codes"))),
+                 "schools": [] if every else sorted(set(f.getlist("schools"))),
+                 "campuses": [] if every else sorted(set(f.getlist("campuses"))),
+                 "places": []}
     if not full and not every and not (scope["codes"] or scope["schools"] or scope["campuses"] or scope["places"]):
         return None, "Choose the departments they may see — or choose “All departments”."
+    delete = bool(preset["delete"]) if preset else f.get("delete") == "on"
     rec = {"name": name, "full": full,
-           "access": {"sections": sections, "delete": f.get("delete") == "on"},
+           "access": {"sections": sections, "delete": delete},
            "scope": scope, "updated_at": now(), "updated_by": _actor()}
     if not editing:
         rec["username"] = email

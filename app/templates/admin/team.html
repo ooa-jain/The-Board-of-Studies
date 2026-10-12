@@ -37,13 +37,6 @@
         </div>
         <div class="small muted mono">{{ u.username }}</div>
         <div class="tm-what">{{ u.summary }}</div>
-        {% if not full %}
-        <div class="tm-secs">
-          {% for k, label, _ in sections %}{% set lv = ((u.access or {}).sections or {}).get(k) or 'none' %}{% if lv != 'none' %}
-          <span class="tm-sec is-{{ lv }}">{{ label }} · {{ seen[lv] }}</span>{% endif %}{% endfor %}
-          {% if (u.access or {}).delete %}<span class="tm-sec is-delete">Can delete</span>{% endif %}
-        </div>
-        {% endif %}
         <div class="small muted">Last signed in: {{ u.last_login.strftime('%d %b %Y, %H:%M') if u.last_login else 'never' }}</div>
       </div>
       {% if u.team %}

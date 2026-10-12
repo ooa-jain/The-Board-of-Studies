@@ -256,7 +256,7 @@ PRE_BOS = {
         {
             "key": "pre_bos_files",
             "title": "Signed composition documents",
-            "help": "Fill the templates, sign them and upload them.",
+            "help": "Please fill in and upload the DIAC, DPAC, and Pre-BoS templates in the respective sections.",
             "type": "fields",
             "fields": [
                 {"name": "diac_signed",
@@ -291,7 +291,7 @@ BOS_DOCUMENTS = {
     "key": "bos_documents",
     "group": "Stage 2 · BoS Documents",
     "title": "BoS Documents",
-    "blurb": "The date of the Board of Studies meeting and its documents.",
+    "blurb": "",
     "sections": [
         {
             "key": "meeting",

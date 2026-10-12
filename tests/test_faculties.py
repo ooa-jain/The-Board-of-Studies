@@ -98,7 +98,7 @@ def test_the_place_in_the_top_bar_changes_every_page(app, client):
     assert r.status_code == 302 and r.location.endswith("/admin/")
     home = client.get("/admin/").get_data(as_text=True)
     assert "Department of Law" in home and "Department of Commerce" not in home
-    assert "Board of Studies | 2027–28 · Kochi" in home
+    assert 'aria-current="true">Kochi</a>' in home
     assert "Department of Commerce" not in client.get("/admin/submissions").get_data(as_text=True)
     page = client.get("/admin/faculties").get_data(as_text=True)
     assert "Faculty of Law" in page and "Faculty of Arts" not in page

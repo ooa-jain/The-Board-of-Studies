@@ -101,19 +101,9 @@
 {% endfor %}
 {% endif %}
 
-{# Two levels: the city first, because most of the time that is the whole
-   question, and then the campus within it. Choosing a city narrows the
-   campus row to the campuses that city actually has. #}
+{# the city is chosen in the top bar; the campus narrows within it #}
 <div class="filter-bar">
-  <nav class="place-toggle" aria-label="Filter by city">
-    <a href="{{ url_for('admin.departments', place='', q=filters.q or None, school=filters.school or None) }}"
-       {% if not filters.place %}aria-current="true"{% endif %}>All</a>
-    {% for pl in places %}
-    <a href="{{ url_for('admin.departments', place=pl, q=filters.q or None, school=filters.school or None) }}"
-       {% if filters.place == pl %}aria-current="true"{% endif %}>{{ pl }}</a>
-    {% endfor %}
-  </nav>
-  <span class="spacer small muted">
+  <span class="small muted">
     {{ departments|length }} shown{% if departments|length != total %} of {{ total }}{% endif %}
   </span>
 </div>

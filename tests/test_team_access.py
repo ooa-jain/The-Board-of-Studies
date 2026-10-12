@@ -237,11 +237,11 @@ def test_a_whole_city_is_one_choice_and_the_switch_keeps_to_it(app, client):
         get_db().departments.update_one({"dept_code": "KOC"}, {"$set": {"place": "Kochi"}})
     _admin(app, client)
     form = client.get("/admin/team/new").get_data(as_text=True)
-    assert 'name="places" value="Kochi"' in form and "Whole city" in form
+    assert 'value="place:Kochi"' in form and "Kochi only" in form
     from werkzeug.datastructures import MultiDict
     from app.access import PRESETS, SECTION_KEYS
     data = MultiDict([("name", "Kochi Desk"), ("email", "kochi@jainuniversity.ac.in"), ("preset", "reviewer"),
-                      ("scope", "selected"), ("pw_mode", "type"), ("password", "KochiDesk2026!"), ("places", "Kochi")]
+                      ("scope", "place:Kochi"), ("pw_mode", "type"), ("password", "KochiDesk2026!")]
                      + [("sec_" + k, PRESETS["reviewer"]["sections"].get(k) or "none") for k in SECTION_KEYS])
     r = client.post("/admin/team/new", data=data)
     assert r.status_code == 302

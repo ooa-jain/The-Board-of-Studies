@@ -34,8 +34,8 @@ def test_the_analysis_says_what_the_numbers_mean(app, client):
     assert "2 departments have filed nothing yet" in page
     for words in ("Stage by stage", "Programmes", "By campus", "By school", "Departments, ranked"):
         assert words in page, words
-    # the overview tabs offer it too
-    assert "Analysis in one click" in client.get("/admin/submissions").get_data(as_text=True)
+    # one way in: from Home, not repeated on every Overview tab
+    assert "Analysis in one click" not in client.get("/admin/submissions").get_data(as_text=True)
 
 
 def test_the_sign_in_page_is_light_with_the_scene_as_its_picture(app, client):
@@ -137,3 +137,19 @@ def test_motion_plays_the_year_from_the_same_numbers(app, client):
     assert data["stages"][0]["done"] == 1 and data["findings"]
     # the same words, as text, for anyone who cannot watch it
     assert "Everything the animation says, as text" in page
+
+
+def test_each_thing_has_one_place_in_the_menu(app, client):
+    """Documents and Comments are Overview tabs, Calendar opens from Updates,
+    and the Excel download lives on Overview only."""
+    _admin(app, client)
+    home = client.get("/admin/").get_data(as_text=True)
+    side = home.split('class="side-nav"')[1].split("</nav>")[0]
+    for gone in ('title="Documents"', 'title="Comments"', 'title="Calendar"'):
+        assert gone not in side, gone
+    assert 'title="Overview"' in side and 'title="Change Password"' in side
+    assert "/admin/sheets.xlsx" not in home
+    overview = client.get("/admin/submissions").get_data(as_text=True)
+    assert "/admin/sheets.xlsx" in overview and ">Documents<" in overview and ">Comments<" in overview
+    assert "/admin/calendar" in client.get("/admin/updates").get_data(as_text=True)
+    assert client.get("/admin/calendar").status_code == 200
