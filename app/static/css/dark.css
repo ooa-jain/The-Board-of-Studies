@@ -6103,6 +6103,58 @@ html[data-theme="dark"] .dp-vers li:first-child {
 html[data-theme="dark"] .dp-changes {
   color: #bbc3d5;
 }
+html[data-theme="dark"] .od-ico {
+  border: 1px solid #373e4c;
+  background: #121519;
+  color: #acc7ec;
+}
+html[data-theme="dark"] .od-ico svg {
+  fill: none;
+  stroke: currentColor;
+}
+html[data-theme="dark"] .od-ico:hover,
+html[data-theme="dark"] .od-dl[open] > .od-ico {
+  border-color: #2563eb;
+  color: #608df0;
+}
+html[data-theme="dark"] .od-dl-menu {
+  border: 1px solid #2e3542;
+  background: #121519;
+  box-shadow: 0 14px 28px -12px rgba(16, 24, 40, 0.35);
+}
+html[data-theme="dark"] .od-dl-h {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .od-dl-menu a {
+  color: #acc7ec;
+  text-decoration: none;
+}
+html[data-theme="dark"] .od-dl-menu a:hover {
+  background: #0e1a2a;
+  color: #a6baf2;
+}
+html[data-theme="dark"] .dp-dot-btn {
+  border: 0;
+  background: none;
+}
+html[data-theme="dark"] .dp-dot-when {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .dp-danger {
+  border-color: #52302c;
+}
+html[data-theme="dark"] .dp-danger .panel-head {
+  background: #2a100e;
+}
+html[data-theme="dark"] .dp-danger-body form {
+  border-top: 1px solid #4a2c28;
+}
+html[data-theme="dark"] .dp-danger-body form:first-child {
+  border-top: 0;
+}
+html[data-theme="dark"] .dp-danger-body input[name=confirm] {
+  border: 1px solid #373e4c;
+}
 
 /* ---- admin.css ---- */
 html[data-theme="dark"] .ad {

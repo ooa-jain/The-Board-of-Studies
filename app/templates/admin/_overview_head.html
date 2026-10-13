@@ -2,10 +2,6 @@
    Documents, Comments — one header, one row of tabs, one Excel download. #}
 {% set ov_tabs = [
   ('departments', 'Departments', url_for('admin.overview_departments'), 'overview'),
-  ('monitor', 'Monitor', url_for('admin.submissions'), 'overview'),
-  ('faculties', 'Faculties', url_for('admin.faculties'), 'overview'),
-  ('analysis', 'Analysis', url_for('admin.analysis'), 'overview'),
-  ('programmes', 'Programmes', url_for('admin.sheets', tab='programmes'), 'overview'),
   ('documents', 'Documents', url_for('admin.sheets', tab='documents'), 'documents'),
   ('comments', 'Comments', url_for('admin.sheets', tab='comments'), 'comments'),
 ] %}

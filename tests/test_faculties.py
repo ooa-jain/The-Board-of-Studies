@@ -29,9 +29,9 @@ def test_faculties_then_schools_then_departments(app, client):
     client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK)
     client.get("/logout")
     _admin(app, client)
-    # the tab sits next to Monitor
-    monitor = client.get("/admin/submissions").get_data(as_text=True)
-    assert monitor.index(">Monitor<") < monitor.index(">Faculties<") < monitor.index(">Analysis<")
+    # Overview's tabs are Departments first; Monitor, Faculties and Analysis are no longer tabs
+    head = client.get("/admin/overview/departments").get_data(as_text=True)
+    assert ">Departments</a>" in head and ">Monitor</a>" not in head and ">Faculties</a>" not in head
 
     page = client.get("/admin/faculties").get_data(as_text=True)
     assert "Faculty of Arts" in page and "Faculty of Law" in page and "2 faculties" in page

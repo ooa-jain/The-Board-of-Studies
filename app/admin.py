@@ -834,6 +834,9 @@ def overview_departments():
                      "programmes": progs.get(code, [0, 0]),
                      "submitted_at": max(sent) if done == total and sent else None,
                      "updated_at": sub.get("updated_at")})
+    upd = _unread_updates()
+    for r in rows:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
     return render_template("admin/overview_departments.html", rows=rows, year=_year())
 
 
@@ -886,7 +889,10 @@ def department_page(dept_code):
         before[k] = v.get("data")
         v["title"] = STAGE_BY_KEY.get(v["stage"], {}).get("title", v["stage"])
     last = rows[0] if rows else None
+    updates = _unread_updates([dept_code]).get(dept_code)
+    comments = db.comments.count_documents({"dept_code": dept_code, "academic_year": year, "status": "open"})
     return render_template("admin/department_page.html", dept=dept, submission=sub, board=board,
+                           updates=updates, open_comments=comments,
                            done=done, complete=complete,
                            submitted_at=max(x for x in sent if x) if complete else None,
                            updated_at=sub.get("updated_at"), last=last,
@@ -1376,6 +1382,22 @@ def export_department(dept_code):
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+@bp.route("/export/<dept_code>.zip")
+@admin_required
+def export_department_both(dept_code):
+    """The department's Excel and Word report together, in one ZIP."""
+    import zipfile
+    get_db().departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = _year()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"BoS-{dept_code}-{year}.xlsx", department_excel(dept_code, year, ShareLinks(dept_code, year)).getvalue())
+        z.writestr(f"BoS-Report-{dept_code}-{year}.docx", submission_word(dept_code, year, ShareLinks(dept_code, year)).getvalue())
+    buf.seek(0)
+    audit(_actor(), "export.department", dept_code, {"kind": "both"})
+    return send_file(buf, as_attachment=True, download_name=f"BoS-{dept_code}-{year}.zip", mimetype="application/zip")
+
+
 @bp.route("/report/<dept_code>/<programme_code>")
 @admin_required
 def programme_report(dept_code, programme_code):
@@ -1422,7 +1444,7 @@ def wipe_department(dept_code):
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
         flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
-        return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+        return redirect(_back_to(dept_code))
     counts = {}
     for col in ("submissions", "files", "comments", "notifications", "versions"):
         counts[col] = db[col].delete_many({"dept_code": dept_code}).deleted_count
@@ -1434,7 +1456,39 @@ def wipe_department(dept_code):
     audit(_actor(), "department.wiped", dept_code, counts)
     flash(f"All of {dept['dept_name']}'s data is deleted: {counts['submissions']} record(s), "
           f"{counts['files']} file(s). The department and its login are kept.", "success")
-    return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+    return redirect(_back_to(dept_code))
+
+
+def _back_to(dept_code):
+    """Back to the department page it was asked from (More), else the full detail."""
+    if request.form.get("back") == "page":
+        return url_for("admin.department_page", dept_code=dept_code)
+    return url_for("admin.submission_detail", dept_code=dept_code)
+
+
+@bp.post("/departments/<dept_code>/delete")
+@admin_required
+def department_delete(dept_code):
+    """Remove the department itself: its record, its login, and everything it
+    entered and uploaded. Asks for the code to be typed."""
+    import shutil
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
+        flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
+        return redirect(_back_to(dept_code))
+    counts = {col: db[col].delete_many({"dept_code": dept_code}).deleted_count
+              for col in ("submissions", "files", "comments", "notifications", "versions")}
+    counts["logins"] = db.users.delete_many({"dept_code": dept_code, "role": "department"}).deleted_count
+    db.departments.delete_one({"_id": dept["_id"]})
+    root = current_app.config["UPLOAD_ROOT"]
+    for year_dir in (root.iterdir() if root.is_dir() else []):
+        folder = year_dir / dept_code
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+    audit(_actor(), "department.deleted", dept_code, counts)
+    flash(f"{dept['dept_name']} is deleted, with its login and all its data.", "success")
+    return redirect(url_for("admin.overview_departments"))
 
 
 @bp.route("/report/<dept_code>/<programme_code>/<kind>.docx")

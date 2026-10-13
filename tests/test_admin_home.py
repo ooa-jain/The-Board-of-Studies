@@ -169,5 +169,30 @@ def test_overview_departments_lists_each_and_more_opens_its_page(app, client):
     assert 'href="/admin/overview/departments/COM"' in page and "/admin/export/COM.xlsx" in page
     more = client.get("/admin/overview/departments/COM").get_data(as_text=True)
     assert "last edited" in more and "Stages" in more and "Versions" in more
-    assert "Download report (Excel)" in more
+    assert "Download report" in more and "/admin/export/COM.zip" in more
     assert client.get("/admin/overview/departments/NOPE").status_code == 404
+
+
+def test_department_page_downloads_both_and_deletes_with_the_code_typed(app, client):
+    from app.db import get_db
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/dept_info/save", json=DEPT_INFO_OK)
+    client.get("/logout")
+    _admin(app, client)
+    r = client.get("/admin/export/COM.zip")
+    assert r.status_code == 200 and r.mimetype == "application/zip"
+    # the data goes, the department stays — and only with the code typed
+    client.post("/admin/departments/COM/wipe", data={"confirm": "nope", "back": "page"})
+    with app.app_context():
+        assert get_db().submissions.count_documents({"dept_code": "COM"}) == 1
+    r = client.post("/admin/departments/COM/wipe", data={"confirm": "COM", "back": "page"})
+    assert r.location.endswith("/admin/overview/departments/COM")
+    with app.app_context():
+        assert get_db().submissions.count_documents({"dept_code": "COM"}) == 0
+        assert get_db().departments.count_documents({"dept_code": "COM"}) == 1
+    r = client.post("/admin/departments/COM/delete", data={"confirm": "COM", "back": "page"})
+    assert r.location.endswith("/admin/overview/departments")
+    with app.app_context():
+        assert get_db().departments.count_documents({"dept_code": "COM"}) == 0
+        assert get_db().users.count_documents({"dept_code": "COM", "role": "department"}) == 0

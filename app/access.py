@@ -59,6 +59,7 @@ ENDPOINTS = {
     "pack_load": ("departments", "edit"), "demo_department": ("departments", "edit"),
     "demo_department_remove": ("departments", "delete"),
     "wipe_department": ("departments", "delete"),
+    "department_delete": ("departments", "delete"), "export_department_both": ("overview", "view"),
     "submissions": ("overview", "view"), "analysis": ("overview", "view"),
     "faculties": ("overview", "view"), "export_group": ("overview", "view"),
     "submission_detail": ("overview", "view"), "submission_review": ("overview", "view"),

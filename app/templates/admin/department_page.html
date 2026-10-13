@@ -21,8 +21,15 @@
         <span class="bar-label">{{ done }} of {{ board|length }} stages</span>
       </div>
       <div class="flex mt-1 head-aside-row">
-        <a class="btn btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Download report (Excel)</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
+        <details class="od-dl">
+          <summary class="btn btn-sm">Download report ▾</summary>
+          <div class="od-dl-menu" role="menu">
+            <span class="od-dl-h">Download as</span>
+            <a role="menuitem" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Excel</a>
+            <a role="menuitem" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
+            <a role="menuitem" href="{{ url_for('admin.export_department_both', dept_code=dept.dept_code) }}">Both (ZIP)</a>
+          </div>
+        </details>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">Full detail</a>
       </div>
     </div>
@@ -36,21 +43,31 @@
 <div class="dp-grid">
   <div class="dp-main">
     <section class="panel">
-      <div class="panel-head"><h3>Stages</h3></div>
-      <ul class="dp-stages">
-        {% for b in board %}
-        {% set has = (submission.stages or {}).get(b.key, {}).get('data') %}
-        <li class="dp-stage">
-          <span class="dp-n">{{ loop.index }}</span>
-          <div class="dp-stage-main"><strong>{{ b.title }}</strong>
-            <span class="small muted">{% if b.timing.submitted %}Submitted {{ b.timing.submitted }}{% elif b.key == 'curriculum' %}Filled programme by programme — see Programmes below{% elif b.timing.updated %}Last saved {{ b.timing.updated }}{% else %}Nothing saved yet{% endif %}</span></div>
-          <span class="od-st dp-{{ b.status }}">{{ words.get(b.status, b.status) }}</span>
-          {% if has %}<button class="btn btn-ghost btn-sm" type="button"
-             data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=b.key) }}">Review</button>
-          {% else %}<span class="dp-noreview"></span>{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
+      <div class="panel-head"><h3>Stages</h3>
+        <span class="erp-legend"><span class="lg"><i class="dot st-submitted"></i>Completed</span> <span class="lg"><i class="dot st-draft"></i>In progress</span>
+          <span class="lg"><i class="dot st-open"></i>Not started</span> <span class="lg"><i class="dot st-returned"></i>Sent back</span>
+          <span class="lg"><i class="dot st-open is-upd"></i>Updated since you last looked</span></span></div>
+      <div class="table-wrap">
+        <table class="erp-table erp-dots dp-monitor">
+          <thead><tr>{% for b in board %}<th class="c">{{ b.title }}</th>{% endfor %}<th class="c">Done</th><th class="c">Comments</th></tr></thead>
+          <tbody><tr>
+            {% for b in board %}
+            {% set fresh = updates and b.key in updates.stages %}
+            {% set has = (submission.stages or {}).get(b.key, {}).get('data') %}
+            <td class="c">
+              {% if has %}<button type="button" class="dp-dot-btn" data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=b.key) }}"
+                 title="Review {{ b.title }} — {{ words.get(b.status, b.status) }}{% if fresh %} · updated since you last looked{% endif %}">
+                <i class="dot st-{{ b.status }}{{ ' is-upd' if fresh }}"></i></button>
+              {% else %}<i class="dot st-{{ b.status }}{{ ' is-upd' if fresh }}" title="{{ b.title }} — {{ words.get(b.status, b.status) }}"></i>{% endif %}
+              <span class="dp-dot-when">{% if b.timing.submitted %}Submitted {{ b.timing.submitted }}{% elif b.key == 'curriculum' %}see programmes{% elif b.timing.updated %}Saved {{ b.timing.updated }}{% else %}—{% endif %}</span>
+            </td>
+            {% endfor %}
+            <td class="c"><strong>{{ done }}/{{ board|length }}</strong></td>
+            <td class="c">{% if open_comments %}<span class="st st-returned">{{ open_comments }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          </tr></tbody>
+        </table>
+      </div>
+      <p class="small muted dp-hint">Click a dot to review what was entered.</p>
     </section>
 
     <section class="panel">
@@ -89,6 +106,29 @@
         {% endfor %}
       </div>
     </section>
+    {% if can('departments', 'delete') %}
+    <section class="panel dp-danger">
+      <div class="panel-head"><h3>Delete</h3></div>
+      <div class="dp-danger-body">
+        <form method="post" action="{{ url_for('admin.wipe_department', dept_code=dept.dept_code) }}"
+              onsubmit="return confirm('Delete everything {{ dept.dept_name|e }} has entered and uploaded? This cannot be undone.')">
+          <input type="hidden" name="back" value="page">
+          <div><strong>Delete this department's data</strong>
+            <p class="small muted">Every stage, programme and uploaded file, in every year. The department and its login stay.</p></div>
+          <input name="confirm" placeholder="Type {{ dept.dept_code }}" required autocomplete="off" aria-label="Type the department code to confirm">
+          <button class="btn btn-danger btn-sm">Delete data</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.department_delete', dept_code=dept.dept_code) }}"
+              onsubmit="return confirm('Delete {{ dept.dept_name|e }} itself — its login and all its data? This cannot be undone.')">
+          <input type="hidden" name="back" value="page">
+          <div><strong>Delete this department</strong>
+            <p class="small muted">Removes the department from the portal, with its login and all its data.</p></div>
+          <input name="confirm" placeholder="Type {{ dept.dept_code }}" required autocomplete="off" aria-label="Type the department code to confirm">
+          <button class="btn btn-danger btn-sm">Delete department</button>
+        </form>
+      </div>
+    </section>
+    {% endif %}
   </div>
 
   <aside class="dp-side panel" aria-label="Versions">
@@ -114,4 +154,9 @@
 <script src="{{ url_for('static', filename='js/summary.js') }}"></script>
 <script src="{{ url_for('static', filename='js/review.js') }}"></script>
 <script src="{{ url_for('static', filename='js/admin-review.js') }}"></script>
+<script>
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details.od-dl[open]").forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+  });
+</script>
 {% endblock %}
