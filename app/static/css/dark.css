@@ -6062,6 +6062,21 @@ html[data-theme="dark"] .od-when {
 html[data-theme="dark"] .od-when.is-sent {
   color: #87deac;
 }
+html[data-theme="dark"] .dp-side {
+  box-shadow: -18px 0 40px -20px rgba(16, 24, 40, 0.45);
+}
+html[data-theme="dark"] .dp-ver-x {
+  border: 0;
+  background: #161d29;
+  color: #acc7ec;
+}
+html[data-theme="dark"] .dp-ver-x:hover {
+  background: #20252e;
+}
+html[data-theme="dark"] .dp-ver-n {
+  background: #2962ae;
+  color: #ffffff;
+}
 html[data-theme="dark"] .dp-stage {
   border-top: 1px solid #2a303c;
 }

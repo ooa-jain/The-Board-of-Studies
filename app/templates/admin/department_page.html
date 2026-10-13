@@ -30,6 +30,8 @@
             <a role="menuitem" href="{{ url_for('admin.export_department_both', dept_code=dept.dept_code) }}">Both (ZIP)</a>
           </div>
         </details>
+        <button class="btn btn-ghost btn-sm" type="button" id="dp-ver-open" aria-controls="dp-vers-panel" aria-expanded="false">
+          Versions{% if versions %} <span class="dp-ver-n">{{ versions|length }}</span>{% endif %}</button>
         <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">Full detail</a>
       </div>
     </div>
@@ -131,8 +133,9 @@
     {% endif %}
   </div>
 
-  <aside class="dp-side panel" aria-label="Versions">
-    <div class="panel-head"><h3>Versions <span class="muted small">last 5 days</span></h3></div>
+  <aside class="dp-side panel" id="dp-vers-panel" aria-label="Versions" hidden>
+    <div class="panel-head"><h3>Versions <span class="muted small">last 5 days</span></h3>
+      <button class="dp-ver-x" type="button" id="dp-ver-close" aria-label="Close versions">×</button></div>
     <ol class="dp-vers">
       {% for v in versions %}
       <li>
@@ -158,5 +161,20 @@
   document.addEventListener("click", function (e) {
     document.querySelectorAll("details.od-dl[open]").forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
   });
+  // Versions: shown only when asked for, sliding in from the right
+  (function () {
+    var panel = document.getElementById("dp-vers-panel"), open = document.getElementById("dp-ver-open"),
+        close = document.getElementById("dp-ver-close");
+    if (!panel || !open) return;
+    function show(on) {
+      if (on) { panel.hidden = false; requestAnimationFrame(function () { panel.classList.add("is-open"); }); }
+      else { panel.classList.remove("is-open"); setTimeout(function () { panel.hidden = true; }, 250); }
+      open.setAttribute("aria-expanded", on ? "true" : "false");
+      if (on) close.focus(); else open.focus();
+    }
+    open.addEventListener("click", function () { show(panel.hidden); });
+    close.addEventListener("click", function () { show(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) show(false); });
+  })();
 </script>
 {% endblock %}
