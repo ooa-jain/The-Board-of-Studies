@@ -145,7 +145,7 @@ DEPARTMENT_INFORMATION = {
         {
             "key": "programmes_offered",
             "title": "Programmes offered",
-            "help": "Keep the programmes you run this year, remove the rest, add any new one.",
+            "help": "Keep the programmes you run this year, remove the rest, and add a new programme at the end.",
             "type": "programme_list",
             "degrees": ["UG", "PG", "PG-1Yr", "PGD"],
             # the tabs the list is split into, by the workbook's Degree column
