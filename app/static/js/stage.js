@@ -2890,21 +2890,7 @@
     content.appendChild(facts);
     bottom.appendChild(content);
     card.appendChild(bottom);
-    // beside the card, an animated department tile (hover plays it)
-    const row = el("div", "pcard-row");
-    row.appendChild(card);
-    const tile = el("div", "dtile");
-    tile.setAttribute("aria-hidden", "true");
-    tile.innerHTML =
-      '<div class="dtile-left"><div class="dtile-card"><div class="dtile-card-line"></div><div class="dtile-dots"></div></div>' +
-      '<div class="dtile-post"><div class="dtile-post-line"></div><div class="dtile-screen"><div class="dtile-tick">✓</div></div>' +
-      '<div class="dtile-keys"></div><div class="dtile-keys2"></div></div></div>';
-    const right = el("div", "dtile-right");
-    right.appendChild(el("b", null, mono));
-    right.appendChild(el("span", null, "Department"));
-    tile.appendChild(right);
-    row.appendChild(tile);
-    block.appendChild(row);
+    block.appendChild(card);
 
     // open while the card is well in view, close as it leaves
     const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
