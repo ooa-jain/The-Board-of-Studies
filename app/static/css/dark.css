@@ -4932,49 +4932,6 @@ html[data-theme="dark"] .pmap-leaf.is-draft > .pmap-dot {
 html[data-theme="dark"] .pmap-leaf.is-returned > .pmap-dot {
   background: #c2412f;
 }
-html[data-theme="dark"] .stairs-step {
-  background: rgba(18, 21, 25, 0.94);
-  color: #acc7ec;
-  text-decoration: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-html[data-theme="dark"] .stairs-step:hover,
-html[data-theme="dark"] .stairs-step:focus-visible {
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
-  outline: none;
-}
-html[data-theme="dark"] .stairs-step b {
-  background: #2962ae;
-  color: #ffffff;
-}
-html[data-theme="dark"] .stairs-dot {
-  background: #313844;
-  box-shadow: 0 0 0 2px #121519;
-}
-html[data-theme="dark"] .stairs-step.st-submitted .stairs-dot {
-  background: #2f8a55;
-}
-html[data-theme="dark"] .stairs-step.st-submitted b {
-  background: #2f8a55;
-}
-html[data-theme="dark"] .stairs-step.st-draft .stairs-dot {
-  background: #2563eb;
-}
-html[data-theme="dark"] .stairs-step.st-returned .stairs-dot {
-  background: #c2412f;
-}
-html[data-theme="dark"] .stairs-step.is-here {
-  box-shadow: 0 0 0 2px #fbbf24, 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-html[data-theme="dark"] .stairs-step.is-here::after {
-  background: #fbbf24;
-  color: #b8c5e0;
-}
-html[data-theme="dark"] .stairs-sign:hover,
-html[data-theme="dark"] .stairs-sign:focus-visible {
-  box-shadow: 0 0 0 3px #fbbf24;
-  outline: none;
-}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
