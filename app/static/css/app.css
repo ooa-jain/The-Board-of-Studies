@@ -4867,3 +4867,9 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 @keyframes mascot-wave { 0%, 100% { transform: rotate(0); } 8% { transform: rotate(-4deg); } 16% { transform: rotate(3deg); } 24% { transform: rotate(0); } }
 @media (max-width: 600px) { .upload-mascot { width: 72px; } }
 @media (prefers-reduced-motion: reduce) { .upload-mascot { animation: none; } }
+
+/* Department Home: a dandelion of books below, swaying a little */
+.home-art { display: flex; justify-content: center; margin: 8px 0 12px; pointer-events: none; }
+.home-art img { width: min(300px, 70%); height: auto; transform-origin: 30% 100%; animation: home-sway 7s ease-in-out infinite; }
+@keyframes home-sway { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(2.5deg); } }
+@media (prefers-reduced-motion: reduce) { .home-art img { animation: none; } }
