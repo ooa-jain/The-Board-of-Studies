@@ -5,7 +5,7 @@
 <div class="page-head home-head">
   <div class="wrap">
     <div>
-      <h1>Welcome back{% if person and person.name %}, {{ person.name }}{% endif %}</h1>
+      <h1>Welcome back{% if person and person.name %}, <span class="hl hl-green">{{ person.name }}</span>{% endif %}</h1>
       <p>{{ dept.dept_name }} · Board of Studies | {{ year|ay }}</p>
     </div>
   </div>

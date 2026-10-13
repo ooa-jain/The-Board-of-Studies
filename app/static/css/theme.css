@@ -65,3 +65,23 @@ html[data-theme="dark"]:root body {
   background-size: 55px 55px;
   background-attachment: fixed;
 }
+
+/* ---- a painted brush-stroke highlight for a key word or two (after a
+   watercolour sticker): .hl, in peach, teal, yellow or green ---- */
+.hl { display: inline-block; padding: .06em .45em .1em; margin: 0 -.05em; line-height: 1.15; color: #1f2937;
+  background-repeat: no-repeat; background-position: center; background-size: 100% 100%; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.hl, .hl-peach { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%2040'%20preserveAspectRatio='none'%3E%3Cpath%20fill='%23e9ad91'%20d='M5%209C40%204%2090%207%20128%205C158%204%20182%203%20196%207L191%2013L198%2019L190%2025L197%2031C160%2037%20112%2034%2072%2036C42%2037%2020%2036%206%2034L11%2028L2%2022L9%2016Z'/%3E%3Cpath%20fill='none'%20stroke='%23fff'%20stroke-opacity='.28'%20stroke-width='1.6'%20d='M14%2014C60%2011%20120%2012%20182%2011M20%2024C80%2022%20130%2024%20186%2023M30%2030C90%2029%20140%2031%20176%2029'/%3E%3C/svg%3E"); }
+.hl-teal { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%2040'%20preserveAspectRatio='none'%3E%3Cpath%20fill='%2393bcc2'%20d='M5%209C40%204%2090%207%20128%205C158%204%20182%203%20196%207L191%2013L198%2019L190%2025L197%2031C160%2037%20112%2034%2072%2036C42%2037%2020%2036%206%2034L11%2028L2%2022L9%2016Z'/%3E%3Cpath%20fill='none'%20stroke='%23fff'%20stroke-opacity='.28'%20stroke-width='1.6'%20d='M14%2014C60%2011%20120%2012%20182%2011M20%2024C80%2022%20130%2024%20186%2023M30%2030C90%2029%20140%2031%20176%2029'/%3E%3C/svg%3E"); }
+.hl-yellow { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%2040'%20preserveAspectRatio='none'%3E%3Cpath%20fill='%23f2cd73'%20d='M5%209C40%204%2090%207%20128%205C158%204%20182%203%20196%207L191%2013L198%2019L190%2025L197%2031C160%2037%20112%2034%2072%2036C42%2037%2020%2036%206%2034L11%2028L2%2022L9%2016Z'/%3E%3Cpath%20fill='none'%20stroke='%23fff'%20stroke-opacity='.28'%20stroke-width='1.6'%20d='M14%2014C60%2011%20120%2012%20182%2011M20%2024C80%2022%20130%2024%20186%2023M30%2030C90%2029%20140%2031%20176%2029'/%3E%3C/svg%3E"); }
+.hl-green { background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%2040'%20preserveAspectRatio='none'%3E%3Cpath%20fill='%23a3d3aa'%20d='M5%209C40%204%2090%207%20128%205C158%204%20182%203%20196%207L191%2013L198%2019L190%2025L197%2031C160%2037%20112%2034%2072%2036C42%2037%2020%2036%206%2034L11%2028L2%2022L9%2016Z'/%3E%3Cpath%20fill='none'%20stroke='%23fff'%20stroke-opacity='.28'%20stroke-width='1.6'%20d='M14%2014C60%2011%20120%2012%20182%2011M20%2024C80%2022%20130%2024%20186%2023M30%2030C90%2029%20140%2031%20176%2029'/%3E%3C/svg%3E"); }
+html[data-theme="dark"] .hl { color: #111827; }
+
+/* ---- the light / dark switch as two pictures: day (ON) and night (OFF) ---- */
+.tt-pic { position: relative; display: block; width: 72px; height: 32px; }
+.tt-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+  transition: opacity .35s ease, transform .45s cubic-bezier(.65, 0, .35, 1); }
+.tt-night { opacity: 0; transform: translateX(6px); }
+.theme-toggle[aria-pressed="true"] .tt-day { opacity: 0; transform: translateX(-6px); }
+.theme-toggle[aria-pressed="true"] .tt-night { opacity: 1; transform: none; }
+.theme-toggle:hover .tt-pic img { filter: drop-shadow(0 2px 4px rgba(15, 36, 64, .25)); }
+@media (prefers-reduced-motion: reduce) { .tt-pic img { transition: none; } }
