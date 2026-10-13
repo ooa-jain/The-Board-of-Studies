@@ -4859,3 +4859,31 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 .pmap-leaf.is-draft > .pmap-dot { background: #2563eb; }
 .pmap-leaf.is-returned > .pmap-dot { background: #c2412f; }
 @media (prefers-reduced-motion: reduce) { .pmap-branch, .pmap-fork path, .pmap-leaf, .pmap-chev, .pflow-art { transition: none; animation: none; } }
+
+/* Department Home: the four stages as a staircase, a stage on each level */
+.stairs { margin: 6px 0 18px; display: flex; justify-content: center; }
+.stairs-art { position: relative; width: 100%; max-width: 640px; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line), 0 18px 34px -26px rgba(15, 36, 64, .45); }
+.stairs-art img { display: block; width: 100%; height: auto; }
+.stairs-step { position: absolute; display: inline-flex; align-items: center; gap: 6px; max-width: 13.2%;
+  padding: 4px 8px; border-radius: 8px; background: rgba(255, 255, 255, .94); color: #0f2440; text-decoration: none;
+  font-size: clamp(9px, 1.35vw, 12.5px); line-height: 1.15; font-weight: 600; box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+  transition: transform .2s ease, box-shadow .2s ease; }
+.stairs-step.is-ground { max-width: 32%; white-space: nowrap; }
+.stairs-step.is-short { max-width: none; white-space: nowrap; }
+.stairs-step.is-top { max-width: 34%; font-size: clamp(10px, 1.6vw, 15px); }
+.stairs-step:hover, .stairs-step:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0, 0, 0, .3); outline: none; }
+.stairs-step b { flex: none; display: grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 50%;
+  background: #0f2440; color: #fff; font-size: .9em; }
+.stairs-dot { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: #c7ccd4;
+  box-shadow: 0 0 0 2px #fff; }
+.stairs-step.st-submitted .stairs-dot { background: #2f8a55; }
+.stairs-step.st-submitted b { background: #2f8a55; }
+.stairs-step.st-draft .stairs-dot { background: #2563eb; }
+.stairs-step.st-returned .stairs-dot { background: #c2412f; }
+.stairs-step.is-here { box-shadow: 0 0 0 2px #fbbf24, 0 4px 12px rgba(0, 0, 0, .3); }
+.stairs-step.is-here::after { content: "You are here"; position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+  white-space: nowrap; padding: 2px 8px; border-radius: 999px; background: #fbbf24; color: #111827; font-size: 10px; font-weight: 700; }
+.stairs-sign { position: absolute; left: 58%; top: 3%; width: 40%; height: 19%; border-radius: 6px; }
+.stairs-sign:hover, .stairs-sign:focus-visible { box-shadow: 0 0 0 3px #fbbf24; outline: none; }
+@media (prefers-reduced-motion: reduce) { .stairs-step { transition: none; } }

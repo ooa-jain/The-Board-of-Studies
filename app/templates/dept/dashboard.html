@@ -81,6 +81,26 @@
   <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.progress_page') }}">See all stages &amp; progress →</a>
 </div>
 
+{# the four stages as a staircase, one stage on each level, from the
+   ground up; each label opens its stage, the sign the next step #}
+{% set spots = [('2%', '91.2%', 'is-ground'), ('35.9%', '81.6%', 'is-short'), ('48.8%', '68.9%', 'is-short'), ('63%', '57%', 'is-top')] %}
+{% set ns = namespace(here=None) %}
+{% for s in board %}{% if ns.here is none and s.status != 'submitted' %}{% set ns.here = s.key %}{% endif %}{% endfor %}
+<section class="stairs" aria-label="The four stages, step by step">
+  <div class="stairs-art">
+    <img src="{{ url_for('static', filename='img/next-step.jpg') }}" alt="" width="736" height="566" loading="lazy">
+    {% for s in board[:4] %}
+    {% set sp = spots[loop.index0] %}
+    <a class="stairs-step st-{{ s.status }} {{ sp[2] }}{{ ' is-here' if s.key == ns.here }}" style="left:{{ sp[0] }};top:{{ sp[1] }}"
+       href="{{ url_for('dept.stage', stage_key=s.key) }}"
+       title="{{ s.title }} — {{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started'}.get(s.status, s.status) }}">
+      <b>{{ loop.index }}</b><span>{{ s.title }}</span><i class="stairs-dot"></i>
+    </a>
+    {% endfor %}
+    <a class="stairs-sign" href="{{ resume.url if resume else url_for('dept.progress_page') }}" aria-label="Next step{{ ': ' ~ resume.title if resume }}"></a>
+  </div>
+</section>
+
 {% if open_comments %}
 <div class="office-comment">
   <div class="oc-head"><span class="oc-icon">💬</span><strong>{{ open_comments|length }} comment{{ 's' if open_comments|length != 1 }} from the Office of Academic Affairs</strong></div>
