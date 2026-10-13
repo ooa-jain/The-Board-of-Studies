@@ -114,11 +114,11 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     {# each person sees only the sections their access gives them #}
     {% if can('home') %}{{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}{% endif %}
-    {% if can('departments') %}{{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep) }}{% endif %}
+    {% if can('departments') %}{{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep and ep not in ('admin.department_page', 'admin.overview_departments')) }}{% endif %}
     {# Documents and Comments are Overview tabs; Calendar opens from Updates #}
     {% if can('overview') or can('documents') or can('comments') %}
-    {% set ov_href = url_for('admin.submissions') if can('overview') else url_for('admin.sheets', tab='documents' if can('documents') else 'comments') %}
-    {{ side_link(ov_href, 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.submissions', 'admin.faculties', 'admin.analysis', 'admin.sheets', 'admin.submission_detail', 'admin.programme_report')) }}{% endif %}
+    {% set ov_href = url_for('admin.overview_departments') if can('overview') else url_for('admin.sheets', tab='documents' if can('documents') else 'comments') %}
+    {{ side_link(ov_href, 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.overview_departments', 'admin.department_page', 'admin.submissions', 'admin.faculties', 'admin.analysis', 'admin.sheets', 'admin.submission_detail', 'admin.programme_report')) }}{% endif %}
     {% if can('flow') %}{{ side_link(url_for('admin.flow'), 'Data Flow', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM10 9l5 3-5 3z', ep == 'admin.flow') }}{% endif %}
     <span class="side-sep"></span>
     {% if can('updates') %}<a class="side-link nav-bell{{ ' is-on' if ep in ('admin.updates', 'admin.calendar') }}" href="{{ url_for('admin.updates') }}"

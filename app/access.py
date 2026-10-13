@@ -62,6 +62,7 @@ ENDPOINTS = {
     "submissions": ("overview", "view"), "analysis": ("overview", "view"),
     "faculties": ("overview", "view"), "export_group": ("overview", "view"),
     "submission_detail": ("overview", "view"), "submission_review": ("overview", "view"),
+    "overview_departments": ("overview", "view"), "department_page": ("overview", "view"),
     "mark_seen": ("overview", "edit"), "submission_return": ("overview", "edit"),
     "submission_unlock": ("overview", "edit"),
     "export_institution": ("overview", "view"), "export_department": ("overview", "view"),

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Overview · Departments{% endblock %}
+{% block header %}{% set ov_tab = 'departments' %}{% include "admin/_overview_head.html" %}{% endblock %}
+
+{% block content %}
+{% set words = {'complete': 'Completed', 'progress': 'In progress', 'none': 'Not started'} %}
+<section class="panel">
+  <div class="panel-head"><h3>Departments <span class="muted small">{{ rows|length }}</span></h3>
+    <input type="search" class="od-find" id="od-find" placeholder="Find a department" aria-label="Find a department"></div>
+  <div class="table-wrap">
+    <table class="erp-table od-table">
+      <thead><tr><th>Department</th><th>Progress</th><th class="c">Programmes</th><th>Status</th>
+        <th>Submitted / last edited</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr data-find="{{ (r.dept.dept_name ~ ' ' ~ r.dept.dept_code ~ ' ' ~ (r.dept.campus or ''))|lower }}">
+        <td><a href="{{ url_for('admin.department_page', dept_code=r.dept.dept_code) }}"><strong>{{ r.dept.dept_name }}</strong></a>
+          <div class="small muted">{{ r.dept.dept_code }}{% if r.dept.campus %} · {{ r.dept.campus }}{% endif %}</div></td>
+        <td><div class="od-prog"><div class="bar"><i style="width:{{ r.percent }}%"></i></div>
+          <span>{{ r.done }}/{{ r.total }} stages</span></div></td>
+        <td class="c">{{ r.programmes[0] }}/{{ r.programmes[1] }}</td>
+        <td><span class="od-st od-{{ r.state }}">{{ words[r.state] }}</span></td>
+        <td class="small">
+          {% if r.submitted_at %}<span class="od-when is-sent">Submitted {{ (r.submitted_at|ist).strftime('%d %b %Y') }}</span>
+          {% elif r.updated_at %}<span class="od-when">Last edited {{ (r.updated_at|ist).strftime('%d %b %Y, %H:%M') }}</span>
+          {% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="act od-act">
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=r.dept.dept_code) }}">View</a>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department', dept_code=r.dept.dept_code) }}">Excel</a>
+          <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=r.dept.dept_code) }}">Word</a>
+          <a class="btn btn-sm" href="{{ url_for('admin.department_page', dept_code=r.dept.dept_code) }}">More →</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">No departments yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var f = document.getElementById("od-find");
+    if (!f) return;
+    f.addEventListener("input", function () {
+      var w = f.value.trim().toLowerCase();
+      document.querySelectorAll(".od-table tbody tr[data-find]").forEach(function (r) {
+        r.hidden = !!w && r.dataset.find.indexOf(w) < 0;
+      });
+    });
+  })();
+</script>
+{% endblock %}

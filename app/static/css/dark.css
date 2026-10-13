@@ -6027,6 +6027,82 @@ html[data-theme="dark"] .hint-i[aria-pressed="true"] {
   background: #2563eb;
   color: #ffffff;
 }
+html[data-theme="dark"] .od-find {
+  border: 1px solid #373e4c;
+}
+html[data-theme="dark"] .od-prog span {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .od-st {
+  background: #181c25;
+  color: #aab1bf;
+}
+html[data-theme="dark"] .od-complete,
+html[data-theme="dark"] .dp-submitted {
+  background: #13321d;
+  color: #87deac;
+}
+html[data-theme="dark"] .od-progress,
+html[data-theme="dark"] .dp-draft {
+  background: #0e1a2a;
+  color: #a6baf2;
+}
+html[data-theme="dark"] .dp-returned {
+  background: #2d120f;
+  color: #ed8078;
+}
+html[data-theme="dark"] .dp-optional {
+  background: transparent;
+  color: #9ba4b5;
+  border: 1px dashed #373e4c;
+}
+html[data-theme="dark"] .od-when {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .od-when.is-sent {
+  color: #87deac;
+}
+html[data-theme="dark"] .dp-stage {
+  border-top: 1px solid #2a303c;
+}
+html[data-theme="dark"] .dp-stage:first-child {
+  border-top: 0;
+}
+html[data-theme="dark"] .dp-n {
+  background: #161d29;
+  color: #acc7ec;
+}
+html[data-theme="dark"] .dp-level-h {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .dp-prog {
+  border: 1px solid #2e3542;
+  background: #121519;
+}
+html[data-theme="dark"] .dp-prog > summary::before {
+  color: #9ba4b5;
+}
+html[data-theme="dark"] .dp-prog-count {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .dp-prog-count.is-all {
+  color: #87deac;
+}
+html[data-theme="dark"] .dp-branch {
+  border-left: 2px solid #2e3542;
+}
+html[data-theme="dark"] .dp-leaf::before {
+  border-top: 2px solid #2e3542;
+}
+html[data-theme="dark"] .dp-vers li {
+  border-top: 1px solid #2a303c;
+}
+html[data-theme="dark"] .dp-vers li:first-child {
+  border-top: 0;
+}
+html[data-theme="dark"] .dp-changes {
+  color: #bbc3d5;
+}
 
 /* ---- admin.css ---- */
 html[data-theme="dark"] .ad {

@@ -806,6 +806,93 @@ def submissions():
     return render_template("admin/submissions.html", rows=rows, year=_year(), STAGES=STAGES)
 
 
+@bp.route("/overview/departments")
+@admin_required
+def overview_departments():
+    """Overview → Departments: every department with its progress, when it
+    last moved, and its downloads; More opens the department's own page."""
+    data = analysis_sheets(_year())
+    db = get_db()
+    subs = {x["dept_code"]: x for x in db.submissions.find({"academic_year": _year(), **scope_q()},
+                                                            {"dept_code": 1, "updated_at": 1, "stages": 1})}
+    progs = {}
+    for p in data["programmes"]:
+        c = progs.setdefault(p["dept"]["dept_code"], [0, 0])
+        c[1] += 1
+        c[0] += all(v == "submitted" for v in p["parts"].values())
+    rows = []
+    for r in data["stages"]:
+        code = r["dept"]["dept_code"]
+        done = sum(c["status"] == "submitted" for c in r["cells"])
+        total = len(r["cells"])
+        sub = subs.get(code) or {}
+        sent = [st.get("submitted_at") for st in (sub.get("stages") or {}).values()
+                if isinstance(st, dict) and st.get("submitted_at")]
+        rows.append({"dept": r["dept"], "done": done, "total": total,
+                     "percent": round(done * 100 / total) if total else 0,
+                     "state": "complete" if done == total else "progress" if done or sub.get("updated_at") else "none",
+                     "programmes": progs.get(code, [0, 0]),
+                     "submitted_at": max(sent) if done == total and sent else None,
+                     "updated_at": sub.get("updated_at")})
+    return render_template("admin/overview_departments.html", rows=rows, year=_year())
+
+
+@bp.route("/overview/departments/<dept_code>")
+@admin_required
+def department_page(dept_code):
+    """One department: when it submitted (or last edited), its stages, every
+    UG and PG programme with Curriculum, Syllabus and Course Revision, and the
+    changes it made, beside."""
+    from .notify import describe_changes
+    from .people import history
+    from .workflow import parts_for, programme_stage_state, programmes_of, stage_board, stage_state, stage_timing
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = _year()
+    sub = get_or_create_submission(dept_code, year)
+    board = stage_board(sub)
+    for b in board:
+        b["timing"] = stage_timing(stage_state(sub, b["key"]))
+    done = sum(b["status"] == "submitted" for b in board)
+    sent = [stage_state(sub, b["key"]).get("submitted_at") for b in board]
+    complete = done == len(board) and all(sent)
+    # every programme, UG and PG, with each part
+    parts = parts_for(STAGE_BY_KEY["curriculum"])
+    levels = {"UG": [], "PG": []}
+    for p in programmes_of(sub, dept):
+        code = p["programme_code"]
+        items = []
+        for k in parts:
+            st = programme_stage_state(sub, code, k)
+            d = STAGE_BY_KEY[k]
+            status = st.get("status") or ("draft" if st.get("data") else "open")
+            if d.get("optional") and not st.get("data"):
+                status = "optional"
+            label = ("Curriculum" if k == "prog_curriculum" else "Course Revision" if k == "prog_revision"
+                     else "Syllabus · Batch of " + (batches()["current"] if k == "prog_syllabus" else d.get("batch", "")))
+            items.append({"key": k, "label": label, "status": status, "has": bool(st.get("data")),
+                          "when": stage_timing(st)})
+        need = [i for i in items if i["status"] != "optional"]
+        levels["PG" if (p.get("level") or "") in ("PG", "PGD") else "UG"].append({
+            "code": code, "name": p.get("display_name") or p.get("programme_name") or code,
+            "degree": p.get("degree_level") or "", "parts": items,
+            "done": sum(i["status"] == "submitted" for i in need), "total": len(need)})
+    # what changed, newest first, each against the version before it
+    rows = history(dept_code, year)
+    before = {}
+    for v in reversed(rows):
+        k = (v["stage"], v["programme_code"])
+        v["changes"] = describe_changes(v["stage"], before.get(k), v.get("data"))
+        before[k] = v.get("data")
+        v["title"] = STAGE_BY_KEY.get(v["stage"], {}).get("title", v["stage"])
+    last = rows[0] if rows else None
+    return render_template("admin/department_page.html", dept=dept, submission=sub, board=board,
+                           done=done, complete=complete,
+                           submitted_at=max(x for x in sent if x) if complete else None,
+                           updated_at=sub.get("updated_at"), last=last,
+                           levels=levels, versions=rows[:60], year=year)
+
+
 NO_FACULTY, NO_SCHOOL = "Faculty not set", "School not set"
 
 

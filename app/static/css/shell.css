@@ -650,3 +650,51 @@ body.has-side .wrap { max-width: none !important; }
   background: #fff; color: #5b6474; font: italic 700 10px/1 Georgia, serif; cursor: pointer; vertical-align: 1px; }
 .hint-i:hover, .hint-i:focus-visible { border-color: #2563eb; color: #2563eb; outline: none; }
 .hint-i[aria-pressed="true"] { border-color: #2563eb; background: #2563eb; color: #fff; }
+
+/* ---- Overview › Departments, and one department's page ---- */
+.od-find { max-width: 260px; margin-left: auto; padding: 7px 10px; border: 1px solid #d0d5dd; border-radius: 8px; font: inherit; font-size: 13px; }
+.od-prog { display: flex; align-items: center; gap: 8px; min-width: 170px; }
+.od-prog .bar { width: 100px; }
+.od-prog span { font-size: 12px; color: #5b6474; white-space: nowrap; }
+.od-st { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: #f1f3f6; color: #5b6474; }
+.od-complete, .dp-submitted { background: #e7f6ec; color: #1d6b3e; }
+.od-progress, .dp-draft { background: #eff6ff; color: #1d4ed8; }
+.dp-returned { background: #fdecea; color: #b42318; }
+.dp-optional { background: transparent; color: #98a2b3; border: 1px dashed #d0d5dd; }
+.od-when { color: #5b6474; }
+.od-when.is-sent { color: #1d6b3e; font-weight: 600; }
+.od-act { white-space: nowrap; }
+.od-act .btn { margin-left: 4px; }
+.dp-when { margin-top: 6px; font-size: 13px; }
+.dp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .dp-grid { grid-template-columns: 1fr; } }
+.dp-side { position: sticky; top: 72px; max-height: calc(100vh - 90px); overflow: auto; }
+.dp-stages, .dp-branch, .dp-vers { list-style: none; margin: 0; padding: 0; }
+.dp-stage { display: grid; grid-template-columns: 28px 1fr auto 84px; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #eef0f3; }
+.dp-stage:first-child { border-top: 0; }
+.dp-stage-main { display: flex; flex-direction: column; gap: 2px; }
+.dp-n { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #eef1f6; color: #0f2440; font-size: 12px; font-weight: 700; }
+.dp-noreview { display: inline-block; width: 1px; }
+.dp-levels { padding: 6px 16px 16px; }
+.dp-level-h { margin: 14px 0 8px; font-size: 14px; color: #0f2440; }
+.dp-prog { border: 1px solid #e4e7ec; border-radius: 10px; margin-bottom: 8px; background: #fff; }
+.dp-prog > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.dp-prog > summary::-webkit-details-marker { display: none; }
+.dp-prog > summary::before { content: "›"; font-size: 18px; color: #98a2b3; transition: transform .2s ease; }
+.dp-prog[open] > summary::before { transform: rotate(90deg); }
+.dp-prog-name { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.dp-prog-count { font-size: 12px; font-weight: 600; color: #5b6474; white-space: nowrap; }
+.dp-prog-count.is-all { color: #1d6b3e; }
+.dp-branch { position: relative; margin: 0 14px 4px 30px; padding-left: 18px; border-left: 2px solid #e4e7ec; }
+.dp-leaf { position: relative; display: grid; grid-template-columns: 12px minmax(160px, 1fr) minmax(0, 1.2fr) auto 84px; align-items: center;
+  gap: 10px; padding: 8px 0; }
+.dp-leaf::before { content: ""; position: absolute; left: -18px; top: 50%; width: 14px; border-top: 2px solid #e4e7ec; }
+.dp-leaf-l { font-weight: 600; font-size: 13px; }
+.dp-prog-foot { padding: 4px 14px 12px 48px; }
+.dp-vers li { padding: 10px 16px; border-top: 1px solid #eef0f3; }
+.dp-vers li:first-child { border-top: 0; }
+.dp-ver-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.dp-changes { margin: 6px 0 0; padding-left: 16px; font-size: 12px; color: #344054; }
+@media (max-width: 760px) { .dp-leaf { grid-template-columns: 12px 1fr auto; } .dp-leaf > .small, .dp-leaf > .dp-noreview, .dp-leaf > button { display: none; } }
+.dp-changes li { margin: 2px 0; word-break: break-word; }

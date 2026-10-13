@@ -1,6 +1,7 @@
 {# One page for following the departments: Monitor, Faculties, Analysis, Programmes,
    Documents, Comments — one header, one row of tabs, one Excel download. #}
 {% set ov_tabs = [
+  ('departments', 'Departments', url_for('admin.overview_departments'), 'overview'),
   ('monitor', 'Monitor', url_for('admin.submissions'), 'overview'),
   ('faculties', 'Faculties', url_for('admin.faculties'), 'overview'),
   ('analysis', 'Analysis', url_for('admin.analysis'), 'overview'),

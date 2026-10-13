@@ -153,3 +153,21 @@ def test_each_thing_has_one_place_in_the_menu(app, client):
     assert "/admin/sheets.xlsx" in overview and ">Documents<" in overview and ">Comments<" in overview
     assert "/admin/calendar" in client.get("/admin/updates").get_data(as_text=True)
     assert client.get("/admin/calendar").status_code == 200
+
+
+def test_overview_departments_lists_each_and_more_opens_its_page(app, client):
+    """Overview opens on Departments: each with its progress and downloads;
+    More opens the department's page — when it last moved, its stages, its
+    programmes by level, and the versions beside."""
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/dept_info/save", json=DEPT_INFO_OK)
+    client.get("/logout")
+    _admin(app, client)
+    page = client.get("/admin/overview/departments").get_data(as_text=True)
+    assert "Department of Commerce" in page and "1/4 stages" not in page
+    assert 'href="/admin/overview/departments/COM"' in page and "/admin/export/COM.xlsx" in page
+    more = client.get("/admin/overview/departments/COM").get_data(as_text=True)
+    assert "last edited" in more and "Stages" in more and "Versions" in more
+    assert "Download report (Excel)" in more
+    assert client.get("/admin/overview/departments/NOPE").status_code == 404

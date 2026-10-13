@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ dept.dept_name }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.overview_departments') }}">Overview</a> <span>›</span>
+        <a href="{{ url_for('admin.overview_departments') }}">Departments</a> <span>›</span> {{ dept.dept_code }}</div>
+      <h1>{{ dept.dept_name }}</h1>
+      <p>{{ dept.dept_code }}{% if dept.campus %} · {{ dept.campus }}{% endif %}{% if dept.school %} · {{ dept.school }}{% endif %}</p>
+      <p class="dp-when">
+        {% if submitted_at %}<span class="od-when is-sent">Submitted on {{ (submitted_at|ist).strftime('%d %b %Y, %H:%M') }} IST</span>
+        {% elif updated_at %}<span class="od-when">Not submitted yet · last edited {{ (updated_at|ist).strftime('%d %b %Y, %H:%M') }} IST{% if last and last.name %} by {{ last.name }}{% endif %}</span>
+        {% else %}<span class="muted">Not started yet</span>{% endif %}
+      </p>
+    </div>
+    <div class="spacer head-aside">
+      <div class="flex head-aside-row">
+        <div class="bar" style="width:160px"><i style="width:{{ (done * 100 / (board|length or 1))|round|int }}%"></i></div>
+        <span class="bar-label">{{ done }} of {{ board|length }} stages</span>
+      </div>
+      <div class="flex mt-1 head-aside-row">
+        <a class="btn btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Download report (Excel)</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">Full detail</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set words = {'submitted': 'Submitted', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started',
+                'locked': 'Not started', 'optional': 'Optional'} %}
+<div class="dp-grid">
+  <div class="dp-main">
+    <section class="panel">
+      <div class="panel-head"><h3>Stages</h3></div>
+      <ul class="dp-stages">
+        {% for b in board %}
+        {% set has = (submission.stages or {}).get(b.key, {}).get('data') %}
+        <li class="dp-stage">
+          <span class="dp-n">{{ loop.index }}</span>
+          <div class="dp-stage-main"><strong>{{ b.title }}</strong>
+            <span class="small muted">{% if b.timing.submitted %}Submitted {{ b.timing.submitted }}{% elif b.key == 'curriculum' %}Filled programme by programme — see Programmes below{% elif b.timing.updated %}Last saved {{ b.timing.updated }}{% else %}Nothing saved yet{% endif %}</span></div>
+          <span class="od-st dp-{{ b.status }}">{{ words.get(b.status, b.status) }}</span>
+          {% if has %}<button class="btn btn-ghost btn-sm" type="button"
+             data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=b.key) }}">Review</button>
+          {% else %}<span class="dp-noreview"></span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>Programmes</h3>
+        <span class="erp-legend"><span class="lg"><i class="dot st-submitted"></i>Submitted</span> <span class="lg"><i class="dot st-draft"></i>In progress</span>
+          <span class="lg"><i class="dot st-open"></i>Not started</span></span></div>
+      <div class="dp-levels">
+        {% for lv in ['UG', 'PG'] if levels[lv] %}
+        <div class="dp-level">
+          <h4 class="dp-level-h">{{ lv }} programmes <span class="muted small">{{ levels[lv]|length }}</span></h4>
+          {% for p in levels[lv] %}
+          <details class="dp-prog"{% if loop.first %} open{% endif %}>
+            <summary>
+              <span class="dp-prog-name"><strong>{{ p.name }}</strong><span class="small muted mono">{{ p.code }}{% if p.degree %} · {{ p.degree }}{% endif %}</span></span>
+              <span class="dp-prog-count{{ ' is-all' if p.done == p.total }}">{{ p.done }}/{{ p.total }} submitted</span>
+            </summary>
+            <ul class="dp-branch">
+              {% for i in p.parts %}
+              <li class="dp-leaf st-{{ i.status }}">
+                <i class="dot st-{{ i.status }}"></i>
+                <span class="dp-leaf-l">{{ i.label }}</span>
+                <span class="small muted">{% if i.when.submitted %}Submitted {{ i.when.submitted }}{% elif i.when.updated %}Last saved {{ i.when.updated }}{% elif i.status == 'optional' %}Only if the batch is begun{% else %}Not filled yet{% endif %}</span>
+                <span class="od-st dp-{{ i.status }}">{{ words.get(i.status, i.status) }}</span>
+                {% if i.has %}<button class="btn btn-ghost btn-sm" type="button"
+                   data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=i.key, programme=p.code) }}">Review</button>
+                {% else %}<span class="dp-noreview"></span>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            <div class="dp-prog-foot"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.programme_report', dept_code=dept.dept_code, programme_code=p.code) }}">Programme report →</a></div>
+          </details>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No programmes listed yet — they come from the department's Department Information.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <aside class="dp-side panel" aria-label="Versions">
+    <div class="panel-head"><h3>Versions <span class="muted small">last 5 days</span></h3></div>
+    <ol class="dp-vers">
+      {% for v in versions %}
+      <li>
+        <div class="dp-ver-head"><strong>{{ v.title }}{% if v.programme_code %} · {{ v.programme_code }}{% endif %}</strong>
+          {% if v.kind == 'submit' %}<span class="od-st dp-submitted">Submitted</span>{% endif %}</div>
+        <div class="small muted">{{ (v.at|ist).strftime('%d %b, %H:%M') }}{% if v.name %} · {{ v.name }}{% endif %}</div>
+        {% if v.changes %}<ul class="dp-changes">{% for c in v.changes[:3] %}<li><span class="muted">{{ c.field }}:</span> {{ c.before }} → <strong>{{ c.after }}</strong></li>{% endfor %}
+          {% if v.changes|length > 3 %}<li class="muted">and {{ v.changes|length - 3 }} more</li>{% endif %}</ul>{% endif %}
+      </li>
+      {% else %}
+      <li class="muted small">No saved changes in the last 5 days.</li>
+      {% endfor %}
+    </ol>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-review.js') }}"></script>
+{% endblock %}
