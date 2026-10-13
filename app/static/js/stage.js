@@ -4520,6 +4520,13 @@
         { onClick: () => { window.location = r.url; }, timeout: 12000 }));
     }
   }
+  // programme steps: Syllabus opens into its current and earlier batches
+  document.querySelectorAll(".pmap-syl > button").forEach(b => b.addEventListener("click", () => {
+    const li = b.parentElement;
+    const open = !li.classList.contains("is-open");
+    li.classList.toggle("is-open", open);
+    b.setAttribute("aria-expanded", open ? "true" : "false");
+  }));
   const allBtn = document.getElementById("btn-all");
   if (allBtn) allBtn.addEventListener("click", () => openAll());
 

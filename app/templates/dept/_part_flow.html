@@ -16,6 +16,71 @@
 <svg class="pflow-arrow" viewBox="0 0 60 50" aria-hidden="true"><path d="M4 6 C 34 2, 52 14, 50 38" fill="none" stroke="currentColor" stroke-width="2.6" stroke-dasharray="2 6" stroke-linecap="round"/><path d="M43 32l7 8 5-9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- endmacro %}
 
+{% macro syllabus_flow(parts, code, here, older, words) %}
+{# The programme page: Curriculum → Syllabus → Course Revision. Syllabus
+   opens, with a branching line, into its two parts — the current batch and
+   the earlier batches — each a link. It starts open on a syllabus page. #}
+{% set cur = parts|selectattr('key', 'equalto', 'prog_syllabus')|first %}
+{% set syl = ([cur] if cur else []) + older %}
+{% set syl_keys = syl|map(attribute='key')|list %}
+{% set sts = syl|map(attribute='status')|list %}
+{% set syl_status = 'submitted' if sts and sts|select('equalto', 'submitted')|list|length == sts|length
+                    else 'returned' if 'returned' in sts else 'draft' if ('draft' in sts or 'submitted' in sts) else 'open' %}
+{% set open_now = here in syl_keys %}
+<ol class="pmap pmap-tree" aria-label="Parts of this programme, in order">
+  {% set n = namespace(i=0) %}
+  {% for part in parts if not part.existing %}
+  {% if part.key == 'prog_syllabus' %}
+  {% set n.i = n.i + 1 %}
+  <li class="pmap-node pmap-c2 pmap-syl is-{{ syl_status }}{{ ' is-here is-open' if open_now }}">
+    <button type="button" class="pmap-pill" aria-expanded="{{ 'true' if open_now else 'false' }}"
+            title="Syllabus — {{ words.get(syl_status, syl_status) }}. Click to choose the batch.">
+      <span class="pmap-ico">{{ icon('current') }}</span>
+      <span class="pmap-n">{{ n.i }}</span>
+      <span class="pmap-title">Syllabus</span>
+      <i class="pmap-dot" aria-hidden="true"></i>
+      <svg class="pmap-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <span class="pmap-branch">
+      <svg class="pmap-fork" viewBox="0 0 44 64" aria-hidden="true"><path d="M0 32 H14 C24 32 22 12 32 12 H44 M14 32 C24 32 22 52 32 52 H44"/></svg>
+      <span class="pmap-leaves">
+        {% if cur %}
+        <a class="pmap-leaf is-{{ cur.status }}{{ ' is-here' if cur.key == here }}" href="{{ url_for('dept.stage', stage_key=cur.key, programme_code=code) }}"
+           {% if cur.key == here %}aria-current="page"{% endif %} title="{{ words.get(cur.status, cur.status) }}">
+          <span class="pmap-leaf-l">Current batch</span>{% if cur.tag %}<span class="pmap-tag">{{ cur.tag }}</span>{% endif %}<i class="pmap-dot"></i></a>
+        {% endif %}
+        {% if older %}
+        <span class="pmap-leaf pmap-leaf-old{{ ' is-here' if here in (older|map(attribute='key')|list) }}">
+          <span class="pmap-leaf-l">Earlier batches</span>
+          {% for ob in older %}
+          <a class="pmap-twig is-{{ ob.status }}{{ ' is-here' if ob.key == here }}" href="{{ url_for('dept.stage', stage_key=ob.key, programme_code=code) }}"
+             {% if ob.key == here %}aria-current="page"{% endif %} title="Batch of {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}"><i class="pmap-dot"></i>{{ ob.tag }}</a>
+          {% endfor %}
+        </span>
+        {% endif %}
+      </span>
+    </span>
+  </li>
+  {% else %}
+  {% set n.i = n.i + 1 %}
+  {% set kind = 'curriculum' if part.key == 'prog_curriculum' else 'revision' %}
+  {% set is_here = part.key == here %}
+  <li class="pmap-node pmap-c{{ 1 if kind == 'curriculum' else 4 }} is-{{ part.status }}{{ ' is-here' if is_here }}">
+    <a class="pmap-pill" href="{{ url_for('dept.stage', stage_key=part.key, programme_code=code) }}"
+       {% if is_here %}aria-current="page"{% endif %}
+       title="{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}">
+      <span class="pmap-ico">{{ icon(kind) }}</span>
+      <span class="pmap-n">{{ n.i }}</span>
+      <span class="pmap-title">{{ 'Course Revision' if kind == 'revision' else part.title }}</span>
+      {% if part.status == 'submitted' %}<span class="pmap-done">✓ Submitted</span>{% endif %}
+      <i class="pmap-dot" aria-hidden="true"></i>
+    </a>
+  </li>
+  {% endif %}
+  {% endfor %}
+</ol>
+{% endmacro %}
+
 {% macro part_flow(parts, code, here=None, show_status=False, zigzag=False) %}
 {# One line, like a mind map: a small node per part joined by a thin line,
    the earlier batches as twigs under Existing Batch. Each node is a link;
@@ -29,6 +94,7 @@
   {% set _ = steps.append(part) %}
   {% if part.key == 'prog_syllabus' and older %}{% set _ = steps.append({'key': '__existing__'}) %}{% endif %}
 {% endfor %}
+{% if not zigzag %}{{ syllabus_flow(parts, code, here, older, words) }}{% else %}
 {% macro short(tag) %}{{ (tag[2:4] ~ '–' ~ tag[-2:]) if zigzag and tag and tag|length >= 9 else tag }}{% endmacro %}
 <ol class="pmap{{ ' is-compact' if zigzag }}" aria-label="Parts of this programme, in order">
   {% for part in steps %}
@@ -69,4 +135,5 @@
   {% endif %}
   {% endfor %}
 </ol>
+{% endif %}
 {% endmacro %}

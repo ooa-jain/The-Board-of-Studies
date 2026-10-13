@@ -4898,6 +4898,40 @@ html[data-theme="dark"] .miss-part strong {
 html[data-theme="dark"] a.miss-go {
   text-decoration: none;
 }
+html[data-theme="dark"] .pmap-syl > button.pmap-pill {
+  color: inherit;
+}
+html[data-theme="dark"] .pmap-chev {
+  fill: none;
+  stroke: currentColor;
+  color: #aab1bf;
+}
+html[data-theme="dark"] .pmap-fork path {
+  fill: none;
+  stroke: #a2aab9;
+}
+html[data-theme="dark"] .pmap-leaf {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: inherit;
+  text-decoration: none;
+}
+html[data-theme="dark"] a.pmap-leaf:hover {
+  border-color: #2e3e56;
+  box-shadow: 0 2px 8px rgba(14, 61, 124, 0.08);
+}
+html[data-theme="dark"] .pmap-leaf.is-here {
+  border-color: #3874e1;
+}
+html[data-theme="dark"] .pmap-leaf.is-submitted > .pmap-dot {
+  background: #2f8a55;
+}
+html[data-theme="dark"] .pmap-leaf.is-draft > .pmap-dot {
+  background: #2563eb;
+}
+html[data-theme="dark"] .pmap-leaf.is-returned > .pmap-dot {
+  background: #c2412f;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

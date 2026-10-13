@@ -62,9 +62,12 @@
     {% if course_map %}· {{ course_map|length }} courses{% endif %}</span>
 </div>
 {% endif %}
+<div class="pflow-row">
 <nav class="pflow-nav" aria-label="Parts of this programme">
   {{ part_flow(parts, programme.programme_code, stage.key) }}
 </nav>
+<img class="pflow-art" src="{{ url_for('static', filename='img/pencil-paper.png') }}" alt="" width="84" height="85">
+</div>
 {% endif %}
 {% for c in comments %}
 <div class="office-comment {{ 'is-done' if c.status == 'done' else '' }}">
