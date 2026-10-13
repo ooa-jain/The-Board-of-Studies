@@ -1032,6 +1032,31 @@ def api_record():
     return jsonify({"ok": True, "dept_name": name, "items": items})
 
 
+@bp.post("/api/programme-check")
+@department_required
+def api_programme_check():
+    """One programme's steps not yet submitted, each with what is still to
+    fill — for the last step's Submit, before its review opens."""
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    code = request.args.get("programme") or ""
+    programme = next((p for p in programmes_of(sub, dept) if p.get("programme_code") == code), None)
+    if not programme:
+        return jsonify({"ok": False, "error": "Unknown programme."}), 404
+    parts = []
+    for item in _record_items(sub, dept):
+        if item["programme"] != code or item["status"] == "submitted":
+            continue
+        issues, _ = validate_only(sub, item["key"], item["data"], programme)
+        errs = [i["message"] for i in issues if i.get("level") == "error"]
+        if not item["data"]:
+            errs = errs or ["Nothing has been filled in here yet."]
+        if errs:
+            parts.append({"title": _step_label(item["key"]), "url": item["url"], "missing": errs[:8],
+                          "more": max(0, len(errs) - 8)})
+    return jsonify({"ok": True, "parts": parts})
+
+
 @bp.post("/api/submit-all")
 @department_required
 def api_submit_all():

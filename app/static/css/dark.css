@@ -4892,6 +4892,12 @@ html[data-theme="dark"] .pl-reopen {
   background: #181b21;
   color: #afb8ca;
 }
+html[data-theme="dark"] .miss-part strong {
+  color: #ced8e6;
+}
+html[data-theme="dark"] a.miss-go {
+  text-decoration: none;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

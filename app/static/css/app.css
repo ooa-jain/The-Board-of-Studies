@@ -4822,3 +4822,7 @@ html.intro-open, html.intro-open body { overflow: hidden; }
 .pl-reopen { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
   margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas);
   font-size: .88rem; color: var(--ink-soft); }
+.miss-part { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 14px 0 6px; }
+.miss-part strong { font-size: .92rem; color: var(--ink); }
+.miss-part-go { font-size: .84rem; font-weight: 600; }
+a.miss-go { text-decoration: none; }

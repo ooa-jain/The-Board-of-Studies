@@ -4140,6 +4140,8 @@
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
       const errs = (j.issues || []).filter(i => i.level === "error");
+      // a programme's last step: every step of it is checked before its review
+      if (j.ok && CTX.programme_review) { paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 }); programmeCheck(btn, errs); return; }
       if (!j.ok || errs.length) { notSubmitted(btn, j); return; }
       paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
       // the step that completes the record opens the review of everything
@@ -4208,6 +4210,69 @@
     else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
+  /* The programme's last step: what is still blank in each of its steps.
+     All filled: its review opens. Otherwise the list, each step a link, and
+     no going on to the next programme until it is done. */
+  function programmeCheck(btn, hereErrs) {
+    const toHere = () => { if (hereErrs && hereErrs[0]) focusIssue(hereErrs[0]); else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" }); };
+    save().then(() => fetch(CTX.urls.programme_check + "?programme=" + encodeURIComponent(CTX.programme), { method: "POST" }))
+      .then(r => r.json()).then(j => {
+        submitLabel(btn);
+        if (!j.ok) { unreachable(btn); return; }
+        if (!(j.parts || []).length) { openProgramme(); return; }
+        saveNote.textContent = "Not submitted — some steps of this programme are still to fill";
+        saveNote.className = "save-note save-note-bad";
+        const n = j.parts.reduce((a, p) => a + p.missing.length + (p.more || 0), 0);
+        const body = el("div", "miss");
+        body.appendChild(el("p", "miss-lede",
+          "This programme is not submitted yet. Please fill in the following in each step, then submit again:"));
+        let ctl = null;
+        j.parts.forEach(p => {
+          const here = p.url === location.pathname;
+          const head = el("div", "miss-part");
+          head.appendChild(el("strong", null, p.title));
+          const go = el("a", "miss-part-go", here ? "This page" : "Go to this step →");
+          go.href = p.url;
+          if (here) go.addEventListener("click", e => {
+            e.preventDefault(); ctl.close(); toHere();
+          });
+          head.appendChild(go);
+          body.appendChild(head);
+          const ul = el("ul", "miss-list");
+          p.missing.forEach(m => {
+            const li = el("li");
+            const a = el("a", "miss-go", m);
+            a.href = p.url;
+            if (here) a.addEventListener("click", e => { e.preventDefault(); go.click(); });
+            li.appendChild(a);
+            ul.appendChild(li);
+          });
+          body.appendChild(ul);
+          if (p.more) body.appendChild(el("p", "miss-more", `…and ${p.more} more on that step.`));
+        });
+        const foot = el("div", "rv-actions");
+        const draft = el("button", "btn btn-ghost", "Save draft");
+        draft.type = "button";
+        draft.addEventListener("click", () => {
+          dirty = true;
+          save().then(() => {
+            ctl.close();
+            if (window.Toast) window.Toast.success("Your draft is saved. Fill the steps listed, then submit.", { title: "Draft saved" });
+          });
+        });
+        const fill = el("button", "btn btn-gold", "Fill them now");
+        fill.type = "button";
+        foot.appendChild(el("span", "spacer"));
+        foot.appendChild(draft);
+        foot.appendChild(fill);
+        ctl = Review.modal({ title: `${n} thing${n === 1 ? "" : "s"} still to fill`, sub: reviewTitle(), body, foot });
+        fill.addEventListener("click", () => {
+          const first = j.parts[0];
+          if (first.url === location.pathname) { ctl.close(); toHere(); } else window.location = first.url;
+        });
+      }).catch(() => unreachable(btn));
+  }
+
   /* Submit found gaps: list them, each a link to its box. The department
      fills them now, or keeps this stage as a draft and goes on to the next —
      it is listed as still to submit there, with a link back. */
@@ -4231,7 +4296,7 @@
     const fill = el("button", "btn btn-gold", "Fill them now");
     fill.type = "button";
     foot.appendChild(el("span", "spacer"));
-    if (CTX.skip_to && CTX.skip_to.url) {
+    if (CTX.skip_to && CTX.skip_to.url && !CTX.programme_review) {
       const skip = el("button", "btn btn-ghost", `Save draft & go to ${CTX.skip_to.label || "the next stage"} →`);
       skip.type = "button";
       skip.addEventListener("click", () => {

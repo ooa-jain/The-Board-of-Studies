@@ -59,7 +59,7 @@
        title="{{ words.get(part.status, part.status|capitalize) }}{% if part.errors and part.status != 'submitted' %} · {{ part.errors }} to fix{% endif %}">
       <span class="pmap-ico">{{ icon(kind) }}</span>
       <span class="pmap-n">{{ n }}</span>
-      <span class="pmap-title"{% if kind == 'current' %} title="The current batch"{% endif %}>{% if kind == 'current' %}Batch of{% elif kind == 'revision' %}Revision{% else %}{{ part.title }}{% endif %}</span>
+      <span class="pmap-title"{% if kind == 'current' %} title="The current batch"{% endif %}>{% if kind == 'current' %}Batch of{% elif kind == 'revision' %}Course Revision{% else %}{{ part.title }}{% endif %}</span>
       {% if part.tag %}<span class="pmap-tag">{{ short(part.tag) }}</span>{% endif %}
       {% if part.status == 'submitted' and not zigzag %}<span class="pmap-done">✓ Submitted</span>{% endif %}
       <i class="pmap-dot" aria-hidden="true"></i>

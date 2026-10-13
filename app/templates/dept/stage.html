@@ -227,6 +227,7 @@
       dashboard:{{ url_for('dept.dashboard')|tojson }},
       dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }},
       edit_programmes:{{ url_for('dept.add_programme')|tojson }},
+      programme_check:{{ url_for('dept.api_programme_check')|tojson }},
       stage:    {{ url_for('dept.stage', stage_key='__stage__')|tojson }}
     }
   };
