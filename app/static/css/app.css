@@ -4862,8 +4862,7 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 
 /* Department Home: the four stages as a staircase, a stage on each level */
 .stairs { margin: 6px 0 18px; display: flex; justify-content: center; }
-.stairs-art { position: relative; width: 100%; max-width: 640px; border-radius: 16px; overflow: hidden;
-  box-shadow: 0 0 0 1px var(--line), 0 18px 34px -26px rgba(15, 36, 64, .45); }
+.stairs-art { position: relative; width: 100%; max-width: 640px; }
 .stairs-art img { display: block; width: 100%; height: auto; }
 .stairs-step { position: absolute; display: inline-flex; align-items: center; gap: 6px; max-width: 13.2%;
   padding: 4px 8px; border-radius: 8px; background: rgba(255, 255, 255, .94); color: #0f2440; text-decoration: none;
@@ -4887,3 +4886,11 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 .stairs-sign { position: absolute; left: 58%; top: 3%; width: 40%; height: 19%; border-radius: 6px; }
 .stairs-sign:hover, .stairs-sign:focus-visible { box-shadow: 0 0 0 3px #fbbf24; outline: none; }
 @media (prefers-reduced-motion: reduce) { .stairs-step { transition: none; } }
+
+/* Pre-BoS and BoS Documents: the folder mascot beside the upload instructions */
+.section-help.has-mascot { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 96px; }
+.upload-mascot { flex: none; width: 110px; height: auto; margin: -8px 0; transform-origin: 50% 90%;
+  animation: mascot-wave 3.4s ease-in-out infinite; }
+@keyframes mascot-wave { 0%, 100% { transform: rotate(0); } 8% { transform: rotate(-4deg); } 16% { transform: rotate(3deg); } 24% { transform: rotate(0); } }
+@media (max-width: 600px) { .upload-mascot { width: 72px; } }
+@media (prefers-reduced-motion: reduce) { .upload-mascot { animation: none; } }

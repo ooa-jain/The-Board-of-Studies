@@ -904,18 +904,18 @@ def _resume(sub, dept):
             if part_status(sub, code, key) == "submitted":
                 nxt = _next_part(dept, key, code)
                 if nxt:
-                    return {"url": nxt["url"], "title": nxt["title"], "where": "next after " + label,
+                    return {"url": nxt["url"], "title": nxt["title"], "where": "next after " + label, "stage": d["parent"],
                             "at": place.get("at"), "name": place.get("name")}
             else:
                 return {"url": url_for("dept.stage", stage_key=key, programme_code=code),
-                        "title": label, "where": "where you left off",
+                        "title": label, "where": "where you left off", "stage": d["parent"],
                         "at": place.get("at"), "name": place.get("name")}
         elif not code and compute_status(sub, key) != "submitted":
-            return {"url": url_for("dept.stage", stage_key=key), "title": d["title"],
+            return {"url": url_for("dept.stage", stage_key=key), "title": d["title"], "stage": key,
                     "where": "where you left off", "at": place.get("at"), "name": place.get("name")}
     nxt = next_action(sub)
     if nxt:
-        return {"url": url_for("dept.stage", stage_key=nxt["key"]), "title": nxt["title"],
+        return {"url": url_for("dept.stage", stage_key=nxt["key"]), "title": nxt["title"], "stage": nxt["key"],
                 "where": "next to do", "at": None, "name": ""}
     return None
 

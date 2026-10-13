@@ -87,3 +87,5 @@ html[data-theme="dark"] .hl { color: #111827; }
 @media (prefers-reduced-motion: reduce) { .tt-pic img { transition: none; } }
 /* the staircase's "You are here" tag keeps dark text on its yellow in both themes */
 html[data-theme="dark"]:root .stairs .stairs-step.is-here::after { background: #fbbf24; color: #111827; }
+/* the staircase has no ground of its own: in dark mode a faint light edge keeps the black figure visible */
+html[data-theme="dark"] .stairs-art img { filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, .55)); }

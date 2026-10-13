@@ -3830,7 +3830,20 @@
       const h = el("h3", null, section.title);
       if (section.title) block.appendChild(h);
       if (WIDE_SECTIONS.includes(section.type) && !["cards", "sheet"].includes(section.display) && section.title) expandable(block, h, section.title);
-      if (section.help) block.appendChild(el("div", "section-help", section.help));
+      if (section.help) {
+        const help = el("div", "section-help", section.help);
+        // Pre-BoS and BoS Documents: the folder mascot above the uploads
+        if (["pre_bos", "bos_documents"].includes(CTX.key) && (section.fields || []).some(f => f.type === "file")
+            && !document.querySelector(".upload-mascot")) {
+          help.classList.add("has-mascot");
+          const img = el("img", "upload-mascot");
+          img.src = CTX.urls.static + "img/folder-mascot.png";
+          img.alt = "";
+          img.width = 110; img.height = 92;
+          help.appendChild(img);
+        }
+        block.appendChild(help);
+      }
       (section.links || []).forEach(l => {
         const a = el("a", "section-link", `${l.label} →`);
         a.href = CTX.urls.stage.replace("__stage__", l.stage);

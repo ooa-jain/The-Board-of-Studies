@@ -84,11 +84,12 @@
 {# the four stages as a staircase, one stage on each level, from the
    ground up; each label opens its stage, the sign the next step #}
 {% set spots = [('2%', '91.2%', 'is-ground'), ('35.9%', '81.6%', 'is-short'), ('48.8%', '68.9%', 'is-short'), ('63%', '57%', 'is-top')] %}
-{% set ns = namespace(here=None) %}
+{# "You are here": the stage the Continue button opens, else the first not yet submitted #}
+{% set ns = namespace(here=(resume.stage if resume else None)) %}
 {% for s in board %}{% if ns.here is none and s.status != 'submitted' %}{% set ns.here = s.key %}{% endif %}{% endfor %}
 <section class="stairs" aria-label="The four stages, step by step">
   <div class="stairs-art">
-    <img src="{{ url_for('static', filename='img/next-step.jpg') }}" alt="" width="736" height="566" loading="lazy">
+    <img src="{{ url_for('static', filename='img/next-step.png') }}" alt="" width="736" height="566" loading="lazy">
     {% for s in board[:4] %}
     {% set sp = spots[loop.index0] %}
     <a class="stairs-step st-{{ s.status }} {{ sp[2] }}{{ ' is-here' if s.key == ns.here }}" style="left:{{ sp[0] }};top:{{ sp[1] }}"

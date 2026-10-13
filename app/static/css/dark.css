@@ -4932,9 +4932,6 @@ html[data-theme="dark"] .pmap-leaf.is-draft > .pmap-dot {
 html[data-theme="dark"] .pmap-leaf.is-returned > .pmap-dot {
   background: #c2412f;
 }
-html[data-theme="dark"] .stairs-art {
-  box-shadow: 0 0 0 1px #20252e, 0 18px 34px -26px rgba(15, 36, 64, 0.45);
-}
 html[data-theme="dark"] .stairs-step {
   background: rgba(18, 21, 25, 0.94);
   color: #acc7ec;
