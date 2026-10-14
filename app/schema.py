@@ -676,10 +676,19 @@ def batch_start(label) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def _batch_courses_columns():
+    """The programme structure's columns, for an earlier batch's courses (no
+    syllabus link: that batch's syllabus is the file uploaded with them)."""
+    import copy
+    sec = next(x for x in PROGRAMME_CURRICULUM["sections"] if x["key"] == "semester_structure")
+    return [copy.deepcopy(c) for c in sec["columns"] if c["name"] != "syllabus"]
+
+
 def _batch_part(start: int) -> dict:
     """An earlier batch's syllabus: not typed in again — the department
     uploads it, in the syllabus template, and it is checked for the
-    syllabus headings like any other upload."""
+    syllabus headings like any other upload; its courses can be listed
+    as in the programme structure."""
     label = batch_label(start)
     return {
         "key": batch_key(start),
@@ -693,17 +702,21 @@ def _batch_part(start: int) -> dict:
             "key": "batch_upload",
             "title": f"Syllabus of the earlier batch — Batch of {label}",
             "help": f"Upload this programme's syllabus for the Batch of {label}, as one file (PDF or Word) "
-                    "in the syllabus template, or type it in the box below — or both. An upload is checked "
-                    "for the syllabus headings.",
+                    "in the syllabus template, or list its courses in the table below — or both. An upload "
+                    "is checked for the syllabus headings.",
             "type": "fields",
             "fields": [{"name": "batch_syllabus", "label": f"Syllabus — Batch of {label}", "type": "file",
                         "wide": True, "accept": ".pdf,.docx,.doc",
-                        "template": "templates/Syllabus_Template.docx"},
-                       {"name": "batch_text", "label": "Or type the syllabus here", "type": "textarea",
-                        "rows": 12, "wide": True,
-                        "placeholder": "Course code and title, then its modules, hours and course outcomes — "
-                                       "one course after another."}],
+                        "template": "templates/Syllabus_Template.docx"}],
             "rules": ["batch_file_or_text"],
+        }, {
+            "key": "batch_courses",
+            "title": f"Courses — Batch of {label}",
+            "help": "One course per row, as in the programme structure.",
+            "type": "table",
+            "min_rows": 0,
+            "columns": _batch_courses_columns(),
+            "rules": ["ltpe_credit_arithmetic", "marks_add_up", "unique_course_codes"],
         }],
     }
 

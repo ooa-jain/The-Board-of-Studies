@@ -693,10 +693,11 @@ def r_plan_applicable_needs_detail(data, ctx, sk):
 
 
 def r_batch_file_or_text(data, ctx, sk):
-    """An earlier batch's syllabus: the file uploaded, or typed in — either will do."""
+    """An earlier batch's syllabus: the file uploaded, or its courses listed — either will do."""
     v = _vals(data, sk)
-    if _is_blank(v.get("batch_syllabus")) and _is_blank(v.get("batch_text")):
-        return [err("Upload the syllabus file, or type the syllabus in the box.",
+    if (_is_blank(v.get("batch_syllabus")) and _is_blank(v.get("batch_text"))
+            and not _rows(data, "batch_courses")):
+        return [err("Upload the syllabus file, or list the courses in the table.",
                     section=sk, field="batch_syllabus")]
     return []
 

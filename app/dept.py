@@ -96,11 +96,17 @@ def _batch_semesters(stage):
         if sec["key"] == "batch_upload":
             sec["title"] += f" · {words[0].upper()}{words[1:]}"
             sec["help"] = (f"The syllabus for the Batch of {b['label']} — {words} only. Upload it as one file "
-                           "(PDF or Word) in the syllabus template, or type it in the box below — or both. "
-                           "An upload is checked for the syllabus headings.")
+                           "(PDF or Word) in the syllabus template, or list its courses in the table below — "
+                           "or both. An upload is checked for the syllabus headings.")
             for f in sec["fields"]:
                 if f["name"] == "batch_syllabus":
                     f["label"] += f" ({words})"
+        elif sec["key"] == "batch_courses":
+            # only the semesters Settings asks this batch for
+            sec["title"] += f" · {words[0].upper()}{words[1:]}"
+            for c in sec["columns"]:
+                if c["name"] == "semester":
+                    c["choices"], c["min"], c["max"] = list(b["semesters"]), min(b["semesters"]), max(b["semesters"])
     return s
 
 
