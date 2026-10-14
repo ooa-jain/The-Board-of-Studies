@@ -4977,6 +4977,10 @@ html[data-theme="dark"] .co-menu {
 html[data-theme="dark"] .co-opt:hover {
   background: #0e1a2a;
 }
+html[data-theme="dark"] .cd-table tr.cd-type.is-chosen td {
+  background: #13321d;
+  color: #87deac;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

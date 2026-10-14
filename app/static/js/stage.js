@@ -2358,6 +2358,23 @@
   const NC_COURSE = "Mandatory Non-Credit Course";
   const NC_AUDIT = "Mandatory Non-Credit Audit Course";
 
+  /* UG credit totals by programme type: semesters 1–6 are the 3-year
+     degree; 4-year Honours adds semesters 7–8 without the research project,
+     Honours with Research with it (and a course marked for one track counts
+     only in that one). */
+  const DEGREE = () => String((state.details || {}).degree_level || "");
+  function typeTotals(all) {
+    const later = all.filter(r => num(r.semester) > 6);
+    const upto6 = all.filter(r => num(r.semester) <= 6);
+    const researchOnly = r => r.track === "Honours with Research" ||
+      (num(r.semester) > 6 && (!r.track || r.track === "All semesters") && r.nep_category === "Research Project / Dissertation");
+    const honoursOnly = r => r.track === "Honours";
+    return { upto6, later,
+             fourYear: later.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year"),
+             honours: all.filter(r => !researchOnly(r)),
+             research: all.filter(r => !honoursOnly(r)) };
+  }
+
   function renderCreditDistribution(section, host) {
     const box = el("div", "cd-box");
     host.appendChild(box);
@@ -2376,16 +2393,7 @@
           "The Credit table will be automatically populated based on the courses added to the programme structure above."));
         return;
       }
-      const track = r => r.track || "All semesters";
-      const special = new Set(all.filter(r => track(r) !== "All semesters").map(r => num(r.semester)));
       const sems = rows => Array.from(new Set(rows.map(r => num(r.semester)))).sort((a, b) => a - b);
-      const base = all.filter(r => !special.has(num(r.semester)));
-      const blocks = [{ title: null, rows: base }];
-      [["Honours", "Honours"], ["Honours with Research", "Honours with Research"]].forEach(([t, label]) => {
-        const rows = all.filter(r => special.has(num(r.semester)) &&
-                                     (track(r) === t || track(r) === "All semesters"));
-        if (rows.some(r => track(r) === t)) blocks.push({ title: label, rows: rows });
-      });
 
       const sumBy = (rows, fn) => rows.reduce((a, r) => a + (fn(r) || 0), 0);
       const nc = rows => rows.filter(r => r.nep_category === NC_COURSE ||
@@ -2427,43 +2435,41 @@
       thead.appendChild(h);
       t1.appendChild(thead);
       const b1 = el("tbody");
-      blocks.forEach((blk, n) => {
-        if (blk.title) {
-          const tr = el("tr", "cd-band");
-          const td = el("td", null, blk.title);
-          td.colSpan = DIST_GROUPS.length + 4;
-          tr.appendChild(td);
-          b1.appendChild(tr);
-        }
-        sems(blk.rows).forEach(sem => {
-          const rows = blk.rows.filter(r => num(r.semester) === sem);
-          const tr = el("tr");
-          tr.appendChild(el("td", null, String(sem)));
-          DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
-            fmt(sumBy(rows.filter(r => inGroup(r, cat)), r => num(r.credits))))));
-          tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
-          tr.appendChild(el("td", "num", String(nc(rows))));
-          tr.appendChild(el("td", "num", String(audit(rows))));
-          b1.appendChild(tr);
-        });
-        // a track's total runs on from the common semesters, as in the template
-        const counted = n === 0 ? blk.rows : base.concat(blk.rows);
-        const tot = el("tr", "total");
-        tot.appendChild(el("td", null, "Total"));
+      const semRow = sem => {
+        const rows = all.filter(r => num(r.semester) === sem);
+        const tr = el("tr");
+        tr.appendChild(el("td", null, String(sem)));
+        DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
+          fmt(sumBy(rows.filter(r => inGroup(r, cat)), r => num(r.credits))))));
+        tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
+        tr.appendChild(el("td", "num", String(nc(rows))));
+        tr.appendChild(el("td", "num", String(audit(rows))));
+        b1.appendChild(tr);
+      };
+      const totRow = (label, counted, deg) => {
+        const tot = el("tr", "total cd-type" + (deg && deg === DEGREE() ? " is-chosen" : ""));
+        tot.appendChild(el("td", null, label));
         DIST_GROUPS.forEach(([cat]) => tot.appendChild(el("td", "num",
           fmt(sumBy(counted.filter(r => inGroup(r, cat)), r => num(r.credits))))));
         tot.appendChild(el("td", "num", fmt(sumBy(counted, r => num(r.credits)))));
         tot.appendChild(el("td", "num", String(nc(counted))));
         tot.appendChild(el("td", "num", String(audit(counted))));
         b1.appendChild(tot);
-      });
+      };
+      const T = typeTotals(all);
+      sems(T.upto6).forEach(semRow);
+      totRow("3-Year UG", T.upto6, "UG - 3 Year");
+      if (T.fourYear) {
+        sems(T.later).forEach(semRow);
+        totRow("4-Year UG (Honours)", T.honours, "UG - 4 Year (Honours)");
+        totRow("4-Year UG (Honours with Research)", T.research, "UG - 4 Year (Honours with Research)");
+      }
       t1.appendChild(b1);
       const w1 = el("div", "rt-wrap");
       w1.appendChild(t1);
       box.appendChild(w1);
       }
       if (!wants("summary")) return;
-      const running = base;
 
       // --- summary
       const t2 = el("table", "cd-table");
@@ -2484,17 +2490,15 @@
         tr.appendChild(el("td", "num", fmt(sumBy(rows, r => num(r.total_marks)))));
         b2.appendChild(tr);
       };
-      blocks.forEach((blk, n) => {
-        if (blk.title) {
-          const tr = el("tr", "cd-band");
-          const td = el("td", null, blk.title);
-          td.colSpan = 5;
-          tr.appendChild(td);
-          b2.appendChild(tr);
-        }
-        sems(blk.rows).forEach(sem => line(String(sem), blk.rows.filter(r => num(r.semester) === sem)));
-        line("Total credits", n === 0 ? blk.rows : running.concat(blk.rows), "total");
-      });
+      const T2 = typeTotals(all);
+      const chosen = deg => "total cd-type" + (deg === DEGREE() ? " is-chosen" : "");
+      sems(T2.upto6).forEach(sem => line(String(sem), all.filter(r => num(r.semester) === sem)));
+      line("3-Year UG", T2.upto6, chosen("UG - 3 Year"));
+      if (T2.fourYear) {
+        sems(T2.later).forEach(sem => line(String(sem), all.filter(r => num(r.semester) === sem)));
+        line("4-Year UG (Honours)", T2.honours, chosen("UG - 4 Year (Honours)"));
+        line("4-Year UG (Honours with Research)", T2.research, chosen("UG - 4 Year (Honours with Research)"));
+      }
       t2.appendChild(b2);
       const w2 = el("div", "rt-wrap");
       w2.appendChild(t2);

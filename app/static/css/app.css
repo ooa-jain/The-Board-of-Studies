@@ -4893,3 +4893,6 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
   box-shadow: 0 14px 28px -12px rgba(16, 24, 40, .35); }
 .co-opt { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: .82rem; font-weight: 600; cursor: pointer; }
 .co-opt:hover { background: #eff6ff; }
+/* credit tables: the total row for each UG programme type; the chosen type stands out */
+.cd-table tr.cd-type td:first-child { white-space: nowrap; }
+.cd-table tr.cd-type.is-chosen td { background: #e7f6ec; color: #1d6b3e; font-weight: 700; }
