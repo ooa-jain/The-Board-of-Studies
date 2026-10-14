@@ -8,6 +8,11 @@ MONGO_DB). The target connection string is asked for, hidden as it is typed,
 and never printed. Every collection is copied with its indexes, and the
 counts are compared at the end. The source is only read, never changed.
 
+Or take the target from another app's .env on this server (its MONGO_URI),
+so nothing is typed or shown:
+
+    venv/bin/python tools/copy_db.py --target-env /var/www/<other-app>/.env
+
 It stops if the target database already holds data, unless --replace is
 given (which empties the target collections it copies into first).
 Afterwards, put the new connection string in .env as MONGO_URI and restart
@@ -74,16 +79,24 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--env", default=str(Path(__file__).resolve().parent.parent / ".env"))
     p.add_argument("--target-db", help="database name on the target (default: the same name)")
+    p.add_argument("--target-env", help="read the target MONGO_URI from this .env file instead of asking")
     p.add_argument("--replace", action="store_true", help="overwrite collections that already have data")
     a = p.parse_args(argv)
     env = dotenv_values(a.env)
     src_uri, src_name = env.get("MONGO_URI"), env.get("MONGO_DB") or "jain_bos_portal"
     if not src_uri:
         sys.exit(f"MONGO_URI is not set in {a.env}")
-    dst_uri = getpass.getpass("Target MongoDB connection string (hidden): ").strip()
+    if a.target_env:
+        dst_uri = (dotenv_values(a.target_env).get("MONGO_URI") or "").strip()
+        if not dst_uri:
+            sys.exit(f"MONGO_URI is not set in {a.target_env}")
+    else:
+        dst_uri = getpass.getpass("Target MongoDB connection string (hidden): ").strip()
     if not dst_uri:
         sys.exit("No target given. Nothing was copied.")
     dst_name = a.target_db or src_name
+    if hide(dst_uri).split("@")[-1].split("/")[0] == hide(src_uri).split("@")[-1].split("/")[0] and dst_name == src_name:
+        sys.exit("The target is the same cluster and database as the source. Nothing was copied.")
     print(f"From {hide(src_uri)}  database '{src_name}'")
     print(f"To   {hide(dst_uri)}  database '{dst_name}'")
     src = MongoClient(src_uri, serverSelectionTimeoutMS=15000)
