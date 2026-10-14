@@ -1477,55 +1477,6 @@
       });
   }
 
-  // A UG programme: semesters 1–6 are the 3-year degree; after semester 6 it
-  // ends there, or goes on to 4-year Honours or Honours with Research.
-  function renderAfterSix(block) {
-    const opts = [["UG - 3 Year", "3-Year UG", "6 semesters"],
-                  ["UG - 4 Year (Honours)", "4-Year UG (Honours)", "8 semesters"],
-                  ["UG - 4 Year (Honours with Research)", "4-Year UG (Honours with Research)", "8 semesters"]];
-    state.details = state.details || {};
-    const cur = state.details.degree_level;
-    const bar = el("div", "deg-pick" + (opts.some(o => o[0] === cur) ? " has-pick" : ""));
-    const lab = el("span", "deg-pick-l", "Programme type");
-    lab.id = "deg-pick-l";
-    bar.appendChild(lab);
-    const row = el("div", "deg-pick-opts");
-    row.setAttribute("role", "radiogroup");
-    row.setAttribute("aria-labelledby", "deg-pick-l");
-    opts.forEach(([val, label, sub]) => {
-      const on = cur === val;
-      const b = el("button", "deg-pick-opt" + (on ? " is-on" : ""));
-      b.type = "button";
-      b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", on ? "true" : "false");
-      b.appendChild(el("span", "deg-pick-dot"));
-      const txt = el("span", "deg-pick-t");
-      txt.appendChild(el("strong", null, label));
-      txt.appendChild(el("small", null, sub));
-      b.appendChild(txt);
-      b.disabled = !!CTX.readonly;
-      b.addEventListener("click", () => {
-        if (on) return;
-        row.querySelectorAll(".deg-pick-opt").forEach(x => {
-          x.classList.toggle("is-on", x === b);
-          x.setAttribute("aria-checked", x === b ? "true" : "false");
-        });
-        bar.classList.add("has-pick");
-        state.details.degree_level = val;
-        dirty = true;
-        reloadAfterSave = true;
-        clearTimeout(saveTimer);
-        save();
-      });
-      row.appendChild(b);
-    });
-    bar.appendChild(row);
-    // at the top of the section, straight under its title
-    const help = block.querySelector(".section-help");
-    const first = help || block.querySelector(".rt-wrap");
-    if (first) block.insertBefore(bar, first); else block.appendChild(bar);
-  }
-
   // Running totals under any table with credit columns.
   function renderTotals(section, data, box) {
     const creditCols = (section.columns || []).filter(c => /credits$/.test(c.name));
@@ -1695,6 +1646,15 @@
     const LOCKED_COLS = ["programme_code", "programme_name"];
     const RULES = derivedRules(section);
     const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
+    // a UG programme structure lists semesters 1–6 once, then semesters 7–8
+    // for Honours and again for Honours with Research, each with its own add
+    const GROUPS = (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG)
+      ? [{ track: "All semesters", label: "3-Year UG", sub: "Semesters 1 – 6", sems: [1, 2, 3, 4, 5, 6] },
+         { track: "Honours", label: "4-Year UG (Honours)", sub: "Semesters 7 – 8", sems: [7, 8] },
+         { track: "Honours with Research", label: "4-Year UG (Honours with Research)",
+           sub: "Semesters 7 – 8", sems: [7, 8] }]
+      : null;
+    if (GROUPS && splitHonours(rows(section.key)) && !CTX.readonly) touch();
     if (synced) {
       const note = el("div", "sync-note");
       note.appendChild(el("span", null,
@@ -1749,7 +1709,7 @@
     // Row-count problems belong next to the table, not in a modal dialog.
     const rowNote = el("span", "rt-note");
     rowNote.setAttribute("role", "status");
-    if (!fixed && !CTX.readonly) {
+    if (!fixed && !CTX.readonly && !GROUPS) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add row");
       add.type = "button";
       add.addEventListener("click", () => { rows(section.key).push(freshRow(section)); draw(); touch(); });
@@ -1796,18 +1756,70 @@
       return changed;
     }
 
+    const SPAN = section.columns.length + 1 + (!fixed && !CTX.readonly ? 1 : 0);
+    const groupOf = row => (GROUPS.find(g => g.track === row.track) || GROUPS[0]);
+
     function draw() {
       tbody.innerHTML = "";
       const data = rows(section.key);
       let settled = false;
-      data.forEach((row, i) => {
+      if (!GROUPS) {
+        data.forEach((row, i) => drawRow(row, i, i + 1, null));
+      } else {
+        GROUPS.forEach(g => {
+          const head = el("tr", "rt-group");
+          const th = el("td");
+          th.colSpan = SPAN;
+          th.appendChild(el("strong", null, g.label));
+          th.appendChild(el("span", "rt-group-sub", g.sub));
+          head.appendChild(th);
+          tbody.appendChild(head);
+          let n = 0;
+          data.forEach((row, i) => { if (groupOf(row) === g) drawRow(row, i, ++n, g); });
+          if (!n && CTX.readonly) {
+            const tr = el("tr", "rt-group-empty");
+            const td = el("td", null, "No courses listed.");
+            td.colSpan = SPAN;
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+          }
+          if (!CTX.readonly) {
+            const tr = el("tr", "rt-group-add");
+            const td = el("td");
+            td.colSpan = SPAN;
+            const add = el("button", "rt-add", `+ Add a course · ${g.label}`);
+            add.type = "button";
+            add.addEventListener("click", () => {
+              data.push(Object.assign(freshRow(section), { track: g.track }));
+              draw();
+              touch();
+              const last = tbody.querySelector(`tr[data-row="${data.length - 1}"] select, ` +
+                                               `tr[data-row="${data.length - 1}"] input`);
+              if (last) last.focus();
+            });
+            td.appendChild(add);
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+          }
+        });
+      }
+      if (settled) touch();
+      showTotals();
+      const min = section.min_rows || 0;
+      count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}` +
+                          "";
+      count.style.color = data.length < min ? "var(--err)" : "";
+
+      function drawRow(row, i, shown, g) {
         if (!CTX.readonly && settle(row)) settled = true;
         const tr = el("tr");
         tr.dataset.row = i;
         const cells = {};
-        tr.appendChild(el("td", "rt-idx", String(i + 1)));
+        tr.appendChild(el("td", "rt-idx", String(shown)));
 
         section.columns.forEach(c => {
+          // within a group, the semester is one of that group's
+          if (g && c.name === "semester") c = Object.assign({}, c, { choices: g.sems, max: Math.max(...g.sems) });
           const td = el("td");
           if (c.auto_index) {
             row[c.name] = i + 1;
@@ -1906,15 +1918,27 @@
         }
         tbody.appendChild(tr);
         if (!CTX.readonly && derive(RULES, row, cells)) touch();
-      });
-      if (settled) touch();
-      showTotals();
-      const min = section.min_rows || 0;
-      count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}` +
-                          "";
-      count.style.color = data.length < min ? "var(--err)" : "";
+      }
     }
     draw();
+  }
+
+  // Semesters 7–8 courses marked for all semesters are listed under Honours
+  // and again under Honours with Research (a research project only there),
+  // so every total stays as it was. True when anything moved.
+  function splitHonours(data) {
+    const out = [];
+    let moved = false;
+    data.forEach(r => {
+      const t = r && (r.track || "All semesters");
+      if (r && num(r.semester) > 6 && t === "All semesters") {
+        moved = true;
+        if (r.nep_category !== "Research Project / Dissertation") out.push(Object.assign({}, r, { track: "Honours" }));
+        out.push(Object.assign({}, r, { track: "Honours with Research" }));
+      } else out.push(r);
+    });
+    if (moved) data.splice(0, data.length, ...out);
+    return moved;
   }
 
   // ------------------------------------------------------------ row cards
@@ -2359,20 +2383,21 @@
   const NC_AUDIT = "Mandatory Non-Credit Audit Course";
 
   /* UG credit totals by programme type: semesters 1–6 are the 3-year
-     degree; 4-year Honours adds semesters 7–8 without the research project,
-     Honours with Research with it (and a course marked for one track counts
-     only in that one). */
+     degree; 4-year Honours adds its own semesters 7–8, and Honours with
+     Research its own (a semester 7–8 course not marked for either counts in
+     both, a research project only with research). */
   const DEGREE = () => String((state.details || {}).degree_level || "");
+  const TRACKED = r => r.track === "Honours" || r.track === "Honours with Research";
   function typeTotals(all) {
-    const later = all.filter(r => num(r.semester) > 6);
-    const upto6 = all.filter(r => num(r.semester) <= 6);
+    const upto6 = all.filter(r => num(r.semester) <= 6 && !TRACKED(r));
     const researchOnly = r => r.track === "Honours with Research" ||
-      (num(r.semester) > 6 && (!r.track || r.track === "All semesters") && r.nep_category === "Research Project / Dissertation");
+      (num(r.semester) > 6 && !TRACKED(r) && r.nep_category === "Research Project / Dissertation");
     const honoursOnly = r => r.track === "Honours";
-    return { upto6, later,
-             fourYear: later.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year"),
-             honours: all.filter(r => !researchOnly(r)),
-             research: all.filter(r => !honoursOnly(r)) };
+    const honLater = all.filter(r => !upto6.includes(r) && !researchOnly(r));
+    const resLater = all.filter(r => !upto6.includes(r) && !honoursOnly(r));
+    return { upto6, honLater, resLater,
+             fourYear: honLater.length + resLater.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year"),
+             honours: upto6.concat(honLater), research: upto6.concat(resLater) };
   }
 
   function renderCreditDistribution(section, host) {
@@ -2435,8 +2460,8 @@
       thead.appendChild(h);
       t1.appendChild(thead);
       const b1 = el("tbody");
-      const semRow = sem => {
-        const rows = all.filter(r => num(r.semester) === sem);
+      const semRow = (sem, from) => {
+        const rows = from.filter(r => num(r.semester) === sem);
         const tr = el("tr");
         tr.appendChild(el("td", null, String(sem)));
         DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
@@ -2456,12 +2481,23 @@
         tot.appendChild(el("td", "num", String(audit(counted))));
         b1.appendChild(tot);
       };
+      const band = (label, cols) => {
+        const tr = el("tr", "cd-band");
+        const td = el("td", null, label);
+        td.colSpan = cols;
+        tr.appendChild(td);
+        return tr;
+      };
       const T = typeTotals(all);
-      sems(T.upto6).forEach(semRow);
+      const COLS1 = DIST_GROUPS.length + 4;
+      sems(T.upto6).forEach(sem => semRow(sem, T.upto6));
       totRow("3-Year UG", T.upto6, "UG - 3 Year");
       if (T.fourYear) {
-        sems(T.later).forEach(semRow);
+        b1.appendChild(band("Honours", COLS1));
+        sems(T.honLater).forEach(sem => semRow(sem, T.honLater));
         totRow("4-Year UG (Honours)", T.honours, "UG - 4 Year (Honours)");
+        b1.appendChild(band("Honours with Research", COLS1));
+        sems(T.resLater).forEach(sem => semRow(sem, T.resLater));
         totRow("4-Year UG (Honours with Research)", T.research, "UG - 4 Year (Honours with Research)");
       }
       t1.appendChild(b1);
@@ -2492,11 +2528,17 @@
       };
       const T2 = typeTotals(all);
       const chosen = deg => "total cd-type" + (deg === DEGREE() ? " is-chosen" : "");
-      sems(T2.upto6).forEach(sem => line(String(sem), all.filter(r => num(r.semester) === sem)));
+      const inSem = (rows, sem) => rows.filter(r => num(r.semester) === sem);
+      sems(T2.upto6).forEach(sem => line(String(sem), inSem(T2.upto6, sem)));
       line("3-Year UG", T2.upto6, chosen("UG - 3 Year"));
       if (T2.fourYear) {
-        sems(T2.later).forEach(sem => line(String(sem), all.filter(r => num(r.semester) === sem)));
+        const band2 = label => { const tr = el("tr", "cd-band"); const td = el("td", null, label);
+                                 td.colSpan = 5; tr.appendChild(td); b2.appendChild(tr); };
+        band2("Honours");
+        sems(T2.honLater).forEach(sem => line(String(sem), inSem(T2.honLater, sem)));
         line("4-Year UG (Honours)", T2.honours, chosen("UG - 4 Year (Honours)"));
+        band2("Honours with Research");
+        sems(T2.resLater).forEach(sem => line(String(sem), inSem(T2.resLater, sem)));
         line("4-Year UG (Honours with Research)", T2.research, chosen("UG - 4 Year (Honours with Research)"));
       }
       t2.appendChild(b2);
@@ -3900,7 +3942,6 @@
         renderRowCards(section, block);
       } else if (section.type === "table") {
         renderTable(section, block);
-        if (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG) renderAfterSix(block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
       } else if (section.type === "revision_summary") {
@@ -3917,7 +3958,7 @@
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
           if (f.hidden) return;              // kept in the record, not shown
-          // a UG degree is chosen under the programme structure, after semester 6
+          // a UG degree comes from the Programme List; the structure covers all three
           if (f.name === "degree_level" && CTX.key === "prog_curriculum" && !IS_PG) return;
           // standard wording is the placeholder: an empty box means "use it".
           // A draft that still holds the wording word for word shows it the

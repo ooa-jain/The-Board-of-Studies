@@ -37,6 +37,7 @@ from . import demo_dept
 from .db import get_db, now
 from .keyword_match import check as keyword_check
 from .packs import PARTS, find_department, get_pack, load_pack
+from .ugc_rules import split_honours
 from .schema import PARTS as PROGRAMME_PARTS
 from .schema import STAGE_BY_KEY, STAGE_KEYS, degree_years, programme_level
 from .summarise import field_label
@@ -117,7 +118,7 @@ def _ug_courses(prefix):
                          "l": lec, "t": 0, "p": 0, "e": exp, "credits": credits,
                          "cia": 50, "ese": 50, "total_marks": 100})
     rows.sort(key=lambda r: (r["semester"], r["course_code"]))
-    return rows
+    return split_honours(rows)
 
 
 def _pg_courses(prefix):

@@ -440,7 +440,7 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "semester_structure",
             "title": "Programme structure — semester scheme",
-            "help": "Enter one course per row for each semester. After Semester 6, select whether the programme concludes with a 3-year degree or continues as a 4-year Honours or Honours with Research programme.",
+            "help": "Enter one course per row. Semesters 1 – 6 make the 3-year degree; list semesters 7 and 8 under Honours and again under Honours with Research, each with its own Add.",
             "type": "table",
             "min_rows": 1,
             "columns": [

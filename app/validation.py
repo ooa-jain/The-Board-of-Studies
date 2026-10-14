@@ -483,6 +483,10 @@ def r_semester_within_duration(data, ctx, sk):
     out = []
     for i, r in enumerate(_rows(data, sk)):
         s = _int(r.get("semester"))
+        # semesters 7-8 listed for Honours or Honours with Research are the
+        # 4-year options of a UG programme
+        if r.get("track") in ("Honours", "Honours with Research") and s and s <= 8:
+            continue
         if s and s > sems:
             out.append(err(f"Semester {s} is outside this programme, which has {sems} semesters.",
                            section=sk, row=i, field="semester"))

@@ -4778,28 +4778,17 @@ html.intro-open, html.intro-open body { overflow: hidden; }
 .pmap-done { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #2f8a55; color: #fff; }
 .pmap-twig.is-submitted { background: #e6f4ea; color: #1f6b44; }
 
-/* UG programme structure: the programme type, chosen at the top */
-.deg-pick { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin: 4px 0 14px; }
-.deg-pick-l { font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
-.deg-pick-opts { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line);
-  border-radius: 12px; background: var(--canvas); }
-.deg-pick-opt { display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px 8px 12px; border: 0;
-  border-radius: 9px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; text-align: left;
-  transition: background .18s, color .18s, opacity .18s, filter .18s, box-shadow .18s; }
-.deg-pick-t { display: flex; flex-direction: column; line-height: 1.2; }
-.deg-pick-t strong { font-size: .86rem; font-weight: 600; color: inherit; }
-.deg-pick-t small { font-size: .72rem; color: var(--ink-faint); }
-.deg-pick-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink-faint);
-  background: var(--surface); }
-.deg-pick-opt:not(.is-on):hover:not(:disabled) { background: var(--surface); }
-.deg-pick-opt:focus-visible { outline: 2px solid var(--gold-500); outline-offset: 2px; }
-.deg-pick-opt.is-on { background: var(--ink-800); color: #fff; box-shadow: 0 2px 8px rgba(15, 36, 64, .22); }
-.deg-pick-opt.is-on small { color: rgba(255, 255, 255, .75); }
-.deg-pick-opt.is-on .deg-pick-dot { border-color: #fff; background: #fff; box-shadow: inset 0 0 0 3px var(--ink-800); }
-/* once one is chosen, the others step back */
-.deg-pick.has-pick .deg-pick-opt:not(.is-on) { opacity: .45; filter: blur(.6px) grayscale(1); }
-.deg-pick.has-pick .deg-pick-opt:not(.is-on):hover:not(:disabled) { opacity: 1; filter: none; }
-.deg-pick-opt:disabled { cursor: default; }
+/* UG programme structure: 3-Year UG, then Honours and Honours with Research,
+   each a band of its own with its own add */
+.rt tr.rt-group td { padding: 9px 12px; background: var(--ink-800); color: #fff; border-top: 10px solid var(--surface); }
+.rt tbody tr.rt-group:first-child td { border-top: 0; }
+.rt tr.rt-group td strong { font-size: .86rem; font-weight: 700; letter-spacing: .02em; color: #fff; }
+.rt-group-sub { margin-left: 10px; font-size: .74rem; color: rgba(255, 255, 255, .72); }
+.rt tr.rt-group-add td, .rt tr.rt-group-empty td { padding: 8px 12px; background: var(--canvas); }
+.rt tr.rt-group-empty td { color: var(--ink-faint); font-size: .84rem; font-style: italic; }
+.rt-add { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px dashed var(--ink-faint);
+  border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; }
+.rt-add:hover, .rt-add:focus-visible { border-style: solid; border-color: var(--gold-500); background: var(--gold-100); outline: none; }
 
 /* Submit found gaps: what is still to fill, each a link to its box */
 .miss-lede { margin: 0 0 10px; color: var(--ink); }

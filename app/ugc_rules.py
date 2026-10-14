@@ -199,3 +199,27 @@ def row_counts_for(row, track):
     if t == "Honours with Research":
         return track == "research"
     return True
+
+
+def split_honours(rows):
+    """A UG structure as the form lists it: semesters 1-6 for every degree,
+    and semesters 7-8 once for Honours and once for Honours with Research.
+    A semester 7-8 course marked for all semesters is listed under both (a
+    research project only under Honours with Research), so every total
+    stays as it was."""
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        try:
+            sem = int(r.get("semester") or 0)
+        except (TypeError, ValueError):
+            sem = 0
+        if sem > 6 and str(r.get("track") or "All semesters") == "All semesters":
+            if r.get("nep_category") != "Research Project / Dissertation":
+                out.append({**r, "track": "Honours"})
+            out.append({**r, "track": "Honours with Research"})
+        else:
+            out.append(r)
+    return out
