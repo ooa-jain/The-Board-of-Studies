@@ -116,6 +116,16 @@
     return n;
   };
 
+  // a note saying something fills itself in carries the yellow highlighter
+  const AUTO_RE = /automatically|worked out from|filled (in|into) .*automatically|populated/i;
+  function autoNote(node) {
+    const t = node.textContent;
+    if (!AUTO_RE.test(t)) return node;
+    node.textContent = "";
+    node.appendChild(el("span", "hl-auto", t));
+    return node;
+  }
+
   // ---------------------------------------------------------------- helpers
 
   function get(sectionKey) {
@@ -1236,7 +1246,7 @@
       lab.appendChild(el("span", null, def.label + (def.required ? " *" : "")));
       wrap.appendChild(lab);
       if (def.help) {
-        const help = el("span", "help", def.help);
+        const help = autoNote(el("span", "help", def.help));
         help.id = `f-${def.name}-help`;
         wrap.appendChild(help);
         describe(input, help.id);
@@ -1286,7 +1296,7 @@
     wrap._input = input;
     addHint(wrap, lab, input, def);
     if (def.help) {
-      const help = el("span", "help", def.help);
+      const help = autoNote(el("span", "help", def.help));
       help.id = `f-${def.name}-help`;
       wrap.appendChild(help);
       describe(input, help.id);
@@ -2415,8 +2425,8 @@
         .filter(r => num(r.semester) !== null);
       if (!all.length) {
         // the section's own line already says the table fills itself; no second bar
-        if (SHOW !== "classification") box.appendChild(el("p", "pl-empty",
-          "The Credit table will be automatically populated based on the courses added to the programme structure above."));
+        if (SHOW !== "classification") box.appendChild(autoNote(el("p", "pl-empty",
+          "The Credit table will be automatically populated based on the courses added to the programme structure above.")));
         return;
       }
       const sems = rows => Array.from(new Set(rows.map(r => num(r.semester)))).sort((a, b) => a - b);
@@ -3916,7 +3926,7 @@
       if (section.title) block.appendChild(h);
       if (WIDE_SECTIONS.includes(section.type) && !["cards", "sheet"].includes(section.display) && section.title) expandable(block, h, section.title);
       if (section.help) {
-        const help = el("div", "section-help", section.help);
+        const help = autoNote(el("div", "section-help", section.help));
         // Pre-BoS and BoS Documents: the folder mascot above the uploads
         if (["pre_bos", "bos_documents"].includes(CTX.key) && (section.fields || []).some(f => f.type === "file")
             && !document.querySelector(".upload-mascot")) {
