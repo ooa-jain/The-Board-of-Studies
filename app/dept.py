@@ -95,9 +95,9 @@ def _batch_semesters(stage):
     for sec in s["sections"]:
         if sec["key"] == "batch_upload":
             sec["title"] += f" · {words[0].upper()}{words[1:]}"
-            sec["help"] = (f"Upload this programme's syllabus for the Batch of {b['label']} — {words} only — "
-                           "as one file (PDF or Word) in the syllabus template. It is checked for the "
-                           "syllabus headings.")
+            sec["help"] = (f"The syllabus for the Batch of {b['label']} — {words} only. Upload it as one file "
+                           "(PDF or Word) in the syllabus template, or type it in the box below — or both. "
+                           "An upload is checked for the syllabus headings.")
             for f in sec["fields"]:
                 if f["name"] == "batch_syllabus":
                     f["label"] += f" ({words})"

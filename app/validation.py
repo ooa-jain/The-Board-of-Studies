@@ -692,6 +692,15 @@ def r_plan_applicable_needs_detail(data, ctx, sk):
     return out
 
 
+def r_batch_file_or_text(data, ctx, sk):
+    """An earlier batch's syllabus: the file uploaded, or typed in — either will do."""
+    v = _vals(data, sk)
+    if _is_blank(v.get("batch_syllabus")) and _is_blank(v.get("batch_text")):
+        return [err("Upload the syllabus file, or type the syllabus in the box.",
+                    section=sk, field="batch_syllabus")]
+    return []
+
+
 RULES = {name[2:]: fn for name, fn in list(globals().items())
          if name.startswith("r_") and callable(fn)}
 

@@ -693,11 +693,17 @@ def _batch_part(start: int) -> dict:
             "key": "batch_upload",
             "title": f"Syllabus of the earlier batch — Batch of {label}",
             "help": f"Upload this programme's syllabus for the Batch of {label}, as one file (PDF or Word) "
-                    "in the syllabus template. It is checked for the syllabus headings.",
+                    "in the syllabus template, or type it in the box below — or both. An upload is checked "
+                    "for the syllabus headings.",
             "type": "fields",
             "fields": [{"name": "batch_syllabus", "label": f"Syllabus — Batch of {label}", "type": "file",
-                        "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
-                        "template": "templates/Syllabus_Template.docx"}],
+                        "wide": True, "accept": ".pdf,.docx,.doc",
+                        "template": "templates/Syllabus_Template.docx"},
+                       {"name": "batch_text", "label": "Or type the syllabus here", "type": "textarea",
+                        "rows": 12, "wide": True,
+                        "placeholder": "Course code and title, then its modules, hours and course outcomes — "
+                                       "one course after another."}],
+            "rules": ["batch_file_or_text"],
         }],
     }
 
