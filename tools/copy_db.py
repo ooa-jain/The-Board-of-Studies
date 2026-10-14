@@ -21,8 +21,10 @@ the portal.
 import argparse
 import getpass
 import sys
+import time
 from pathlib import Path
 
+import bson
 from dotenv import dotenv_values
 from pymongo import MongoClient
 
@@ -49,16 +51,28 @@ def copy(src_db, dst_db, replace=False, out=print):
         src, dst = src_db[name], dst_db[name]
         if replace:
             dst.delete_many({})
-        batch, n = [], 0
-        for doc in src.find({}, no_cursor_timeout=False):
+        total = src.estimated_document_count()
+        first = src.find_one({}, {"_id": 1})
+        sample = src.find_one({"_id": first["_id"]}) if first else None
+        big = bool(sample) and len(bson.encode(sample)) > 50_000
+        # large records (a department's whole submission) are fetched a few at a
+        # time and written one by one, with a running count, so a slow source
+        # shows progress instead of a frozen screen
+        cursor = src.find({}).batch_size(2 if big else BATCH)
+        batch, n, t0 = [], 0, time.time()
+        for doc in cursor:
             batch.append(doc)
-            if len(batch) >= BATCH:
+            if len(batch) >= (1 if big else BATCH):
                 dst.insert_many(batch, ordered=False)
                 n += len(batch)
                 batch = []
+                if big:
+                    print(f"\r  {name:<20} {n}/{total} copied ({int(time.time() - t0)}s)", end="", flush=True)
         if batch:
             dst.insert_many(batch, ordered=False)
             n += len(batch)
+        if big:
+            print("\r", end="")
         for idx in src.list_indexes():
             if idx["name"] == "_id_":
                 continue
