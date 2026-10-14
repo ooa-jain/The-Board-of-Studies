@@ -66,6 +66,13 @@ DOCS = {
         "Rating scale 1 to 5; average rating 4.2",
         "Feedback: more case studies and analytics in the curriculum."]),
 }
+# an earlier batch's syllabus, as uploaded in the syllabus template
+DOCS["earlier_batch_syllabus.pdf"] = ("earlier_batch", "batch_syllabus", [
+    "Syllabus — Batch of 2025-2026", "Name of the Program: BBA in Demonstration Management",
+    "Course Code: 25BBA1C01   Name of the Course: Principles of Management",
+    "Course Credits: 4   No. of Hours per Week: 4   Total No. of Teaching Hours: 60",
+    "Course Outcomes: CO1 to CO5", "Module No. 1: Introduction   Hours: 12",
+    "Books for reference: Koontz, Essentials of Management"])
 # the optional ones too: a demo shows every box with a document in it
 DOCS["pre_bos_minutes.pdf"] = ("pre_bos", "pre_bos_minutes", [
     "Minutes of the Pre-BoS Meeting — Department of Demonstration Studies",
@@ -285,7 +292,10 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                if "prog_curriculum.document" in files else {}),
         }
     batch = (STAGE_BY_KEY.get(stage_key) or {}).get("batch") or ""
-    if stage_key == "prog_syllabus" or stage_key.startswith("prog_syllabus_b"):
+    if stage_key.startswith("prog_syllabus_b"):
+        # an earlier batch: its syllabus as one uploaded file
+        return {"batch_upload": {"batch_syllabus": files["batch_syllabus"]}} if "batch_syllabus" in files else {}
+    if stage_key == "prog_syllabus":
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
         out = {"courses": [_syllabus_row(c, y) for c in courses]}
         if stage_key == "prog_syllabus" and "prog_syllabus.document" in files:

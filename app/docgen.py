@@ -763,6 +763,36 @@ def syllabus_docx(db, dept_code, year, programme_code):
     return _save(doc)
 
 
+def batch_syllabus_file(path, programme_name, batch_label, courses):
+    """An earlier batch's syllabus as a stand-in file for its upload box (the
+    Drive import): the syllabus template's headings, course by course, as
+    plain paragraphs — quick to write for every programme and batch."""
+    from docx import Document
+    doc = Document()
+    doc.add_heading(f"{programme_name} — Syllabus, Batch of {batch_label}", level=1)
+    doc.add_paragraph("JAIN (Deemed-to-be University), Bangalore")
+    courses = sorted([c for c in courses or [] if isinstance(c, dict)], key=lambda c: (_num(c.get("semester")) or 99))
+    for c in courses:
+        doc.add_heading(f"Course Code: {c.get('course_code') or ''} — Name of the Course: {c.get('course_title') or ''}", level=2)
+        doc.add_paragraph(f"Semester {_fmt(c.get('semester'))} · Course Credits: {_fmt(c.get('credits'))} · "
+                          f"No. of Hours per Week: {_fmt(c.get('hours_per_week'))} · "
+                          f"Total No. of Teaching Hours: {_fmt(c.get('teaching_hours'))}")
+        outs = _lines(c.get("outcomes"))
+        if outs:
+            doc.add_paragraph("Course Outcomes: " + "; ".join(f"CO{i}: {o}" for i, o in enumerate(outs, 1)))
+        for n, m in enumerate([m for m in c.get("modules") or [] if isinstance(m, dict)], 1):
+            doc.add_paragraph(f"Module No. {n}: {m.get('title') or ''} ({_fmt(m.get('hours'))} Hours) — "
+                              f"{str(m.get('revised') or m.get('content') or '').strip()}")
+        books = _lines(c.get("books"))
+        if books:
+            doc.add_paragraph("Books for reference: " + "; ".join(books))
+    if not courses:
+        doc.add_paragraph("Syllabus: Course Code, Name of the Course, Course Credits, Course Outcomes, "
+                          "Module No., Hours, Books for reference — to be uploaded by the department.")
+    doc.core_properties.title = f"Syllabus, Batch of {batch_label} — {programme_name}"[:250]
+    doc.save(str(path))
+
+
 # ---------------------------------------------------------------------------
 # Course Revision — the "Percentage of change in syllabus revision" document
 # (BBA Syllabus Revision 2024): its letterhead, orange bands, (A)–(D),

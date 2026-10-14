@@ -677,9 +677,29 @@ def batch_start(label) -> int | None:
 
 
 def _batch_part(start: int) -> dict:
-    part = _plain_syllabus(batch_key(start), f"Syllabus — Batch of {batch_label(start)}", "")
-    part.update({"batch": batch_label(start), "existing_batch": True, "optional": False})
-    return part
+    """An earlier batch's syllabus: not typed in again — the department
+    uploads it, in the syllabus template, and it is checked for the
+    syllabus headings like any other upload."""
+    label = batch_label(start)
+    return {
+        "key": batch_key(start),
+        "parent": "curriculum",
+        "group": "Stage 3 · Curriculum",
+        "title": f"Syllabus — Batch of {label}",
+        "blurb": "",
+        "per_programme": True,
+        "batch": label, "existing_batch": True, "optional": False,
+        "sections": [{
+            "key": "batch_upload",
+            "title": f"Syllabus of the earlier batch — Batch of {label}",
+            "help": f"Upload this programme's syllabus for the Batch of {label}, as one file (PDF or Word) "
+                    "in the syllabus template. It is checked for the syllabus headings.",
+            "type": "fields",
+            "fields": [{"name": "batch_syllabus", "label": f"Syllabus — Batch of {label}", "type": "file",
+                        "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
+                        "template": "templates/Syllabus_Template.docx"}],
+        }],
+    }
 
 
 BATCH_PARTS = [_batch_part(y) for y in range(2010, 2041)]

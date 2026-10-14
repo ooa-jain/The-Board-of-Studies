@@ -542,7 +542,18 @@ def fill_from_drive(dept, year, actor):
             if build is None:
                 # an earlier batch: the current batch's syllabus as a stand-in
                 current = programme_stage_state(sub, pcode, "prog_syllabus").get("data") or {}
-                data = _batch_syllabus(current, STAGE_BY_KEY[part].get("batch"), stored)
+                label = STAGE_BY_KEY[part].get("batch")
+                data = _batch_syllabus(current, label, stored)
+                # the batch's syllabus as one file in the syllabus template,
+                # in its upload box (the courses stay, for Course Revision)
+                if not (data.get("batch_upload") or {}).get("batch_syllabus"):
+                    from .docgen import batch_syllabus_file
+                    pname = programme.get("programme_name") or pcode
+                    val = _store(db, code, year, part, "batch_syllabus",
+                                 f"{pcode}_Syllabus_Batch_{str(label).replace('–', '-')}.docx",
+                                 lambda path, pname=pname, label=label, cs=data.get("courses"):
+                                     batch_syllabus_file(path, pname, label, cs), actor)
+                    data["batch_upload"] = {"batch_syllabus": val}
                 base = prefill_for(part, dept, year, programme, fresh())
                 for k, v in base.items():
                     data.setdefault(k, v)

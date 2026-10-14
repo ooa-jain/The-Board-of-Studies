@@ -60,6 +60,10 @@ KEYWORDS = {
                      "Type of revision / Major / Minor", "% Change / Percentage", "rationale",
                      "Existing Content", "Proposed Content", "Stakeholder feedback", "BoS Date / BoS"],
     "course_file": ["syllabus", "course", "module / unit", "credits", "outcomes / CO", "hours"],
+    # an earlier batch's syllabus, uploaded in the syllabus template
+    "batch_syllabus": ["syllabus", "course code", "name of the course / course title / course name",
+                       "course outcomes / outcomes / CO", "module / unit", "hours", "credits",
+                       "books for reference / references / text books"],
     "document": ["curriculum", "semester", "credits", "course code", "course title / course name",
                  "programme structure / program structure / scheme"],
 }
@@ -118,9 +122,9 @@ READABLE = {".pdf", ".docx", ".xlsx", ".csv"}
 
 def upload_boxes():
     """Every upload box in the forms, once each: [{field, label, where}]."""
-    from .schema import PARTS, STAGES
+    from .schema import BATCH_PARTS, PARTS, STAGES
     out, seen = [], set()
-    for stage in STAGES + PARTS:
+    for stage in STAGES + PARTS + BATCH_PARTS[:1]:
         for sec in stage.get("sections", []):
             for f in sec.get("fields", []) + sec.get("columns", []):
                 if f.get("type") == "file" and f["name"] not in seen:
@@ -128,6 +132,8 @@ def upload_boxes():
                     label = f.get("label") or f["name"]
                     if f["name"] == "course_file":
                         label = "Course document (syllabus row upload)"
+                    if f["name"] == "batch_syllabus":
+                        label = "Syllabus of an earlier batch"
                     out.append({"field": f["name"], "label": label,
                                 "where": stage.get("group") or stage.get("title", "")})
     return out
