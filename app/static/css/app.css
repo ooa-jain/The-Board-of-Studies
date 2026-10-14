@@ -4867,3 +4867,8 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 @keyframes mascot-wave { 0%, 100% { transform: rotate(0); } 8% { transform: rotate(-4deg); } 16% { transform: rotate(3deg); } 24% { transform: rotate(0); } }
 @media (max-width: 600px) { .upload-mascot { width: 72px; } }
 @media (prefers-reduced-motion: reduce) { .upload-mascot { animation: none; } }
+/* the programme code is made from the name and kept in the record, not shown */
+.pl-in[hidden] { display: none !important; }
+/* syllabus column of the programme structure: Yes opens it, No does nothing */
+.syl-chip.is-yes { background: #e2f1e6; color: #1f6b44; border-color: #cfe6d7; font-weight: 700; }
+.syl-chip.is-no { background: #f4f5f7; color: #6b7280; border-color: #e4e7ec; cursor: default; }

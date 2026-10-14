@@ -47,6 +47,16 @@
           {% for b in batches.existing %}<span class="batch-tag">Batch of {{ b.label }}</span>{% endfor %}
         </p>
       </fieldset>
+      {% set cur_start = (batches.current[:4]|int) if batches.current else 0 %}
+      {% if cur_start and can('settings', 'edit') %}
+      <div class="batch-next">
+        <div><strong>Start the next batch</strong>
+          <p class="small muted">Batch of {{ batches.current }} becomes an earlier batch — each programme's syllabus moves
+            there as it is — and <strong>Batch of {{ cur_start + 1 }}–{{ cur_start + 2 }}</strong> becomes the current batch,
+            starting empty. Do it whenever the new batch begins.</p></div>
+        <button class="btn btn-sm" type="submit" form="next-batch-form">Make {{ cur_start + 1 }}–{{ cur_start + 2 }} the current batch</button>
+      </div>
+      {% endif %}
       <div class="field">
         <label>Banner message</label>
         <textarea name="banner" rows="2"
@@ -90,4 +100,10 @@
     </form>
   </div>
 </div>
+{% if batches.current and can('settings', 'edit') %}
+<form id="next-batch-form" method="post" action="{{ url_for('admin.next_batch') }}"
+      onsubmit="return confirm('Start Batch of {{ (batches.current[:4]|int) + 1 }}–{{ (batches.current[:4]|int) + 2 }}? Batch of {{ batches.current }} becomes an earlier batch, with every programme\'s syllabus moved to it as it is.')">
+  <input type="hidden" name="from" value="{{ batches.current }}">
+</form>
+{% endif %}
 {% endblock %}

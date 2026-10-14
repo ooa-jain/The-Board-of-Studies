@@ -1598,12 +1598,10 @@
     const code = codes[0] || "";
     const a = el("a", "syl-chip");
     const syl = CTX.syllabi || [];
-    const cur = syl.find(x => x.current);
     if (!code) {
-      a.className = "syl-chip is-none";
-      a.textContent = "—";
-      a.title = "Enter the course code first";
-      return a;
+      const no = el("span", "syl-chip is-no", "No");
+      no.title = "Enter the course code first";
+      return no;
     }
     const hits = [];
     syl.filter(x => x.current).forEach(x => (x.courses || []).forEach(c => {
@@ -1614,25 +1612,18 @@
     }));
     const best = hits.find(h => h.x.current && h.same) || hits.find(h => h.x.current) ||
                  hits.find(h => h.same) || hits[0];
-    if (!best) {
-      a.className = "syl-chip is-none";
-      a.textContent = "+ Add";
-      a.title = "No syllabus has this course code yet — opens the current batch's syllabus";
-      if (cur) a.href = cur.url;
-      return a;
+    if (!best || !best.x.current) {
+      // no syllabus for this course in the current batch: No, and nothing happens
+      const no = el("span", "syl-chip is-no", "No");
+      no.title = "This course has no syllabus in the current batch yet";
+      return no;
     }
+    // Yes: opens the course's syllabus in the current batch
     a.href = best.x.url + "#course-" + encodeURIComponent(best.c.code.toUpperCase());
-    if (best.same && best.x.current) {
-      a.className = "syl-chip is-ok";
-      a.textContent = codes.length > 1 ? `✓ ${new Set(hits.map(h => h.c.code)).size}/${codes.length}` : "✓";
-    } else if (best.x.current) {
-      a.className = "syl-chip is-warn";
-      a.textContent = "Title differs";
-    } else {
-      a.className = "syl-chip is-old";
-      a.textContent = best.x.label.replace("Batch ", "");
-    }
-    a.title = hits.map(h => `${h.x.label}: ${h.c.code} — ${h.c.title}${h.same ? " ✓ same title" : " (title differs)"}`).join("\n");
+    a.className = "syl-chip is-yes";
+    a.textContent = "Yes";
+    a.title = best.same ? "Open this course's syllabus — current batch"
+                        : "Open this course's syllabus — current batch (its title there differs)";
     return a;
   }
 
@@ -3157,6 +3148,8 @@
         const codeBox = input(row, "programme_code",
           { name: "programme_code", label: "Programme code", type: "text", required: true,
             placeholder: "e.g. MSCDS" });
+        // the code is made from the name (MSCDS) and kept, not shown
+        codeBox.hidden = true;
         grid.appendChild(codeBox);
         grid.appendChild(input(row, "degree",
           { name: "degree", label: "Degree", type: "select", required: true,
@@ -3205,7 +3198,7 @@
       const body = el("div", "pl-body");
       body.appendChild(el("span", "pl-name", row.programme_name || ""));
       const meta = el("span", "pl-meta");
-      meta.appendChild(el("span", "pl-code", row.programme_code || ""));
+      // the code stays in the record; the list shows the name, level and year
       const rest = [row.degree, row.year_introduced && `since ${row.year_introduced}`,
                     row.minors].filter(Boolean).join(" · ");
       if (rest) meta.appendChild(document.createTextNode(" " + rest));

@@ -4932,6 +4932,16 @@ html[data-theme="dark"] .pmap-leaf.is-draft > .pmap-dot {
 html[data-theme="dark"] .pmap-leaf.is-returned > .pmap-dot {
   background: #c2412f;
 }
+html[data-theme="dark"] .syl-chip.is-yes {
+  background: #193320;
+  color: #88ddb1;
+  border-color: #2c523a;
+}
+html[data-theme="dark"] .syl-chip.is-no {
+  background: #181b21;
+  color: #a1a9b8;
+  border-color: #2e3542;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
@@ -6169,6 +6179,10 @@ html[data-theme="dark"] .dp-danger-body form:first-child {
 }
 html[data-theme="dark"] .dp-danger-body input[name=confirm] {
   border: 1px solid #373e4c;
+}
+html[data-theme="dark"] .batch-next {
+  border: 1px solid #2b3b50;
+  background: #0e1a2a;
 }
 
 /* ---- admin.css ---- */

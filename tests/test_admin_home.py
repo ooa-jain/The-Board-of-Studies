@@ -196,3 +196,34 @@ def test_department_page_downloads_both_and_deletes_with_the_code_typed(app, cli
     with app.app_context():
         assert get_db().departments.count_documents({"dept_code": "COM"}) == 0
         assert get_db().users.count_documents({"dept_code": "COM", "role": "department"}) == 0
+
+
+def test_next_batch_moves_the_current_syllabus_to_an_earlier_batch(app, client):
+    from app.db import get_db
+    from app.workflow import batches
+    make_department(app)
+    with app.app_context():
+        db = get_db()
+        db.settings.update_one({"_id": "app"}, {"$set": {"current_batch": "2026-2027",
+                                                         "existing_batches": ["2024-2025", "2025-2026"]}}, upsert=True)
+        db.submissions.update_one({"dept_code": "COM"}, {"$set": {
+            "programmes.BCOM.prog_syllabus": {"status": "submitted", "data": {"courses": [{"course_code": "C1"}]}},
+            "programmes.BCOM.prog_curriculum": {"status": "draft", "data": {"x": 1}}}}, upsert=True)
+    _admin(app, client)
+    page = client.get("/admin/settings").get_data(as_text=True)
+    assert "Make 2027–2028 the current batch" in page
+    r = client.post("/admin/settings/next-batch", data={"from": "2026–2027"})
+    assert r.status_code == 302
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "COM"})
+        p = sub["programmes"]["BCOM"]
+        assert "prog_syllabus" not in p and p["prog_syllabus_b2026"]["status"] == "submitted"
+        assert p["prog_curriculum"]["data"] == {"x": 1}
+        b = batches()
+        assert b["current"] == "2027–2028"
+        assert [x["label"] for x in b["existing"]] == ["2024–2025", "2025–2026", "2026–2027"]
+    # the same click again (an old page) changes nothing
+    client.post("/admin/settings/next-batch", data={"from": "2026–2027"})
+    with app.app_context():
+        from app.workflow import batches as again
+        assert again()["current"] == "2027–2028"

@@ -1355,6 +1355,55 @@ def app_settings():
                            stage_count=len(STAGES))
 
 
+@bp.post("/settings/next-batch")
+@admin_required
+def next_batch():
+    """Start the next batch at any time: the current batch (2026–2027) becomes
+    an earlier batch and the next year (2027–2028) the current one. Each
+    programme's current-batch syllabus moves, as it is, under that earlier
+    batch, and the current batch starts empty."""
+    from .db import settings as _s
+    from .schema import batch_key, batch_label, batch_start
+    db = get_db()
+    b = batches()
+    cur = batch_start(b["current"])
+    # the form names the batch it was shown, so a second click does nothing
+    if not cur or batch_start(request.form.get("from")) != cur:
+        flash("The batches have already changed. Nothing was moved.", "info")
+        return redirect(url_for("admin.app_settings"))
+    new = cur + 1
+    if new > 2040:
+        flash("Batches go up to 2040–2041.", "error")
+        return redirect(url_for("admin.app_settings"))
+    old_key = batch_key(cur)
+    moved = kept = 0
+    for sub in db.submissions.find({"programmes": {"$exists": True}}, {"programmes": 1}):
+        sets, unsets = {}, {}
+        for code, parts in (sub.get("programmes") or {}).items():
+            st = (parts or {}).get("prog_syllabus")
+            if not st:
+                continue
+            if ((parts or {}).get(old_key) or {}).get("data"):
+                kept += 1          # that earlier batch is already filled: leave both as they are
+                continue
+            sets[f"programmes.{code}.{old_key}"] = st
+            unsets[f"programmes.{code}.prog_syllabus"] = ""
+            moved += 1
+        if sets:
+            db.submissions.update_one({"_id": sub["_id"]}, {"$set": sets, "$unset": unsets})
+    earlier = sorted({f"{y}-{y + 1}" for y in [batch_start(x["label"]) for x in b["existing"]] + [cur] if y})
+    db.settings.update_one({"_id": "app"}, {"$set": {"current_batch": f"{new}-{new + 1}",
+                                                     "existing_batches": earlier, "updated_at": now()}},
+                           upsert=True)
+    audit(_actor(), "batch.next", detail={"from": batch_label(cur), "to": batch_label(new),
+                                          "moved": moved, "kept": kept})
+    flash(f"The current batch is now {batch_label(new)}. Batch of {batch_label(cur)} is an earlier batch, "
+          f"with {moved} programme syllabus(es) moved to it as they were."
+          + (f" {kept} programme(s) already had a {batch_label(cur)} syllabus, so theirs were left in place." if kept else ""),
+          "success")
+    return redirect(url_for("admin.app_settings"))
+
+
 @bp.route("/audit")
 @admin_required
 def audit_log():

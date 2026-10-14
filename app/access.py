@@ -76,7 +76,7 @@ ENDPOINTS = {
     "calendar": ("calendar", "view"),
     "flow": ("flow", "view"), "flow_data": ("flow", "view"), "flow_excel": ("flow", "view"),
     "updates": ("updates", "view"), "updates_json": ("updates", "view"), "updates_read": ("updates", "edit"),
-    "app_settings": ("settings", ("view", "edit")), "rules": ("settings", ("view", "edit")),
+    "app_settings": ("settings", ("view", "edit")), "next_batch": ("settings", "edit"), "rules": ("settings", ("view", "edit")),
     "rules_reset": ("settings", "edit"), "audit_log": ("settings", "view"),
     "connectors": ("settings", ("view", "edit")), "connector_toggle": ("settings", "edit"),
     "connector_delete": ("settings", "delete"), "connector_test": ("settings", "edit"),
