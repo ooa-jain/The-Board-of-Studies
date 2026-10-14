@@ -1333,6 +1333,13 @@ def app_settings():
                 elif y != cur and f"{y}-{y + 1}" not in years:
                     years.append(f"{y}-{y + 1}")
             fields["existing_batches"] = sorted(years)
+            # the semesters each earlier batch uploads (5 and 6, 3 and 4 …)
+            chosen = dict(_s().get("batch_semesters") or {})
+            for b in batches()["existing"]:
+                if f"sems_{b['start']}_shown" in request.form:
+                    chosen[str(b["start"])] = sorted({int(n) for n in request.form.getlist(f"sems_{b['start']}")
+                                                      if n.isdigit() and 1 <= int(n) <= 8})
+            fields["batch_semesters"] = chosen
             if bad:
                 flash("Not a batch year (use the form 2024-2025, from 2010 to 2040): "
                       + ", ".join(bad), "error")

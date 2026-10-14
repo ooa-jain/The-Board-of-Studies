@@ -1650,9 +1650,9 @@
     // for Honours and again for Honours with Research, each with its own add
     const GROUPS = (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG)
       ? [{ track: "All semesters", label: "3-Year UG", sub: "Semesters 1 – 6", sems: [1, 2, 3, 4, 5, 6] },
-         { track: "Honours", label: "4-Year UG (Honours)", sub: "Semesters 7 – 8", sems: [7, 8] },
+         { track: "Honours", label: "4-Year UG (Honours)", sub: "Semesters 7 – 8", sems: [7, 8], optional: true },
          { track: "Honours with Research", label: "4-Year UG (Honours with Research)",
-           sub: "Semesters 7 – 8", sems: [7, 8] }]
+           sub: "Semesters 7 – 8", sems: [7, 8], optional: true }]
       : null;
     if (GROUPS && splitHonours(rows(section.key)) && !CTX.readonly) touch();
     if (synced) {
@@ -1772,6 +1772,7 @@
           th.colSpan = SPAN;
           th.appendChild(el("strong", null, g.label));
           th.appendChild(el("span", "rt-group-sub", g.sub));
+          if (g.optional) th.appendChild(el("span", "rt-group-opt", "Optional"));
           head.appendChild(th);
           tbody.appendChild(head);
           let n = 0;

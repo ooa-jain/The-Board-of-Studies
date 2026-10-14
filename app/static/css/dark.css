@@ -2683,6 +2683,19 @@ html[data-theme="dark"] .batch-box {
 html[data-theme="dark"] .batch-box legend {
   color: #acc7ec;
 }
+html[data-theme="dark"] .batch-sem span {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: #ced8e6;
+}
+html[data-theme="dark"] .batch-sem input:checked + span {
+  background: #2962ae;
+  border-color: #4582d3;
+  color: #ffffff;
+}
+html[data-theme="dark"] .batch-sem input:focus-visible + span {
+  outline: 2px solid #2563eb;
+}
 html[data-theme="dark"] .pflow-card {
   background: #f0707f;
   color: #dbdee4;
@@ -4827,6 +4840,10 @@ html[data-theme="dark"] .rt tbody tr.rt-group:first-child td {
   border-top: 0;
 }
 html[data-theme="dark"] .rt tr.rt-group td strong {
+  color: #ffffff;
+}
+html[data-theme="dark"] .rt-group-opt {
+  background: rgba(18, 21, 25, 0.16);
   color: #ffffff;
 }
 html[data-theme="dark"] .rt-group-sub {

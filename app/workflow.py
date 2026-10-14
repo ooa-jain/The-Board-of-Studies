@@ -69,8 +69,23 @@ def batches(s=None) -> dict:
         raw = DEFAULT_EXISTING_BATCHES
     years = sorted({y for y in (batch_start(x) for x in raw) if y and y != cur
                     and batch_key(y) in STAGE_BY_KEY})
+    # which semesters each earlier batch's syllabus covers, as Settings says
+    # (none chosen: the whole syllabus)
+    sems = s.get("batch_semesters") or {}
     return {"current": batch_label(cur) if cur else "",
-            "existing": [{"key": batch_key(y), "label": batch_label(y)} for y in years]}
+            "existing": [{"key": batch_key(y), "label": batch_label(y), "start": y,
+                          "semesters": sorted(int(n) for n in (sems.get(str(y)) or []))}
+                         for y in years]}
+
+
+def semester_words(sems) -> str:
+    """[5, 6] → "semesters 5 and 6"; [3] → "semester 3"."""
+    sems = [str(n) for n in sems or []]
+    if not sems:
+        return ""
+    if len(sems) == 1:
+        return f"semester {sems[0]}"
+    return "semesters " + ", ".join(sems[:-1]) + " and " + sems[-1]
 
 
 def parts_for(stage: dict, s=None) -> list:

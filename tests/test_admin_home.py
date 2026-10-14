@@ -227,3 +227,30 @@ def test_next_batch_moves_the_current_syllabus_to_an_earlier_batch(app, client):
     with app.app_context():
         from app.workflow import batches as again
         assert again()["current"] == "2027–2028"
+
+
+def test_settings_choose_the_semesters_each_earlier_batch_uploads(app, client):
+    from app.db import get_db
+    from app.dept import _batch_semesters
+    from app.schema import STAGE_BY_KEY
+    from app.workflow import batches
+    with app.app_context():
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"current_batch": "2026-2027",
+                                                               "existing_batches": ["2024-2025", "2025-2026"]}},
+                                     upsert=True)
+    _admin(app, client)
+    page = client.get("/admin/settings").get_data(as_text=True)
+    assert "Semesters each earlier batch uploads" in page and 'name="sems_2024"' in page
+    r = client.post("/admin/settings", data={
+        "academic_year": "2026-27", "current_batch": "2026-2027", "existing_batches": "2024-2025\n2025-2026",
+        "sems_2024_shown": "1", "sems_2024": ["5", "6"], "sems_2025_shown": "1", "sems_2025": ["3", "4"]})
+    assert r.status_code == 302
+    with app.app_context():
+        b = {x["label"]: x["semesters"] for x in batches()["existing"]}
+        assert b == {"2024–2025": [5, 6], "2025–2026": [3, 4]}
+        sec = _batch_semesters(STAGE_BY_KEY["prog_syllabus_b2024"])["sections"][0]
+        assert "semesters 5 and 6 only" in sec["help"] and sec["title"].endswith("Semesters 5 and 6")
+    page = client.get("/admin/settings").get_data(as_text=True)
+    import re
+    assert re.search(r'name="sems_2024" value="5"\s+checked', page)
+    assert not re.search(r'name="sems_2024" value="4"\s+checked', page)

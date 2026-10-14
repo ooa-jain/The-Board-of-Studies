@@ -3243,6 +3243,15 @@ td.rt-file { min-width: 104px; }
 .batch-box { border: 1px solid var(--lv-border, #e4e7ec); border-radius: 12px; padding: 12px 16px 6px; margin: 0 0 16px; }
 .batch-box legend { padding: 0 6px; font-weight: 800; font-size: .86rem; color: var(--lv-navy, #0f2440); }
 .batch-now { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.batch-sems { display: grid; gap: 8px; margin: 4px 0 6px; }
+.batch-sems-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.batch-sems-row .batch-tag { min-width: 150px; margin-right: 6px; }
+.batch-sem { position: relative; display: inline-flex; margin: 0; cursor: pointer; }
+.batch-sem input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.batch-sem span { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--surface); color: var(--ink); font-size: .86rem; font-weight: 600; }
+.batch-sem input:checked + span { background: var(--ink-800); border-color: var(--ink-800); color: #fff; }
+.batch-sem input:focus-visible + span { outline: 2px solid var(--gold-500); outline-offset: 2px; }
 
 /* ---------- a programme's parts as numbered steps (STEP 01–04): coloured
    cards with a round badge, joined by dotted arrows ---------- */
@@ -4783,6 +4792,8 @@ html.intro-open, html.intro-open body { overflow: hidden; }
 .rt tr.rt-group td { padding: 9px 12px; background: var(--ink-800); color: #fff; border-top: 10px solid var(--surface); }
 .rt tbody tr.rt-group:first-child td { border-top: 0; }
 .rt tr.rt-group td strong { font-size: .86rem; font-weight: 700; letter-spacing: .02em; color: #fff; }
+.rt-group-opt { margin-left: 10px; padding: 1px 8px; border-radius: 999px; background: rgba(255, 255, 255, .16);
+  font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #fff; }
 .rt-group-sub { margin-left: 10px; font-size: .74rem; color: rgba(255, 255, 255, .72); }
 .rt tr.rt-group-add td, .rt tr.rt-group-empty td { padding: 8px 12px; background: var(--canvas); }
 .rt tr.rt-group-empty td { color: var(--ink-faint); font-size: .84rem; font-style: italic; }

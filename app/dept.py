@@ -83,6 +83,27 @@ def _remember_person(resp, dept_code, person):
     return resp
 
 
+def _batch_semesters(stage):
+    """An earlier batch's upload, naming the semesters Settings asks for."""
+    import copy
+    from .workflow import semester_words
+    b = next((x for x in batches()["existing"] if x["key"] == stage["key"]), None)
+    words = semester_words((b or {}).get("semesters"))
+    if not words:
+        return stage
+    s = copy.deepcopy(stage)
+    for sec in s["sections"]:
+        if sec["key"] == "batch_upload":
+            sec["title"] += f" · {words[0].upper()}{words[1:]}"
+            sec["help"] = (f"Upload this programme's syllabus for the Batch of {b['label']} — {words} only — "
+                           "as one file (PDF or Word) in the syllabus template. It is checked for the "
+                           "syllabus headings.")
+            for f in sec["fields"]:
+                if f["name"] == "batch_syllabus":
+                    f["label"] += f" ({words})"
+    return s
+
+
 @bp.before_request
 def _ask_who():
     """A department's login is shared, so each person says who they are once
@@ -384,6 +405,8 @@ def stage(stage_key, programme_code=None):
     deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
            else {}).get("degree_level") or (programme or {}).get("degree_level")
     page_stage = for_level(stage_def, deg)
+    if stage_def.get("existing_batch"):
+        page_stage = _batch_semesters(page_stage)
     if stage_key == "prog_curriculum":
         data = pg_groups(data, deg)
     # where "go to the next stage" leads when this one is left as a draft
