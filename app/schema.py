@@ -471,7 +471,7 @@ PROGRAMME_CURRICULUM = {
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
                  "min": MARKS_TOTAL, "max": MARKS_TOTAL, "fixed_value": MARKS_TOTAL},
                 {"name": "syllabus", "label": "Syllabus", "type": "syllabus_link",
-                 "help": "Opens this course's syllabus — matched by course code and title."},
+                 "help": "Yes: this course has a syllabus — the link opens it in the current batch. No: it has none."},
             ],
             "rules": [
                 "ltpe_credit_arithmetic",

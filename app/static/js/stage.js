@@ -1591,41 +1591,38 @@
      syllabus (then the earlier batches'), and the title compared. The chip
      says how well they match and opens that syllabus at that course. */
   const norm = v => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  /* Programme structure: does this course have a syllabus? Yes / No.
+     Yes (the default) shows a link to its syllabus in the current batch —
+     the course is added there if it is not yet; No leaves it out. */
   function syllabusLink(row) {
-    // an elective pair "A1 / A2" has a syllabus for each option
-    const codes = String(row.course_code || "").split("/").map(x => x.trim().toUpperCase()).filter(Boolean);
-    const titles = String(row.course_title || "").split(" / ");
-    const code = codes[0] || "";
-    const a = el("a", "syl-chip");
-    const syl = CTX.syllabi || [];
-    if (!code) {
-      const no = el("span", "syl-chip is-no", "No");
-      no.title = "Enter the course code first";
-      return no;
+    const wrap = el("span", "syl-yn");
+    const sel = el("select", "syl-sel");
+    sel.setAttribute("aria-label", "Syllabus for this course");
+    [["Yes", "Yes"], ["No", "No"]].forEach(([v, t]) => {
+      const o = el("option", null, t);
+      o.value = v;
+      sel.appendChild(o);
+    });
+    sel.value = row.syllabus === "No" ? "No" : "Yes";
+    sel.disabled = !!CTX.readonly;
+    sel.addEventListener("change", () => { row.syllabus = sel.value; touch(); });
+    wrap.appendChild(sel);
+    if (sel.value === "No") return wrap;
+    const code = String(row.course_code || "").split("/")[0].trim().toUpperCase();
+    const cur = (CTX.syllabi || []).find(x => x.current);
+    if (!code || !cur) {
+      const hint = el("span", "syl-go is-off", "Syllabus →");
+      hint.title = code ? "The current batch's syllabus is not open yet" : "Enter the course code first";
+      wrap.appendChild(hint);
+      return wrap;
     }
-    const hits = [];
-    syl.filter(x => x.current).forEach(x => (x.courses || []).forEach(c => {
-      const k = codes.indexOf(c.code.toUpperCase());
-      if (k < 0) return;
-      const title = titles.length === codes.length ? titles[k] : row.course_title;
-      hits.push({ x, c, same: norm(c.title) === norm(title) });
-    }));
-    const best = hits.find(h => h.x.current && h.same) || hits.find(h => h.x.current) ||
-                 hits.find(h => h.same) || hits[0];
-    if (!best || !best.x.current) {
-      // no syllabus for this course in the current batch: No, and nothing happens
-      const no = el("span", "syl-chip is-no", "No");
-      no.title = "This course has no syllabus in the current batch yet";
-      return no;
-    }
-    // Yes: opens the course's syllabus in the current batch
-    a.href = best.x.url + "#course-" + encodeURIComponent(best.c.code.toUpperCase());
-    a.className = "syl-chip is-yes";
-    a.textContent = "Yes";
-    a.title = best.same ? "Open this course's syllabus — current batch"
-                        : "Open this course's syllabus — current batch (its title there differs)";
-    return a;
+    const go = el("a", "syl-go", "Syllabus →");
+    go.href = cur.url + "#course-" + encodeURIComponent(code);
+    go.title = "Open this course's syllabus — current batch (added there if it is not yet)";
+    wrap.appendChild(go);
+    return wrap;
   }
+
 
   function rowFile(def, row, changed) {
     const box = el("div", "row-file");
@@ -3305,6 +3302,18 @@
     host.appendChild(top);
     const list = el("div", "sheets");
     host.appendChild(list);
+
+    // arriving from the programme structure for a course not here yet: add it
+    if (!CTX.readonly && location.hash.startsWith("#course-")) {
+      const want = decodeURIComponent(location.hash.slice(8)).toUpperCase();
+      const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+      const src = (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === want);
+      if (want && src && !have.has(want)) {
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(Object.assign({}, src));
+        setTimeout(() => { touch(); note.textContent = `Added ${src.course_code} — fill in its syllabus below.`; }, 0);
+      }
+    }
 
     if (!CTX.readonly && (CTX.fill || []).length) {
       const fb = el("button", "btn btn-ghost btn-sm", "Fill in all courses from the Curriculum");

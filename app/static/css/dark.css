@@ -4942,6 +4942,16 @@ html[data-theme="dark"] .syl-chip.is-no {
   color: #a1a9b8;
   border-color: #2e3542;
 }
+html[data-theme="dark"] .syl-go {
+  color: #a6baf2;
+  text-decoration: none;
+}
+html[data-theme="dark"] .syl-go:hover {
+  text-decoration: underline;
+}
+html[data-theme="dark"] .syl-go.is-off {
+  color: #9ba4b5;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

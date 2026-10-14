@@ -661,6 +661,8 @@ def course_fill_source(submission, programme_code):
     year = bos[:4] if bos[:4].isdigit() else ""
     out, seen = [], set()
     for r in data.get("semester_structure") or []:
+        if not isinstance(r, dict) or r.get("syllabus") == "No":
+            continue          # the department said this course has no syllabus
         hours = 0
         for k in ("l", "t", "p", "e"):
             try:
