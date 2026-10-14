@@ -841,7 +841,8 @@ def degree_tag(degree_level) -> str:
             "UG - 4 Year (Honours with Research)": "Honours with Research"}.get(degree_level or "", "")
 
 
-_DEGREE_SUFFIX = re.compile(r"\s*\((?:[^()]*hon(?:ou)?r?s[^()]*|\s*\d\s*years?\s*)\)\s*$", re.I)
+# "(Honours)", "(3 Years)" — or one typed without its closing bracket
+_DEGREE_SUFFIX = re.compile(r"\s*\((?:[^()]*hon(?:ou)?r?s[^()]*|\s*\d\s*years?\s*)\)?\s*$", re.I)
 
 
 def degree_name(name, degree_level) -> str:
@@ -851,7 +852,8 @@ def degree_name(name, degree_level) -> str:
     tag = degree_tag(degree_level)
     name = str(name or "").strip()
     if not tag:
-        return name
+        # a bracket left open is closed
+        return name + ")" if name.count("(") > name.count(")") else name
     return f"{_DEGREE_SUFFIX.sub('', name)} ({tag})"
 
 
