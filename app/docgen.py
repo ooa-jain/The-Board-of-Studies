@@ -661,14 +661,15 @@ def _pg_curriculum_docx(prog, cur, deg):
 # ---------------------------------------------------------------------------
 
 def _course_sheet(doc, programme_name, c, width):
-    t = doc.add_table(rows=0, cols=3)
+    # four columns: the module rows need Syllabus | CO's | Hours
+    t = doc.add_table(rows=0, cols=4)
     _borders(t, size=8)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     center = WD_ALIGN_PARAGRAPH.CENTER
 
     def full():
         row = t.add_row()
-        cell = row.cells[0].merge(row.cells[2])
+        cell = row.cells[0].merge(row.cells[3])
         cell.text = ""
         return cell
 
@@ -679,9 +680,11 @@ def _course_sheet(doc, programme_name, c, width):
         " " + (c.get("course_title") or "")).bold = True
 
     hr = t.add_row().cells
+    hr = [hr[0], hr[1], hr[2].merge(hr[3])]
     for i, h in enumerate(("Course Credits", "No. of Hours per Week", "Total No. of Teaching Hours")):
         _write(hr[i], h, bold=True, size=10, align=center)
     vr = t.add_row().cells
+    vr = [vr[0], vr[1], vr[2].merge(vr[3])]
     for i, v in enumerate((f"{_fmt(c.get('credits'))} Credits" if _fmt(c.get("credits")) else "",
                            f"{_fmt(c.get('hours_per_week'))} Hrs" if _fmt(c.get("hours_per_week")) else "",
                            f"{_fmt(c.get('teaching_hours'))} Hrs" if _fmt(c.get("teaching_hours")) else "")):
@@ -703,12 +706,16 @@ def _course_sheet(doc, programme_name, c, width):
     row = t.add_row()
     left = row.cells[0].merge(row.cells[1])
     _write(left, "Syllabus:", bold=True, size=10)
-    _write(row.cells[2], "Hours", bold=True, size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _write(row.cells[2], "CO's", bold=True, size=10, align=center)
+    _write(row.cells[3], "Hours", bold=True, size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
     for n, m in enumerate([m for m in (c.get("modules") or []) if isinstance(m, dict)], start=1):
         row = t.add_row()
         left = row.cells[0].merge(row.cells[1])
         _write(left, f"Module No. {n}: {m.get('title') or ''}".rstrip(": "), bold=True, size=10)
-        _write(row.cells[2], _fmt(m.get("hours")), bold=True, size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        cos = m.get("cos")
+        cos = ", ".join(cos) if isinstance(cos, list) else str(cos or "")
+        _write(row.cells[2], cos, size=10, align=center)
+        _write(row.cells[3], _fmt(m.get("hours")), bold=True, size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
         body = str(m.get("revised") or m.get("content") or "").strip()
         if body:
             cell = full()
@@ -730,7 +737,7 @@ def _course_sheet(doc, programme_name, c, width):
 
     numbered("Skill Development Activities:", c.get("skill_activities"))
     numbered("Books for reference:", c.get("books"), "Note: Latest edition of books may be used.")
-    _widths(t, [width * 0.30, width * 0.36, width * 0.34])
+    _widths(t, [width * 0.30, width * 0.36, width * 0.18, width * 0.16])
 
 
 def syllabus_docx(db, dept_code, year, programme_code):
