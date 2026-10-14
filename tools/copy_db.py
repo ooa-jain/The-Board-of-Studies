@@ -24,7 +24,6 @@ import sys
 import time
 from pathlib import Path
 
-import bson
 from dotenv import dotenv_values
 from pymongo import MongoClient
 
@@ -37,6 +36,39 @@ def hide(uri: str) -> str:
         head, rest = uri.split("//", 1)
         return head + "//***@" + rest.split("@", 1)[1]
     return uri
+
+
+# collections whose records are large and nested: copied piece by piece
+PIECEWISE = ("submissions",)
+
+
+def _keys(coll, _id, path=None):
+    """The field names of one record (or of one of its sub-documents)."""
+    src = "$$ROOT" if not path else "$" + path
+    res = list(coll.aggregate([{"$match": {"_id": _id}},
+                               {"$project": {"k": {"$map": {"input": {"$objectToArray": src}, "in": "$$this.k"}}}}]))
+    return (res[0].get("k") or []) if res else []
+
+
+def _by_pieces(coll, _id, label):
+    """One record, fetched field by field — and its stages and programmes one
+    at a time — with each piece shown as it arrives."""
+    doc = {"_id": _id}
+    t0 = time.time()
+    for k in _keys(coll, _id):
+        if k == "_id":
+            continue
+        if k in ("stages", "programmes"):
+            doc[k] = {}
+            for sub in _keys(coll, _id, k):
+                print(f"\r  {label} · {k}.{sub} ({int(time.time() - t0)}s)" + " " * 20, end="", flush=True)
+                got = coll.find_one({"_id": _id}, {f"{k}.{sub}": 1}) or {}
+                doc[k][sub] = (got.get(k) or {}).get(sub)
+        else:
+            got = coll.find_one({"_id": _id}, {k: 1}) or {}
+            if k in got:
+                doc[k] = got[k]
+    return doc
 
 
 def copy(src_db, dst_db, replace=False, out=print):
@@ -52,27 +84,26 @@ def copy(src_db, dst_db, replace=False, out=print):
         if replace:
             dst.delete_many({})
         total = src.estimated_document_count()
-        first = src.find_one({}, {"_id": 1})
-        sample = src.find_one({"_id": first["_id"]}) if first else None
-        big = bool(sample) and len(bson.encode(sample)) > 50_000
-        # large records (a department's whole submission) are fetched a few at a
-        # time and written one by one, with a running count, so a slow source
-        # shows progress instead of a frozen screen
-        cursor = src.find({}).batch_size(2 if big else BATCH)
-        batch, n, t0 = [], 0, time.time()
-        for doc in cursor:
-            batch.append(doc)
-            if len(batch) >= (1 if big else BATCH):
+        out(f"  {name:<20} reading {total} record(s)…")
+        n = 0
+        if name in PIECEWISE:
+            # a department's whole submission is large: fetched in pieces —
+            # each stage and each programme on its own — and put back together
+            for i, ref in enumerate(src.find({}, {"_id": 1}), 1):
+                dst.insert_one(_by_pieces(src, ref["_id"], f"{name} {i}/{total}"))
+                n += 1
+            print("\r" + " " * 90 + "\r", end="", flush=True)
+        else:
+            batch = []
+            for doc in src.find({}).batch_size(BATCH):
+                batch.append(doc)
+                if len(batch) >= BATCH:
+                    dst.insert_many(batch, ordered=False)
+                    n += len(batch)
+                    batch = []
+            if batch:
                 dst.insert_many(batch, ordered=False)
                 n += len(batch)
-                batch = []
-                if big:
-                    print(f"\r  {name:<20} {n}/{total} copied ({int(time.time() - t0)}s)", end="", flush=True)
-        if batch:
-            dst.insert_many(batch, ordered=False)
-            n += len(batch)
-        if big:
-            print("\r", end="")
         for idx in src.list_indexes():
             if idx["name"] == "_id_":
                 continue
