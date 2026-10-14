@@ -346,7 +346,7 @@ def _programmes_sheet(wb, rep):
         ws.cell(row=r, column=1, value="Programme Structure").font = Font(bold=True, size=11, color=NAVY)
         r += 1
         if ctx["semesters"]:
-            _put(ws, r, ["Course code", "Course title", "Course group", "L", "T", "P", "E", "Credits",
+            _put(ws, r, ["Course code", "Course title", "Course category", "L", "T", "P", "E", "Credits",
                          "CA marks", "TEE marks", "Total"], bold=True, fill=GREEN)
             r += 1
             total = 0
@@ -511,7 +511,7 @@ def _word_programmes(doc, rep):
             rows += [(x.get("course_code"), x.get("course_title"), x.get("nep_category"), x.get("credits"))
                      for x in rs]
         if rows:
-            _word_table(doc, ("Course code", "Course title", "Course group", "Credits"), rows)
+            _word_table(doc, ("Course code", "Course title", "Course category", "Credits"), rows)
         else:
             doc.add_paragraph().add_run("Not entered yet.").italic = True
         doc.add_heading("Minor / Honours — Annexure I", level=2)

@@ -1721,7 +1721,7 @@
         if (cur) {
           const all = el("a", "syl-all", "All syllabi →");
           all.href = cur.url;
-          all.title = "Open the syllabus page — pick a semester, a course group or search";
+          all.title = "Open the syllabus page — pick a semester, a course category or search";
           th.appendChild(all);
         } else th.textContent = c.label;
         htr.appendChild(th);
@@ -3356,12 +3356,47 @@
       return d;
     };
 
+    /* The course outcomes a module serves: any of CO1–CO6, chosen from a
+       drop-down of ticks; the chosen ones show on top. */
+    function coPick(m) {
+      if (!Array.isArray(m.cos)) m.cos = [];
+      const box = el("details", "co-pick");
+      const sum = el("summary", "co-sum");
+      const paint = () => {
+        sum.textContent = "";
+        const chosen = ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"].filter(c => m.cos.includes(c));
+        if (!chosen.length) sum.appendChild(el("span", "co-none", CTX.readonly ? "—" : "Choose"));
+        chosen.forEach(c => sum.appendChild(el("span", "co-chip", c)));
+      };
+      paint();
+      box.appendChild(sum);
+      const menu = el("div", "co-menu");
+      ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"].forEach(c => {
+        const lab = el("label", "co-opt");
+        const cb = el("input");
+        cb.type = "checkbox";
+        cb.checked = m.cos.includes(c);
+        cb.disabled = !!CTX.readonly;
+        cb.addEventListener("change", () => {
+          m.cos = cb.checked ? [...new Set([...m.cos, c])] : m.cos.filter(x => x !== c);
+          paint(); touch();
+        });
+        lab.appendChild(cb);
+        lab.appendChild(el("span", null, c));
+        menu.appendChild(lab);
+      });
+      box.appendChild(menu);
+      if (CTX.readonly) box.addEventListener("toggle", () => { box.open = false; });
+      return box;
+    }
+
     function modulesRows(row, i, tbody) {
       if (!Array.isArray(row.modules)) row.modules = [];
       const mods = row.modules;
       if (!mods.length && !CTX.readonly) mods.push({});
       const head = el("tr", "sh-syl-head");
       head.appendChild(cell("th", "sh-left", ["Syllabus:"]));
+      head.appendChild(cell("th", "sh-cos", ["CO's"]));
       head.appendChild(cell("th", "sh-hours", ["Hours"]));
       tbody.appendChild(head);
       const sum = el("span");
@@ -3387,6 +3422,7 @@
           lab.appendChild(rm);
         }
         tr.appendChild(cell("td", "sh-left", [lab]));
+        tr.appendChild(cell("td", "sh-cos", [coPick(m)]));
         const h = el("input", "sh-mod-hours");
         h.type = "text"; h.inputMode = "numeric"; h.value = m.hours ?? ""; h.placeholder = "—";
         h.addEventListener("input", () => {
@@ -3401,11 +3437,11 @@
         ta.rows = 4; ta.value = m.revised ?? ""; ta.placeholder = "Content of the module";
         ta.addEventListener("input", () => { m.revised = ta.value; touch(); });
         if (CTX.readonly) t.disabled = h.disabled = ta.disabled = true;
-        tr2.appendChild(cell("td", null, [ta], 2));
+        tr2.appendChild(cell("td", null, [ta], 3));
         tbody.appendChild(tr2);
       });
       const foot = el("tr", "sh-mod-foot");
-      const td = cell("td", null, [], 2);
+      const td = cell("td", null, [], 3);
       if (!CTX.readonly) {
         const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
         add.type = "button";
@@ -3517,13 +3553,13 @@
       semSel.value = pick.sem;
       const groups = [...new Set(data.filter(r => !pick.sem || info(r).sem === pick.sem).map(r => info(r).group))];
       const grpSel = el("select");
-      grpSel.setAttribute("aria-label", "Course group");
-      grpSel.appendChild(new Option("All course groups", ""));
+      grpSel.setAttribute("aria-label", "Course category");
+      grpSel.appendChild(new Option("All course categories", ""));
       groups.forEach(g => grpSel.appendChild(new Option(g, g)));
       grpSel.value = groups.includes(pick.group) ? pick.group : "";
       const lab = (t, sel) => { const w = el("label", "syl-nav-field"); w.appendChild(el("span", null, t)); w.appendChild(sel); return w; };
       row1.appendChild(lab("Semester", semSel));
-      row1.appendChild(lab("Course group", grpSel));
+      row1.appendChild(lab("Course category", grpSel));
       const find = el("input", "syl-nav-search");
       find.type = "search";
       find.placeholder = "Search code or title";
@@ -4535,6 +4571,10 @@
         { onClick: () => { window.location = r.url; }, timeout: 12000 }));
     }
   }
+  // a CO drop-down closes when the click is elsewhere
+  document.addEventListener("click", e => {
+    document.querySelectorAll("details.co-pick[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+  });
   // programme steps: Syllabus opens into its current and earlier batches
   document.querySelectorAll(".pmap-syl > button").forEach(b => b.addEventListener("click", () => {
     const li = b.parentElement;

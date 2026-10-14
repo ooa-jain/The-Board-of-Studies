@@ -446,7 +446,7 @@ PROGRAMME_CURRICULUM = {
             "columns": [
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
                  "min": 1, "max": 8, "choices": SEMESTERS, "width": "64px"},
-                {"name": "nep_category", "label": "Course group", "type": "select", "required": True,
+                {"name": "nep_category", "label": "Course category", "type": "select", "required": True,
                  "options": NEP_CATEGORIES},
                 {"name": "course_code", "label": "Course code", "type": "text",
                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /\\-.]{1,60}$", "width": "110px",

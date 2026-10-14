@@ -4952,6 +4952,31 @@ html[data-theme="dark"] .syl-go:hover {
 html[data-theme="dark"] .syl-go.is-off {
   color: #9ba4b5;
 }
+html[data-theme="dark"] .co-sum {
+  border: 1px dashed #2e3e56;
+  background: #121519;
+}
+html[data-theme="dark"] .co-sum::after {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .co-pick[open] .co-sum {
+  border-color: #2563eb;
+}
+html[data-theme="dark"] .co-none {
+  color: #9ba4b5;
+}
+html[data-theme="dark"] .co-chip {
+  background: #0e1a2a;
+  color: #a6baf2;
+}
+html[data-theme="dark"] .co-menu {
+  border: 1px solid #2e3542;
+  background: #121519;
+  box-shadow: 0 14px 28px -12px rgba(16, 24, 40, 0.35);
+}
+html[data-theme="dark"] .co-opt:hover {
+  background: #0e1a2a;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

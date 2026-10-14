@@ -4877,3 +4877,19 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 .syl-go { font-size: .78rem; font-weight: 600; color: #1d4ed8; text-decoration: none; }
 .syl-go:hover { text-decoration: underline; }
 .syl-go.is-off { color: #98a2b3; cursor: default; }
+
+/* Syllabus sheet: the course outcomes each module serves (CO1–CO6) */
+.sh-cos { width: 150px; text-align: center; vertical-align: middle; }
+.co-pick { position: relative; display: inline-block; text-align: left; }
+.co-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 30px; min-width: 120px; padding: 4px 24px 4px 8px;
+  border: 1px dashed #c8d3e3; border-radius: 6px; background: #fff; cursor: pointer; list-style: none; position: relative; }
+.co-sum::-webkit-details-marker { display: none; }
+.co-sum::after { content: "▾"; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #5b6474; font-size: 11px; }
+.co-pick[open] .co-sum { border-color: #2563eb; border-style: solid; }
+.co-none { color: #98a2b3; font-size: .8rem; }
+.co-chip { padding: 1px 7px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: .74rem; font-weight: 700; }
+.co-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+  min-width: 150px; padding: 6px; border: 1px solid #e4e7ec; border-radius: 8px; background: #fff;
+  box-shadow: 0 14px 28px -12px rgba(16, 24, 40, .35); }
+.co-opt { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.co-opt:hover { background: #eff6ff; }
