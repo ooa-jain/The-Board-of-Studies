@@ -86,9 +86,9 @@ def _gate(dept_code):
 
 def _file(token):
     dept_code, stored = _read(token, "d")
+    from .drive_store import ensure_local
     rec = get_db().files.find_one({"dept_code": dept_code, "stored_name": stored}) or abort(404)
-    path = (current_app.config["UPLOAD_ROOT"] / (rec.get("academic_year") or "")
-            / dept_code / rec["stage"] / stored)
+    path = ensure_local(rec)
     if not path.is_file():
         abort(404)
     return rec, path

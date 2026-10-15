@@ -1166,7 +1166,8 @@ def api_upload():
            "field": field, "original_name": f.filename, "stored_name": stored,
            "size": size, "uploaded_by": _me()["username"], "uploaded_at": now(),
            "keyword_match": match}
-    get_db().files.insert_one(rec)
+    from .drive_store import push_later
+    push_later(get_db().files.insert_one(rec).inserted_id)
     words = {"match": "keywords match", "weak": "few keywords match",
              "miss": "no expected keywords found", "unread": "no text to check"}[match["status"]]
     _tell(dept, "keyword_miss" if match["status"] == "miss" else "uploaded", stage_key,
@@ -1232,7 +1233,8 @@ def download(stage_key, stored):
     rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})
     if not rec:
         abort(404)
-    path = current_app.config["UPLOAD_ROOT"] / _year() / dept["dept_code"] / stage_key / stored
+    from .drive_store import ensure_local
+    path = ensure_local(rec)
     if not path.exists():
         abort(404)
     suffix = Path(rec["original_name"]).suffix.lower()
@@ -1259,8 +1261,8 @@ def file_summary(stage_key, stored):
     rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})
     if not rec:
         return jsonify({"ok": False, "error": "That file was not found."}), 404
-    path = (current_app.config["UPLOAD_ROOT"] / (rec.get("academic_year") or _year())
-            / dept["dept_code"] / rec["stage"] / stored)
+    from .drive_store import ensure_local
+    path = ensure_local(rec)
     try:
         out = summarise(rec, path, refresh=request.args.get("refresh") == "1")
     except SummaryError as e:

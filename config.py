@@ -27,6 +27,12 @@ class Config:
     UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", BASE_DIR / "uploads"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_MB", "32")) * 1024 * 1024
 
+    # Uploaded files in Google Drive (app/drive_store.py): "disk" keeps them on
+    # the server only; "drive" also sends each to Drive through the Apps Script.
+    FILE_STORE = os.getenv("FILE_STORE", "disk").strip().lower()
+    DRIVE_SCRIPT_URL = os.getenv("DRIVE_SCRIPT_URL", "").strip()
+    DRIVE_SCRIPT_SECRET = os.getenv("DRIVE_SCRIPT_SECRET", "").strip()
+
     # Short AI summaries of uploaded PDFs. Any service with an OpenAI-style
     # chat API works: Google Gemini (free tier), Groq, xAI Grok, OpenAI …
     # AI_* names win; the older XAI_* names still work. No key = feature off.
@@ -74,6 +80,6 @@ class Config:
     ]
 
     ALLOWED_UPLOAD_EXT = {
-        ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv",
+        ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv", ".pptx", ".ppt",
         ".png", ".jpg", ".jpeg", ".webp", ".zip",
     }

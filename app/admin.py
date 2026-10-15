@@ -1106,10 +1106,9 @@ def _documents(dept_code, sub, year):
 
 
 def _file_rec(dept_code, stored):
+    from .drive_store import ensure_local
     rec = get_db().files.find_one({"dept_code": dept_code, "stored_name": stored}) or abort(404)
-    path = (current_app.config["UPLOAD_ROOT"] / (rec.get("academic_year") or _year())
-            / dept_code / rec["stage"] / stored)
-    return rec, path
+    return rec, ensure_local({**rec, "academic_year": rec.get("academic_year") or _year()})
 
 
 @bp.route("/documents/<dept_code>/<stored>")
@@ -1501,6 +1500,8 @@ def wipe_department(dept_code):
     if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
         flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
         return redirect(_back_to(dept_code))
+    from .drive_store import trash_later
+    trash_later([r.get("drive_id") for r in db.files.find({"dept_code": dept_code}, {"drive_id": 1})])
     counts = {}
     for col in ("submissions", "files", "comments", "notifications", "versions"):
         counts[col] = db[col].delete_many({"dept_code": dept_code}).deleted_count
@@ -1533,6 +1534,8 @@ def department_delete(dept_code):
     if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
         flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
         return redirect(_back_to(dept_code))
+    from .drive_store import trash_later
+    trash_later([r.get("drive_id") for r in db.files.find({"dept_code": dept_code}, {"drive_id": 1})])
     counts = {col: db[col].delete_many({"dept_code": dept_code}).deleted_count
               for col in ("submissions", "files", "comments", "notifications", "versions")}
     counts["logins"] = db.users.delete_many({"dept_code": dept_code, "role": "department"}).deleted_count
@@ -1813,10 +1816,10 @@ def keywords_recheck():
     from .keyword_match import check
     from .summarise import field_label
     db = get_db()
-    root = current_app.config["UPLOAD_ROOT"]
+    from .drive_store import ensure_local
     done = gone = 0
     for r in db.files.find({"academic_year": _year()}):
-        path = root / (r.get("academic_year") or _year()) / r["dept_code"] / r["stage"] / r["stored_name"]
+        path = ensure_local({**r, "academic_year": r.get("academic_year") or _year()})
         if not path.exists():
             gone += 1
             continue

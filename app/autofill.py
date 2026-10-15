@@ -365,10 +365,12 @@ def _store(db, dept_code, year, stage, field, name, writer, actor):
     path = folder / stored
     writer(path)
     match = keyword_check(path, field, field_label(stage, field))
-    db.files.insert_one({"dept_code": dept_code, "academic_year": year, "stage": stage, "field": field,
-                         "original_name": name, "stored_name": stored, "size": path.stat().st_size,
-                         "uploaded_by": actor, "uploaded_at": now(), "keyword_match": match,
-                         "autofilled": True})
+    from .drive_store import push_later
+    push_later(db.files.insert_one({
+        "dept_code": dept_code, "academic_year": year, "stage": stage, "field": field,
+        "original_name": name, "stored_name": stored, "size": path.stat().st_size,
+        "uploaded_by": actor, "uploaded_at": now(), "keyword_match": match,
+        "autofilled": True}).inserted_id)
     val = {"name": name, "stored": stored, "size": path.stat().st_size,
            "url": f"/department/file/{stage}/{stored}", "match": match}
     if name.lower().endswith(".pdf"):

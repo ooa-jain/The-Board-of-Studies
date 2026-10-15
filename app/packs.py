@@ -116,13 +116,14 @@ def _place(db, dept_code, academic_year, stage, field, src, actor):
     stored = f"{uuid.uuid4().hex[:12]}-{secure_filename(src.name)}"
     shutil.copyfile(src, folder / stored)
     size = (folder / stored).stat().st_size
-    db.files.insert_one({
+    from .drive_store import push_later
+    push_later(db.files.insert_one({
         "dept_code": dept_code, "academic_year": academic_year, "stage": stage, "field": field,
         "original_name": src.name, "stored_name": stored, "size": size,
         "uploaded_by": actor, "uploaded_at": now(),
         # a file from the department's own folder, not a form to check
         "keyword_match": {"status": "unread", "label": field, "found": [], "expected": []},
-    })
+    }).inserted_id)
     return {"name": src.name, "stored": stored, "size": size,
             "url": f"/department/file/{stage}/{stored}", "thumb": None}
 
