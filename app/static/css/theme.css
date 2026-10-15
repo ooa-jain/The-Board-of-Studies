@@ -92,3 +92,23 @@ html[data-theme="dark"]:root .hl-auto { color: #111827; }
 .theme-toggle[aria-pressed="true"] .tt-night { opacity: 1; transform: none; }
 .theme-toggle:hover .tt-pic img { filter: drop-shadow(0 2px 4px rgba(15, 36, 64, .25)); }
 @media (prefers-reduced-motion: reduce) { .tt-pic img { transition: none; } }
+
+/* The sign-in picture is a picture: in dark mode it keeps its navy scene and
+   white cards, the same as in light mode, with a faint edge on the dark page. */
+html[data-theme="dark"]:root .login-stage {
+  background: radial-gradient(120% 90% at 70% 30%, #1d4ed8 0%, #0e2a5c 55%, #0b1f45 100%);
+  box-shadow: 0 30px 60px -36px rgba(0, 0, 0, .8), inset 0 0 0 1px rgba(255, 255, 255, .06); }
+html[data-theme="dark"]:root .login-stage::before { background-image: radial-gradient(rgba(255, 255, 255, .10) 1px, transparent 1px); }
+html[data-theme="dark"]:root .lp { border-color: rgba(255, 255, 255, .35); }
+html[data-theme="dark"]:root .lp-blue { background: linear-gradient(160deg, rgba(88, 112, 240, .92), rgba(47, 79, 216, .85)); }
+html[data-theme="dark"]:root .lp-slate { background: linear-gradient(160deg, rgba(148, 163, 184, .88), rgba(71, 85, 105, .85)); }
+html[data-theme="dark"]:root .lp-glass { background: linear-gradient(160deg, rgba(232, 237, 247, .86), rgba(160, 174, 198, .72)); }
+html[data-theme="dark"]:root .lp-dot { background: #fff; }
+html[data-theme="dark"]:root .lp-glass .lp-title { color: #0e2a5c; }
+html[data-theme="dark"]:root .lp-card { background: rgba(255, 255, 255, .95); }
+html[data-theme="dark"]:root .lp-card b { color: #0e2a5c; }
+html[data-theme="dark"]:root .lp-card i { background: #c9d2e3; }
+html[data-theme="dark"]:root .lp-tick { background: #e7ecf4; }
+html[data-theme="dark"]:root .lp-card.is-done .lp-tick { background: #16a34a; color: #fff; }
+html[data-theme="dark"]:root .lsc-steps i { background: rgba(255, 255, 255, .16); color: #fff; }
+html[data-theme="dark"]:root .lsc-step.is-on i { background: #fff; color: #0e2a5c; }

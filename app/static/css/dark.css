@@ -6938,3 +6938,7 @@ html[data-theme="dark"] .lsc-steps i {
 html[data-theme="dark"] .login-stage-cap b {
   color: #ffffff !important;
 }
+html[data-theme="dark"] .lsc-step.is-on i {
+  background: #121519;
+  color: #a6c1f2;
+}

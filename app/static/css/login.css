@@ -166,3 +166,47 @@ body.is-login { background: #f4f5f7; color: #1f2937; }
   .login-stage-cap .lsc-k { display: none; }
   .login-gear.g1 { right: 8%; bottom: 36%; width: 40px; } .login-gear.g2 { right: 2%; bottom: 30%; width: 54px; }
 }
+
+/* the caption's steps: the stage at the front is lit */
+.lsc-step { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; opacity: .72;
+  transition: opacity .3s ease; }
+.lsc-step.is-on { opacity: 1; font-weight: 700; }
+.lsc-step i { transition: background .3s ease, color .3s ease; }
+.lsc-step.is-on i { background: #fff; color: #0e2a5c; }
+
+/* Phones and tablets: the picture as a short film — one stage panel at a
+   time slides in from the right, ticks its cards off, and slides away —
+   with the caption below it rather than over it. The day/night switch
+   keeps its own row at the top. */
+@media (max-width: 900px) {
+  .login { padding-top: 76px; }
+  .login-stage { height: auto; min-height: 0; display: flex; flex-direction: column; perspective: none; }
+  .login-scene { order: 1; position: relative; inset: auto; height: 272px; margin: 24px 0 4px;
+    transform: none !important; transition: none; }
+  .lp { top: 0; left: 0; right: 0; margin: 0 auto; width: min(320px, 80%); height: auto;
+    padding: 20px 14px 14px; gap: 9px; filter: none;
+    transition: transform .75s cubic-bezier(.6, .05, .25, 1), opacity .55s ease; }
+  /* the next stage waits on the right; the one just shown leaves to the left */
+  .lp[data-pos="2"] { transform: none; opacity: 1; }
+  .lp[data-pos="0"] { transform: translateX(118%) scale(.9); opacity: 0; }
+  .lp[data-pos="1"] { transform: translateX(-118%) scale(.9); opacity: 0; }
+  .lp-card { padding: 10px 40px 10px 12px; }
+  .lp-card b { font-size: .8rem; }
+  .login-gear { display: none; }
+  .login-stage-cap { order: 2; position: relative; left: auto; right: auto; bottom: auto; padding: 16px 18px 18px; gap: 8px; }
+  .login-stage-cap .lsc-k { display: block; }
+  .login-stage-cap b { font-size: 1rem; }
+  .lsc-steps { gap: 8px 14px; }
+}
+@media (max-width: 400px) {
+  .login-scene { height: 268px; }
+  .lp { width: 84%; }
+  .lsc-steps { font-size: .78rem; gap: 6px 10px; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 900px) {
+  .lp { transition: none; }
+}
+
+/* the day/night switch keeps to its row at the top and scrolls with the page,
+   so it never sits on the picture */
+body.is-login .theme-float { position: absolute; }
