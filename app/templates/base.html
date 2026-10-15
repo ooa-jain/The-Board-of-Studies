@@ -21,7 +21,8 @@
         href="{{ url_for('static', filename='img/favicon-512.png') }}">
   <link rel="apple-touch-icon" sizes="180x180"
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
-  {# the portal installs as an app (manifest + /sw.js) #}
+  {% if current_user and current_user.role == 'admin' %}
+  {# the Office's portal installs as an app (manifest + /sw.js); nobody else is offered it #}
   <link rel="manifest" href="{{ url_for('public.manifest') }}" crossorigin="use-credentials">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -34,6 +35,13 @@
       navigator.serviceWorker.register("{{ url_for('public.service_worker') }}").catch(function () {});
     });
   </script>
+  {% elif current_user %}
+  <script>
+    /* not the Office: no app here, and none left behind from before */
+    if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations()
+      .then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+  </script>
+  {% endif %}
   <script>
     /* light or dark before the first paint, so a dark page never flashes white:
        the choice made here, else the computer's own setting */

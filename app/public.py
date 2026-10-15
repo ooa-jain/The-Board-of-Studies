@@ -2,7 +2,7 @@
 
 import json
 
-from flask import (Blueprint, current_app, redirect, render_template, request, send_from_directory,
+from flask import (Blueprint, abort, current_app, redirect, render_template, request, send_from_directory,
                    session, url_for)
 
 from .db import get_db, settings
@@ -39,7 +39,10 @@ CAMPUS_INFO = [
 
 @bp.route("/manifest.webmanifest")
 def manifest():
+    # only the Office installs the portal as an app
     user = session.get("user") or {}
+    if user.get("role") != "admin":
+        abort(404)
     data = {
         "id": "/",
         "name": "BoS Academic Portal",
@@ -57,13 +60,12 @@ def manifest():
              "type": "image/png", "purpose": "maskable"},
         ],
     }
-    if user.get("role") == "admin":
-        # long-press the app icon: straight to these
-        data["shortcuts"] = [
-            {"name": "Departments", "url": url_for("admin.overview_departments")},
-            {"name": "Updates", "url": url_for("admin.updates")},
-            {"name": "Storage", "url": url_for("admin.storage")},
-        ]
+    # long-press the app icon: straight to these
+    data["shortcuts"] = [
+        {"name": "Departments", "url": url_for("admin.overview_departments")},
+        {"name": "Updates", "url": url_for("admin.updates")},
+        {"name": "Storage", "url": url_for("admin.storage")},
+    ]
     resp = current_app.response_class(json.dumps(data), mimetype="application/manifest+json")
     resp.headers["Cache-Control"] = "no-cache"
     return resp
