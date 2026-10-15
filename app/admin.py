@@ -1410,6 +1410,15 @@ def next_batch():
     return redirect(url_for("admin.app_settings"))
 
 
+@bp.route("/storage")
+@admin_required
+def storage():
+    """Where the portal keeps what — MongoDB, Google Drive, the server — and how much."""
+    from .storage_report import report, size
+    return render_template("admin/storage.html", r=report(refresh=request.args.get("refresh") == "1"),
+                           size=size)
+
+
 @bp.route("/audit")
 @admin_required
 def audit_log():

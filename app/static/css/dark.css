@@ -4989,6 +4989,38 @@ html[data-theme="dark"] .cd-table tr.cd-type.is-chosen td {
   background: #13321d;
   color: #87deac;
 }
+html[data-theme="dark"] .sg-what {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .sg-arrow {
+  color: #a1a9b8;
+}
+html[data-theme="dark"] .pill.sg-on {
+  background: #15311d;
+  color: #88ddb1;
+  border-color: #366545;
+}
+html[data-theme="dark"] .pill.sg-off {
+  background: #2f1010;
+  color: #dd8888;
+  border-color: #542d2d;
+}
+html[data-theme="dark"] .sg-card tfoot .sg-total td {
+  border-top: 1.5px solid #2e3542;
+}
+html[data-theme="dark"] .sg-wait {
+  background: #2f2510;
+  color: #ffcd66;
+}
+html[data-theme="dark"] .sg-bar {
+  background: #181b21;
+}
+html[data-theme="dark"] .sg-bar span {
+  background: #2962ae;
+}
+html[data-theme="dark"] .sg-bar.is-high span {
+  background: #b23a2a;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

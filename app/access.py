@@ -25,7 +25,7 @@ SECTIONS = [
     ("calendar", "Calendar", "What happened, day by day"),
     ("flow", "Data Flow", "How a department's data flows"),
     ("updates", "Updates", "Changes from departments as they happen"),
-    ("settings", "Settings", "Portal settings, credit rules, keywords, connectors, audit log"),
+    ("settings", "Settings", "Portal settings, credit rules, keywords, connectors, storage, audit log"),
 ]
 SECTION_KEYS = [k for k, _, _ in SECTIONS]
 LEVELS = ("none", "view", "edit")
@@ -77,7 +77,7 @@ ENDPOINTS = {
     "flow": ("flow", "view"), "flow_data": ("flow", "view"), "flow_excel": ("flow", "view"),
     "updates": ("updates", "view"), "updates_json": ("updates", "view"), "updates_read": ("updates", "edit"),
     "app_settings": ("settings", ("view", "edit")), "next_batch": ("settings", "edit"), "rules": ("settings", ("view", "edit")),
-    "rules_reset": ("settings", "edit"), "audit_log": ("settings", "view"),
+    "rules_reset": ("settings", "edit"), "audit_log": ("settings", "view"), "storage": ("settings", "view"),
     "connectors": ("settings", ("view", "edit")), "connector_toggle": ("settings", "edit"),
     "connector_delete": ("settings", "delete"), "connector_test": ("settings", "edit"),
     "keywords": ("settings", ("view", "edit")), "keywords_reset": ("settings", "edit"),

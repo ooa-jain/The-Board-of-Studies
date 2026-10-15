@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Storage{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Settings <span>›</span> Storage</div>
+      <h1>Storage</h1>
+      <p>Where the portal keeps what, and how much: typed answers in MongoDB, uploaded files in Google Drive,
+         and a working copy of the files on the server.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "admin/_tabs.html" %}
+{% set m, d, s = r.mongo, r.drive, r.server %}
+
+{# how it works, with the totals #}
+<div class="sg-flow">
+  <div class="sg-step">
+    <div class="sg-what">Typed answers</div>
+    <div class="sg-arrow" aria-hidden="true">→</div>
+    <div class="stat sg-tile">
+      <div class="l">MongoDB</div>
+      <div class="n">{{ size(m.data) }}</div>
+      <div class="sub">{{ '{:,}'.format(m.records) }} records{% if m.disk %} · {{ size(m.disk) }} on disk{% endif %}</div>
+    </div>
+  </div>
+  <div class="sg-step">
+    <div class="sg-what">Uploaded files</div>
+    <div class="sg-arrow" aria-hidden="true">→</div>
+    <div class="stat sg-tile">
+      <div class="l">Google Drive
+        <span class="pill {{ 'sg-on' if d.on else 'sg-off' }}">{{ 'On' if d.on else 'Off' }}</span></div>
+      <div class="n">{{ size(d.bytes) }}</div>
+      <div class="sub">{{ d.files }} file{{ '' if d.files == 1 else 's' }}{% if d.waiting and d.configured %} · {{ d.waiting }} not sent yet{% endif %}</div>
+    </div>
+  </div>
+  <div class="sg-step">
+    <div class="sg-what">Working copy</div>
+    <div class="sg-arrow" aria-hidden="true">→</div>
+    <div class="stat sg-tile">
+      <div class="l">Server</div>
+      <div class="n">{{ size(s.bytes + s.thumbs) }}</div>
+      <div class="sub">{{ s.files }} file{{ '' if s.files == 1 else 's' }}{% if s.disk %} · {{ size(s.disk.free) }} free{% endif %}</div>
+    </div>
+  </div>
+</div>
+<p class="small muted sg-note">Figures as of now · <a href="{{ url_for('admin.storage', refresh=1) }}">Refresh</a></p>
+
+{# MongoDB #}
+<section class="card sg-card">
+  <div class="card-head"><h3>MongoDB — typed answers</h3>
+    <span class="spacer"></span><span class="small muted mono">{{ m.host }} · {{ m.db }}</span></div>
+  <div class="card-body" style="padding:0">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th scope="col">Collection</th><th scope="col">What it holds</th>
+          <th scope="col" class="num">Records</th><th scope="col" class="num">Size</th></tr></thead>
+        <tbody>
+          {% for c in m.collections %}
+          <tr><td class="mono small">{{ c.name }}</td><td class="small">{{ c.about }}</td>
+            <td class="num">{{ '{:,}'.format(c.records) }}</td><td class="num">{{ size(c.data) }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr class="sg-total"><td colspan="2">Total{% if m.index %} <span class="small muted">· indexes {{ size(m.index) }}</span>{% endif %}</td>
+          <td class="num">{{ '{:,}'.format(m.records) }}</td><td class="num">{{ size(m.data) }}</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</section>
+
+{# Google Drive #}
+<section class="card sg-card">
+  <div class="card-head"><h3>Google Drive — uploaded files</h3>
+    <span class="spacer"></span>
+    {% if d.folder %}<a class="btn btn-ghost btn-sm" href="{{ d.folder }}" target="_blank" rel="noopener">Open the Drive folder ↗</a>{% endif %}</div>
+  <div class="card-body">
+    {% if not d.configured %}
+      <p class="muted">Google Drive is not connected. Files stay on the server only.</p>
+    {% else %}
+      <p class="small sg-status">
+        {% if d.reach_error %}<span class="pill sg-off">Not reachable</span> {{ d.reach_error }}
+        {% else %}<span class="pill sg-on">Connected</span>
+          {% if d.on %}New uploads go to Drive within seconds.{% else %}Connected, but new uploads are not sent yet (FILE_STORE is not “drive”).{% endif %}
+        {% endif %}
+      </p>
+      {% if d.account_used is not none %}
+      <div class="sg-acct">
+        <div class="small"><strong>The Drive account</strong> (everything in it, not only the portal):
+          {{ size(d.account_used) }} used{% if d.account_limit %} of {{ size(d.account_limit) }}{% endif %}</div>
+        {% if d.account_limit %}
+        {% set pct = (100 * d.account_used / d.account_limit) %}
+        <div class="sg-bar" role="img" aria-label="{{ '%.1f'|format(pct) }}% used"><span style="width: {{ [pct, 0.5]|max }}%"></span></div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if d.waiting %}
+      <p class="small sg-wait">{{ d.waiting }} file{{ '' if d.waiting == 1 else 's' }} ({{ size(d.waiting_bytes) }}) not in Drive yet{% if d.errors %}, {{ d.errors }} with an error last time{% endif %}.
+        On the server: <code>venv/bin/python tools/drive_sync.py --push</code></p>
+      {% endif %}
+    {% endif %}
+
+    {% if d.files %}
+    <div class="grid grid-2 sg-split">
+      <div>
+        <h4 class="sg-h">By type</h4>
+        <table class="data">
+          <thead><tr><th scope="col">Type</th><th scope="col" class="num">Files</th><th scope="col" class="num">Size</th></tr></thead>
+          <tbody>{% for k in d.kinds %}<tr><td>{{ k.kind }}</td><td class="num">{{ k.files }}</td><td class="num">{{ size(k.bytes) }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      <div>
+        <h4 class="sg-h">By department</h4>
+        <table class="data">
+          <thead><tr><th scope="col">Department</th><th scope="col" class="num">Files</th><th scope="col" class="num">Size</th></tr></thead>
+          <tbody>{% for x in d.departments %}<tr><td>{{ x.name }} <span class="small muted mono">{{ x.code }}</span></td>
+            <td class="num">{{ x.files }}</td><td class="num">{{ size(x.bytes) }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# the server #}
+<section class="card sg-card">
+  <div class="card-head"><h3>Server — working copy of the files</h3></div>
+  <div class="card-body">
+    <p class="small">{{ s.files }} file{{ '' if s.files == 1 else 's' }}, {{ size(s.bytes) }}{% if s.thumbs %}, and {{ size(s.thumbs) }} of page previews{% endif %}.
+      {% if d.on %}Files already in Drive can be removed from here to save space — they come back from Drive when opened:
+      <code>venv/bin/python tools/drive_sync.py --prune</code>{% endif %}</p>
+    {% if s.disk %}
+    {% set pct = (100 * s.disk.used / s.disk.total) %}
+    <div class="small"><strong>Server disk:</strong> {{ size(s.disk.used) }} used of {{ size(s.disk.total) }} · {{ size(s.disk.free) }} free</div>
+    <div class="sg-bar{{ ' is-high' if pct > 85 }}" role="img" aria-label="{{ '%.0f'|format(pct) }}% used"><span style="width: {{ pct }}%"></span></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -87,3 +87,33 @@ def test_with_drive_off_nothing_is_sent(app, client, monkeypatch):
     with app.app_context():
         assert "drive_id" not in get_db().files.find_one({"stored_name": j["stored"]})
     assert store == {}
+
+
+def test_the_storage_page_shows_mongodb_drive_and_the_server(app, client, monkeypatch):
+    from app import drive_store, storage_report
+    store, _ = _fake_drive(monkeypatch, app)
+    real = drive_store._call
+    monkeypatch.setattr(drive_store, "_call", lambda payload, timeout=120, app=None: (
+        {"ok": True, "root": "ROOT", "used": 5 * 1024 ** 3, "limit": 15 * 1024 ** 3}
+        if payload["action"] == "ping" else real(payload, timeout, app)))
+    storage_report._drive_cache.clear()
+    u, p = make_department(app)
+    login(client, u, p)
+    client.post("/department/api/upload", data={
+        "file": (io.BytesIO(_tiny_pdf()), "minutes.pdf"), "stage": "bos_documents", "field": "minutes",
+    }, content_type="multipart/form-data")
+    client.get("/logout")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    page = client.get("/admin/storage").get_data(as_text=True)
+    assert "MongoDB — typed answers" in page and "submissions" in page and "Total" in page
+    assert "Google Drive — uploaded files" in page and "Connected" in page
+    assert "drive.google.com/drive/folders/ROOT" in page
+    assert "5.00 GB used of 15.00 GB" in page
+    assert "Department of Commerce" in page and ">PDF<" in page
+    assert "Server disk:" in page
+
+
+def test_size_reads_in_words():
+    from app.storage_report import size
+    assert size(812) == "812 bytes" and size(2048) == "2.0 KB"
+    assert size(38.4 * 1024 ** 2) == "38.4 MB" and size(1.25 * 1024 ** 3) == "1.25 GB"

@@ -4896,3 +4896,26 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 /* credit tables: the total row for each UG programme type; the chosen type stands out */
 .cd-table tr.cd-type td:first-child { white-space: nowrap; }
 .cd-table tr.cd-type.is-chosen td { background: #e7f6ec; color: #1d6b3e; font-weight: 700; }
+
+/* Admin > Settings > Storage: what goes where, and how much */
+.sg-flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 4px 0 6px; }
+.sg-step { display: grid; grid-template-rows: auto auto 1fr; gap: 6px; }
+.sg-what { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+.sg-arrow { font-size: 1.1rem; line-height: 1; color: var(--gold-600); transform: rotate(90deg); width: 1em; }
+.sg-tile .l { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.sg-tile .n { font-size: 1.7rem; }
+.pill.sg-on { background: #e6f4ea; color: #1f6b44; border-color: #a9d8b8; }
+.pill.sg-off { background: #fbeaea; color: #9b2c2c; border-color: #efc2c2; }
+.sg-note { margin: 0 0 16px; }
+.sg-card { margin-bottom: 18px; }
+.sg-card tfoot .sg-total td { font-weight: 700; border-top: 1.5px solid var(--line); }
+.sg-card table.data th.num { text-align: right; }
+.sg-status { margin: 0 0 12px; }
+.sg-acct { margin: 0 0 14px; }
+.sg-wait { margin: 0 0 14px; padding: 8px 12px; border-radius: 8px; background: #fff7e6; color: #7a5200; }
+.sg-split { gap: 20px; margin-top: 6px; }
+.sg-h { margin: 0 0 8px; font-size: .86rem; }
+.sg-bar { height: 10px; margin-top: 6px; border-radius: 999px; background: var(--ink-050, #eef1f6); overflow: hidden; }
+.sg-bar span { display: block; height: 100%; border-radius: 999px; background: var(--ink-800); }
+.sg-bar.is-high span { background: #b23a2a; }
+@media (max-width: 760px) { .sg-flow { grid-template-columns: 1fr; } }

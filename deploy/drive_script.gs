@@ -36,7 +36,8 @@ function doPost(e) {
   try {
     const b = JSON.parse(e.postData.contents);
     if (!b.secret || b.secret !== props().getProperty('SECRET')) return out_({ ok: false, error: 'forbidden' });
-    if (b.action === 'ping') return out_({ ok: true, root: root_().getId() });
+    if (b.action === 'ping') return out_({ ok: true, root: root_().getId(),
+                                           used: DriveApp.getStorageUsed(), limit: DriveApp.getStorageLimit() });
     if (b.action === 'put') {
       const blob = Utilities.newBlob(Utilities.base64Decode(b.data), b.mime || 'application/octet-stream', b.name);
       return out_({ ok: true, id: folder_(b.path).createFile(blob).getId() });
