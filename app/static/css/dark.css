@@ -6263,6 +6263,22 @@ html[data-theme="dark"] .batch-next {
   border: 1px solid #2b3b50;
   background: #0e1a2a;
 }
+html[data-theme="dark"] button.side-link.side-install {
+  border: 0;
+  background: none;
+}
+html[data-theme="dark"] .app-dialog {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: #ced8e6;
+  box-shadow: 0 24px 60px rgba(9, 19, 36, 0.25);
+}
+html[data-theme="dark"] .app-dialog::backdrop {
+  background: rgba(43, 90, 171, 0.45);
+}
+html[data-theme="dark"] .app-dialog-head p {
+  color: #afb8ca;
+}
 
 /* ---- admin.css ---- */
 html[data-theme="dark"] .ad {

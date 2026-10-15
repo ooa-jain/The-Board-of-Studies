@@ -21,6 +21,19 @@
         href="{{ url_for('static', filename='img/favicon-512.png') }}">
   <link rel="apple-touch-icon" sizes="180x180"
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
+  {# the portal installs as an app (manifest + /sw.js) #}
+  <link rel="manifest" href="{{ url_for('public.manifest') }}" crossorigin="use-credentials">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="BoS Portal">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script>
+    /* the browser's offer to install, kept for the "Install app" button */
+    window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__installAsk = e; });
+    if ("serviceWorker" in navigator) window.addEventListener("load", function () {
+      navigator.serviceWorker.register("{{ url_for('public.service_worker') }}").catch(function () {});
+    });
+  </script>
   <script>
     /* light or dark before the first paint, so a dark page never flashes white:
        the choice made here, else the computer's own setting */
@@ -126,7 +139,9 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span class="side-text">Updates</span>
       <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
     </a>{% endif %}
-    {% if can('settings') %}{{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log') or ep.startswith('admin.team')) }}{% endif %}
+    {% if can('settings') %}{{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log', 'admin.storage') or ep.startswith('admin.team')) }}{% endif %}
+    <button class="side-link side-install" type="button" id="app-install" hidden title="Install the portal as an app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg><span class="side-text">Install app</span></button>
     {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
@@ -506,6 +521,47 @@
 </script>
 {% block scripts %}{% endblock %}
 {% if current_user and current_user.role == 'admin' %}
+<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-h">
+  <form method="dialog">
+    <div class="app-dialog-head">
+      <img src="{{ url_for('static', filename='img/app-192.png') }}" alt="" width="48" height="48">
+      <div><h2 id="app-dialog-h">Install the BoS Portal app</h2>
+        <p>It opens in its own window, like any app, and its icon shows the number of new updates.</p></div>
+    </div>
+    <ol class="app-steps">
+      <li><strong>Computer — Chrome or Edge:</strong> click the install icon <span aria-hidden="true">⊕</span> at the right end of the
+        address bar, or the menu <b>⋮</b> → <em>Cast, save and share</em> → <em>Install page as app</em>
+        (Edge: <b>…</b> → <em>Apps</em> → <em>Install this site as an app</em>).</li>
+      <li><strong>Android — Chrome:</strong> the menu <b>⋮</b> → <em>Add to Home screen</em> → <em>Install</em>.</li>
+      <li><strong>iPhone or iPad — Safari:</strong> the Share button <b>⬆</b> → <em>Add to Home Screen</em> → <em>Add</em>.</li>
+    </ol>
+    <p class="small muted">Sign in once in the app; it stays signed in like the browser.</p>
+    <div class="app-dialog-foot"><button class="btn btn-sm" value="close">Got it</button></div>
+  </form>
+</dialog>
+<script>
+/* Install app: the browser's own install offer when it has one, else the
+   steps for this kind of device. Hidden once the portal runs as the app. */
+(function () {
+  var btn = document.getElementById("app-install");
+  if (!btn) return;
+  var isApp = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+  if (isApp) return;
+  btn.hidden = false;
+  window.addEventListener("appinstalled", function () { btn.hidden = true; window.__installAsk = null; });
+  btn.addEventListener("click", function () {
+    var ask = window.__installAsk;
+    if (ask) {
+      ask.prompt();
+      ask.userChoice.then(function (c) { if (c.outcome === "accepted") btn.hidden = true; });
+      window.__installAsk = null;
+      return;
+    }
+    var d = document.getElementById("app-dialog");
+    if (d && d.showModal) d.showModal();
+  });
+})();
+</script>
 <script>
 /* Updates as they happen: every 20 seconds the bell asks for anything new
    and shows it as a message card; clicking one opens that department. */
@@ -530,6 +586,8 @@
         count.hidden = !j.unread;
         count.textContent = j.unread > 99 ? "99+" : j.unread;
         bell.classList.toggle("has-new", !!j.unread);
+        // the installed app's icon carries the same number
+        if (navigator.setAppBadge) (j.unread ? navigator.setAppBadge(j.unread) : navigator.clearAppBadge()).catch(function () {});
       }).catch(function () {});
   }
   tick();

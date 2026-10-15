@@ -1,6 +1,9 @@
 """Public landing page and campus information."""
 
-from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
+import json
+
+from flask import (Blueprint, current_app, redirect, render_template, request, send_from_directory,
+                   session, url_for)
 
 from .db import get_db, settings
 from .workflow import get_or_create_submission, next_action, progress
@@ -27,6 +30,51 @@ CAMPUS_INFO = [
         "accent": "#4BA3C8",
     },
 ]
+
+
+# ---------------------------------------------------------------- the app
+# The portal installs as an app (a PWA): the manifest names it and its icon,
+# and the service worker lets it open on its own. Both are served from the
+# site's root, where a service worker must live to look after every page.
+
+@bp.route("/manifest.webmanifest")
+def manifest():
+    user = session.get("user") or {}
+    data = {
+        "id": "/",
+        "name": "BoS Academic Portal",
+        "short_name": "BoS Portal",
+        "description": "JAIN Office of Academic Affairs — Board of Studies records.",
+        "start_url": "/?app=1",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#091324",
+        "theme_color": "#091324",
+        "icons": [
+            {"src": url_for("static", filename="img/app-192.png"), "sizes": "192x192", "type": "image/png"},
+            {"src": url_for("static", filename="img/app-512.png"), "sizes": "512x512", "type": "image/png"},
+            {"src": url_for("static", filename="img/app-maskable-512.png"), "sizes": "512x512",
+             "type": "image/png", "purpose": "maskable"},
+        ],
+    }
+    if user.get("role") == "admin":
+        # long-press the app icon: straight to these
+        data["shortcuts"] = [
+            {"name": "Departments", "url": url_for("admin.overview_departments")},
+            {"name": "Updates", "url": url_for("admin.updates")},
+            {"name": "Storage", "url": url_for("admin.storage")},
+        ]
+    resp = current_app.response_class(json.dumps(data), mimetype="application/manifest+json")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@bp.route("/sw.js")
+def service_worker():
+    resp = send_from_directory(current_app.static_folder, "sw.js", mimetype="application/javascript",
+                               max_age=0)
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @bp.route("/")

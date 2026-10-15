@@ -737,3 +737,19 @@ body.has-side .wrap { max-width: none !important; }
 .batch-next { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin: 4px 0 16px;
   padding: 12px 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; }
 .batch-next p { margin: 2px 0 0; max-width: 62ch; }
+
+/* Install app: a menu item that is a button */
+button.side-link.side-install { width: auto; margin: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; }
+button.side-link.side-install[hidden] { display: none; }
+
+/* the steps to install, for browsers that do not offer it themselves */
+.app-dialog { width: min(520px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line, #e4e7ec); border-radius: 14px;
+  background: var(--surface, #fff); color: var(--ink, #1f2937); box-shadow: 0 24px 60px rgba(9, 19, 36, .25); }
+.app-dialog::backdrop { background: rgba(9, 19, 36, .45); }
+.app-dialog form { padding: 22px 24px 18px; }
+.app-dialog-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 12px; }
+.app-dialog-head img { flex: none; border-radius: 12px; }
+.app-dialog-head h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.app-dialog-head p { margin: 0; font-size: .88rem; color: var(--ink-soft, #4b5563); }
+.app-steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 8px; font-size: .9rem; }
+.app-dialog-foot { display: flex; justify-content: flex-end; }
