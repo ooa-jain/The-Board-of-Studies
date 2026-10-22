@@ -238,16 +238,24 @@ def test_curriculum_follows_the_template_order():
         < keys.index("minors")
 
 
-def test_non_credit_courses_carry_no_credits():
-    ok = {"semester_structure": [_course(nep_category="Mandatory Non-Credit Course",
+def test_a_course_with_no_credits_is_a_non_credit_course():
+    """There is no non-credit category in the Course category list: a course
+    with 0 credits is the non-credit one, and its contact hours carry none."""
+    ok = {"semester_structure": [_course(nep_category="Major (Core)",
                                          l=2, credits=0, cia=50, ese=0, total_marks=50)]}
     issues, _ = validate_stage("prog_curriculum", ok, ctx("UG - 3 Year", 6))
-    assert not any("works out to" in m or "non-credit" in m for m in errors(issues))
+    assert not any("works out to" in m for m in errors(issues))
 
-    bad = {"semester_structure": [_course(nep_category="Mandatory Non-Credit Audit Course",
-                                          l=2, credits=2)]}
+    # an older draft that still names the non-credit category reads the same way
+    old = {"semester_structure": [_course(nep_category="Mandatory Non-Credit Audit Course",
+                                          l=2, credits=0, cia=50, ese=0, total_marks=50)]}
+    issues, _ = validate_stage("prog_curriculum", old, ctx("UG - 3 Year", 6))
+    assert not any("works out to" in m or "not one of" in m for m in errors(issues))
+
+    # a course that carries credits is still checked against its hours
+    bad = {"semester_structure": [_course(nep_category="Major (Core)", l=2, credits=4)]}
     issues, _ = validate_stage("prog_curriculum", bad, ctx("UG - 3 Year", 6))
-    assert any("non-credit course, so its credits must be 0" in m for m in errors(issues))
+    assert any("works out to" in m for m in errors(issues))
 
 
 def _syllabus(modules):

@@ -44,7 +44,6 @@ SEMESTERS = list(range(1, 9))
 
 NEP_CATEGORIES = [
     "Major (Core)",
-    "Discipline Specific Elective (DSE)",
     "Minor Stream",
     "Multidisciplinary",
     "Ability Enhancement Courses (AEC)",
@@ -52,17 +51,29 @@ NEP_CATEGORIES = [
     "Value Added Courses (VAC)",
     "Summer Internship",
     "Research Project / Dissertation",
-    "Mandatory Non-Credit Course",
-    "Mandatory Non-Credit Audit Course",
 ]
 
-# a course group, PG or UG, is one of the categories above; what an older PG
-# draft (or a pack) called it is read as the category it stands for
-_OLDER_PG_GROUPS = {
+# what each is called in the Course category list: the credit table's own headings
+CATEGORY_LABELS = {
+    "Major (Core)": "Major",
+    "Minor Stream": "Minor",
+    "Multidisciplinary": "Multi-Disciplinary / OE",
+    "Ability Enhancement Courses (AEC)": "Ability Enhancement / AEC",
+    "Skill Enhancement Courses (SEC)": "Skill Enhancement / SEC",
+    "Value Added Courses (VAC)": "Common Value Added / VAC",
+    "Summer Internship": "Summer Internship / INTERNSHIP",
+    "Research Project / Dissertation": "Research Project / Dissertation / PROJECT",
+}
+
+# what an older draft (or a pack) called a course group, read as the category it stands for
+_OLDER_GROUPS = {
+    "Discipline Specific Elective (DSE)": "Major (Core)",
+    "Mandatory Non-Credit Course": "Major (Core)",
+    "Mandatory Non-Credit Audit Course": "Major (Core)",
     "Generic Core": "Major (Core)",
     "Specialisation Core": "Major (Core)",
-    "Generic Elective": "Discipline Specific Elective (DSE)",
-    "Specialisation Elective": "Discipline Specific Elective (DSE)",
+    "Generic Elective": "Major (Core)",
+    "Specialisation Elective": "Major (Core)",
     "Open Elective": "Multidisciplinary",
     "Research / Thesis / Project / Patent": "Research Project / Dissertation",
 }
@@ -70,23 +81,16 @@ _OLDER_PG_GROUPS = {
 
 def course_category(value, credits=None, title=""):
     """A course group as one of the course categories: a group already one of
-    them stays; any other word (an older PG draft's, a pack's own) becomes the
-    category it stands for."""
+    them stays; any other word (an older draft's, a pack's own) becomes the
+    category it stands for. A course with no credits is counted as non-credit
+    by its zero, whichever category it sits in."""
     v = str(value or "").strip()
     if v in NEP_CATEGORIES:
         return v
-    if v in _OLDER_PG_GROUPS:
-        return _OLDER_PG_GROUPS[v]
+    if v in _OLDER_GROUPS:
+        return _OLDER_GROUPS[v]
     # the group's own words decide; a course's title only when it has no group
     low = (v or str(title or "")).lower()
-    try:
-        none = float(credits) == 0
-    except (TypeError, ValueError):
-        none = False
-    if "audit" in low:
-        return "Mandatory Non-Credit Audit Course"
-    if "non-credit" in low or "non credit" in low:
-        return "Mandatory Non-Credit Course"
     if any(w in low for w in ("research", "thesis", "dissertation", "project", "patent")):
         return "Research Project / Dissertation"
     if "internship" in low:
@@ -95,8 +99,6 @@ def course_category(value, credits=None, title=""):
         return ""
     if "minor" in low:
         return "Minor Stream"
-    if "special" in low:
-        return "Discipline Specific Elective (DSE)" if "elective" in low else "Major (Core)"
     if "open" in low or "multi" in low:
         return "Multidisciplinary"
     if "skill" in low:
@@ -105,10 +107,6 @@ def course_category(value, credits=None, title=""):
         return "Ability Enhancement Courses (AEC)"
     if "value" in low:
         return "Value Added Courses (VAC)"
-    if "elective" in low or "dse" in low:
-        return "Discipline Specific Elective (DSE)"
-    if none:
-        return "Mandatory Non-Credit Course"
     return "Major (Core)"
 
 
@@ -451,7 +449,7 @@ PROGRAMME_CURRICULUM = {
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
                  "min": 1, "max": 8, "choices": SEMESTERS, "width": "64px"},
                 {"name": "nep_category", "label": "Course category", "type": "select", "required": True,
-                 "options": NEP_CATEGORIES},
+                 "options": NEP_CATEGORIES, "option_labels": CATEGORY_LABELS},
                 {"name": "course_code", "label": "Course code", "type": "text",
                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /\\-.]{1,60}$", "width": "110px",
                  "help": "For example 26BCC1C01."},
@@ -854,22 +852,24 @@ def for_level(stage: dict, degree_level) -> dict:
     return s
 
 
-def pg_groups(data: dict, degree_level, key="semester_structure") -> dict:
-    """A PG programme's structure (or an earlier batch's course list, with
+def category_groups(data: dict, degree_level, key="semester_structure") -> dict:
+    """A programme's structure (or an earlier batch's course list, with
     key="batch_courses") with every course group one of the course categories
-    (an older draft's Generic Core and the like are read as the category they
-    stand for)."""
-    if not is_pg(degree_level) or not isinstance(data, dict):
+    (an older draft's Discipline Specific Elective, Generic Core and the like
+    are read as the category they stand for). A PG programme has no tracks."""
+    if not isinstance(data, dict):
         return data
     rows = data.get(key)
     if not isinstance(rows, list):
         return data
+    pg = is_pg(degree_level)
     out = []
     for r in rows:
         if isinstance(r, dict):
             r = dict(r)
             r["nep_category"] = course_category(r.get("nep_category"), r.get("credits"), r.get("course_title"))
-            r.pop("track", None)
+            if pg:
+                r.pop("track", None)
         out.append(r)
     return {**data, key: out}
 

@@ -422,6 +422,8 @@ def r_ltpe_credit_arithmetic(data, ctx, sk):
         cr = _num(r.get("credits"))
         if None in (l, t, p, e) or cr is None:
             continue
+        if cr == 0:
+            continue        # no credits: a non-credit course, whose contact hours carry none
         expected = l * w["lecture"] + t * w["tutorial"] + p * w["practical"] + e * w["experiential"]
         if abs(expected - cr) > tol:
             out.append(err(
@@ -723,14 +725,14 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     issues = []
     data = data or {}
     # a PG programme's Curriculum is the PG Course Matrix: its own course groups
-    from .schema import for_level, pg_groups
+    from .schema import for_level, category_groups
     deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
         or ctx.get("degree_level")
     stage = for_level(stage, deg)
     if stage_key == "prog_curriculum":
-        data = pg_groups(data, deg)
+        data = category_groups(data, deg)
     elif stage.get("existing_batch"):
-        data = pg_groups(data, deg, "batch_courses")
+        data = category_groups(data, deg, "batch_courses")
 
     for section in stage.get("sections", []):
         sk = section["key"]

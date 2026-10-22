@@ -444,15 +444,15 @@ def apply_defaults(stage_key, data, programme=None):
     specialisation ("derive_from"), stand in for any box left empty. Applied
     when checking and submitting, so leaving a box empty means accepting it.
     A PG programme's Curriculum takes the PG wording and course groups."""
-    from .schema import for_level, pg_groups
+    from .schema import for_level, category_groups
     data = dict(data or {})
     deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
         or (programme or {}).get("degree_level")
     stage = for_level(STAGE_BY_KEY.get(stage_key) or {}, deg)
     if stage_key == "prog_curriculum":
-        data = pg_groups(data, deg)
+        data = category_groups(data, deg)
     elif stage.get("existing_batch"):
-        data = pg_groups(data, deg, "batch_courses")
+        data = category_groups(data, deg, "batch_courses")
 
     def read(ref):
         sec, name = ref.split(".", 1)

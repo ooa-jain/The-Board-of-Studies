@@ -129,10 +129,9 @@ def _pg_courses(prefix):
         for i in range(count):
             title = PG_TOPICS[n % len(PG_TOPICS)]
             n += 1
-            group = "Major (Core)" if i < 4 else "Discipline Specific Elective (DSE)"
             rows.append({"semester": sem,
-                         "nep_category": group,
-                         "course_code": f"26{prefix}{sem}{'C' if 'Core' in group else 'E'}{i + 1:02d}",
+                         "nep_category": "Major (Core)",
+                         "course_code": f"26{prefix}{sem}{'C' if i < 4 else 'E'}{i + 1:02d}",
                          "course_title": title, "l": 4, "t": 0, "p": 0, "e": 0, "credits": 4,
                          "cia": 60, "ese": 40, "total_marks": 100})
         if sem < 4:
@@ -216,8 +215,8 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
         data["semester_structure"] = rows
     if not ug:
         # a PG programme's groups as the course categories, whatever the pack called them
-        from .schema import pg_groups
-        data = pg_groups(data, details["degree_level"])
+        from .schema import category_groups
+        data = category_groups(data, details["degree_level"])
         details = data["details"]
     profile = data.setdefault("profile", {})
     prog_name = programme.get("programme_name") or code

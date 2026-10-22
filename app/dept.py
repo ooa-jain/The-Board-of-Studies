@@ -16,7 +16,7 @@ from .db import audit, get_db, now, rules_doc, settings, to_ist
 from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
 from .report import ShareLinks
-from .schema import STAGE_BY_KEY, STAGE_KEYS
+from .schema import STAGE_BY_KEY, STAGE_KEYS, course_category
 from . import people
 from .notify import describe_changes
 from .notify import record as notify_record
@@ -390,7 +390,7 @@ def stage(stage_key, programme_code=None):
             for code, title in course_options(r.get("course_code"), r.get("course_title")):
                 if code.upper() not in course_map:
                     course_map[code.upper()] = {"semester": r.get("semester"),
-                                                "group": r.get("nep_category") or "",
+                                                "group": course_category(r.get("nep_category")),
                                                 "title": title}
         # back to where the course link was clicked: the programme structure,
         # or an earlier batch's curriculum (its course list)
@@ -431,16 +431,16 @@ def stage(stage_key, programme_code=None):
                 next_step = np_ and {**np_, "label": "the next programme"}
     _note_place(dept, stage_key, (programme or {}).get("programme_code"))
     # a PG programme fills the PG Course Matrix: its own course groups and wording
-    from .schema import for_level, pg_groups
+    from .schema import for_level, category_groups
     deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
            else {}).get("degree_level") or (programme or {}).get("degree_level")
     page_stage = for_level(stage_def, deg)
     if stage_def.get("existing_batch"):
         page_stage = _batch_semesters(page_stage)
     if stage_key == "prog_curriculum":
-        data = pg_groups(data, deg)
+        data = category_groups(data, deg)
     elif stage_def.get("existing_batch"):
-        data = pg_groups(data, deg, "batch_courses")
+        data = category_groups(data, deg, "batch_courses")
     # where "go to the next stage" leads when this one is left as a draft
     if next_step and next_step.get("url"):
         skip_to = {"url": next_step["url"], "label": next_step.get("label") or next_step.get("title") or ""}

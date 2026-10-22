@@ -542,10 +542,11 @@ def curriculum_docx(db, dept_code, year, programme_code):
     if not rec:
         return None
     _dept, prog, cur, _ = rec
-    from .schema import is_pg, pg_groups
+    from .schema import category_groups, is_pg
     deg = (cur.get("details") or {}).get("degree_level") or prog.get("degree_level")
+    cur = category_groups(cur, deg)
     if is_pg(deg):
-        return _pg_curriculum_docx(prog, pg_groups(cur, deg), deg)
+        return _pg_curriculum_docx(prog, cur, deg)
     name, spec, batch = _title_line(prog, cur)
     doc = _letterhead(_version_line(name, batch))
     sec = doc.sections[0]

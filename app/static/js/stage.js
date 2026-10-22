@@ -101,7 +101,7 @@
   // run after every change: counts that follow a table, and the like
   const refreshers = [];
   // course groups that carry no credits
-  const NON_CREDIT = ["Mandatory Non-Credit Course", "Mandatory Non-Credit Audit Course"];
+  const NON_CREDIT = ["Mandatory Non-Credit Course", "Mandatory Non-Credit Audit Course"];   // an older draft's
   let state = JSON.parse(document.getElementById("stage-data").textContent || "{}");
 
   const root = document.getElementById("sections");
@@ -725,7 +725,9 @@
       // a select, or a number picked from a short list (semester 1–8)
       input = el("select");
       input.appendChild(new Option(def.choices ? "—" : def.required ? "Choose…" : "—", ""));
-      (def.options || def.choices || []).forEach(o => input.appendChild(new Option(String(o), String(o))));
+      // a list can name its choices otherwise than it stores them (def.option_labels)
+      (def.options || def.choices || []).forEach(o =>
+        input.appendChild(new Option(String((def.option_labels || {})[o] || o), String(o))));
       input.value = value == null ? "" : String(value);
     } else if (def.type === "checkbox") {
       input = el("input");
@@ -3698,7 +3700,8 @@
       const grpSel = el("select");
       grpSel.setAttribute("aria-label", "Course category");
       grpSel.appendChild(new Option("All course categories", ""));
-      groups.forEach(g => grpSel.appendChild(new Option(g, g)));
+      const CAT_LABEL = Object.fromEntries(DIST_GROUPS);
+      groups.forEach(g => grpSel.appendChild(new Option(CAT_LABEL[g] || g, g)));
       grpSel.value = groups.includes(pick.group) ? pick.group : "";
       const lab = (t, sel) => { const w = el("label", "syl-nav-field"); w.appendChild(el("span", null, t)); w.appendChild(sel); return w; };
       row1.appendChild(lab("Semester", semSel));
