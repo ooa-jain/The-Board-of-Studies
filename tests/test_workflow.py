@@ -1048,7 +1048,8 @@ def test_department_information_lists_the_workbook_programmes(app, client):
                       .split("</script>")[0])
     codes = [r["programme_code"] for r in data["programmes_offered"]]
     assert "BCMREG" in codes and "BCHCOF" in codes
-    assert all(r["decision"] == "keep" for r in data["programmes_offered"])
+    # none is offered until the department ticks it
+    assert all(r["decision"] == "remove" for r in data["programmes_offered"])
     assert "magic-bento.js" in body
 
 
@@ -1066,24 +1067,30 @@ def test_programme_list_must_keep_one_and_new_rows_need_details(app, client):
     assert "needs a name" in msgs and "needs a code" in msgs and "UG, PG" in msgs
 
 
-def test_a_removed_programme_needs_a_reason(app, client):
+def test_one_ticked_programme_is_enough_and_the_rest_need_no_reason(app, client):
     u, p = make_department(app)
     login(client, u, p)
-    rows = [dict(r) for r in PROGRAMMES_OK]
-    rows[1].pop("removal_reason")
+    one = [{"programme_code": "BCMREG", "programme_name": "Bachelor of Commerce", "degree": "UG",
+            "source": "catalogue", "decision": "keep"},
+           {"programme_code": "BCHCOF", "programme_name": "B.Com in Corporate Finance", "degree": "UG",
+            "source": "catalogue", "decision": "remove"},
+           {"programme_code": "MCMREG", "programme_name": "Master of Commerce", "degree": "PG",
+            "source": "catalogue", "decision": "remove"}]
+    # none ticked is refused, in the words of the tick
+    none = [dict(r, decision="remove") for r in one]
     body = client.post("/department/api/dept_info/submit",
-                       json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()
+                       json=dict(DEPT_INFO_OK, programmes_offered=none)).get_json()
     assert body["ok"] is False
-    assert any("being removed" in i["message"] for i in body["issues"])
+    assert any("Tick at least one programme" in i["message"] for i in body["issues"])
 
-    rows[1]["removal_reason"] = "Other"
-    body = client.post("/department/api/dept_info/submit",
-                       json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()
-    assert any("add a line" in i["message"] for i in body["issues"])
-
-    rows[1]["removal_note"] = "Folded into BCMREG"
+    # one is enough, and the others need no reason
     assert client.post("/department/api/dept_info/submit",
-                       json=dict(DEPT_INFO_OK, programmes_offered=rows)).get_json()["ok"]
+                       json=dict(DEPT_INFO_OK, programmes_offered=one)).get_json()["ok"]
+    with app.app_context():
+        from app.db import get_db
+        from app.workflow import programmes_of
+        sub = get_db().submissions.find_one({})
+        assert [x["programme_code"] for x in programmes_of(sub)] == ["BCMREG"]
 
 
 

@@ -1516,11 +1516,10 @@ html[data-theme="dark"] .pl-remove[aria-pressed=true] {
 html[data-theme="dark"] .pl-opt:focus-visible {
   outline: 2px solid #2c5488;
 }
-html[data-theme="dark"] .pl-row.is-removed {
+html[data-theme="dark"] .pl-row.is-off {
   background: #181b21;
 }
-html[data-theme="dark"] .pl-row.is-removed .pl-name {
-  text-decoration: line-through;
+html[data-theme="dark"] .pl-row.is-off .pl-name {
   color: #aab2c1;
 }
 html[data-theme="dark"] .pl-row.is-new {
@@ -1599,42 +1598,14 @@ html[data-theme="dark"] .pl-plus:hover {
 html[data-theme="dark"] .pl-icon:focus-visible {
   outline: 2px solid #2c5488;
 }
-html[data-theme="dark"] .pl-why {
-  color: #e48b81;
+html[data-theme="dark"] .pl-pick {
+  color: #87deac;
 }
-html[data-theme="dark"] .reason-dlg {
-  border: 0;
-  box-shadow: 0 24px 64px rgba(9, 19, 36, 0.2);
-  color: #ced8e6;
+html[data-theme="dark"] .pl-pick input {
+  accent-color: #acc7ec;
 }
-html[data-theme="dark"] .reason-dlg::backdrop {
-  background: rgba(43, 90, 171, 0.5);
-}
-html[data-theme="dark"] .reason-prog {
-  color: #afb8ca;
-}
-html[data-theme="dark"] .reason-dlg fieldset {
-  border: 0;
-}
-html[data-theme="dark"] .reason-opt {
-  border: 1px solid #2e3542;
-}
-html[data-theme="dark"] .reason-opt:has(input:checked) {
-  border-color: #2c5488;
-  background: #181b21;
-}
-html[data-theme="dark"] .reason-opt input {
-  accent-color: #afc9e9;
-}
-html[data-theme="dark"] .reason-warn {
-  color: #e48b81;
-}
-html[data-theme="dark"] .reason-ok {
-  background: #ad3325;
-  color: #ffffff;
-}
-html[data-theme="dark"] .reason-ok:hover {
-  background: #8e281c;
+html[data-theme="dark"] .pl-row.is-off .pl-pick {
+  color: #aab2c1;
 }
 html[data-theme="dark"] input.is-auto {
   background: #130e29;
@@ -1708,7 +1679,7 @@ html[data-theme="dark"] .pl-panel .pl-code {
   background: #10182d;
   color: #acc7ec;
 }
-html[data-theme="dark"] .pl-panel .pl-row.is-removed {
+html[data-theme="dark"] .pl-panel .pl-row.is-off {
   background: none;
 }
 html[data-theme="dark"] .pl-panel .pl-row.is-new {

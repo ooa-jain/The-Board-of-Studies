@@ -480,7 +480,7 @@ def add_programme():
     """From Curriculum: "add a new UG / PG programme". Department Information
     holds the programme list, so go there — reopened if it was already
     submitted — with a new row started, and come back to Curriculum after."""
-    # no level: reopened only to change the list (add or remove), from the
+    # no level: reopened only to change the list (tick or add), from the
     # submitted Department Information page itself
     level = {"PG": "PG", "UG": "UG"}.get(request.args.get("level"), "")
     dept = _dept()
@@ -495,9 +495,9 @@ def add_programme():
             {"$set": {"stages.dept_info.status": "draft", "updated_at": now()},
              "$unset": {"stages.dept_info.returned_note": ""}})
         audit(_me()["username"], "stage.reopened", f"{dept['dept_code']}/dept_info",
-              {"why": f"add a new {level} programme" if level else "add or remove programmes"})
+              {"why": f"add a new {level} programme" if level else "change the programmes"})
     if not level:
-        flash("Department Information is open again: add or remove programmes, then submit it again.", "info")
+        flash("Department Information is open again: change the programmes, then submit it again.", "info")
         return redirect(url_for("dept.stage", stage_key="dept_info"))
     return redirect(url_for("dept.stage", stage_key="dept_info", add=level, back="curriculum"))
 

@@ -168,8 +168,8 @@
       li.appendChild(el("strong", null, p.programme_name || p.programme_code || "—"));
       li.appendChild(el("span", "rv-prog-code", p.programme_code || ""));
       li.appendChild(el("span", "rv-prog-dec", p.decision === "remove"
-        ? "Removed" + (p.removal_reason ? " — " + p.removal_reason : "")
-        : p.source === "new" ? "New" : "Kept"));
+        ? "Not offered"
+        : p.source === "new" ? "New" : "Offered"));
       ul.appendChild(li);
     });
     return ul;

@@ -119,7 +119,7 @@ def section_items(stage_key, data, links):
             rows = payload if isinstance(payload, list) else []
             kept = [r for r in rows if r.get("decision") != "remove"]
             items.append((bool(kept), section.get("title") or "Programmes",
-                          f"{len(kept)} kept · {len(rows) - len(kept)} removed", []))
+                          f"{len(kept)} offered · {len(rows) - len(kept)} not offered", []))
         elif kind == "table":
             rows = [r for r in (payload or []) if isinstance(r, dict)] if isinstance(payload, list) else []
             docs = [(x.get("name") or "file", links.file(stage_key, x))

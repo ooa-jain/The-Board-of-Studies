@@ -56,3 +56,20 @@ def test_an_earlier_batch_has_its_courses_and_their_syllabi_and_no_upload():
     assert [s["key"] for s in sections] == ["batch_courses", "courses"]
     assert sections[1]["display"] == "sheet" and sections[1]["min_rows"] == 0
     assert not any(f.get("type") == "file" for s in sections for f in s.get("fields", []))
+
+
+def test_semester_one_and_two_courses_cannot_be_marked_no():
+    from app.validation import validate_stage
+    rows = [
+        {"semester": 1, "course_code": "C1", "syllabus": "No"},
+        {"semester": 2, "course_code": "C2", "revision": "No"},
+        {"semester": 3, "course_code": "C3", "syllabus": "No", "revision": "No"},
+        {"semester": 2, "course_code": "C4", "syllabus": "Yes", "revision": "Yes"},
+    ]
+    issues, _ = validate_stage("prog_curriculum", {"semester_structure": rows}, {})
+    msgs = [i["message"] for i in issues if "semester 1 or 2" in i["message"]]
+    assert len(msgs) == 2 and "C1" in msgs[0] and "C2" in msgs[1]
+    assert [i["row"] for i in issues if "semester 1 or 2" in i["message"]] == [0, 1]
+    # an earlier batch has no such rule: it has no Yes / No at all
+    batch, _ = validate_stage("prog_syllabus_b2025", {"batch_courses": rows}, {})
+    assert not [i for i in batch if "semester 1 or 2" in i["message"]]

@@ -129,19 +129,17 @@ def _pg_courses(prefix):
         for i in range(count):
             title = PG_TOPICS[n % len(PG_TOPICS)]
             n += 1
-            # the PG Course Matrix's classifications
-            group = ("Generic Core" if i < 2 else "Specialisation Core" if i < 4
-                     else "Generic Elective" if sem == 1 else "Specialisation Elective")
+            group = "Major (Core)" if i < 4 else "Discipline Specific Elective (DSE)"
             rows.append({"semester": sem,
                          "nep_category": group,
                          "course_code": f"26{prefix}{sem}{'C' if 'Core' in group else 'E'}{i + 1:02d}",
                          "course_title": title, "l": 4, "t": 0, "p": 0, "e": 0, "credits": 4,
                          "cia": 60, "ese": 40, "total_marks": 100})
         if sem < 4:
-            rows.append({"semester": sem, "nep_category": "Open Elective" if sem == 3 else "Generic Core",
+            rows.append({"semester": sem, "nep_category": "Multidisciplinary" if sem == 3 else "Major (Core)",
                          "course_code": f"26{prefix}{sem}S01", "course_title": f"Skill Lab {sem}",
                          "l": 3, "t": 0, "p": 0, "e": 0, "credits": 3, "cia": 100, "ese": 0, "total_marks": 100})
-    rows.append({"semester": 4, "nep_category": "Research / Thesis / Project / Patent",
+    rows.append({"semester": 4, "nep_category": "Research Project / Dissertation",
                  "course_code": f"26{prefix}4P01", "course_title": "Project / Internship",
                  "l": 2, "t": 0, "p": 4, "e": 12, "credits": 8, "cia": 60, "ese": 40, "total_marks": 100})
     return rows
@@ -214,10 +212,10 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
         if syllabus_courses:
             # the syllabus is the Drive's: its courses are the major, the rest fills the scheme
             rows = _major_from_syllabus(syllabus_courses, pg=not ug) + [
-                r for r in rows if r["nep_category"] not in ("Major (Core)", "Generic Core", "Specialisation Core")]
+                r for r in rows if r["nep_category"] != "Major (Core)"]
         data["semester_structure"] = rows
     if not ug:
-        # a PG programme's groups in the PG Course Matrix's terms, whatever the pack called them
+        # a PG programme's groups as the course categories, whatever the pack called them
         from .schema import pg_groups
         data = pg_groups(data, details["degree_level"])
         details = data["details"]
@@ -529,6 +527,11 @@ def fill_from_drive(dept, year, actor):
     if not submitted("dept_info"):
         stored = ((sub.get("stages") or {}).get("dept_info") or {}).get("data")
         data = stored or prefill_for("dept_info", dept, year, None, sub)
+        if not stored:
+            # the Drive's record is the department's own: every programme in it is offered
+            for r in data.get("programmes_offered") or []:
+                if isinstance(r, dict):
+                    r["decision"] = "keep"
         data.setdefault("contact", {}).setdefault("office_email", dept.get("office_email") or "csit@jainuniversity.ac.in")
         data["contact"].setdefault("faculty_count", 20)
         save_draft(code, year, "dept_info", data)

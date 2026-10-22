@@ -84,9 +84,9 @@ def test_short_forms_expand_to_full_words():
 
 
 def test_a_pg_curriculum_is_the_pg_course_matrix_and_ug_stays_as_it_was():
-    """PG: Generic Core … Research / Thesis / Project / Patent, no Honours
-    tracks or minors, a Fee item, 60 / 40; UG unchanged."""
-    from app.schema import PG_CATEGORIES, STAGE_BY_KEY, for_level, pg_category, pg_groups
+    """PG: the same course categories as UG, no Honours tracks or minors, a
+    Fee item, 60 / 40; UG unchanged."""
+    from app.schema import NEP_CATEGORIES, STAGE_BY_KEY, course_category, for_level, pg_groups
     base = STAGE_BY_KEY["prog_curriculum"]
     assert for_level(base, "UG - 4 Year (Honours with Research)") is base
     pg = for_level(base, "PG - 2 Year")
@@ -94,17 +94,26 @@ def test_a_pg_curriculum_is_the_pg_course_matrix_and_ug_stays_as_it_was():
     assert "minors" not in keys and pg["level"] == "PG"
     struct = next(s for s in pg["sections"] if s["key"] == "semester_structure")
     cols = {c["name"]: c for c in struct["columns"]}
-    assert "track" not in cols and cols["nep_category"]["options"] == PG_CATEGORIES
+    assert "track" not in cols and cols["nep_category"]["options"] == NEP_CATEGORIES
     prof = next(s for s in pg["sections"] if s["key"] == "profile")
     assert "fee" in [f["name"] for f in prof["fields"]]
     assert "60% Continuous Assessment" in next(f for f in prof["fields"] if f["name"] == "assessment")["prefill_text"]
-    # a UG group saved for a PG programme reads as its PG classification
-    assert pg_category("Major (Core)") == "Generic Core"
-    assert pg_category("Discipline Specific Elective (DSE)") == "Generic Elective"
-    assert pg_category("Research Project / Dissertation") == "Research / Thesis / Project / Patent"
-    assert pg_category("Major (Core)", 4, "Project Management") == "Generic Core"
-    data = pg_groups({"semester_structure": [{"nep_category": "Multidisciplinary", "track": "All semesters"}]}, "PG - 2 Year")
-    assert data["semester_structure"][0] == {"nep_category": "Open Elective"}
+    # a category stays as it is; an older PG draft's words read as the category they stand for
+    assert course_category("Major (Core)") == "Major (Core)"
+    assert course_category("Discipline Specific Elective (DSE)") == "Discipline Specific Elective (DSE)"
+    assert course_category("Generic Core") == "Major (Core)"
+    assert course_category("Specialisation Elective") == "Discipline Specific Elective (DSE)"
+    assert course_category("Open Elective") == "Multidisciplinary"
+    assert course_category("Research / Thesis / Project / Patent") == "Research Project / Dissertation"
+    assert course_category("Major (Core)", 4, "Project Management") == "Major (Core)"
+    assert course_category("", 4, "Summer Internship in industry") == "Summer Internship"
+    assert course_category("Anything else", 0) == "Mandatory Non-Credit Course"
+    data = pg_groups({"semester_structure": [{"nep_category": "Generic Core", "track": "All semesters"}]}, "PG - 2 Year")
+    assert data["semester_structure"][0] == {"nep_category": "Major (Core)"}
+    # an earlier batch's PG list offers the same categories
+    batch = for_level(STAGE_BY_KEY["prog_syllabus_b2025"], "PG - 2 Year")
+    bcols = {c["name"]: c for c in next(s for s in batch["sections"] if s["key"] == "batch_courses")["columns"]}
+    assert bcols["nep_category"]["options"] == NEP_CATEGORIES
 
 
 def test_the_home_is_live_and_every_number_says_where_it_comes_from(app, client):

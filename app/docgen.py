@@ -502,12 +502,15 @@ def _minors_table(doc, minors, width):
 
 
 PG_SUMMARY = [
-    ("Generic Core", "Generic Core"),
-    ("Generic Elective", "Generic Elective"),
-    ("Specialisation Core", "Specialisation Core"),
-    ("Specialisation Elective", "Specialisation Elective"),
-    ("Open Elective", "Open Elective"),
-    ("Research / Thesis / Project / Patent", "RESEARCH / THESIS / PROJECT / PATENT"),
+    ("Major (Core)", "Major (Core)"),
+    ("Discipline Specific Elective (DSE)", "DSE"),
+    ("Minor Stream", "Minor"),
+    ("Multidisciplinary", "Multi-Disciplinary"),
+    ("Ability Enhancement Courses (AEC)", "AEC"),
+    ("Skill Enhancement Courses (SEC)", "SEC"),
+    ("Value Added Courses (VAC)", "VAC"),
+    ("Summer Internship", "INTERNSHIP"),
+    ("Research Project / Dissertation", "RESEARCH PROJECT / DISSERTATION"),
 ]
 
 
@@ -643,10 +646,11 @@ def _pg_curriculum_docx(prog, cur, deg):
     _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=12, after=6)
     if rows:
         _pg_summary_table(doc, rows, width)
-        _para(doc, "The classifications defined for assigning credits: Generic Core, Generic Elective, "
-                   "Specialisation Core, Specialisation Elective, Open Elective, and Research / Thesis / "
-                   "Project / Patent. Electives vary by programme; each elective a student may choose is "
-                   "listed in its semester.", size=8.5, align=WD_ALIGN_PARAGRAPH.LEFT)
+        _para(doc, "Credits are classified by course category: Major (Core), Discipline Specific Elective, "
+                   "Minor Stream, Multidisciplinary, Ability Enhancement, Skill Enhancement, Value Added, "
+                   "Summer Internship and Research Project / Dissertation. Electives vary by programme; "
+                   "each elective a student may choose is listed in its semester.",
+              size=8.5, align=WD_ALIGN_PARAGRAPH.LEFT)
         _page_break(doc)
         _pg_semester_tables(doc, rows, width)
         _summary_table(doc, rows, width, title="CREDITS BY ASSESSMENT")

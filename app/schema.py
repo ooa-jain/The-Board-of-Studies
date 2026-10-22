@@ -56,45 +56,60 @@ NEP_CATEGORIES = [
     "Mandatory Non-Credit Audit Course",
 ]
 
-# a PG programme's course groups, as the PG Course Matrix classifies credits
-PG_CATEGORIES = [
-    "Generic Core",
-    "Generic Elective",
-    "Specialisation Core",
-    "Specialisation Elective",
-    "Open Elective",
-    "Research / Thesis / Project / Patent",
-    "Mandatory Non-Credit Course",
-]
+# a course group, PG or UG, is one of the categories above; what an older PG
+# draft (or a pack) called it is read as the category it stands for
+_OLDER_PG_GROUPS = {
+    "Generic Core": "Major (Core)",
+    "Specialisation Core": "Major (Core)",
+    "Generic Elective": "Discipline Specific Elective (DSE)",
+    "Specialisation Elective": "Discipline Specific Elective (DSE)",
+    "Open Elective": "Multidisciplinary",
+    "Research / Thesis / Project / Patent": "Research Project / Dissertation",
+}
 
 
-def pg_category(value, credits=None, title=""):
-    """A course group in a PG programme's own terms: a UG / NEP group (or a
-    pack's own word for it) becomes the PG classification it stands for."""
+def course_category(value, credits=None, title=""):
+    """A course group as one of the course categories: a group already one of
+    them stays; any other word (an older PG draft's, a pack's own) becomes the
+    category it stands for."""
     v = str(value or "").strip()
-    if v in PG_CATEGORIES:
+    if v in NEP_CATEGORIES:
         return v
+    if v in _OLDER_PG_GROUPS:
+        return _OLDER_PG_GROUPS[v]
     # the group's own words decide; a course's title only when it has no group
     low = (v or str(title or "")).lower()
     try:
         none = float(credits) == 0
     except (TypeError, ValueError):
         none = False
-    if "non-credit" in low or "non credit" in low or "audit" in low:
+    if "audit" in low:
+        return "Mandatory Non-Credit Audit Course"
+    if "non-credit" in low or "non credit" in low:
         return "Mandatory Non-Credit Course"
-    if any(w in low for w in ("research", "thesis", "dissertation", "project", "patent", "internship")):
-        return "Research / Thesis / Project / Patent"
+    if any(w in low for w in ("research", "thesis", "dissertation", "project", "patent")):
+        return "Research Project / Dissertation"
+    if "internship" in low:
+        return "Summer Internship"
     if not v:
         return ""
-    if "special" in v.lower() or v == "Minor Stream":
-        return "Specialisation Elective" if "elective" in v.lower() else "Specialisation Core"
-    if "open" in v.lower() or v == "Multidisciplinary":
-        return "Open Elective"
-    if "elective" in v.lower() or "dse" in v.lower():
-        return "Generic Elective"
-    if none and v:
+    if "minor" in low:
+        return "Minor Stream"
+    if "special" in low:
+        return "Discipline Specific Elective (DSE)" if "elective" in low else "Major (Core)"
+    if "open" in low or "multi" in low:
+        return "Multidisciplinary"
+    if "skill" in low:
+        return "Skill Enhancement Courses (SEC)"
+    if "ability" in low or "language" in low:
+        return "Ability Enhancement Courses (AEC)"
+    if "value" in low:
+        return "Value Added Courses (VAC)"
+    if "elective" in low or "dse" in low:
+        return "Discipline Specific Elective (DSE)"
+    if none:
         return "Mandatory Non-Credit Course"
-    return "Generic Core" if v else ""
+    return "Major (Core)"
 
 
 # course groups that carry no credits; counted in their own columns
@@ -145,22 +160,13 @@ DEPARTMENT_INFORMATION = {
         {
             "key": "programmes_offered",
             "title": "Programmes offered",
-            "help": "Keep the programmes you run this year, remove the rest, and add a new programme at the end.",
+            "help": "Tick the programmes you run this year — one is enough. Add a new programme at the end.",
             "type": "programme_list",
             "degrees": ["UG", "PG", "PG-1Yr", "PGD"],
             # the tabs the list is split into, by the workbook's Degree column
             "tabs": [{"key": "UG", "label": "UG programmes", "degrees": ["UG"]},
                      {"key": "PG", "label": "PG programmes",
                       "degrees": ["PG", "PG-1Yr", "PGD"]}],
-            "removal_reasons": [
-                "Programme discontinued",
-                "No admissions this year",
-                "Merged into another programme",
-                "Moved to another department",
-                "Not run at this campus",
-                "Listed here by mistake",
-                "Other",
-            ],
             "rules": ["programmes_offered_valid"],
             # what the Excel and Word exports print for each programme
             "columns": [
@@ -168,9 +174,7 @@ DEPARTMENT_INFORMATION = {
                 {"name": "programme_name", "label": "Programme"},
                 {"name": "degree", "label": "Degree"},
                 {"name": "source", "label": "From"},
-                {"name": "decision", "label": "Kept / removed"},
-                {"name": "removal_reason", "label": "Reason for removal"},
-                {"name": "removal_note", "label": "Note"},
+                {"name": "decision", "label": "Offered / not offered"},
             ],
         },
     ],
@@ -471,15 +475,18 @@ PROGRAMME_CURRICULUM = {
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
                  "min": MARKS_TOTAL, "max": MARKS_TOTAL, "fixed_value": MARKS_TOTAL},
                 {"name": "syllabus", "label": "Syllabus", "type": "syllabus_link",
-                 "help": "Yes: this course has a syllabus — the link opens it in the current batch. No: it has none."},
+                 "help": "Yes: this course has a syllabus — the link opens it in the current batch. No: it has none. "
+                         "Always Yes in semesters 1 and 2."},
                 {"name": "revision", "label": "Revision", "type": "revision_link",
-                 "help": "Yes: this course is revised in this BoS — the link opens it in Course Revision. No: it is not."},
+                 "help": "Yes: this course is revised in this BoS — the link opens it in Course Revision. No: it is not. "
+                         "Always Yes in semesters 1 and 2."},
             ],
             "rules": [
                 "ltpe_credit_arithmetic",
                 "marks_add_up",
                 "semester_within_duration",
                 "unique_course_codes",
+                "first_year_has_syllabus_and_revision",
             ],
         },
         {
@@ -680,11 +687,18 @@ def batch_start(label) -> int | None:
 
 def _batch_courses_columns():
     """The programme structure's columns, for an earlier batch's courses —
-    with the same Syllabus and Revision links, into the current batch's
-    syllabus and Course Revision."""
+    with the same Syllabus and Revision links (a → into that batch's own
+    Syllabus page and into Course Revision)."""
     import copy
     sec = next(x for x in PROGRAMME_CURRICULUM["sections"] if x["key"] == "semester_structure")
-    return [copy.deepcopy(c) for c in sec["columns"]]
+    cols = [copy.deepcopy(c) for c in sec["columns"]]
+    for c in cols:
+        # no Yes / No on an earlier batch: each course's syllabus is typed in its Syllabus page
+        if c["name"] == "syllabus":
+            c["help"] = "Opens this course's syllabus in this batch's Syllabus page."
+        elif c["name"] == "revision":
+            c["help"] = "Opens this course in Course Revision."
+    return cols
 
 
 def _batch_part(start: int) -> dict:
@@ -766,9 +780,9 @@ def is_pg(degree_level) -> bool:
 
 def for_level(stage: dict, degree_level) -> dict:
     """The Curriculum form as a programme of this level fills it. A PG
-    programme classifies credits as the PG Course Matrix does (Generic Core …
-    Research / Thesis / Project / Patent), has no Honours tracks or minors,
-    states its fee, and opens with the PG wording; a UG programme is as it was."""
+    programme has no Honours tracks or minors, states its fee, and opens
+    with the PG wording; a UG programme is as it was. Both choose a course's
+    category from the same list."""
     import copy
     if stage and stage.get("existing_batch"):
         # an earlier batch's course list follows the programme's level too
@@ -782,8 +796,6 @@ def for_level(stage: dict, degree_level) -> dict:
                 if c["name"] == "semester":
                     n = 4 if is_pg(degree_level) else 6
                     c["max"], c["choices"] = n, list(range(1, n + 1))
-                elif c["name"] == "nep_category" and is_pg(degree_level):
-                    c["label"], c["options"], c["width"] = "Category", PG_CATEGORIES, "200px"
         return s
     if not stage or stage.get("key") != "prog_curriculum":
         return stage
@@ -805,16 +817,11 @@ def for_level(stage: dict, degree_level) -> dict:
         if sec["key"] == "semester_structure":
             sec["columns"] = list(sec["columns"])
             for c in sec["columns"]:
-                if c["name"] == "nep_category":
-                    c["label"] = "Category"
-                    c["options"] = PG_CATEGORIES
-                    c["width"] = "200px"
-                elif c["name"] == "semester":
+                if c["name"] == "semester":
                     c["max"], c["choices"] = 4, [1, 2, 3, 4]
-            sec["help"] = ("One row per course, with its category as the PG Course Matrix classifies "
-                           "credits. Electives vary by programme: list each elective a student may "
-                           "choose as its own row, in its semester and category, so the choice is "
-                           "clear to the students.")
+            sec["help"] = ("One row per course, with its course category. Electives vary by programme: "
+                           "list each elective a student may choose as its own row, in its semester and "
+                           "category, so the choice is clear to the students.")
         elif sec["key"] == "credit_classification":
             sec["title"] = "Summary — credits by classification"
             sec["help"] = "The Credit table will be automatically populated based on the courses added to the programme structure below."
@@ -849,7 +856,9 @@ def for_level(stage: dict, degree_level) -> dict:
 
 def pg_groups(data: dict, degree_level, key="semester_structure") -> dict:
     """A PG programme's structure (or an earlier batch's course list, with
-    key="batch_courses") with every course group in PG terms."""
+    key="batch_courses") with every course group one of the course categories
+    (an older draft's Generic Core and the like are read as the category they
+    stand for)."""
     if not is_pg(degree_level) or not isinstance(data, dict):
         return data
     rows = data.get(key)
@@ -859,7 +868,7 @@ def pg_groups(data: dict, degree_level, key="semester_structure") -> dict:
     for r in rows:
         if isinstance(r, dict):
             r = dict(r)
-            r["nep_category"] = pg_category(r.get("nep_category"), r.get("credits"), r.get("course_title"))
+            r["nep_category"] = course_category(r.get("nep_category"), r.get("credits"), r.get("course_title"))
             r.pop("track", None)
         out.append(r)
     return {**data, key: out}

@@ -396,19 +396,19 @@ def test_the_curriculum_is_the_template_with_logo_and_every_course(app, client):
     body = page.get_data(as_text=True)
     assert page.status_code == 200 and "Download Word" in body
     # an MCA is PG: the PG Course Matrix's layout
-    assert "SUMMARY" in body and "Generic Core" in body and "25MCAC101" in body
+    assert "SUMMARY" in body and "Major (Core)" in body and "25MCAC101" in body
     r = app.test_client().get(urlparse(url).path + "/file")        # and the Word document
     assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment")
     doc = Document(io.BytesIO(r.data))
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "Jain (Deemed-to-be University), Bangalore" in text and "Programme Structure" in text
     cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
-    for words in ("SUMMARY", "Generic Core", "Generic Elective", "Specialisation Core", "Specialisation Elective",
-                  "Open Elective", "RESEARCH / THESIS / PROJECT / PATENT", "Mandatory Non-Credit",
+    for words in ("SUMMARY", "Major (Core)", "DSE", "Multi-Disciplinary", "INTERNSHIP",
+                  "RESEARCH PROJECT / DISSERTATION", "Mandatory Non-Credit",
                   "SEMESTER I", "Category", "25MCAC101", "Objective", "Fee",
                   "100% Continuous Assessment Credits"):
         assert words in cells, words
-    assert "Classification of Credits" not in cells and "Major (Core)" not in cells
+    assert "Classification of Credits" not in cells and "Generic Core" not in cells
     sec = doc.sections[0]
     assert sec.page_width > sec.page_height                         # landscape, as the template
     assert "Master of Computer Applications" in sec.header.paragraphs[0].text

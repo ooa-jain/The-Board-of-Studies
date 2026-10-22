@@ -387,7 +387,7 @@ def programmes_of(submission: dict, department: dict | None = None):
     Information — with the details each one's Curriculum holds."""
     offered = offered_programmes(submission)
     if offered is None:
-        offered = catalogue_rows(department) if department else []
+        offered = catalogue_rows(department, offered=True) if department else []
     out, seen = [], set()
     for p in offered:
         code = str(p.get("programme_code") or "").strip()
@@ -620,14 +620,15 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
     return out
 
 
-def catalogue_rows(department):
+def catalogue_rows(department, offered=False):
     """The department's programmes from the Office of Academic Affairs workbook, as
-    rows of the Programmes offered list — every one kept until the
-    department says otherwise."""
+    rows of the Programmes offered list. Each starts not offered: the
+    department ticks the ones it runs ("keep" is ticked, "remove" is not)."""
     everyone = list(get_db().departments.find({}, {"dept_name": 1, "campus": 1}))
     fields = ("programme_code", "programme_name", "degree", "year_introduced",
               "category", "minors")
-    return [{**{k: r.get(k, "") for k in fields}, "source": "catalogue", "decision": "keep"}
+    return [{**{k: r.get(k, "") for k in fields}, "source": "catalogue",
+             "decision": "keep" if offered else "remove"}
             for r in catalogue.programmes_for(department or {}, everyone)]
 
 
@@ -718,7 +719,7 @@ def programme_fill_source(submission, department):
     workbook."""
     offered = offered_programmes(submission)
     if offered is None:
-        offered = catalogue_rows(department)
+        offered = catalogue_rows(department, offered=True)
     out = []
     for p in offered:
         code = str(p.get("programme_code") or "").strip()

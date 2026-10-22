@@ -1610,7 +1610,7 @@
     const out = [];
     const year = String(STAGE.batch || "").slice(0, 4);
     (Array.isArray(state.batch_courses) ? state.batch_courses : []).forEach(r => {
-      if (!r || r.syllabus === "No") return;
+      if (!r) return;
       const codes = String(r.course_code || "").split("/").map(x => x.trim()).filter(Boolean);
       let titles = String(r.course_title || "").split(" / ").map(x => x.trim());
       if (titles.length !== codes.length) titles = codes.map(() => String(r.course_title || "").trim());
@@ -1627,24 +1627,35 @@
     return out;
   }
 
+  /* The current batch's semester 1 and 2 courses always have a syllabus and
+     a revision: their Yes cannot be changed. An earlier batch has no Yes / No
+     at all — each of its courses is typed in its Syllabus page. */
+  const MUST_HAVE = [1, 2];
+  const mustHave = row => !IS_BATCH && MUST_HAVE.includes(num(row.semester));
+
   function courseLink(type, row) {
     const K = COURSE_LINKS[type];
     const wrap = el("span", "syl-yn");
-    const sel = el("select", "syl-sel");
-    sel.setAttribute("aria-label", K.aria);
-    ["Yes", "No"].forEach(v => { const o = el("option", null, v); o.value = v; sel.appendChild(o); });
-    sel.value = row[K.field] === "No" ? "No" : "Yes";
-    sel.disabled = !!CTX.readonly;
-    sel.addEventListener("change", () => {
-      row[K.field] = sel.value;
-      touch();
-      wrap.replaceWith(courseLink(type, row));
-    });
-    wrap.appendChild(sel);
-    if (sel.value === "No") return wrap;
+    if (!IS_BATCH) {
+      const locked = mustHave(row);
+      if (locked) row[K.field] = "Yes";
+      const sel = el("select", "syl-sel");
+      sel.setAttribute("aria-label", K.aria);
+      ["Yes", "No"].forEach(v => { const o = el("option", null, v); o.value = v; sel.appendChild(o); });
+      sel.value = row[K.field] === "No" ? "No" : "Yes";
+      sel.disabled = !!CTX.readonly || locked;
+      if (locked) sel.title = "A semester 1 or 2 course always has a " + K.word.toLowerCase();
+      sel.addEventListener("change", () => {
+        row[K.field] = sel.value;
+        touch();
+        wrap.replaceWith(courseLink(type, row));
+      });
+      wrap.appendChild(sel);
+      if (sel.value === "No") return wrap;
+    }
     const code = String(row.course_code || "").split("/")[0].trim().toUpperCase();
     const targets = code ? K.targets(code, row) : [];
-    // a small → beside the Yes: the column's heading says where it goes
+    // a small → beside the Yes (alone on an earlier batch): the column's heading says where it goes
     if (!targets.length) {
       const hint = el("span", "syl-go is-off", "→");
       hint.title = code ? K.off : "Enter the course code first";
@@ -1749,7 +1760,7 @@
     if (synced) {
       const note = el("div", "sync-note");
       note.appendChild(el("span", null,
-        "These programmes come from Department Information. To add or remove one, "));
+        "These programmes come from Department Information. To change which are offered, "));
       const a = el("a", null, "change the list there");
       a.href = CTX.urls.dept_info;
       note.appendChild(a);
@@ -1842,7 +1853,8 @@
        code, title or Yes / No changes, not on every key pressed anywhere. */
     let links = [];
     function paintLink(L) {
-      const key = [L.row.course_code, L.row.course_title, L.row[COURSE_LINKS[L.type].field]].join("\u0001");
+      const key = [L.row.course_code, L.row.course_title, L.row.semester,
+                   L.row[COURSE_LINKS[L.type].field]].join("\u0001");
       if (key === L.key) return;
       L.key = key;
       L.holder.textContent = "";
@@ -2150,7 +2162,7 @@
     if (synced) {
       const note = el("div", "sync-note");
       note.appendChild(el("span", null,
-        "These programmes come from Department Information. To add or remove one, "));
+        "These programmes come from Department Information. To change which are offered, "));
       const a = el("a", null, "change the list there");
       a.href = CTX.urls.dept_info;
       note.appendChild(a);
@@ -2521,14 +2533,17 @@
   const IS_PG = STAGE.level === "PG";
   const freshRow = section => (IS_PG && section && section.key === "semester_structure")
     ? { cia: 60, ese: 40, total_marks: 100 } : {};
-  // the PG Course Matrix's SUMMARY columns
+  // a PG programme's credit summary: one column for each course category
   const PG_GROUPS = [
-    ["Generic Core", "Generic Core"],
-    ["Generic Elective", "Generic Elective"],
-    ["Specialisation Core", "Specialisation Core"],
-    ["Specialisation Elective", "Specialisation Elective"],
-    ["Open Elective", "Open Elective"],
-    ["Research / Thesis / Project / Patent", "Research / Thesis / Project / Patent"],
+    ["Major (Core)", "Major"],
+    ["Discipline Specific Elective (DSE)", "DSE"],
+    ["Minor Stream", "Minor"],
+    ["Multidisciplinary", "Multi-Disciplinary"],
+    ["Ability Enhancement Courses (AEC)", "AEC"],
+    ["Skill Enhancement Courses (SEC)", "SEC"],
+    ["Value Added Courses (VAC)", "VAC"],
+    ["Summer Internship", "Internship"],
+    ["Research Project / Dissertation", "Project"],
   ];
 
   // the columns of the template's "Classification of Credits" table
@@ -3171,10 +3186,10 @@
 
   // ------------------------------------------------------- programme list
   /* The department's programmes from the Office of Academic Affairs workbook, in a
-     UG tab and a PG tab. The minus takes a programme off — after asking why —
-     and the plus puts it back or adds one the workbook does not have. A
-     removed programme stays in the list, struck through with its reason, so
-     the Office can see what was dropped and a slip is one click to undo. */
+     UG tab and a PG tab. Each starts unticked: the department ticks the ones
+     it runs (one is enough), and the plus adds one the workbook does not
+     have. An unticked programme stays in the list, so a slip is one click to
+     undo. */
 
   const ICON = {
     plus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
@@ -3195,69 +3210,6 @@
     b.title = label;
     b.setAttribute("aria-label", label);
     return b;
-  }
-
-  // Asks why a programme is being removed. Resolves with {reason, note}, or
-  // null if the department thinks better of it.
-  function askRemovalReason(row, reasons) {
-    return new Promise(resolve => {
-      const dlg = el("dialog", "reason-dlg");
-      const form = el("form");
-      form.method = "dialog";
-      form.appendChild(el("h3", null, `Remove ${row.programme_code}?`));
-      form.appendChild(el("p", "reason-prog", row.programme_name || ""));
-      const fs = el("fieldset");
-      fs.appendChild(el("legend", null, "Why is this programme being removed?"));
-      reasons.forEach((r, i) => {
-        const lab = el("label", "reason-opt");
-        const radio = el("input");
-        radio.type = "radio";
-        radio.name = "reason";
-        radio.value = r;
-        if (r === row.removal_reason || (!row.removal_reason && i === 0)) radio.checked = true;
-        lab.appendChild(radio);
-        lab.appendChild(el("span", null, r));
-        fs.appendChild(lab);
-      });
-      form.appendChild(fs);
-      const noteLab = el("label", "reason-note-lab", "Anything the Office of Academic Affairs should know");
-      const note = el("textarea");
-      note.rows = 3;
-      note.value = row.removal_note || "";
-      note.placeholder = "For example: merged into BCHFBA from 2026-27";
-      noteLab.appendChild(note);
-      form.appendChild(noteLab);
-      const warn = el("p", "reason-warn");
-      warn.setAttribute("role", "alert");
-      form.appendChild(warn);
-
-      const actions = el("div", "reason-actions");
-      const cancel = el("button", "btn btn-ghost btn-sm", "Keep it");
-      cancel.type = "button";
-      const ok = el("button", "btn btn-sm reason-ok", "Remove programme");
-      ok.type = "submit";
-      actions.appendChild(cancel);
-      actions.appendChild(ok);
-      form.appendChild(actions);
-      dlg.appendChild(form);
-      document.body.appendChild(dlg);
-
-      let result = null;
-      cancel.addEventListener("click", () => dlg.close());
-      form.addEventListener("submit", e => {
-        const reason = (form.querySelector("input[name=reason]:checked") || {}).value;
-        if (reason === "Other" && !note.value.trim()) {
-          e.preventDefault();
-          warn.textContent = "Say what the reason is when you choose “Other”.";
-          note.focus();
-          return;
-        }
-        result = { reason: reason, note: note.value.trim() };
-      });
-      dlg.addEventListener("close", () => { dlg.remove(); resolve(result); });
-      dlg.showModal();
-      (form.querySelector("input[name=reason]:checked") || note).focus();
-    });
   }
 
   function renderProgrammeList(section, host) {
@@ -3283,8 +3235,8 @@
     // submitted: the list can still change — reopen it to add or remove
     if (CTX.readonly && CTX.key === "dept_info" && !CTX.sealed && CTX.urls.edit_programmes) {
       const re = el("div", "pl-reopen");
-      re.appendChild(el("span", null, "Submitted. Need to add or remove a programme?"));
-      const a = el("a", "btn btn-sm", "Add or remove programmes");
+      re.appendChild(el("span", null, "Submitted. Need to change the programmes?"));
+      const a = el("a", "btn btn-sm", "Change the programmes");
       a.href = CTX.urls.edit_programmes;
       re.appendChild(a);
       wrap.appendChild(re);
@@ -3344,7 +3296,7 @@
 
     function rowItem(row, i, n) {
       const removed = row.decision === "remove";
-      const li = el("li", "pl-row" + (removed ? " is-removed" : "") +
+      const li = el("li", "pl-row" + (removed ? " is-off" : "") +
                           (row.source === "new" ? " is-new" : ""));
       li.dataset.row = i;
       li.appendChild(el("span", "pl-num", String(n).padStart(2, "0")));
@@ -3412,50 +3364,46 @@
                     row.minors].filter(Boolean).join(" · ");
       if (rest) meta.appendChild(document.createTextNode(" " + rest));
       body.appendChild(meta);
-      if (removed) {
-        const why = el("span", "pl-why");
-        why.dataset.field = "removal_reason";
-        why.textContent = "Removed — " + (row.removal_reason || "no reason given") +
-                          (row.removal_note ? `: ${row.removal_note}` : "");
-        body.appendChild(why);
-      }
       li.appendChild(body);
 
-      if (!CTX.readonly) {
-        if (removed) {
-          const back = labelButton("pl-plus", "plus", "Add back", `Keep ${row.programme_code} after all`);
-          back.addEventListener("click", () => {
-            row.decision = "keep";
-            delete row.removal_reason;
-            delete row.removal_note;
-            draw();
-            touch();
-          });
-          li.appendChild(back);
-        } else {
-          const rm = labelButton("pl-minus", "minus", "Remove", `Remove ${row.programme_code}`);
-          rm.addEventListener("click", async () => {
-            const answer = await askRemovalReason(row, section.removal_reasons || ["Other"]);
-            if (!answer) { rm.focus(); return; }
-            row.decision = "remove";
-            row.removal_reason = answer.reason;
-            row.removal_note = answer.note;
-            draw();
-            touch();
-          });
-          li.appendChild(rm);
-        }
-      }
+      // ticked: the department runs this programme; unticked: it does not
+      const pick = el("label", "pl-pick");
+      const box = el("input");
+      box.type = "checkbox";
+      box.checked = !removed;
+      box.disabled = !!CTX.readonly;
+      box.setAttribute("aria-label", `Offer ${row.programme_name || row.programme_code}`);
+      const word = el("span", "pl-pick-word", removed ? "Not offered" : "Offered");
+      box.addEventListener("change", () => {
+        row.decision = box.checked ? "keep" : "remove";
+        li.classList.toggle("is-off", !box.checked);
+        word.textContent = box.checked ? "Offered" : "Not offered";
+        paintCounts();
+        touch();
+      });
+      pick.appendChild(box);
+      pick.appendChild(word);
+      li.appendChild(pick);
       return li;
     }
 
-    function draw() {
-      Object.values(panels).forEach(({ tab, title, list }) => {
-        const mine = data.map((r, i) => [r, i]).filter(([r]) => tabOf(r) === tab.key);
-        const live = mine.filter(([r]) => r.decision !== "remove").length;
+    // the number offered in each panel, and the tally above the lists
+    function paintCounts() {
+      Object.values(panels).forEach(({ tab, title }) => {
+        const live = data.filter(r => tabOf(r) === tab.key && r.decision !== "remove").length;
         title.textContent = "";
         title.appendChild(el("span", null, tab.label));
         title.appendChild(el("span", "pl-panel-n", String(live)));
+      });
+      const offered = data.filter(r => r.decision !== "remove" && r.source !== "new").length;
+      const off = data.filter(r => r.decision === "remove").length;
+      const added = data.filter(r => r.source === "new").length;
+      tally.textContent = `${offered} offered · ${off} not offered` + (added ? ` · ${added} new` : "");
+    }
+
+    function draw() {
+      Object.values(panels).forEach(({ tab, list }) => {
+        const mine = data.map((r, i) => [r, i]).filter(([r]) => tabOf(r) === tab.key);
         list.textContent = "";
         if (!mine.length) {
           list.appendChild(el("li", "pl-empty",
@@ -3465,10 +3413,7 @@
         mine.forEach(([row, i], n) => list.appendChild(rowItem(row, i, n + 1)));
       });
 
-      const kept = data.filter(r => r.decision !== "remove" && r.source !== "new").length;
-      const gone = data.filter(r => r.decision === "remove").length;
-      const added = data.filter(r => r.source === "new").length;
-      tally.textContent = `${kept} kept · ${gone} removed · ${added} new`;
+      paintCounts();
       filter();
     }
 

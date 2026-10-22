@@ -267,9 +267,10 @@ def r_programme_unique_codes(data, ctx, sk):
 def r_programmes_offered_valid(data, ctx, sk):
     """Department Information → Programmes offered.
 
-    Every row is kept or removed; a row the department added needs a code, a
-    name and a degree, and no code may appear twice. At least one programme
-    has to stay, because every later stage is filed per programme.
+    The department ticks the programmes it runs — one is enough, and the rest
+    need no reason. A row the department added needs a code, a name and a
+    degree, and no code may appear twice. At least one programme has to be
+    ticked, because every later stage is filed per programme.
     """
     rows = _rows(data, sk)
     out, seen = [], {}
@@ -289,15 +290,6 @@ def r_programmes_offered_valid(data, ctx, sk):
             if _is_blank(r.get("degree")):
                 out.append(err(f"Programme {i + 1}: choose UG, PG or another degree level.",
                                section=sk, row=i, field="degree"))
-        if r.get("decision") == "remove" and r.get("source") != "new":
-            why = r.get("removal_reason")
-            if _is_blank(why):
-                out.append(err(f"Say why “{r.get('programme_code')}” is being removed.",
-                               section=sk, row=i, field="removal_reason"))
-            elif why == "Other" and _is_blank(r.get("removal_note")):
-                out.append(err(f"“{r.get('programme_code')}” is removed for “Other” — "
-                               f"add a line saying what the reason is.",
-                               section=sk, row=i, field="removal_note"))
         c = str(r.get("programme_code") or "").strip().upper()
         if c:
             if c in seen:
@@ -305,7 +297,7 @@ def r_programmes_offered_valid(data, ctx, sk):
                                section=sk, row=i, field="programme_code"))
             seen.setdefault(c, i)
     if not any(r.get("decision") != "remove" for r in rows):
-        out.append(err("Keep or add at least one programme — every later stage is filed "
+        out.append(err("Tick at least one programme — every later stage is filed "
                        "per programme.", section=sk))
     return out
 
@@ -410,7 +402,7 @@ def r_ugc_research_or_lieu(data, ctx, sk):
     return out
 
 
-LONG_COURSES = ("Research Project / Dissertation", "Summer Internship", "Research / Thesis / Project / Patent")
+LONG_COURSES = ("Research Project / Dissertation", "Summer Internship")
 
 
 def r_ltpe_credit_arithmetic(data, ctx, sk):
@@ -490,6 +482,20 @@ def r_semester_within_duration(data, ctx, sk):
         if s and s > sems:
             out.append(err(f"Semester {s} is outside this programme, which has {sems} semesters.",
                            section=sk, row=i, field="semester"))
+    return out
+
+
+def r_first_year_has_syllabus_and_revision(data, ctx, sk):
+    """A semester 1 or 2 course always has a syllabus and a revision: neither
+    can be marked No."""
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        if _int(r.get("semester")) not in (1, 2):
+            continue
+        for field, word in (("syllabus", "a syllabus"), ("revision", "a revision")):
+            if r.get(field) == "No":
+                out.append(err(f"{r.get('course_code') or f'Row {i + 1}'}: a semester 1 or 2 course "
+                               f"always has {word} — set it to Yes.", section=sk, row=i, field=field))
     return out
 
 
