@@ -9,7 +9,8 @@ the login can see who changed what and restore an earlier version.
 
 from __future__ import annotations
 
-from datetime import timedelta
+import time
+from datetime import timedelta, timezone
 
 from .db import get_db, now
 
@@ -18,10 +19,26 @@ FOLD_MINUTES = 15          # one person's saves on one stage, folded together
 ACTIVE_MINUTES = 20        # “also working now”
 
 
+# when each person was last marked as seen, and each department's old
+# versions last cleared — so a save every few seconds does not do either
+# again and again (per worker; a worker of its own does it once more at most)
+_seen_at: dict = {}
+_cleared_at: dict = {}
+
+
+def _aware(dt):
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
 def seen(dept_code, person):
     """The person is active on the department's login now."""
     if not person:
         return
+    key = (dept_code, person["email"].lower())
+    t = time.monotonic()
+    if t - _seen_at.get(key, -1e9) < 60:
+        return
+    _seen_at[key] = t
     get_db().people.update_one(
         {"dept_code": dept_code, "email": person["email"].lower()},
         {"$set": {"name": person["name"], "last_seen": now()},
@@ -45,19 +62,22 @@ def keep(dept_code, year, stage_key, programme_code, data, person, kind="save"):
     an hour are one version; older than five days, versions are dropped."""
     db = get_db()
     t = now()
-    db.versions.delete_many({"dept_code": dept_code, "at": {"$lt": t - timedelta(days=KEEP_DAYS)}})
+    # old versions go on a submit or a restore, and on a save once an hour
+    if kind != "save" or time.monotonic() - _cleared_at.get(dept_code, -1e9) > 3600:
+        _cleared_at[dept_code] = time.monotonic()
+        db.versions.delete_many({"dept_code": dept_code, "at": {"$lt": t - timedelta(days=KEEP_DAYS)}})
     who = person or {"name": "Unknown", "email": ""}
     key = {"dept_code": dept_code, "academic_year": year, "stage": stage_key,
            "programme_code": programme_code or ""}
     if kind == "save":
-        last = db.versions.find_one({**key, "kind": "save", "email": who.get("email", ""),
-                                     "at": {"$gte": t - timedelta(minutes=FOLD_MINUTES)}},
-                                    sort=[("at", -1)])
-        newest = db.versions.find_one(key, sort=[("at", -1)])
-        if last and newest and last["_id"] == newest["_id"]:
-            db.versions.update_one({"_id": last["_id"]}, {"$set": {"data": data, "at": t},
-                                                           "$inc": {"saves": 1}})
-            return last["_id"]
+        # the newest version, if it is this person's save from the last few
+        # minutes, takes this one too
+        newest = db.versions.find_one(key, {"kind": 1, "email": 1, "at": 1}, sort=[("at", -1)])
+        if (newest and newest.get("kind") == "save" and newest.get("email") == who.get("email", "")
+                and _aware(newest["at"]) >= t - timedelta(minutes=FOLD_MINUTES)):
+            db.versions.update_one({"_id": newest["_id"]}, {"$set": {"data": data, "at": t},
+                                                             "$inc": {"saves": 1}})
+            return newest["_id"]
     return db.versions.insert_one({**key, "data": data, "at": t, "first_at": t, "kind": kind,
                                    "name": who.get("name", ""), "email": who.get("email", ""),
                                    "saves": 1}).inserted_id

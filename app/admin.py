@@ -13,7 +13,7 @@ from . import ugc_rules as U
 from .access import (allows, current_place, current_scope, current_user, guard_admin_request, may_see,
                      scope_q, view_scope)
 from .auth import admin_required
-from .db import audit, get_db, issue_department_login, now, rules_doc, to_ist
+from .db import audit, forget_cached, get_db, issue_department_login, now, rules_doc, to_ist
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
 from .packs import available_packs, load_pack
@@ -1273,6 +1273,7 @@ def rules():
         db.rules.update_one({"_id": "ugc"},
                             {"$set": {"table2": table, "totals": totals, "other": other,
                                       "updated_at": now(), "updated_by": _actor()}})
+        forget_cached()
         audit(_actor(), "rules.updated")
         flash("The credit rules have been updated. They apply to every validation from now on.",
               "success")
@@ -1290,6 +1291,7 @@ def rules_reset():
                                         "totals": U.DEFAULT_TOTALS,
                                         "other": U.DEFAULT_OTHER_RULES,
                                         "updated_at": now(), "updated_by": _actor()}})
+    forget_cached()
     audit(_actor(), "rules.reset")
     flash("Credit rules restored to the published UGC Table 2 values.", "success")
     return redirect(url_for("admin.rules"))
@@ -1344,6 +1346,7 @@ def app_settings():
                       + ", ".join(bad), "error")
                 return redirect(url_for("admin.app_settings"))
         db.settings.update_one({"_id": "app"}, {"$set": fields})
+        forget_cached()
         audit(_actor(), "settings.updated")
         # Unlocking every stage for every department is worth its own line in
         # the log, separate from whatever else was saved in the same form.
@@ -1401,6 +1404,7 @@ def next_batch():
     db.settings.update_one({"_id": "app"}, {"$set": {"current_batch": f"{new}-{new + 1}",
                                                      "existing_batches": earlier, "updated_at": now()}},
                            upsert=True)
+    forget_cached()
     audit(_actor(), "batch.next", detail={"from": batch_label(cur), "to": batch_label(new),
                                           "moved": moved, "kept": kept})
     flash(f"The current batch is now {batch_label(new)}. Batch of {batch_label(cur)} is an earlier batch, "
@@ -1773,6 +1777,7 @@ def keywords():
             if words and words != default_keywords(b["field"], b["label"]):
                 mine[b["field"]] = words
         db.settings.update_one({"_id": "app"}, {"$set": {"keywords": mine}}, upsert=True)
+        forget_cached()
         audit(_actor(), "keywords.updated", detail={"boxes": len(mine)})
         flash("Keywords saved. They apply to the next upload — use “Check all files again” "
               "for the ones already in.", "success")
@@ -1812,6 +1817,7 @@ def keywords():
 @admin_required
 def keywords_reset():
     get_db().settings.update_one({"_id": "app"}, {"$set": {"keywords": {}}}, upsert=True)
+    forget_cached()
     audit(_actor(), "keywords.reset")
     flash("Every box is back to its standard keywords.", "success")
     return redirect(url_for("admin.keywords"))

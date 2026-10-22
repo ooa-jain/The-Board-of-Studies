@@ -30,7 +30,10 @@ def app(monkeypatch):
                                   "value testing or bool(). Compare with None instead.")
     monkeypatch.setattr(mongomock.database.Database, "__bool__", _no_bool, raising=False)
     monkeypatch.setattr(mongomock.collection.Collection, "__bool__", _no_bool, raising=False)
-    from app import create_app
+    from app import create_app, people
+    # each test starts afresh: nobody seen yet, no versions cleared yet
+    people._seen_at.clear()
+    people._cleared_at.clear()
     application = create_app()
     application.config.update(TESTING=True, SESSION_COOKIE_SECURE=False, ASK_PERSON=False)
     yield application

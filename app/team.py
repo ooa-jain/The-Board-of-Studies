@@ -19,7 +19,7 @@ from flask import abort, current_app, flash, redirect, render_template, request,
 from .access import PRESETS, SECTIONS, SECTION_KEYS, summary
 from .admin import _actor, _year, bp
 from .auth import admin_required
-from .db import audit, generate_password, get_db, hash_password, now
+from .db import audit, forget_cached, generate_password, get_db, hash_password, now
 
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -262,6 +262,7 @@ def team_links():
     """Who may open the links in the downloaded Excel and Word files."""
     mode = "team" if request.form.get("share_links") == "team" else "anyone"
     get_db().settings.update_one({"_id": "app"}, {"$set": {"share_links": mode}}, upsert=True)
+    forget_cached()
     audit(_actor(), "settings.share_links", mode)
     flash("Links in downloads now open only for people signed in to the portal who may see that department."
           if mode == "team" else "Links in downloads open for anyone who has the link.", "success")

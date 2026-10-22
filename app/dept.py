@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from pathlib import Path
 
@@ -586,9 +587,18 @@ def _programme_hub(stage_def, programmes, sub, dept):
 # JSON endpoints used by the form renderer
 # ---------------------------------------------------------------------------
 
-def _guard(stage_key, programme_code=None):
+def _guard(stage_key, programme_code=None, light=False):
+    """light: what a save needs of the record — every stage, and only this
+    programme of all of them (each programme's answers can run long; an
+    autosave every few seconds should not fetch them all)."""
     dept = _dept()
-    sub = get_or_create_submission(dept["dept_code"], _year())
+    sub = None
+    if light and (not programme_code or re.fullmatch(r"[A-Za-z0-9_-]+", programme_code)):
+        fields = {"dept_code": 1, "academic_year": 1, "status": 1, "stages": 1}
+        if programme_code:
+            fields[f"programmes.{programme_code}"] = 1
+        sub = get_db().submissions.find_one({"dept_code": dept["dept_code"], "academic_year": _year()}, fields)
+    sub = sub or get_or_create_submission(dept["dept_code"], _year())
     stage_def = STAGE_BY_KEY.get(stage_key)
     closed = (jsonify({"ok": False, "error": "This stage is not open for editing."}), 409)
     if not stage_def or stage_def.get("parts"):
@@ -688,7 +698,7 @@ def _pin_frozen(stage_key, data, dept, sub, programme):
 @bp.post("/api/<stage_key>/<programme_code>/save")
 @department_required
 def api_save(stage_key, programme_code=None):
-    dept, sub, programme, bad = _guard(stage_key, programme_code)
+    dept, sub, programme, bad = _guard(stage_key, programme_code, light=True)
     if bad:
         return bad
     data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)

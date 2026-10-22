@@ -1806,7 +1806,17 @@
     if (!fixed && !CTX.readonly && !GROUPS) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add row");
       add.type = "button";
-      add.addEventListener("click", () => { rows(section.key).push(freshRow(section)); draw(); touch(); });
+      add.addEventListener("click", () => {
+        const data = rows(section.key);
+        const row = freshRow(section);
+        data.push(row);
+        const tr = drawRow(row, data.length - 1, data.length, null);
+        tbody.appendChild(tr);
+        rowsChanged();
+        touch();
+        const first = tr.querySelector("input, select, textarea");
+        if (first) first.focus();
+      });
       foot.appendChild(add);
     }
     foot.appendChild(count);
@@ -1815,10 +1825,30 @@
     const totalsBox = el("div", "rt-totals");
     totalsBox.setAttribute("aria-live", "polite");
     host.appendChild(totalsBox);
-    function showTotals() {
-      renderTotals(section, rows(section.key), totalsBox);
-      window.dispatchEvent(new CustomEvent("stage:rows", { detail: section.key }));
+    // the totals, and the credit tables that follow this one, are worked
+    // out once typing pauses, not on every key
+    let totalsTimer = 0;
+    function showTotals(now) {
+      clearTimeout(totalsTimer);
+      const paint = () => {
+        renderTotals(section, rows(section.key), totalsBox);
+        window.dispatchEvent(new CustomEvent("stage:rows", { detail: section.key }));
+      };
+      if (now === true) paint();
+      else totalsTimer = setTimeout(paint, 150);
     }
+
+    /* Each row's Syllabus / Revision link is made again only when the row's
+       code, title or Yes / No changes, not on every key pressed anywhere. */
+    let links = [];
+    function paintLink(L) {
+      const key = [L.row.course_code, L.row.course_title, L.row[COURSE_LINKS[L.type].field]].join("\u0001");
+      if (key === L.key) return;
+      L.key = key;
+      L.holder.textContent = "";
+      L.holder.appendChild(courseLink(L.type, L.row));
+    }
+    refreshers.push(() => links.forEach(paintLink));
 
     // seed fixed rows
     if (section.fixed_rows) {
@@ -1852,13 +1882,44 @@
 
     const SPAN = section.columns.length + 1 + (!fixed && !CTX.readonly ? 1 : 0);
     const groupOf = row => (GROUPS.find(g => g.track === row.track) || GROUPS[0]);
+    let settled = false;
+
+    // after a row is added or taken off: the count and the totals
+    function rowsChanged() {
+      const data = rows(section.key);
+      const min = section.min_rows || 0;
+      count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}`;
+      count.style.color = data.length < min ? "var(--err)" : "";
+      showTotals();
+    }
+
+    // each row's number (counted within its group), and the index the checks
+    // use to find it, follow the list as it now is
+    function renumber() {
+      const data = rows(section.key);
+      let n = 0;
+      tbody.querySelectorAll("tr").forEach(tr => {
+        if (tr.classList.contains("rt-group")) { n = 0; return; }
+        if (!tr._row) return;
+        const i = data.indexOf(tr._row);
+        tr.dataset.row = i;
+        tr.firstChild.textContent = String(++n);
+        tr.querySelectorAll("td[data-auto-index]").forEach(td => {
+          tr._row[td.dataset.autoIndex] = i + 1;
+          td.textContent = String(i + 1);
+        });
+        const del = tr.querySelector(".rt-del button");
+        if (del) del.setAttribute("aria-label", `Remove row ${n}`);
+      });
+    }
 
     function draw() {
       tbody.innerHTML = "";
+      links = [];
       const data = rows(section.key);
-      let settled = false;
+      settled = false;
       if (!GROUPS) {
-        data.forEach((row, i) => drawRow(row, i, i + 1, null));
+        data.forEach((row, i) => tbody.appendChild(drawRow(row, i, i + 1, null)));
       } else {
         GROUPS.forEach(g => {
           const head = el("tr", "rt-group");
@@ -1870,7 +1931,7 @@
           head.appendChild(th);
           tbody.appendChild(head);
           let n = 0;
-          data.forEach((row, i) => { if (groupOf(row) === g) drawRow(row, i, ++n, g); });
+          data.forEach((row, i) => { if (groupOf(row) === g) tbody.appendChild(drawRow(row, i, ++n, g)); });
           if (!n && CTX.readonly) {
             const tr = el("tr", "rt-group-empty");
             const td = el("td", null, "No courses listed.");
@@ -1885,12 +1946,16 @@
             const add = el("button", "rt-add", `+ Add a course · ${g.label}`);
             add.type = "button";
             add.addEventListener("click", () => {
-              data.push(Object.assign(freshRow(section), { track: g.track }));
-              draw();
+              // the new row goes in at the end of its group; nothing else is drawn again
+              const row = Object.assign(freshRow(section), { track: g.track });
+              data.push(row);
+              const tr = drawRow(row, data.length - 1, 0, g);
+              tbody.insertBefore(tr, add.closest("tr"));
+              renumber();
+              rowsChanged();
               touch();
-              const last = tbody.querySelector(`tr[data-row="${data.length - 1}"] select, ` +
-                                               `tr[data-row="${data.length - 1}"] input`);
-              if (last) last.focus();
+              const first = tr.querySelector("select, input");
+              if (first) first.focus();
             });
             td.appendChild(add);
             tr.appendChild(td);
@@ -1899,121 +1964,127 @@
         });
       }
       if (settled) touch();
-      showTotals();
-      const min = section.min_rows || 0;
-      count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}` +
-                          "";
-      count.style.color = data.length < min ? "var(--err)" : "";
+      showTotals(true);
+      rowsChanged();
+    }
 
-      function drawRow(row, i, shown, g) {
-        if (!CTX.readonly && settle(row)) settled = true;
-        const tr = el("tr");
-        tr.dataset.row = i;
-        const cells = {};
-        tr.appendChild(el("td", "rt-idx", String(shown)));
+    function drawRow(row, i, shown, g) {
+      if (!CTX.readonly && settle(row)) settled = true;
+      const tr = el("tr");
+      tr.dataset.row = i;
+      tr._row = row;
+      const cells = {};
+      tr.appendChild(el("td", "rt-idx", String(shown)));
 
-        section.columns.forEach(c => {
-          // within a group, the semester is one of that group's
-          if (g && c.name === "semester") c = Object.assign({}, c, { choices: g.sems, max: Math.max(...g.sems) });
-          const td = el("td");
-          if (c.auto_index) {
-            row[c.name] = i + 1;
-            td.className = "rt-idx";
-            td.textContent = String(i + 1);
-            tr.appendChild(td);
-            return;
-          }
-          const holder = el("div");
-          holder.dataset.field = c.name;
-          if (COURSE_LINKS[c.type]) {
-            holder.appendChild(courseLink(c.type, row));
-            refreshers.push(() => { holder.textContent = ""; holder.appendChild(courseLink(c.type, row)); });
-            td.className = "rt-syl";
-            td.appendChild(holder);
-            tr.appendChild(td);
-            return;
-          }
-          if (c.type === "file") {
-            holder.appendChild(rowFile(c, row, () => { touch(); }));
-            td.className = "rt-file";
-            td.appendChild(holder);
-            tr.appendChild(td);
-            return;
-          }
-          const input = makeInput(c, row[c.name], (v) => {
-            row[c.name] = v;
-            if (c.complement) {
-              if (cells[c.name]) cells[c.name].classList.remove("is-auto");   // typed, not worked out
-              const n = num(v);
-              if (n !== null && n >= 0 && n <= OUT_OF) {
-                row[c.complement] = OUT_OF - n;
-                if (cells[c.complement]) {
-                  cells[c.complement].value = String(OUT_OF - n);
-                  cells[c.complement].classList.add("is-auto");
-                  fitNum(cells[c.complement]);
-                }
-              }
-            }
-            if (DERIVED[c.name]) markManual(row, c.name, cells);
-            derive(RULES, row, cells);
-            touch();
-            showTotals();
-          });
-          cells[c.name] = input;
-          if (DERIVED[c.name]) {
-            if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
-            hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, showTotals));
-          }
-          if (c.type === "integer" && !c.choices) {
-            // two digits wide, growing with what is typed
-            input.classList.add("num-cell");
-            fitNum(input);
-            input.addEventListener("input", () => fitNum(input));
-          } else if (c.width) input.style.minWidth = c.width;
-          if (c.fixed_value != null) {
-            input.readOnly = true;
-            input.classList.add("is-fixed");
-            input.title = `Every course is out of ${c.fixed_value}`;
-          }
-          if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) {
-            input.readOnly = true;
-          }
-          holder.appendChild(input);
-          attachLiveCheck(input, c, holder);
+      section.columns.forEach(c => {
+        // within a group, the semester is one of that group's
+        if (g && c.name === "semester") c = Object.assign({}, c, { choices: g.sems, max: Math.max(...g.sems) });
+        const td = el("td");
+        if (c.auto_index) {
+          row[c.name] = i + 1;
+          td.className = "rt-idx";
+          td.dataset.autoIndex = c.name;
+          td.textContent = String(i + 1);
+          tr.appendChild(td);
+          return;
+        }
+        const holder = el("div");
+        holder.dataset.field = c.name;
+        if (COURSE_LINKS[c.type]) {
+          const L = { type: c.type, row: row, holder: holder, key: null };
+          links.push(L);
+          paintLink(L);
+          td.className = "rt-syl";
           td.appendChild(holder);
           tr.appendChild(td);
-        });
-
-        if (!fixed && !CTX.readonly) {
-          const td = el("td", "rt-del");
-          const b = el("button", null, "×");
-          b.type = "button";
-          b.title = "Remove this row";
-          b.setAttribute("aria-label", `Remove row ${i + 1}`);
-          b.addEventListener("click", () => {
-            if (data.length <= (section.min_rows || 0)) {
-              rowNote.textContent =
-                `This table has to keep at least ${section.min_rows} row` +
-                `${section.min_rows === 1 ? "" : "s"}.`;
-              return;
-            }
-            data.splice(i, 1);
-            rowNote.textContent = "";
-            draw();
-            touch();
-            // The row under the caret is gone — put focus somewhere sensible.
-            const rowsLeft = tbody.querySelectorAll("tr").length;
-            const nextRow = tbody.querySelectorAll("tr")[Math.min(i, rowsLeft - 1)];
-            const target = nextRow && nextRow.querySelector("input, select, textarea");
-            if (target) target.focus();
-            else { const add = foot.querySelector("button"); if (add) add.focus(); }
-          });
-          td.appendChild(b);
-          tr.appendChild(td);
+          return;
         }
-        tbody.appendChild(tr);
-        if (!CTX.readonly && derive(RULES, row, cells)) touch();
+        if (c.type === "file") {
+          holder.appendChild(rowFile(c, row, () => { touch(); }));
+          td.className = "rt-file";
+          td.appendChild(holder);
+          tr.appendChild(td);
+          return;
+        }
+        const input = makeInput(c, row[c.name], (v) => {
+          row[c.name] = v;
+          if (c.complement) {
+            if (cells[c.name]) cells[c.name].classList.remove("is-auto");   // typed, not worked out
+            const n = num(v);
+            if (n !== null && n >= 0 && n <= OUT_OF) {
+              row[c.complement] = OUT_OF - n;
+              if (cells[c.complement]) {
+                cells[c.complement].value = String(OUT_OF - n);
+                cells[c.complement].classList.add("is-auto");
+                fitNum(cells[c.complement]);
+              }
+            }
+          }
+          if (DERIVED[c.name]) markManual(row, c.name, cells);
+          derive(RULES, row, cells);
+          touch();
+          showTotals();
+        });
+        cells[c.name] = input;
+        if (DERIVED[c.name]) {
+          if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
+          hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, showTotals));
+        }
+        if (c.type === "integer" && !c.choices) {
+          // two digits wide, growing with what is typed
+          input.classList.add("num-cell");
+          fitNum(input);
+          input.addEventListener("input", () => fitNum(input));
+        } else if (c.width) input.style.minWidth = c.width;
+        if (c.fixed_value != null) {
+          input.readOnly = true;
+          input.classList.add("is-fixed");
+          input.title = `Every course is out of ${c.fixed_value}`;
+        }
+        if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) {
+          input.readOnly = true;
+        }
+        holder.appendChild(input);
+        attachLiveCheck(input, c, holder);
+        td.appendChild(holder);
+        tr.appendChild(td);
+      });
+
+      if (!fixed && !CTX.readonly) {
+        const td = el("td", "rt-del");
+        const b = el("button", null, "×");
+        b.type = "button";
+        b.title = "Remove this row";
+        b.setAttribute("aria-label", `Remove row ${shown}`);
+        b.addEventListener("click", () => {
+          const data = rows(section.key);
+          if (data.length <= (section.min_rows || 0)) {
+            rowNote.textContent =
+              `This table has to keep at least ${section.min_rows} row` +
+              `${section.min_rows === 1 ? "" : "s"}.`;
+            return;
+          }
+          const at = data.indexOf(row);
+          if (at < 0) return;
+          data.splice(at, 1);
+          rowNote.textContent = "";
+          // only this row goes; the rest stay as they are, renumbered
+          const near = [tr.nextElementSibling, tr.previousElementSibling].find(x => x && x._row);
+          const after = tr.nextElementSibling;
+          tr.remove();
+          links = links.filter(L => L.row !== row);
+          renumber();
+          rowsChanged();
+          touch();
+          // The row under the caret is gone — put focus somewhere sensible.
+          const target = (near || after || foot).querySelector("input, select, textarea, button");
+          if (target) target.focus({ preventScroll: true });
+        });
+        td.appendChild(b);
+        tr.appendChild(td);
       }
+      if (!CTX.readonly && derive(RULES, row, cells)) touch();
+      return tr;
     }
     draw();
   }
@@ -4181,6 +4252,22 @@
   let saveTimer = null;
   let dirty = false;
   let reloadAfterSave = false;
+  // every change counts up; a save that comes back clears "unsaved" only if
+  // nothing changed while it was on its way
+  let edits = 0;
+  let saving = null;
+  let leftWith = -1;
+
+  /* What is not saved yet is also kept in this tab as the page goes: a quick
+     reload (or Back) can open the page before that save is in, and then
+     takes it from here and saves it again. */
+  const COPY = "bos-unsaved:" + ((CTX.urls || {}).save || location.pathname);
+  function keepCopy() {
+    try { sessionStorage.setItem(COPY, JSON.stringify({ at: Date.now(), state: state })); } catch (_) { /* full or blocked */ }
+  }
+  function dropCopy() {
+    try { sessionStorage.removeItem(COPY); } catch (_) { /* fine */ }
+  }
 
   function refresh() {
     refreshers.forEach(fn => { try { fn(); } catch (_) { /* never block typing */ } });
@@ -4189,43 +4276,58 @@
   function touch() {
     refresh();
     dirty = true;
+    edits++;
     saveNote.textContent = "Unsaved changes";
     saveNote.className = "save-note";
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 1400);
+    saveTimer = setTimeout(save, 800);
   }
 
-  function save() {
-    if (CTX.readonly || !dirty) return Promise.resolve();
+  /* Saved on its own, a moment after each change. One save at a time: what
+     changes while one is on its way goes with the next. Leaving the page,
+     the save is sent so that it still arrives as the page closes. Resolves
+     true once everything is saved. */
+  function save(leaving) {
+    if (CTX.readonly) return Promise.resolve(true);
+    if (saving && leaving !== true) return saving.then(() => save());
+    if (!dirty) return Promise.resolve(true);
+    if (leaving === true && leftWith === edits) return saving || Promise.resolve(true);   // sent already
+    if (leaving === true) { leftWith = edits; keepCopy(); }
+    clearTimeout(saveTimer);
+    const sent = edits;
+    const body = JSON.stringify(state);
+    const keepalive = leaving === true && new Blob([body]).size < 60000;
     saveNote.textContent = "Saving…";
     saveNote.className = "save-note saving";
-    return fetch(CTX.urls.save, {
+    const p = fetch(CTX.urls.save, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state)
+      body: body,
+      keepalive: keepalive
     }).then(r => r.json()).then(j => {
       if (j.ok) {
-        dirty = false;
-        saveNote.textContent = "Saved " + new Date().toLocaleTimeString();
-        saveNote.className = "save-note saved";
+        if (edits === sent) {
+          dirty = false;
+          // the copy left on the way out stays: the page may already be
+          // opening again with what was there before this save was in
+          if (leftWith !== sent) dropCopy();
+          saveNote.textContent = "All changes saved · " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          saveNote.className = "save-note saved";
+        }
         if (reloadAfterSave) { reloadAfterSave = false; window.location.reload(); }
-      } else {
-        saveNote.textContent = j.error || "Could not save";
-        saveNote.className = "save-note";
+        return true;
       }
+      saveNote.textContent = j.error || "Could not save";
+      saveNote.className = "save-note";
+      return false;
     }).catch(() => {
       saveNote.textContent = "Could not reach the server — your work is still in this tab";
-    });
+      saveNote.className = "save-note";
+      return false;
+    }).finally(() => { if (saving === p) saving = null; });
+    saving = p;
+    return p;
   }
-
-  // "Back to Curriculum" keeps what was typed: save, then go
-  document.querySelectorAll(".js-back-save").forEach(a => {
-    a.addEventListener("click", e => {
-      if (!dirty) return;
-      e.preventDefault();
-      save().then(() => { window.location = a.href; });
-    });
-  });
 
   const checksCard = document.getElementById("checks-card");
   const checksClose = document.getElementById("checks-close");
@@ -4745,8 +4847,21 @@
 
   // ------------------------------------------------------------------- boot
 
+  // a copy left by a quick reload, from before its save was in: taken up again
+  let fromCopy = false;
+  if (!CTX.readonly) {
+    let kept = null;
+    try { kept = JSON.parse(sessionStorage.getItem(COPY) || "null"); } catch (_) { kept = null; }
+    const nav = (performance.getEntriesByType && performance.getEntriesByType("navigation")[0]) || {};
+    if (kept && kept.state && Date.now() - kept.at < 120000 && (nav.type === "reload" || nav.type === "back_forward")) {
+      Object.keys(state).forEach(k => delete state[k]);
+      Object.assign(state, kept.state);
+      fromCopy = true;
+    } else dropCopy();
+  }
   render();
   refresh();
+  if (fromCopy) { dirty = true; edits++; save(); }
   /* An earlier batch is two pages of one part: its Curriculum (the courses
      it studied) and its Syllabus. Moving between them happens in place —
      the address follows (?view=…), the steps at the top follow, and nothing
@@ -4799,6 +4914,24 @@
       if (target) setTimeout(() => window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" }), 50);
     });
   }
+
+  // going to another page from here: what was typed is saved first (after
+  // the handlers above, so a link that switches the view in place is theirs)
+  if (!CTX.readonly) document.addEventListener("click", e => {
+    if (!dirty && !saving) return;
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((a.target && a.target !== "_self") || a.hasAttribute("download")) return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+    if (url.pathname === location.pathname && url.search === location.search) return;   // a place on this page
+    e.preventDefault();
+    save().then(ok => {
+      if (ok) window.location.href = a.href;
+      else if (window.Toast) window.Toast.error("Your last changes are not saved yet. Check the connection, then try again.",
+                                                { title: "Not saved" });
+    });
+  });
 
   // opened from a curriculum row: that course is already chosen — start at
   // the semester / course group / search bar above it, where the department
@@ -4871,10 +5004,19 @@
         if (window.Toast) window.Toast.success("Every box is filled with sample data. Press Submit to review it.", { title: "Filled" });
       }).catch(() => { sampleBtn.disabled = false; });
     });
+    // closing the tab, reloading, or the phone putting the page away: what is
+    // not saved yet is sent on the way out. Only a page too big to be sure of
+    // that way (a long syllabus) has the browser ask first.
     window.addEventListener("beforeunload", (e) => {
-      if (dirty) { e.preventDefault(); e.returnValue = ""; }
+      if (!dirty) return;
+      save(true);
+      if (new Blob([JSON.stringify(state)]).size >= 60000) { e.preventDefault(); e.returnValue = ""; }
     });
-    setInterval(() => { if (dirty) save(); }, 25000);
+    window.addEventListener("pagehide", () => { if (dirty) save(true); });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && dirty) save(true);
+    });
+    setInterval(() => { if (dirty) save(); }, 20000);
   } else {
     check();
     const show = () => Review.build(STAGE, state, { viewFile: v => openViewer(v) });

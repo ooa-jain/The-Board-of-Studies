@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import secrets
 import string
 from datetime import datetime, timezone, timedelta
@@ -228,12 +229,33 @@ def _bootstrap(app):
 # convenience accessors
 # ---------------------------------------------------------------------------
 
+def _once_per_request(key, load):
+    """A small document a page asks for many times (the settings, nineteen
+    times for one programme page), read from the database once per request
+    and handed out as a copy, so no caller changes it for the next."""
+    from flask import has_request_context, request
+    if not has_request_context():
+        return load()
+    env = request.environ
+    if key not in env:
+        env[key] = load()
+    return copy.deepcopy(env[key])
+
+
+def forget_cached():
+    """After writing the settings or the rules: read them afresh."""
+    from flask import has_request_context, request
+    if has_request_context():
+        request.environ.pop("bos.settings", None)
+        request.environ.pop("bos.rules", None)
+
+
 def settings():
-    return get_db().settings.find_one({"_id": "app"}) or {}
+    return _once_per_request("bos.settings", lambda: get_db().settings.find_one({"_id": "app"}) or {})
 
 
 def rules_doc():
-    return get_db().rules.find_one({"_id": "ugc"}) or {}
+    return _once_per_request("bos.rules", lambda: get_db().rules.find_one({"_id": "ugc"}) or {})
 
 
 def audit(actor: str, action: str, target: str = "", detail=None):
