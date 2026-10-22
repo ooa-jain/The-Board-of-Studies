@@ -403,8 +403,10 @@ def test_the_curriculum_is_the_template_with_logo_and_every_course(app, client):
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "Jain (Deemed-to-be University), Bangalore" in text and "Programme Structure" in text
     cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
-    for words in ("SUMMARY", "Major (Core)", "DSE", "Multi-Disciplinary", "INTERNSHIP",
-                  "RESEARCH PROJECT / DISSERTATION", "Mandatory Non-Credit",
+    # the summary has the UG classification's columns, and no others
+    for words in ("SUMMARY", "Major", "Minor", "Multi-Disciplinary / OE", "Ability Enhancement / AEC",
+                  "Skill Enhancement / SEC", "Common Value Added / VAC", "Summer Internship / INTERNSHIP",
+                  "Research Project / Dissertation / PROJECT", "Mandatory Non-Credit",
                   "SEMESTER I", "Category", "25MCAC101", "Objective", "Fee",
                   "100% Continuous Assessment Credits"):
         assert words in cells, words

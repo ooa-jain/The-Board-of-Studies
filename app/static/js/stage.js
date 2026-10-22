@@ -2533,19 +2533,6 @@
   const IS_PG = STAGE.level === "PG";
   const freshRow = section => (IS_PG && section && section.key === "semester_structure")
     ? { cia: 60, ese: 40, total_marks: 100 } : {};
-  // a PG programme's credit summary: one column for each course category
-  const PG_GROUPS = [
-    ["Major (Core)", "Major"],
-    ["Discipline Specific Elective (DSE)", "DSE"],
-    ["Minor Stream", "Minor"],
-    ["Multidisciplinary", "Multi-Disciplinary"],
-    ["Ability Enhancement Courses (AEC)", "AEC"],
-    ["Skill Enhancement Courses (SEC)", "SEC"],
-    ["Value Added Courses (VAC)", "VAC"],
-    ["Summer Internship", "Internship"],
-    ["Research Project / Dissertation", "Project"],
-  ];
-
   // the columns of the template's "Classification of Credits" table
   const DIST_GROUPS = [
     ["Major (Core)", "Major"],
@@ -2577,7 +2564,7 @@
     const honLater = all.filter(r => !upto6.includes(r) && !researchOnly(r));
     const resLater = all.filter(r => !upto6.includes(r) && !honoursOnly(r));
     return { upto6, honLater, resLater,
-             fourYear: honLater.length + resLater.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year"),
+             fourYear: !IS_PG && (honLater.length + resLater.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year")),
              honours: upto6.concat(honLater), research: upto6.concat(resLater) };
   }
 
@@ -2606,32 +2593,8 @@
         (num(r.credits) === 0 && r.nep_category !== NC_AUDIT)).length || "";
       const audit = rows => rows.filter(r => r.nep_category === NC_AUDIT).length || "";
 
-      // --- classification of credits: the PG Course Matrix's SUMMARY for a PG programme
-      if (wants("classification") && IS_PG) {
-        const t = el("table", "cd-table");
-        const hr = el("tr");
-        ["Semester", ...PG_GROUPS.map(g => g[1]), "Mandatory Non-Credit", "Total Credits"]
-          .forEach(x => hr.appendChild(el("th", x === "Semester" ? null : "num", x)));
-        const th = el("thead");
-        th.appendChild(hr);
-        t.appendChild(th);
-        const tb = el("tbody");
-        const pgLine = (label, rows, cls) => {
-          const tr = el("tr", cls || "");
-          tr.appendChild(el("td", null, label));
-          PG_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
-            fmt(sumBy(rows.filter(r => r.nep_category === cat), r => num(r.credits))))));
-          tr.appendChild(el("td", "num", String(nc(rows))));
-          tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
-          tb.appendChild(tr);
-        };
-        sems(all).forEach(sem => pgLine(String(sem), all.filter(r => num(r.semester) === sem)));
-        pgLine("TOTAL", all, "total");
-        t.appendChild(tb);
-        const w = el("div", "rt-wrap");
-        w.appendChild(t);
-        box.appendChild(w);
-      } else if (wants("classification")) {
+      // --- classification of credits (a PG programme's too: the same columns, its own semesters)
+      if (wants("classification")) {
       const t1 = el("table", "cd-table");
       const h = el("tr");
       ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total Credits",
@@ -2672,7 +2635,7 @@
       const T = typeTotals(all);
       const COLS1 = DIST_GROUPS.length + 4;
       sems(T.upto6).forEach(sem => semRow(sem, T.upto6));
-      totRow("3-Year UG", T.upto6, "UG - 3 Year");
+      totRow(IS_PG ? "TOTAL" : "3-Year UG", T.upto6, IS_PG ? null : "UG - 3 Year");
       if (T.fourYear) {
         b1.appendChild(band("Honours", COLS1));
         sems(T.honLater).forEach(sem => semRow(sem, T.honLater));
@@ -2711,7 +2674,7 @@
       const chosen = deg => "total cd-type" + (deg === DEGREE() ? " is-chosen" : "");
       const inSem = (rows, sem) => rows.filter(r => num(r.semester) === sem);
       sems(T2.upto6).forEach(sem => line(String(sem), inSem(T2.upto6, sem)));
-      line("3-Year UG", T2.upto6, chosen("UG - 3 Year"));
+      line(IS_PG ? "TOTAL" : "3-Year UG", T2.upto6, IS_PG ? "total cd-type" : chosen("UG - 3 Year"));
       if (T2.fourYear) {
         const band2 = label => { const tr = el("tr", "cd-band"); const td = el("td", null, label);
                                  td.colSpan = 5; tr.appendChild(td); b2.appendChild(tr); };

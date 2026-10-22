@@ -366,7 +366,7 @@ def _profile_table(doc, cur, width, degree_level=None):
     _widths(t, [width * 0.06, width * 0.17, width * 0.77])
 
 
-def _classification_table(doc, rows, width):
+def _classification_table(doc, rows, width, title="Classification of Credits and Number of Non-Credit Courses"):
     base, blocks = _blocks(rows)
     heads = (["Semester"] + [g[1] for g in DIST_GROUPS] +
              ["Total Credits", "No. of Mandatory Non-Credit Course/s",
@@ -374,7 +374,7 @@ def _classification_table(doc, rows, width):
     t = doc.add_table(rows=0, cols=len(heads))
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
-    _band(t, "Classification of Credits and Number of Non-Credit Courses", GREEN, size=10)
+    _band(t, title, GREEN, size=10)
     hr = t.add_row().cells
     for i, h in enumerate(heads):
         _write(hr[i], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER,
@@ -501,50 +501,11 @@ def _minors_table(doc, minors, width):
     _widths(t, [width * 0.18, width * 0.09, width * 0.14, width * 0.45, width * 0.09])
 
 
-PG_SUMMARY = [
-    ("Major (Core)", "Major (Core)"),
-    ("Discipline Specific Elective (DSE)", "DSE"),
-    ("Minor Stream", "Minor"),
-    ("Multidisciplinary", "Multi-Disciplinary"),
-    ("Ability Enhancement Courses (AEC)", "AEC"),
-    ("Skill Enhancement Courses (SEC)", "SEC"),
-    ("Value Added Courses (VAC)", "VAC"),
-    ("Summer Internship", "INTERNSHIP"),
-    ("Research Project / Dissertation", "RESEARCH PROJECT / DISSERTATION"),
-]
-
-
-def _pg_summary_table(doc, rows, width):
-    """The PG Course Matrix's SUMMARY: credits by classification, by semester."""
-    heads = ["Semester"] + [h for _, h in PG_SUMMARY] + ["Mandatory Non-Credit", "TOTAL CREDITS"]
-    t = doc.add_table(rows=0, cols=len(heads))
-    _borders(t)
-    t.alignment = WD_TABLE_ALIGNMENT.CENTER
-    _band(t, "SUMMARY", GREEN, size=10)
-    hr = t.add_row().cells
-    for i, h in enumerate(heads):
-        _write(hr[i], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
-        _shade(hr[i], GREEN)
-    nc = lambda rs: len([r for r in rs if r.get("nep_category") == NC_COURSE]) or ""
-
-    def line(label, rs, bold=False):
-        cells = t.add_row().cells
-        vals = ([label] + [_fmt(_credits([r for r in rs if r.get("nep_category") == g])) for g, _ in PG_SUMMARY]
-                + [str(nc(rs)), _fmt(_credits(rs))])
-        for i, v in enumerate(vals):
-            _write(cells[i], v, bold=bold, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
-
-    for s in _sems(rows):
-        line(str(s), [r for r in rows if _num(r.get("semester")) == s])
-    line("TOTAL", rows, bold=True)
-    _widths(t, [width / len(heads)] * len(heads))
-
-
 def _pg_semester_tables(doc, rows, width):
     """One table a semester: Course Code, Course Title, Category, Credits and
     the marks — as the PG Course Matrix lays them out."""
     roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
-    order = {c: n for n, c in enumerate([g for g, _ in PG_SUMMARY] + [NC_COURSE])}
+    order = {c: n for n, (c, _) in enumerate(GROUP_HEADS)}
     for s in _sems(rows):
         rs = sorted([r for r in rows if _num(r.get("semester")) == s],
                     key=lambda r: (order.get(r.get("nep_category"), 99), str(r.get("course_code") or "")))
@@ -645,11 +606,9 @@ def _pg_curriculum_docx(prog, cur, deg):
     _para(doc, name, bold=True, size=12)
     _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=12, after=6)
     if rows:
-        _pg_summary_table(doc, rows, width)
-        _para(doc, "Credits are classified by course category: Major (Core), Discipline Specific Elective, "
-                   "Minor Stream, Multidisciplinary, Ability Enhancement, Skill Enhancement, Value Added, "
-                   "Summer Internship and Research Project / Dissertation. Electives vary by programme; "
-                   "each elective a student may choose is listed in its semester.",
+        _classification_table(doc, rows, width, title="SUMMARY")
+        _para(doc, "A discipline specific elective is counted with the major courses. Electives vary by "
+                   "programme; each elective a student may choose is listed in its semester.",
               size=8.5, align=WD_ALIGN_PARAGRAPH.LEFT)
         _page_break(doc)
         _pg_semester_tables(doc, rows, width)
