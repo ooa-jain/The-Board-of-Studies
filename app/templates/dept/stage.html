@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% import "_art.html" as art %}
-{% block title %}{% if batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}{% endblock %}
+{% block title %}{% if stage.existing_batch %}Earlier batch · {{ batch_tag }}{% elif batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}{% endblock %}
 
 {% block header %}
 <div class="page-head">
@@ -13,7 +13,7 @@
         {% else %}{{ stage.group }}{% endif %}
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
-      <h1>{% if programme %}{{ programme.display_name or programme.programme_name }} — {% endif %}{% if batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}</h1>
+      <h1>{% if programme %}{{ programme.display_name or programme.programme_name }} — {% endif %}{% if stage.existing_batch %}Earlier batch · {{ batch_tag }}{% elif batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}</h1>
       {% if batch_tag %}
       <span class="batch-tag{{ ' is-current' if stage.batch == 'current' }}">
         Batch of {{ batch_tag }}{{ ' · current batch' if stage.batch == 'current' else ' · earlier batch' }}

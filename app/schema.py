@@ -697,8 +697,8 @@ def _batch_part(start: int) -> dict:
     sheet = copy.deepcopy(next(x for x in PROGRAMME_SYLLABUS["sections"] if x["key"] == "courses"))
     sheet.update({
         "title": f"Syllabus — Batch of {label}",
-        "help": "Each course's syllabus for this batch. Syllabus → on a course above opens it here; "
-                "or fill in all the courses of the list at once.",
+        "help": "Each course's syllabus for this batch. Syllabus → on a course of this batch's Curriculum "
+                "opens it here; or fill in all its courses at once.",
         "min_rows": 0,
         # its courses are this batch's own, not the current programme structure's
         "rules": ["bloom_verbs_present"],
@@ -713,9 +713,9 @@ def _batch_part(start: int) -> dict:
         "batch": label, "existing_batch": True, "optional": False,
         "sections": [{
             "key": "batch_courses",
-            "title": f"Courses — Batch of {label}",
+            "title": f"Curriculum — Batch of {label}",
             "help": "The courses this batch studied, one per row, as in the programme structure. "
-                    "Syllabus → opens the course's syllabus below; Revision → opens it in Course Revision.",
+                    "Syllabus → opens the course on this batch's Syllabus page; Revision → opens it in Course Revision.",
             "type": "table",
             "min_rows": 0,
             "columns": _batch_courses_columns(),

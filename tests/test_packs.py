@@ -573,31 +573,34 @@ def test_submitting_a_programme_part_goes_to_the_next_step_of_that_programme(app
     data = sub["programmes"]["MCAREG"]["prog_curriculum"]["data"]
     j = client.post("/department/api/prog_curriculum/MCAREG/submit", json=data).get_json()
     assert j["ok"], j
-    assert j["redirect"].endswith("/department/stage/prog_syllabus/MCAREG")   # Current Batch, same programme
+    assert j["redirect"].endswith("/department/stage/prog_syllabus/MCAREG")   # its Syllabus, same programme
     page = client.get(j["redirect"]).get_data(as_text=True)
     assert "✓ Submitted" in page                                             # Curriculum turns green
     syl = _sub(app, code)["programmes"]["MCAREG"]["prog_syllabus"]["data"]
     j = client.post("/department/api/prog_syllabus/MCAREG/submit", json=syl).get_json()
-    # then each earlier batch, then Course Revision
-    assert j["ok"] and "/department/stage/prog_syllabus_b" in j["redirect"] and j["redirect"].endswith("/MCAREG")
+    # then Course Revision, and after it the earlier batches
+    assert j["ok"] and j["redirect"].endswith("/department/stage/prog_revision/MCAREG")
 
 
 def test_each_step_says_where_it_goes_and_the_last_reviews_the_programme(app, client):
     code = _signed_in_department(app, client)
     client.post("/department/drive/fill")
     cur = client.get("/department/stage/prog_curriculum/MCAREG").get_data(as_text=True)
-    assert "Submit Curriculum &amp; go to Batch of 2026–2027" in cur
+    assert "Submit Curriculum &amp; go to Syllabus" in cur
     syl = client.get("/department/stage/prog_syllabus/MCAREG").get_data(as_text=True)
-    assert "Submit Batch of 2026–2027 &amp; go to Batch of 2024–2025" in syl
+    assert "Submit Syllabus &amp; go to Course Revision" in syl
     from app.workflow import batches
     with app.test_request_context():
         older = [b["key"] for b in batches()["existing"]]
-    if older:
-        last_old = client.get(f"/department/stage/{older[-1]}/MCAREG").get_data(as_text=True)
-        # earlier batches are required: no Skip
-        assert "go to Course Revision" in last_old and "Skip to Course Revision" not in last_old
     rev = client.get("/department/stage/prog_revision/MCAREG").get_data(as_text=True)
-    assert "Review &amp; submit this programme" in rev and '"programme_review": true' in rev.replace("programme_review: true", '"programme_review": true')
+    if older:
+        assert "Submit Course Revision &amp; go to Earlier batch 2024–2025" in rev
+        last_old = client.get(f"/department/stage/{older[-1]}/MCAREG").get_data(as_text=True)
+        # earlier batches are required: no Skip; the last one reviews the programme
+        assert "Skip to Course Revision" not in last_old and "Skip to Earlier batch" not in last_old
+        assert "Review &amp; submit this programme" in last_old
+    else:
+        assert "Review &amp; submit this programme" in rev
 
     record = client.get("/department/api/record?programme=MCAREG").get_json()
     assert record["items"] and all(i["programme"] == "MCAREG" for i in record["items"])

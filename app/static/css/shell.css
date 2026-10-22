@@ -204,6 +204,9 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
 .side-sub-link .side-dot { position: static; flex: none; width: 7px; height: 7px; margin: 0; border-radius: 50%; }
 .side-sub-link small { color: #9aa3b2; font-weight: 500; }
 .side-sub-link .side-text { overflow: hidden; text-overflow: ellipsis; }
+/* the earlier batches, apart from the current batch's three steps */
+.side-sub-h { margin: 8px 0 2px; padding: 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--sh-muted); }
 @media (min-width: 901px) { html.side-collapsed .side-sub { display: none; } }
 
 /* ---- the stage page: the form takes the whole width ---- */

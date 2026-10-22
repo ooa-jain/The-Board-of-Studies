@@ -91,14 +91,10 @@ def semester_words(sems) -> str:
 
 
 def parts_for(stage: dict, s=None) -> list:
-    """The parts a programme shows, in order: Curriculum, the current batch
-    syllabus, each earlier batch's syllabus, Course Revision."""
-    out = []
-    for k in stage.get("parts", []):
-        out.append(k)
-        if k == "prog_syllabus":
-            out += [b["key"] for b in batches(s)["existing"]]
-    return out
+    """The parts a programme shows, in order: the current batch — Curriculum,
+    Syllabus, Course Revision — then each earlier batch, a part of its own
+    (its course list and its syllabus)."""
+    return list(stage.get("parts", [])) + [b["key"] for b in batches(s)["existing"]]
 
 
 def dev_mode() -> bool:

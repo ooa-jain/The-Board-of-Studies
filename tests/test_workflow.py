@@ -419,11 +419,10 @@ def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
     # every part validates clean — the parts' own checks are covered elsewhere
     monkeypatch.setattr(workflow, "validate_stage",
                         lambda *a, **k: ([], {"errors": 0, "warnings": 0}))
-    # the earlier batches are required too, in their place between the
-    # current batch and Course Revision
+    # the current batch's three steps, then the earlier batches — required too
     order = [(code, part) for code in ("BCMREG", "MCMNEW")
-             for part in ("prog_curriculum", "prog_syllabus", "prog_syllabus_b2024",
-                          "prog_syllabus_b2025", "prog_revision")]
+             for part in ("prog_curriculum", "prog_syllabus", "prog_revision",
+                          "prog_syllabus_b2024", "prog_syllabus_b2025")]
     for n, (code, part) in enumerate(order):
         body = client.post(f"/department/api/{part}/{code}/submit", json={}).get_json()
         assert body["ok"]
@@ -1160,8 +1159,11 @@ def test_batches_come_from_settings_and_show_as_parts(app, client):
 def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, client):
     _through_bos_documents(app, client)
     page = client.get("/department/stage/prog_syllabus_b2024/BCMREG").get_data(as_text=True)
-    # batches are named "Batch of" with their years
-    assert "Syllabus — Batch of 2024–2025" in page and "earlier batch" in page
+    # an earlier batch is named by its years: its Curriculum and its Syllabus
+    assert "Earlier batch · 2024–2025" in page
+    from app.schema import STAGE_BY_KEY as SBK
+    assert [x["title"] for x in SBK["prog_syllabus_b2024"]["sections"]] == [
+        "Curriculum — Batch of 2024–2025", "Syllabus — Batch of 2024–2025"]
     cur = client.get("/department/stage/prog_syllabus/BCMREG").get_data(as_text=True)
     assert "Syllabus — Batch of 2026–2027" in cur and "current batch" in cur
     assert "Current Batch" not in cur and "Existing Batch" not in cur

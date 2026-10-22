@@ -1556,23 +1556,19 @@
      Yes (the default) shows a link to its syllabus in the current batch —
      the course is added there if it is not yet; No leaves it out. */
   /* Syllabus and Revision, on each course row: Yes or No, and with Yes a
-     small → that opens this course there. From the programme structure,
-     Syllabus offers each batch (current and earlier); on an earlier batch's
-     page it opens the course's syllabus further down the same page.
-     Revision opens the course in Course Revision. Each link says where it
-     was clicked, so the page it opens leads back there. */
+     small → that opens this course there. In the Curriculum, Syllabus opens
+     the current batch's syllabus; on an earlier batch's Curriculum, that
+     batch's own Syllabus page. Revision opens the course in Course Revision.
+     Each link says where it was clicked, so the page it opens leads back. */
   const IS_BATCH = !!STAGE.existing_batch;
   const FROM = "?from=" + encodeURIComponent(CTX.key);
-  const batchName = s => s.current ? "Current · " + String(s.label || "").replace(/^Batch of\s*/, "").replace(/\s*\(current\)$/, "")
-                                   : String(s.label || "").replace(/^Batch of\s*/, "");
+  const currentSyllabus = () => ((CTX.syllabi || []).find(x => x.current) || {}).url;
   const COURSE_LINKS = {
     syllabus_link: { field: "syllabus", word: "Syllabus", all: "All syllabi",
                      targets: code => IS_BATCH
-                       ? [{ href: "#course-" + encodeURIComponent(code), here: code }]
-                       : (CTX.syllabi || []).map(s => ({ label: batchName(s),
-                           href: s.url + FROM + "#course-" + encodeURIComponent(code) })),
-                     allHref: () => IS_BATCH ? "#sec-courses"
-                       : ((CTX.syllabi || []).find(x => x.current) || {}).url,
+                       ? [{ href: "?view=syllabus#course-" + encodeURIComponent(code), here: code }]
+                       : currentSyllabus() ? [{ href: currentSyllabus() + FROM + "#course-" + encodeURIComponent(code) }] : [],
+                     allHref: () => IS_BATCH ? "?view=syllabus" : currentSyllabus(),
                      off: "The syllabus is not open yet",
                      title: "Open this course's syllabus",
                      allTitle: "Open the syllabus — pick a semester, a course category or search",
@@ -1593,10 +1589,6 @@
                      allTitle: "Open Course Revision — every revised course",
                      aria: "Is this course revised in this BoS?" },
   };
-
-  document.addEventListener("click", e => {
-    document.querySelectorAll("details.syl-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
-  });
 
   /* The same course across batches: the same code, the same code without
      its year (25BCA1C01 and 26BCA1C01), or the same title. */
@@ -1660,38 +1652,16 @@
       wrap.appendChild(hint);
       return wrap;
     }
-    if (targets.length === 1) {
-      const t = targets[0];
-      const go = el("a", "syl-go", "→");
-      go.href = t.href;
-      go.title = K.title;
-      go.setAttribute("aria-label", `${K.word} of ${code}`);
-      if (t.here) go.addEventListener("click", e => {
-        // the syllabus is further down this page: open the course there
-        if (window.__openSheet) { e.preventDefault(); window.__openSheet(t.here); }
-      });
-      wrap.appendChild(go);
-      return wrap;
-    }
-    // more than one batch: a small menu of them
-    const menu = el("details", "syl-menu");
-    const sum = el("summary", "syl-go", "→");
-    sum.title = K.title + " — choose the batch";
-    sum.setAttribute("aria-label", `${K.word} of ${code}: choose the batch`);
-    menu.appendChild(sum);
-    const list = el("div", "syl-menu-list");
-    list.appendChild(el("span", "syl-menu-h", `${code} · syllabus of`));
-    targets.forEach(t => {
-      const a = el("a", null, t.label);
-      a.href = t.href;
-      list.appendChild(a);
+    const t = targets[0];
+    const go = el("a", "syl-go", "→");
+    go.href = t.href;
+    go.title = K.title;
+    go.setAttribute("aria-label", `${K.word} of ${code}`);
+    if (t.here) go.addEventListener("click", e => {
+      // the batch's Syllabus page: shown in place, at this course
+      if (window.__batchView) { e.preventDefault(); window.__batchView("syllabus", t.here); }
     });
-    menu.appendChild(list);
-    menu.addEventListener("toggle", () => {
-      if (!menu.open) return;
-      document.querySelectorAll("details.syl-menu[open]").forEach(d => { if (d !== menu) d.open = false; });
-    });
-    wrap.appendChild(menu);
+    wrap.appendChild(go);
     return wrap;
   }
 
@@ -3496,13 +3466,13 @@
 
     if (!CTX.readonly && (IS_BATCH || (CTX.fill || []).length)) {
       const fb = el("button", "btn btn-ghost btn-sm",
-        IS_BATCH ? "Fill in all courses from the course list above" : "Fill in all courses from the Curriculum");
+        IS_BATCH ? "Fill in all courses from this batch's Curriculum" : "Fill in all courses from the Curriculum");
       fb.type = "button";
       fb.addEventListener("click", () => {
         const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
         const add = sourceAll().filter(p => !have.has(String(p.course_code).toUpperCase()));
         if (!add.length) {
-          note.textContent = IS_BATCH && !batchCourses().length ? "List this batch's courses above first."
+          note.textContent = IS_BATCH && !batchCourses().length ? "List this batch's courses in its Curriculum first."
             : IS_BATCH ? "Every course of the list is already here." : "Every course of the Curriculum is already here.";
           return;
         }
@@ -3764,8 +3734,8 @@
       row1.appendChild(el("span", "syl-nav-count", `${done} of ${data.length} courses filled`));
       const structure = document.querySelector(".back-link");
       if (IS_BATCH) {
-        const go = el("a", "btn btn-ghost btn-sm", "Check / add in the course list ↑");
-        go.href = "#sec-batch_courses";
+        const go = el("a", "btn btn-ghost btn-sm", "Check / add in this batch's Curriculum →");
+        go.href = "?view=curriculum#sec-batch_courses";
         row1.appendChild(go);
       } else if (structure) {
         const go = el("a", "btn btn-ghost btn-sm", "Check / add in the Programme structure →");
@@ -4330,6 +4300,8 @@
   function focusIssue(iss) {
     const target = locate(iss);
     if (!target) return;
+    const blk = target.closest ? target.closest(".section-block") : null;
+    if (blk && blk.hidden && window.__showSection) window.__showSection(blk.id);
     // a field behind the cards has to be brought out before it can be fixed
     const behind = target.closest ? target.closest(".bento-form") : null;
     if (behind && behind.hidden && behind.openForm) behind.openForm(iss.field);
@@ -4664,6 +4636,7 @@
       },
       edit: key => {
         ctl.close();
+        if (window.__showSection) window.__showSection("sec-" + key);
         const sec = document.getElementById("sec-" + key);
         if (sec) { sec.scrollIntoView({ behavior: "smooth", block: "start" }); sec.classList.add("is-flash"); setTimeout(() => sec.classList.remove("is-flash"), 1600); }
       }
@@ -4774,6 +4747,59 @@
 
   render();
   refresh();
+  /* An earlier batch is two pages of one part: its Curriculum (the courses
+     it studied) and its Syllabus. Moving between them happens in place —
+     the address follows (?view=…), the steps at the top follow, and nothing
+     typed is lost on the way. */
+  if (IS_BATCH) {
+    const VIEW_OF = { batch_courses: "curriculum", courses: "syllabus" };
+    const setView = (v, push) => {
+      v = v === "syllabus" ? "syllabus" : "curriculum";
+      document.querySelectorAll(".section-block").forEach(b => {
+        const key = (b.id || "").replace(/^sec-/, "");
+        if (VIEW_OF[key]) b.hidden = VIEW_OF[key] !== v;
+      });
+      document.querySelectorAll(".pflow-simple .pmap-node").forEach((li, i) => {
+        const on = (i === 0) === (v === "curriculum");
+        li.classList.toggle("is-here", on);
+        const a = li.querySelector("a");
+        if (a) { if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
+      });
+      // the way back to the batch's Curriculum shows on its Syllabus page
+      document.querySelectorAll(".back-bar").forEach(b => { b.hidden = v !== "syllabus"; });
+      if (push) {
+        const url = new URL(location.href);
+        url.searchParams.set("view", v);
+        url.searchParams.delete("from");
+        history.pushState({ view: v }, "", url.pathname + url.search);
+      }
+      window.scrollTo({ top: 0 });
+    };
+    window.__batchView = (v, code) => {
+      setView(v, true);
+      if (code && window.__openSheet) window.__openSheet(code);
+    };
+    // a section the page needs to show (a check's "fix it", the review's "edit")
+    window.__showSection = id => {
+      const key = String(id || "").replace(/^sec-/, "");
+      if (VIEW_OF[key]) setView(VIEW_OF[key], true);
+    };
+    const params = new URLSearchParams(location.search);
+    setView(params.get("view") === "syllabus" || location.hash.startsWith("#course-") ? "syllabus" : "curriculum", false);
+    window.addEventListener("popstate", () => setView(new URLSearchParams(location.search).get("view"), false));
+    // links to the other page of this batch: in place, too
+    document.addEventListener("click", e => {
+      const a = e.target.closest && e.target.closest("a[href]");
+      if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey) return;
+      const url = new URL(a.getAttribute("href"), location.href);
+      if (url.pathname !== location.pathname || !url.searchParams.get("view")) return;
+      e.preventDefault();
+      setView(url.searchParams.get("view"), true);
+      const target = url.hash && document.getElementById(url.hash.slice(1));
+      if (target) setTimeout(() => window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" }), 50);
+    });
+  }
+
   // opened from a curriculum row: that course is already chosen — start at
   // the semester / course group / search bar above it, where the department
   // can move on to any other course

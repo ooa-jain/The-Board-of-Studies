@@ -5052,6 +5052,27 @@ html[data-theme="dark"] .sg-bar span {
 html[data-theme="dark"] .sg-bar.is-high span {
   background: #b23a2a;
 }
+html[data-theme="dark"] .pflow-batches {
+  border: 1px solid #2e3542;
+  background: #121519;
+}
+html[data-theme="dark"] .pflow-batches-k {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .pflow-batches-k.is-sub {
+  border-left: 1px solid #2e3542;
+}
+html[data-theme="dark"] .pflow-batch {
+  color: #ced8e6;
+  text-decoration: none;
+}
+html[data-theme="dark"] .pflow-batch:hover {
+  background: #181b21;
+}
+html[data-theme="dark"] .pflow-batch.is-here {
+  background: #2962ae;
+  color: #ffffff;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
@@ -5503,6 +5524,9 @@ html[data-theme="dark"] .side-sub-link.is-on {
 }
 html[data-theme="dark"] .side-sub-link small {
   color: #a2aab9;
+}
+html[data-theme="dark"] .side-sub-h {
+  color: #a1a9b8;
 }
 html[data-theme="dark"] .ugc-strip {
   background: #121519;

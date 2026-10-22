@@ -200,9 +200,12 @@
       <a class="side-sub-prog" href="{{ url_for('dept.stage', stage_key='curriculum') }}#prog-{{ programme.programme_code }}"
          title="{{ programme.programme_name }}">{{ programme.programme_code }}</a>
       {% for ps in prog_steps %}
+      {% if ps.earlier and loop.previtem is defined and not loop.previtem.earlier %}
+      <span class="side-sub-h">Earlier batches</span>
+      {% endif %}
       <a class="side-sub-link{{ ' is-on' if ps.key == stage.key }}" href="{{ ps.url }}"
          {% if ps.key == stage.key %}aria-current="page"{% endif %}>
-        <i class="side-dot st-{{ ps.status }}"></i><span class="side-text">{{ ps.label }}</span></a>
+        <i class="side-dot st-{{ ps.status }}"></i><span class="side-text">{{ ps.short or ps.label }}</span></a>
       {% endfor %}
     </div>
     {% endif %}

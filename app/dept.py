@@ -99,8 +99,8 @@ def _batch_semesters(stage):
             # only the semesters Settings asks this batch for
             sec["title"] += f" · {words[0].upper()}{words[1:]}"
             sec["help"] = (f"The courses the Batch of {b['label']} studied in {words}, one per row, as in the "
-                           "programme structure. Syllabus → opens the course's syllabus below; Revision → opens "
-                           "it in Course Revision.")
+                           "programme structure. Syllabus → opens the course on this batch's Syllabus page; "
+                           "Revision → opens it in Course Revision.")
             for c in sec["columns"]:
                 if c["name"] == "semester":
                     c["choices"], c["min"], c["max"] = list(b["semesters"]), min(b["semesters"]), max(b["semesters"])
@@ -392,14 +392,19 @@ def stage(stage_key, programme_code=None):
                                                 "group": r.get("nep_category") or "",
                                                 "title": title}
         # back to where the course link was clicked: the programme structure,
-        # or an earlier batch's course list
+        # or an earlier batch's curriculum (its course list)
         came = request.args.get("from") or ""
         came_def = STAGE_BY_KEY.get(came) or {}
-        if came_def.get("existing_batch") and came != stage_key:
-            back = url_for("dept.stage", stage_key=came,
-                           programme_code=programme["programme_code"]) + "#sec-batch_courses"
-            back_label = f"Batch of {came_def.get('batch', '')} — courses"
-        elif not stage_def.get("existing_batch") or came == "prog_curriculum":
+        if stage_def.get("existing_batch"):
+            # shown on the batch's Syllabus page (the page script hides it on its Curriculum)
+            back = url_for("dept.stage", stage_key=stage_key, programme_code=programme["programme_code"],
+                           view="curriculum") + "#sec-batch_courses"
+            back_label = f"Curriculum · Batch of {stage_def.get('batch', '')}"
+        elif came_def.get("existing_batch"):
+            back = url_for("dept.stage", stage_key=came, programme_code=programme["programme_code"],
+                           view="curriculum") + "#sec-batch_courses"
+            back_label = f"Curriculum · Batch of {came_def.get('batch', '')}"
+        else:
             back = url_for("dept.stage", stage_key="prog_curriculum",
                            programme_code=programme["programme_code"]) + "#sec-semester_structure"
             back_label = "Programme structure — semester scheme"
@@ -984,9 +989,9 @@ def _step_label(key, cfg=None):
     if key == "prog_curriculum":
         return "Curriculum"
     if key == "prog_syllabus":
-        return f"Batch of {batches(cfg)['current']}".strip()
+        return "Syllabus"
     if d.get("existing_batch"):
-        return f"Batch of {d.get('batch', '')}".strip()
+        return f"Earlier batch {d.get('batch', '')}".strip()
     if key == "prog_revision":
         return "Course Revision"
     return d["title"]
@@ -999,6 +1004,9 @@ def _programme_steps(sub, code):
     cfg = app_settings_doc()
     return [{"key": k, "label": _step_label(k, cfg), "status": part_status(sub, code, k),
              "optional": bool(STAGE_BY_KEY[k].get("optional")),
+             # the earlier batches are listed apart, by their years
+             "earlier": bool(STAGE_BY_KEY[k].get("existing_batch")),
+             "short": STAGE_BY_KEY[k].get("batch", "") if STAGE_BY_KEY[k].get("existing_batch") else "",
              "url": url_for("dept.stage", stage_key=k, programme_code=code)}
             for k in parts_for(stage_def, cfg)]
 

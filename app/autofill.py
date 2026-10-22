@@ -555,7 +555,8 @@ def fill_from_drive(dept, year, actor):
         from .workflow import parts_for
         stage_def = next(s for s in STAGE_BY_KEY.values() if s.get("parts"))
         builds = {"prog_curriculum": _curriculum, "prog_syllabus": _syllabus, "prog_revision": _revision}
-        for part in parts_for(stage_def):
+        # Course Revision last: it reads the earlier batches' syllabi
+        for part in sorted(parts_for(stage_def), key=lambda k: k == "prog_revision"):
             build = builds.get(part)
             sub = fresh()
             if _is_submitted(sub, pcode, part):
