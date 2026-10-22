@@ -692,13 +692,10 @@ def r_plan_applicable_needs_detail(data, ctx, sk):
     return out
 
 
-def r_batch_file_or_text(data, ctx, sk):
-    """An earlier batch's syllabus: the file uploaded, or its courses listed — either will do."""
-    v = _vals(data, sk)
-    if (_is_blank(v.get("batch_syllabus")) and _is_blank(v.get("batch_text"))
-            and not _rows(data, "batch_courses")):
-        return [err("Upload the syllabus file, or list the courses in the table.",
-                    section=sk, field="batch_syllabus")]
+def r_batch_has_courses(data, ctx, sk):
+    """An earlier batch lists at least one of its courses."""
+    if not _rows(data, sk):
+        return [err("List this batch's courses — at least one row.", section=sk)]
     return []
 
 
@@ -724,7 +721,10 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
         or ctx.get("degree_level")
     stage = for_level(stage, deg)
-    data = pg_groups(data, deg) if stage_key == "prog_curriculum" else data
+    if stage_key == "prog_curriculum":
+        data = pg_groups(data, deg)
+    elif stage.get("existing_batch"):
+        data = pg_groups(data, deg, "batch_courses")
 
     for section in stage.get("sections", []):
         sk = section["key"]

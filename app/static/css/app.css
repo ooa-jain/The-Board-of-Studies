@@ -4881,6 +4881,19 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
   text-decoration: none; line-height: 1; }
 .syl-go:hover, .syl-go:focus-visible { background: #1d4ed8; border-color: #1d4ed8; color: #fff; outline: none; }
 .syl-go.is-off { border-color: var(--line); background: transparent; color: #98a2b3; cursor: default; }
+/* more than one batch: the → opens a small menu of them */
+.syl-menu { position: relative; display: inline-block; }
+.syl-menu > summary { list-style: none; cursor: pointer; }
+.syl-menu > summary::-webkit-details-marker { display: none; }
+.syl-menu[open] > summary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.syl-menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 190px; padding: 6px;
+  display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface, #fff);
+  box-shadow: 0 14px 30px -12px rgba(16, 24, 40, .35); }
+.syl-menu-h { padding: 4px 8px 6px; font-size: .72rem; font-weight: 700; color: var(--ink-soft, #5b6474);
+  text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.syl-menu-list a { display: block; padding: 7px 10px; border-radius: 7px; color: var(--ink, #1f2937); font-size: .85rem;
+  font-weight: 600; text-decoration: none; white-space: nowrap; }
+.syl-menu-list a:hover, .syl-menu-list a:focus-visible { background: #eef3fd; color: #1d4ed8; outline: none; }
 /* the programme structure and an earlier batch's courses: a wide table, kept tight */
 #sec-semester_structure table.rt td, #sec-batch_courses table.rt td { padding: 5px 4px; }
 #sec-semester_structure table.rt th, #sec-batch_courses table.rt th { padding: 9px 4px; }

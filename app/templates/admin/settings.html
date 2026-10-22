@@ -44,7 +44,7 @@
         </div>
         {% if batches.existing %}
         <div class="field">
-          <label>Semesters each earlier batch uploads</label>
+          <label>Semesters each earlier batch covers</label>
           <div class="batch-sems">
             {% for b in batches.existing %}
             <div class="batch-sems-row">
@@ -57,8 +57,8 @@
             </div>
             {% endfor %}
           </div>
-          <span class="help">Tick the semesters whose syllabus a batch uploads — 5 and 6 for one, 3 and 4 for another.
-            Departments see them on that batch's upload. None ticked: the whole syllabus.</span>
+          <span class="help">Tick the semesters whose courses and syllabus a batch fills in — 5 and 6 for one, 3 and 4
+            for another. Departments see them on that batch's page. None ticked: every semester.</span>
         </div>
         {% endif %}
         <p class="batch-now small">

@@ -688,11 +688,21 @@ def _batch_courses_columns():
 
 
 def _batch_part(start: int) -> dict:
-    """An earlier batch's syllabus: not typed in again — the department
-    uploads it, in the syllabus template, and it is checked for the
-    syllabus headings like any other upload; its courses can be listed
-    as in the programme structure."""
+    """An earlier batch's syllabus, as the current batch's is: the courses
+    the batch studied (the programme structure's columns, with Syllabus and
+    Revision on each row), and below them each course's syllabus — the same
+    sheet as the current batch, in the syllabus template."""
+    import copy
     label = batch_label(start)
+    sheet = copy.deepcopy(next(x for x in PROGRAMME_SYLLABUS["sections"] if x["key"] == "courses"))
+    sheet.update({
+        "title": f"Syllabus — Batch of {label}",
+        "help": "Each course's syllabus for this batch. Syllabus → on a course above opens it here; "
+                "or fill in all the courses of the list at once.",
+        "min_rows": 0,
+        # its courses are this batch's own, not the current programme structure's
+        "rules": ["bloom_verbs_present"],
+    })
     return {
         "key": batch_key(start),
         "parent": "curriculum",
@@ -702,25 +712,15 @@ def _batch_part(start: int) -> dict:
         "per_programme": True,
         "batch": label, "existing_batch": True, "optional": False,
         "sections": [{
-            "key": "batch_upload",
-            "title": f"Syllabus of the earlier batch — Batch of {label}",
-            "help": f"Upload this programme's syllabus for the Batch of {label}, as one file (PDF or Word) "
-                    "in the syllabus template, or list its courses in the table below — or both. An upload "
-                    "is checked for the syllabus headings.",
-            "type": "fields",
-            "fields": [{"name": "batch_syllabus", "label": f"Syllabus — Batch of {label}", "type": "file",
-                        "wide": True, "accept": ".pdf,.docx,.doc",
-                        "template": "templates/Syllabus_Template.docx"}],
-            "rules": ["batch_file_or_text"],
-        }, {
             "key": "batch_courses",
             "title": f"Courses — Batch of {label}",
-            "help": "One course per row, as in the programme structure.",
+            "help": "The courses this batch studied, one per row, as in the programme structure. "
+                    "Syllabus → opens the course's syllabus below; Revision → opens it in Course Revision.",
             "type": "table",
             "min_rows": 0,
             "columns": _batch_courses_columns(),
-            "rules": ["ltpe_credit_arithmetic", "marks_add_up", "unique_course_codes"],
-        }],
+            "rules": ["ltpe_credit_arithmetic", "marks_add_up", "unique_course_codes", "batch_has_courses"],
+        }, sheet],
     }
 
 
@@ -769,9 +769,24 @@ def for_level(stage: dict, degree_level) -> dict:
     programme classifies credits as the PG Course Matrix does (Generic Core …
     Research / Thesis / Project / Patent), has no Honours tracks or minors,
     states its fee, and opens with the PG wording; a UG programme is as it was."""
+    import copy
+    if stage and stage.get("existing_batch"):
+        # an earlier batch's course list follows the programme's level too
+        if not (is_pg(degree_level) or degree_level == "UG - 3 Year"):
+            return stage
+        s = copy.deepcopy(stage)
+        for sec in s["sections"]:
+            if sec["key"] != "batch_courses":
+                continue
+            for c in sec["columns"]:
+                if c["name"] == "semester":
+                    n = 4 if is_pg(degree_level) else 6
+                    c["max"], c["choices"] = n, list(range(1, n + 1))
+                elif c["name"] == "nep_category" and is_pg(degree_level):
+                    c["label"], c["options"], c["width"] = "Category", PG_CATEGORIES, "200px"
+        return s
     if not stage or stage.get("key") != "prog_curriculum":
         return stage
-    import copy
     if degree_level == "UG - 3 Year":
         # a 3-year degree runs for six semesters
         s = copy.deepcopy(stage)
@@ -832,11 +847,12 @@ def for_level(stage: dict, degree_level) -> dict:
     return s
 
 
-def pg_groups(data: dict, degree_level) -> dict:
-    """A PG programme's structure with every course group in PG terms."""
+def pg_groups(data: dict, degree_level, key="semester_structure") -> dict:
+    """A PG programme's structure (or an earlier batch's course list, with
+    key="batch_courses") with every course group in PG terms."""
     if not is_pg(degree_level) or not isinstance(data, dict):
         return data
-    rows = data.get("semester_structure")
+    rows = data.get(key)
     if not isinstance(rows, list):
         return data
     out = []
@@ -846,7 +862,7 @@ def pg_groups(data: dict, degree_level) -> dict:
             r["nep_category"] = pg_category(r.get("nep_category"), r.get("credits"), r.get("course_title"))
             r.pop("track", None)
         out.append(r)
-    return {**data, "semester_structure": out}
+    return {**data, key: out}
 
 
 def programme_level(degree_level: str) -> str:

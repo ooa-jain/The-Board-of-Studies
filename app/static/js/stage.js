@@ -1556,22 +1556,84 @@
      Yes (the default) shows a link to its syllabus in the current batch —
      the course is added there if it is not yet; No leaves it out. */
   /* Syllabus and Revision, on each course row: Yes or No, and with Yes a
-     link that opens this course there — its syllabus in the current batch,
-     or its entry in Course Revision (added there if it is not yet). */
+     small → that opens this course there. From the programme structure,
+     Syllabus offers each batch (current and earlier); on an earlier batch's
+     page it opens the course's syllabus further down the same page.
+     Revision opens the course in Course Revision. Each link says where it
+     was clicked, so the page it opens leads back there. */
+  const IS_BATCH = !!STAGE.existing_batch;
+  const FROM = "?from=" + encodeURIComponent(CTX.key);
+  const batchName = s => s.current ? "Current · " + String(s.label || "").replace(/^Batch of\s*/, "").replace(/\s*\(current\)$/, "")
+                                   : String(s.label || "").replace(/^Batch of\s*/, "");
   const COURSE_LINKS = {
     syllabus_link: { field: "syllabus", word: "Syllabus", all: "All syllabi",
-                     url: () => ((CTX.syllabi || []).find(x => x.current) || {}).url,
-                     off: "The current batch's syllabus is not open yet",
-                     title: "Open this course's syllabus — current batch (added there if it is not yet)",
-                     allTitle: "Open the syllabus page — pick a semester, a course category or search",
+                     targets: code => IS_BATCH
+                       ? [{ href: "#course-" + encodeURIComponent(code), here: code }]
+                       : (CTX.syllabi || []).map(s => ({ label: batchName(s),
+                           href: s.url + FROM + "#course-" + encodeURIComponent(code) })),
+                     allHref: () => IS_BATCH ? "#sec-courses"
+                       : ((CTX.syllabi || []).find(x => x.current) || {}).url,
+                     off: "The syllabus is not open yet",
+                     title: "Open this course's syllabus",
+                     allTitle: "Open the syllabus — pick a semester, a course category or search",
                      aria: "Syllabus for this course" },
     revision_link: { field: "revision", word: "Revision", all: "All revisions",
-                     url: () => CTX.revision_url,
+                     targets: (code, row) => {
+                       if (!CTX.revision_url) return [];
+                       // an earlier batch's course is revised as the current course of the same name
+                       if (IS_BATCH) {
+                         const m = sameCourse(structureCourses(), code, row && row.course_title);
+                         if (m) code = String(m.course_code).toUpperCase();
+                       }
+                       return [{ href: CTX.revision_url + FROM + "#course-" + encodeURIComponent(code) }];
+                     },
+                     allHref: () => CTX.revision_url ? CTX.revision_url + FROM : "",
                      off: "Course Revision is not open yet",
                      title: "Open this course in Course Revision (added there if it is not yet)",
                      allTitle: "Open Course Revision — every revised course",
                      aria: "Is this course revised in this BoS?" },
   };
+
+  document.addEventListener("click", e => {
+    document.querySelectorAll("details.syl-menu[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+  });
+
+  /* The same course across batches: the same code, the same code without
+     its year (25BCA1C01 and 26BCA1C01), or the same title. */
+  const noYear = c => String(c || "").trim().toUpperCase().replace(/^\d{2}/, "");
+  function sameCourse(list, code, title) {
+    code = String(code || "").trim().toUpperCase();
+    const t = String(title || "").trim().toLowerCase();
+    return list.find(p => String(p.course_code || "").trim().toUpperCase() === code)
+      || list.find(p => noYear(p.course_code) === noYear(code))
+      || (t ? list.find(p => String(p.course_title || "").trim().toLowerCase() === t) : undefined);
+  }
+  // the programme structure's courses, as {course_code, course_title}
+  const structureCourses = () => Object.entries(CTX.structure_courses || {})
+    .map(([course_code, course_title]) => ({ course_code, course_title }));
+
+  /* An earlier batch's own courses, as the syllabus sheets take them: from
+     the course list on the same page, as it stands (saved or not). */
+  function batchCourses() {
+    const out = [];
+    const year = String(STAGE.batch || "").slice(0, 4);
+    (Array.isArray(state.batch_courses) ? state.batch_courses : []).forEach(r => {
+      if (!r || r.syllabus === "No") return;
+      const codes = String(r.course_code || "").split("/").map(x => x.trim()).filter(Boolean);
+      let titles = String(r.course_title || "").split(" / ").map(x => x.trim());
+      if (titles.length !== codes.length) titles = codes.map(() => String(r.course_title || "").trim());
+      const hours = ["l", "t", "p", "e"].reduce((a, k) => a + (num(r[k]) || 0), 0);
+      codes.forEach((code, i) => {
+        const p = { course_code: code, course_title: titles[i] };
+        if (r.semester !== undefined && r.semester !== "") p.semester = r.semester;
+        if (num(r.credits) !== null) p.credits = r.credits;
+        if (/^\d{4}$/.test(year)) p.year_latest = year;
+        if (hours) { p.hours_per_week = hours; p.teaching_hours = hours * 15; }
+        out.push(p);
+      });
+    });
+    return out;
+  }
 
   function courseLink(type, row) {
     const K = COURSE_LINKS[type];
@@ -1589,20 +1651,47 @@
     wrap.appendChild(sel);
     if (sel.value === "No") return wrap;
     const code = String(row.course_code || "").split("/")[0].trim().toUpperCase();
-    const url = K.url();
+    const targets = code ? K.targets(code, row) : [];
     // a small → beside the Yes: the column's heading says where it goes
-    if (!code || !url) {
+    if (!targets.length) {
       const hint = el("span", "syl-go is-off", "→");
       hint.title = code ? K.off : "Enter the course code first";
       hint.setAttribute("aria-hidden", "true");
       wrap.appendChild(hint);
       return wrap;
     }
-    const go = el("a", "syl-go", "→");
-    go.href = url + "#course-" + encodeURIComponent(code);
-    go.title = K.title;
-    go.setAttribute("aria-label", `${K.word} of ${code}`);
-    wrap.appendChild(go);
+    if (targets.length === 1) {
+      const t = targets[0];
+      const go = el("a", "syl-go", "→");
+      go.href = t.href;
+      go.title = K.title;
+      go.setAttribute("aria-label", `${K.word} of ${code}`);
+      if (t.here) go.addEventListener("click", e => {
+        // the syllabus is further down this page: open the course there
+        if (window.__openSheet) { e.preventDefault(); window.__openSheet(t.here); }
+      });
+      wrap.appendChild(go);
+      return wrap;
+    }
+    // more than one batch: a small menu of them
+    const menu = el("details", "syl-menu");
+    const sum = el("summary", "syl-go", "→");
+    sum.title = K.title + " — choose the batch";
+    sum.setAttribute("aria-label", `${K.word} of ${code}: choose the batch`);
+    menu.appendChild(sum);
+    const list = el("div", "syl-menu-list");
+    list.appendChild(el("span", "syl-menu-h", `${code} · syllabus of`));
+    targets.forEach(t => {
+      const a = el("a", null, t.label);
+      a.href = t.href;
+      list.appendChild(a);
+    });
+    menu.appendChild(list);
+    menu.addEventListener("toggle", () => {
+      if (!menu.open) return;
+      document.querySelectorAll("details.syl-menu[open]").forEach(d => { if (d !== menu) d.open = false; });
+    });
+    wrap.appendChild(menu);
     return wrap;
   }
 
@@ -1709,7 +1798,7 @@
       if (COURSE_LINKS[c.type]) {
         // one way into all the syllabi / the whole Course Revision for the
         // table; each row says Yes or No, and opens that course
-        const K = COURSE_LINKS[c.type], url = K.url();
+        const K = COURSE_LINKS[c.type], url = K.allHref();
         th.textContent = "";
         th.className = "rt-syl-head";
         if (url) {
@@ -3373,7 +3462,15 @@
      Development Activities and Books for reference. */
   function renderSheets(section, host) {
     const data = rows(section.key);
-    if (!data.length && !CTX.readonly) data.push({});
+    if (!data.length && !CTX.readonly && section.min_rows !== 0) data.push({});
+    // where a course's code, title, credits and hours come from: the
+    // programme structure — or, on an earlier batch, that batch's own list
+    const sourceAll = () => IS_BATCH ? batchCourses() : (CTX.fill || []);
+    const sourceOne = code => (IS_BATCH ? sameCourse(batchCourses(), code) : undefined)
+      || (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === code);
+    const hashCode = location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
+    // the course the link meant, as this page names it
+    const arrived = hashCode ? String((sourceOne(hashCode) || {}).course_code || hashCode).toUpperCase() : "";
     const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
     const blank = r => Object.keys(r).filter(k => !k.startsWith("_"))
       .every(k => r[k] === "" || r[k] == null || (Array.isArray(r[k]) && !r[k].some(m => m && (m.title || m.revised || m.hours))));
@@ -3386,10 +3483,10 @@
     host.appendChild(list);
 
     // arriving from the programme structure for a course not here yet: add it
-    if (!CTX.readonly && location.hash.startsWith("#course-")) {
-      const want = decodeURIComponent(location.hash.slice(8)).toUpperCase();
+    if (!CTX.readonly && arrived) {
+      const want = arrived;
       const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
-      const src = (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === want);
+      const src = sourceOne(hashCode);
       if (want && src && !have.has(want)) {
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         data.push(Object.assign({}, src));
@@ -3397,13 +3494,18 @@
       }
     }
 
-    if (!CTX.readonly && (CTX.fill || []).length) {
-      const fb = el("button", "btn btn-ghost btn-sm", "Fill in all courses from the Curriculum");
+    if (!CTX.readonly && (IS_BATCH || (CTX.fill || []).length)) {
+      const fb = el("button", "btn btn-ghost btn-sm",
+        IS_BATCH ? "Fill in all courses from the course list above" : "Fill in all courses from the Curriculum");
       fb.type = "button";
       fb.addEventListener("click", () => {
         const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
-        const add = CTX.fill.filter(p => !have.has(String(p.course_code).toUpperCase()));
-        if (!add.length) { note.textContent = "Every course of the Curriculum is already here."; return; }
+        const add = sourceAll().filter(p => !have.has(String(p.course_code).toUpperCase()));
+        if (!add.length) {
+          note.textContent = IS_BATCH && !batchCourses().length ? "List this batch's courses above first."
+            : IS_BATCH ? "Every course of the list is already here." : "Every course of the Curriculum is already here.";
+          return;
+        }
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         add.forEach(p => data.push(Object.assign({}, p)));
         draw(); touch();
@@ -3605,16 +3707,26 @@
 
     /* Semester → course group → course: pick one and only its sheet shows. */
     const MAP = CTX.course_map || {};
-    const USE_NAV = CTX.key === "prog_syllabus";
+    const USE_NAV = String(CTX.key).startsWith("prog_syllabus");
+    // an earlier batch's course list, as it stands, says each course's semester and group
+    const liveMap = () => {
+      const m = {};
+      if (IS_BATCH) (state.batch_courses || []).forEach(r => {
+        String((r && r.course_code) || "").split("/").map(x => x.trim().toUpperCase()).filter(Boolean)
+          .forEach(code => { if (!m[code]) m[code] = { semester: r.semester, group: r.nep_category || "" }; });
+      });
+      return m;
+    };
     const nav = el("div", "syl-nav");
     host.insertBefore(nav, list);
     const info = r => {
-      const m = MAP[String(r.course_code || "").trim().toUpperCase()] || {};
+      const k = String(r.course_code || "").trim().toUpperCase();
+      const m = liveMap()[k] || MAP[k] || {};
       return { sem: String(r.semester || m.semester || ""), group: m.group || "Other courses" };
     };
     const isFilled = r => !!(String(r.outcomes || "").trim() && (r.modules || []).some(m => m && String(m.revised || m.title || "").trim()));
     let pick = { sem: "", group: "", idx: -1 };
-    const wanted = location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
+    const wanted = arrived;
     const hit = wanted ? data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === wanted) : -1;
     if (hit >= 0) pick = { sem: info(data[hit]).sem, group: info(data[hit]).group, idx: hit };
     else if (data.length) pick = { sem: info(data[0]).sem, group: "", idx: 0 };
@@ -3651,7 +3763,11 @@
       const done = data.filter(isFilled).length;
       row1.appendChild(el("span", "syl-nav-count", `${done} of ${data.length} courses filled`));
       const structure = document.querySelector(".back-link");
-      if (structure) {
+      if (IS_BATCH) {
+        const go = el("a", "btn btn-ghost btn-sm", "Check / add in the course list ↑");
+        go.href = "#sec-batch_courses";
+        row1.appendChild(go);
+      } else if (structure) {
         const go = el("a", "btn btn-ghost btn-sm", "Check / add in the Programme structure →");
         go.href = structure.href;
         row1.appendChild(go);
@@ -3712,9 +3828,30 @@
       }
     }
     host.showRow = () => draw();
+    if (arrived) host.dataset.arrived = arrived;
+    // open one course here — from a course list's Syllabus → on this page:
+    // added from the list if it is not here yet, chosen, and scrolled to
+    window.__openSheet = code => {
+      code = String(code || "").toUpperCase();
+      let i = data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === code);
+      if (i < 0) {
+        const src = sourceOne(code);
+        if (!src || CTX.readonly) return;
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(Object.assign({}, src));
+        i = data.length - 1;
+        touch();
+        note.textContent = `Added ${src.course_code} — fill in its syllabus below.`;
+      }
+      pick = { sem: info(data[i]).sem, group: info(data[i]).group, idx: i };
+      query = "";
+      draw();
+      const target = document.getElementById("course-" + code) || list;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+      target.classList.add("is-flash");
+      setTimeout(() => target.classList.remove("is-flash"), 1900);
+    };
     draw();
-    // arriving from a course in the programme structure: start at the
-    // filter, with that course chosen
   }
 
   // -------------------------------------------------------- revision tables
@@ -3741,7 +3878,9 @@
     if (!CTX.readonly && location.hash.startsWith("#course-")) {
       const want = decodeURIComponent(location.hash.slice(8)).toUpperCase();
       const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
-      const src = (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === want);
+      const m = (CTX.course_map || {})[want];
+      const src = (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === want)
+        || (m ? { course_code: want, course_title: m.title || "", semester: m.semester || "" } : null);
       if (want && src && !have.has(want)) {
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         data.push(JSON.parse(JSON.stringify(src)));
@@ -4640,7 +4779,9 @@
   // can move on to any other course
   if (location.hash.startsWith("#course-")) {
     setTimeout(() => {
-      const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      const named = document.querySelector("[data-arrived]");
+      const target = (named && document.getElementById("course-" + named.dataset.arrived))
+        || document.getElementById(decodeURIComponent(location.hash.slice(1)));
       const nav = document.querySelector(".syl-nav:not([hidden])");
       if (nav) window.scrollTo({ top: nav.getBoundingClientRect().top + window.scrollY - 110 });
       else if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });

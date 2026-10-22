@@ -57,7 +57,7 @@
 {% from "dept/_part_flow.html" import part_flow %}
 {% if back_to_structure %}
 <div class="back-bar">
-  <a class="back-link" href="{{ back_to_structure }}">← Programme structure — semester scheme</a>
+  <a class="back-link" href="{{ back_to_structure }}">← {{ back_label or 'Programme structure — semester scheme' }}</a>
   <span class="back-prog"><strong>{{ programme.display_name or programme.programme_name }}</strong> <span class="mono">{{ programme.programme_code }}</span>
     {% if course_map %}· {{ course_map|length }} courses{% endif %}</span>
 </div>
@@ -208,6 +208,7 @@
     syllabi: {{ syllabi|tojson }},
     revision_url: {{ (revision_url or '')|tojson }},
     course_map: {{ course_map|tojson }},
+    structure_courses: {{ structure_courses|tojson }},
     record: {{ record|tojson }},
     submitted_at: {{ ((state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},
     readonly: {{ readonly|tojson }},

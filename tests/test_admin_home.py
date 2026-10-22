@@ -240,7 +240,7 @@ def test_settings_choose_the_semesters_each_earlier_batch_uploads(app, client):
                                      upsert=True)
     _admin(app, client)
     page = client.get("/admin/settings").get_data(as_text=True)
-    assert "Semesters each earlier batch uploads" in page and 'name="sems_2024"' in page
+    assert "Semesters each earlier batch covers" in page and 'name="sems_2024"' in page
     r = client.post("/admin/settings", data={
         "academic_year": "2026-27", "current_batch": "2026-2027", "existing_batches": "2024-2025\n2025-2026",
         "sems_2024_shown": "1", "sems_2024": ["5", "6"], "sems_2025_shown": "1", "sems_2025": ["3", "4"]})
@@ -249,7 +249,9 @@ def test_settings_choose_the_semesters_each_earlier_batch_uploads(app, client):
         b = {x["label"]: x["semesters"] for x in batches()["existing"]}
         assert b == {"2024–2025": [5, 6], "2025–2026": [3, 4]}
         sec = _batch_semesters(STAGE_BY_KEY["prog_syllabus_b2024"])["sections"][0]
-        assert "semesters 5 and 6 only" in sec["help"] and sec["title"].endswith("Semesters 5 and 6")
+        assert "studied in semesters 5 and 6" in sec["help"] and sec["title"].endswith("Semesters 5 and 6")
+        sem = next(c for c in sec["columns"] if c["name"] == "semester")
+        assert sem["choices"] == [5, 6]
     page = client.get("/admin/settings").get_data(as_text=True)
     import re
     assert re.search(r'name="sems_2024" value="5"\s+checked', page)

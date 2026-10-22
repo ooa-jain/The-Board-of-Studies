@@ -324,6 +324,25 @@ def _revision(sub, programme, stored, year):
     return data
 
 
+def _batch_course_list(structure, courses, batch_label):
+    """An earlier batch's course list, from the programme structure: the rows
+    of the courses its syllabus has (their codes in that batch's year)."""
+    yy = str(batch_label or "")[2:4]
+    want = {str(c.get("course_code") or "").strip().upper() for c in courses or [] if isinstance(c, dict)}
+    out = []
+    for r in (structure or {}).get("semester_structure") or []:
+        if not isinstance(r, dict) or r.get("track") in ("Honours", "Honours with Research"):
+            continue
+        r = {k: r.get(k) for k in ("semester", "nep_category", "course_code", "course_title", "l", "t", "p",
+                                    "e", "credits", "cia", "ese", "total_marks") if r.get(k) not in (None, "")}
+        code_ = str(r.get("course_code") or "")
+        if yy.isdigit() and re.match(r"^\d{2}", code_):
+            r["course_code"] = yy + code_[2:]
+        if r.get("course_code", "").upper() in want:
+            out.append(r)
+    return out
+
+
 def _batch_syllabus(current, batch_label, stored):
     """An earlier batch's syllabus, where the Drive has none: the current
     batch's courses as a stand-in — the batch's year in the course codes,
@@ -547,16 +566,11 @@ def fill_from_drive(dept, year, actor):
                 current = programme_stage_state(sub, pcode, "prog_syllabus").get("data") or {}
                 label = STAGE_BY_KEY[part].get("batch")
                 data = _batch_syllabus(current, label, stored)
-                # the batch's syllabus as one file in the syllabus template,
-                # in its upload box (the courses stay, for Course Revision)
-                if not (data.get("batch_upload") or {}).get("batch_syllabus"):
-                    from .docgen import batch_syllabus_file
-                    pname = programme.get("programme_name") or pcode
-                    val = _store(db, code, year, part, "batch_syllabus",
-                                 f"{pcode}_Syllabus_Batch_{str(label).replace('–', '-')}.docx",
-                                 lambda path, pname=pname, label=label, cs=data.get("courses"):
-                                     batch_syllabus_file(path, pname, label, cs), actor)
-                    data["batch_upload"] = {"batch_syllabus": val}
+                # the batch's course list: the programme structure's rows for
+                # the courses its syllabus has, with that batch's year in the codes
+                if not data.get("batch_courses"):
+                    structure = programme_stage_state(sub, pcode, "prog_curriculum").get("data") or {}
+                    data["batch_courses"] = _batch_course_list(structure, data.get("courses"), label)
                 base = prefill_for(part, dept, year, programme, fresh())
                 for k, v in base.items():
                     data.setdefault(k, v)

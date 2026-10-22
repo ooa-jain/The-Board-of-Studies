@@ -84,7 +84,7 @@ def _remember_person(resp, dept_code, person):
 
 
 def _batch_semesters(stage):
-    """An earlier batch's upload, naming the semesters Settings asks for."""
+    """An earlier batch's page, naming the semesters Settings asks for."""
     import copy
     from .workflow import semester_words
     b = next((x for x in batches()["existing"] if x["key"] == stage["key"]), None)
@@ -93,17 +93,14 @@ def _batch_semesters(stage):
         return stage
     s = copy.deepcopy(stage)
     for sec in s["sections"]:
-        if sec["key"] == "batch_upload":
+        if sec["key"] == "courses":
             sec["title"] += f" · {words[0].upper()}{words[1:]}"
-            sec["help"] = (f"The syllabus for the Batch of {b['label']} — {words} only. Upload it as one file "
-                           "(PDF or Word) in the syllabus template, or list its courses in the table below — "
-                           "or both. An upload is checked for the syllabus headings.")
-            for f in sec["fields"]:
-                if f["name"] == "batch_syllabus":
-                    f["label"] += f" ({words})"
         elif sec["key"] == "batch_courses":
             # only the semesters Settings asks this batch for
             sec["title"] += f" · {words[0].upper()}{words[1:]}"
+            sec["help"] = (f"The courses the Batch of {b['label']} studied in {words}, one per row, as in the "
+                           "programme structure. Syllabus → opens the course's syllabus below; Revision → opens "
+                           "it in Course Revision.")
             for c in sec["columns"]:
                 if c["name"] == "semester":
                     c["choices"], c["min"], c["max"] = list(b["semesters"]), min(b["semesters"]), max(b["semesters"])
@@ -376,19 +373,36 @@ def stage(stage_key, programme_code=None):
     # where each course's Revision link goes
     revision_url = (url_for("dept.stage", stage_key="prog_revision", programme_code=programme["programme_code"])
                     if linked and programme else "")
-    course_map, back = {}, None
-    if programme and stage_key in ("prog_syllabus", "prog_revision"):
-        # each course's semester and course group, from the programme structure
+    course_map, back, back_label, structure_courses = {}, None, "", {}
+    if programme and (stage_key.startswith("prog_syllabus") or stage_key == "prog_revision"):
+        # each course's semester and course group: an earlier batch's own
+        # course list first, then the programme structure
         cur = programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {}
+        own = (data.get("batch_courses") or []) if stage_def.get("existing_batch") and isinstance(data, dict) else []
+        # the programme structure's own courses, code → title, to match an
+        # earlier batch's course to the current one of the same name
         for r in cur.get("semester_structure") or []:
+            for code, title in course_options((r or {}).get("course_code"), (r or {}).get("course_title")):
+                structure_courses.setdefault(code.upper(), title)
+        for r in list(own) + list(cur.get("semester_structure") or []):
             r = r or {}
             for code, title in course_options(r.get("course_code"), r.get("course_title")):
                 if code.upper() not in course_map:
                     course_map[code.upper()] = {"semester": r.get("semester"),
                                                 "group": r.get("nep_category") or "",
                                                 "title": title}
-        back = url_for("dept.stage", stage_key="prog_curriculum",
-                       programme_code=programme["programme_code"]) + "#sec-semester_structure"
+        # back to where the course link was clicked: the programme structure,
+        # or an earlier batch's course list
+        came = request.args.get("from") or ""
+        came_def = STAGE_BY_KEY.get(came) or {}
+        if came_def.get("existing_batch") and came != stage_key:
+            back = url_for("dept.stage", stage_key=came,
+                           programme_code=programme["programme_code"]) + "#sec-batch_courses"
+            back_label = f"Batch of {came_def.get('batch', '')} — courses"
+        elif not stage_def.get("existing_batch") or came == "prog_curriculum":
+            back = url_for("dept.stage", stage_key="prog_curriculum",
+                           programme_code=programme["programme_code"]) + "#sec-semester_structure"
+            back_label = "Programme structure — semester scheme"
     comments = list(get_db().comments.find({
         "dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
         "programme_code": (programme or {}).get("programme_code", ""),
@@ -419,6 +433,8 @@ def stage(stage_key, programme_code=None):
         page_stage = _batch_semesters(page_stage)
     if stage_key == "prog_curriculum":
         data = pg_groups(data, deg)
+    elif stage_def.get("existing_batch"):
+        data = pg_groups(data, deg, "batch_courses")
     # where "go to the next stage" leads when this one is left as a draft
     if next_step and next_step.get("url"):
         skip_to = {"url": next_step["url"], "label": next_step.get("label") or next_step.get("title") or ""}
@@ -433,7 +449,8 @@ def stage(stage_key, programme_code=None):
                            skip_to=skip_to,
                            final=final, record=record, syllabi=syllabi, revision_url=revision_url, comments=comments,
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
-                           course_map=course_map, back_to_structure=back,
+                           course_map=course_map, back_to_structure=back, back_label=back_label,
+                           structure_courses=structure_courses,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),
                            back_to=(url_for("dept.stage", stage_key="curriculum")

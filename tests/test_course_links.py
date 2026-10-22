@@ -28,3 +28,31 @@ def test_a_course_not_revised_is_left_out_of_course_revision(app):
     with app.app_context():
         codes = [r["course_code"] for r in revision_fill_source(sub, "BCA")]
     assert codes == ["C1"]
+
+
+def test_course_revision_finds_the_earlier_batch_course_whatever_its_year(app):
+    from app.workflow import revision_fill_source
+    sub = {"programmes": {"BCA": {
+        "prog_curriculum": {"data": {"semester_structure": [
+            {"semester": 1, "course_code": "26BCA1C01", "course_title": "Programming", "credits": 4}]}},
+        "prog_syllabus": {"data": {"courses": [
+            {"course_code": "26BCA1C01", "course_title": "Programming",
+             "modules": [{"title": "Basics", "revised": "Variables and loops", "hours": 9}]}]}},
+        "prog_syllabus_b2025": {"data": {"courses": [
+            {"course_code": "25BCA1C01", "course_title": "Programming",
+             "modules": [{"title": "Basics", "revised": "Variables", "hours": 9}]}]}},
+    }}}
+    with app.app_context():
+        from app.db import get_db
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"current_batch": "2026-2027",
+                                                               "existing_batches": ["2025-2026"]}}, upsert=True)
+        row = revision_fill_source(sub, "BCA")[0]
+    assert row["prev_code"] == "25BCA1C01" and row["year_previous"] == "2025"
+    assert "Variables" in row["modules"][0]["previous"]
+
+
+def test_an_earlier_batch_has_its_courses_and_their_syllabi_and_no_upload():
+    sections = STAGE_BY_KEY["prog_syllabus_b2025"]["sections"]
+    assert [s["key"] for s in sections] == ["batch_courses", "courses"]
+    assert sections[1]["display"] == "sheet" and sections[1]["min_rows"] == 0
+    assert not any(f.get("type") == "file" for s in sections for f in s.get("fields", []))

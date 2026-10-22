@@ -4968,6 +4968,29 @@ html[data-theme="dark"] .syl-go.is-off {
   background: transparent;
   color: #9ba4b5;
 }
+html[data-theme="dark"] .syl-menu[open] > summary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+html[data-theme="dark"] .syl-menu-list {
+  border: 1px solid #2e3542;
+  background: #121519;
+  box-shadow: 0 14px 30px -12px rgba(16, 24, 40, 0.35);
+}
+html[data-theme="dark"] .syl-menu-h {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .syl-menu-list a {
+  color: #ced8e6;
+  text-decoration: none;
+}
+html[data-theme="dark"] .syl-menu-list a:hover,
+html[data-theme="dark"] .syl-menu-list a:focus-visible {
+  background: #0e182b;
+  color: #a6baf2;
+  outline: none;
+}
 html[data-theme="dark"] .co-sum {
   border: 1px dashed #2e3e56;
   background: #121519;

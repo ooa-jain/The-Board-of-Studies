@@ -20,6 +20,8 @@ Stage status values
 
 from __future__ import annotations
 
+import re
+
 from . import catalogue
 from .db import get_db, now, rules_doc, settings, to_ist
 from .schema import (STAGE_BY_KEY, STAGE_KEYS, STAGES, degree_name, degree_tag, degree_years, programme_level,
@@ -453,6 +455,8 @@ def apply_defaults(stage_key, data, programme=None):
     stage = for_level(STAGE_BY_KEY.get(stage_key) or {}, deg)
     if stage_key == "prog_curriculum":
         data = pg_groups(data, deg)
+    elif stage.get("existing_batch"):
+        data = pg_groups(data, deg, "batch_courses")
 
     def read(ref):
         sec, name = ref.split(".", 1)
@@ -766,6 +770,19 @@ def _module_text(m):
     return " — ".join(x for x in (first, body) if x)
 
 
+def same_course(rows, code, title=""):
+    """The same course in another batch's list: the same code, the same code
+    without its year (25BCA1C01 and 26BCA1C01), or the same title."""
+    code = str(code or "").strip().upper()
+    no_year = re.sub(r"^\d{2}", "", code)
+    title = str(title or "").strip().lower()
+    key = lambda r: str(r.get("course_code") or "").strip().upper()
+    return (next((r for r in rows if key(r) == code), None)
+            or next((r for r in rows if re.sub(r"^\d{2}", "", key(r)) == no_year), None)
+            or (next((r for r in rows if str(r.get("course_title") or "").strip().lower() == title), None)
+                if title else None))
+
+
 def revision_fill_source(submission, programme_code):
     """Courses for Course Revision's "fill in all": every course of the
     current batch syllabus (or, failing that, of the curriculum), with its
@@ -782,8 +799,7 @@ def revision_fill_source(submission, programme_code):
     for b in reversed(batches()["existing"]):
         bd = (progs.get(b["key"]) or {}).get("data") or {}
         rows = bd.get("courses") or bd.get("batch_courses") or []
-        older.append((b["label"][:4], {str(c.get("course_code") or "").strip().upper(): c
-                                       for c in rows if isinstance(c, dict)}))
+        older.append((b["label"][:4], [c for c in rows if isinstance(c, dict)]))
     # the programme structure says which courses are revised in this BoS
     not_revised = set()
     for r in ((progs.get("prog_curriculum") or {}).get("data") or {}).get("semester_structure") or []:
@@ -808,8 +824,9 @@ def revision_fill_source(submission, programme_code):
         revised = [_module_text(m) for m in c.get("modules") or []]
         prev, year = None, ""
         for y, courses in older:
-            if code.upper() in courses:
-                prev, year = courses[code.upper()], y
+            prev = same_course(courses, code, row["course_title"])
+            if prev:
+                year = y
                 break
         previous = [_module_text(m) for m in (prev or {}).get("modules") or []]
         n = max(len(revised), len(previous))
