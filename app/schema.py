@@ -464,14 +464,16 @@ PROGRAMME_CURRICULUM = {
                  "min": 0, "max": 20, "width": "76px"},
                 # every course is out of 100: type one of the two marks and the
                 # other is 100 minus it (75 → 25, 35 → 65)
-                {"name": "cia", "label": "Continuous Assessment marks", "type": "integer",
+                {"name": "cia", "label": "Continuous Assessment marks", "short": "CA marks", "type": "integer",
                  "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "ese"},
-                {"name": "ese", "label": "Term End Examination marks", "type": "integer",
+                {"name": "ese", "label": "Term End Examination marks", "short": "TEE marks", "type": "integer",
                  "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "cia"},
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
                  "min": MARKS_TOTAL, "max": MARKS_TOTAL, "fixed_value": MARKS_TOTAL},
                 {"name": "syllabus", "label": "Syllabus", "type": "syllabus_link",
                  "help": "Yes: this course has a syllabus — the link opens it in the current batch. No: it has none."},
+                {"name": "revision", "label": "Revision", "type": "revision_link",
+                 "help": "Yes: this course is revised in this BoS — the link opens it in Course Revision. No: it is not."},
             ],
             "rules": [
                 "ltpe_credit_arithmetic",
@@ -677,11 +679,12 @@ def batch_start(label) -> int | None:
 
 
 def _batch_courses_columns():
-    """The programme structure's columns, for an earlier batch's courses (no
-    syllabus link: that batch's syllabus is the file uploaded with them)."""
+    """The programme structure's columns, for an earlier batch's courses —
+    with the same Syllabus and Revision links, into the current batch's
+    syllabus and Course Revision."""
     import copy
     sec = next(x for x in PROGRAMME_CURRICULUM["sections"] if x["key"] == "semester_structure")
-    return [copy.deepcopy(c) for c in sec["columns"] if c["name"] != "syllabus"]
+    return [copy.deepcopy(c) for c in sec["columns"]]
 
 
 def _batch_part(start: int) -> dict:

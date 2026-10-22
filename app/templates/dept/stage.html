@@ -206,6 +206,7 @@
     // the last step of a programme: review and submit the whole programme
     programme_review: {{ (step is not none and last_step)|tojson }},
     syllabi: {{ syllabi|tojson }},
+    revision_url: {{ (revision_url or '')|tojson }},
     course_map: {{ course_map|tojson }},
     record: {{ record|tojson }},
     submitted_at: {{ ((state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},

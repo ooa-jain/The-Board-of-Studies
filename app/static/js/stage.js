@@ -1555,31 +1555,53 @@
   /* Programme structure: does this course have a syllabus? Yes / No.
      Yes (the default) shows a link to its syllabus in the current batch —
      the course is added there if it is not yet; No leaves it out. */
-  function syllabusLink(row) {
+  /* Syllabus and Revision, on each course row: Yes or No, and with Yes a
+     link that opens this course there — its syllabus in the current batch,
+     or its entry in Course Revision (added there if it is not yet). */
+  const COURSE_LINKS = {
+    syllabus_link: { field: "syllabus", word: "Syllabus", all: "All syllabi",
+                     url: () => ((CTX.syllabi || []).find(x => x.current) || {}).url,
+                     off: "The current batch's syllabus is not open yet",
+                     title: "Open this course's syllabus — current batch (added there if it is not yet)",
+                     allTitle: "Open the syllabus page — pick a semester, a course category or search",
+                     aria: "Syllabus for this course" },
+    revision_link: { field: "revision", word: "Revision", all: "All revisions",
+                     url: () => CTX.revision_url,
+                     off: "Course Revision is not open yet",
+                     title: "Open this course in Course Revision (added there if it is not yet)",
+                     allTitle: "Open Course Revision — every revised course",
+                     aria: "Is this course revised in this BoS?" },
+  };
+
+  function courseLink(type, row) {
+    const K = COURSE_LINKS[type];
     const wrap = el("span", "syl-yn");
     const sel = el("select", "syl-sel");
-    sel.setAttribute("aria-label", "Syllabus for this course");
-    [["Yes", "Yes"], ["No", "No"]].forEach(([v, t]) => {
-      const o = el("option", null, t);
-      o.value = v;
-      sel.appendChild(o);
-    });
-    sel.value = row.syllabus === "No" ? "No" : "Yes";
+    sel.setAttribute("aria-label", K.aria);
+    ["Yes", "No"].forEach(v => { const o = el("option", null, v); o.value = v; sel.appendChild(o); });
+    sel.value = row[K.field] === "No" ? "No" : "Yes";
     sel.disabled = !!CTX.readonly;
-    sel.addEventListener("change", () => { row.syllabus = sel.value; touch(); });
+    sel.addEventListener("change", () => {
+      row[K.field] = sel.value;
+      touch();
+      wrap.replaceWith(courseLink(type, row));
+    });
     wrap.appendChild(sel);
     if (sel.value === "No") return wrap;
     const code = String(row.course_code || "").split("/")[0].trim().toUpperCase();
-    const cur = (CTX.syllabi || []).find(x => x.current);
-    if (!code || !cur) {
-      const hint = el("span", "syl-go is-off", "Syllabus →");
-      hint.title = code ? "The current batch's syllabus is not open yet" : "Enter the course code first";
+    const url = K.url();
+    // a small → beside the Yes: the column's heading says where it goes
+    if (!code || !url) {
+      const hint = el("span", "syl-go is-off", "→");
+      hint.title = code ? K.off : "Enter the course code first";
+      hint.setAttribute("aria-hidden", "true");
       wrap.appendChild(hint);
       return wrap;
     }
-    const go = el("a", "syl-go", "Syllabus →");
-    go.href = cur.url + "#course-" + encodeURIComponent(code);
-    go.title = "Open this course's syllabus — current batch (added there if it is not yet)";
+    const go = el("a", "syl-go", "→");
+    go.href = url + "#course-" + encodeURIComponent(code);
+    go.title = K.title;
+    go.setAttribute("aria-label", `${K.word} of ${code}`);
     wrap.appendChild(go);
     return wrap;
   }
@@ -1681,17 +1703,19 @@
     const htr = el("tr");
     htr.appendChild(el("th", null, "#"));
     section.columns.forEach(c => {
-      const th = el("th", null, c.label + (c.required ? " *" : ""));
-      if (c.type === "syllabus_link") {
-        // one way into the syllabi for the whole table; each row only says
-        // whether its syllabus is there, and opens that course
-        const cur = (CTX.syllabi || []).find(x => x.current);
+      // a long label can carry a short heading; the full one is its tooltip
+      const th = el("th", null, (c.short || c.label) + (c.required ? " *" : ""));
+      if (c.short) th.title = c.label;
+      if (COURSE_LINKS[c.type]) {
+        // one way into all the syllabi / the whole Course Revision for the
+        // table; each row says Yes or No, and opens that course
+        const K = COURSE_LINKS[c.type], url = K.url();
         th.textContent = "";
         th.className = "rt-syl-head";
-        if (cur) {
-          const all = el("a", "syl-all", "All syllabi →");
-          all.href = cur.url;
-          all.title = "Open the syllabus page — pick a semester, a course category or search";
+        if (url) {
+          const all = el("a", "syl-all", K.all + " →");
+          all.href = url;
+          all.title = K.allTitle;
           th.appendChild(all);
         } else th.textContent = c.label;
         htr.appendChild(th);
@@ -1700,6 +1724,7 @@
       if (c.type === "integer") th.className = "num-col";
       else if (c.width) th.style.width = c.width;
       if (c.help) th.title = c.help;
+      else if (c.short) th.title = c.label;
       htr.appendChild(th);
     });
     if (!fixed && !CTX.readonly) {
@@ -1841,9 +1866,9 @@
           }
           const holder = el("div");
           holder.dataset.field = c.name;
-          if (c.type === "syllabus_link") {
-            holder.appendChild(syllabusLink(row));
-            refreshers.push(() => { holder.textContent = ""; holder.appendChild(syllabusLink(row)); });
+          if (COURSE_LINKS[c.type]) {
+            holder.appendChild(courseLink(c.type, row));
+            refreshers.push(() => { holder.textContent = ""; holder.appendChild(courseLink(c.type, row)); });
             td.className = "rt-syl";
             td.appendChild(holder);
             tr.appendChild(td);
@@ -3711,6 +3736,18 @@
     host.appendChild(top);
     const list = el("div", "rv-list");
     host.appendChild(list);
+
+    // arriving from a course row's "Revision →": add that course if it is not here yet
+    if (!CTX.readonly && location.hash.startsWith("#course-")) {
+      const want = decodeURIComponent(location.hash.slice(8)).toUpperCase();
+      const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+      const src = (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === want);
+      if (want && src && !have.has(want)) {
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(JSON.parse(JSON.stringify(src)));
+        setTimeout(() => { touch(); note.textContent = `Added ${src.course_code} — enter the % change for each module.`; }, 0);
+      }
+    }
     if (!CTX.readonly && (CTX.fill || []).length) {
       const fb = el("button", "btn btn-ghost btn-sm", "Fill in all courses from the syllabi");
       fb.type = "button";
@@ -3742,6 +3779,7 @@
     function course(row, i) {
       const wrap = el("section", "rv-course");
       wrap.dataset.row = i;
+      if (row.course_code) wrap.id = "course-" + String(row.course_code).trim().toUpperCase();
       const head = el("div", "rv-course-head");
       head.appendChild(el("span", "rv-course-no", String(i + 1).padStart(2, "0")));
       const [hc, ic] = input(row, "course_code");
@@ -4605,7 +4643,7 @@
       const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
       const nav = document.querySelector(".syl-nav:not([hidden])");
       if (nav) window.scrollTo({ top: nav.getBoundingClientRect().top + window.scrollY - 110 });
-      else if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      else if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
       if (target) target.classList.add("is-flash");
     }, 400);
   }

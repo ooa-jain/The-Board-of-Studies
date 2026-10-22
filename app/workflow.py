@@ -780,12 +780,20 @@ def revision_fill_source(submission, programme_code):
     # the earlier batches, latest first
     older = []
     for b in reversed(batches()["existing"]):
-        rows = ((progs.get(b["key"]) or {}).get("data") or {}).get("courses") or []
+        bd = (progs.get(b["key"]) or {}).get("data") or {}
+        rows = bd.get("courses") or bd.get("batch_courses") or []
         older.append((b["label"][:4], {str(c.get("course_code") or "").strip().upper(): c
                                        for c in rows if isinstance(c, dict)}))
+    # the programme structure says which courses are revised in this BoS
+    not_revised = set()
+    for r in ((progs.get("prog_curriculum") or {}).get("data") or {}).get("semester_structure") or []:
+        if isinstance(r, dict) and r.get("revision") == "No":
+            not_revised |= {x.strip().upper() for x in str(r.get("course_code") or "").split("/") if x.strip()}
     out = []
     for c in cur:
         code = str(c["course_code"]).strip()
+        if code.upper() in not_revised:
+            continue
         row = {"course_code": code, "course_title": c.get("course_title", "")}
         b = base.get(code.upper()) or {}
         for k in ("semester", "year_latest"):

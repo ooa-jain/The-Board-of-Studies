@@ -371,7 +371,11 @@ def stage(stage_key, programme_code=None):
         elif stage_key == "prog_revision" and programme:
             fill = revision_fill_source(sub, programme["programme_code"])
 
-    syllabi = _syllabus_index(sub, stage_key, programme) if stage_key == "prog_curriculum" else []
+    linked = stage_key == "prog_curriculum" or bool(stage_def.get("existing_batch"))
+    syllabi = _syllabus_index(sub, stage_key, programme) if linked else []
+    # where each course's Revision link goes
+    revision_url = (url_for("dept.stage", stage_key="prog_revision", programme_code=programme["programme_code"])
+                    if linked and programme else "")
     course_map, back = {}, None
     if programme and stage_key in ("prog_syllabus", "prog_revision"):
         # each course's semester and course group, from the programme structure
@@ -427,7 +431,7 @@ def stage(stage_key, programme_code=None):
         skip_to = None
     return render_template("dept/stage.html", calc=calc, fill=fill, stage=page_stage, dept=dept, submission=sub,
                            skip_to=skip_to,
-                           final=final, record=record, syllabi=syllabi, comments=comments,
+                           final=final, record=record, syllabi=syllabi, revision_url=revision_url, comments=comments,
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")

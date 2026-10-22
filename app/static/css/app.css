@@ -4221,7 +4221,9 @@ td.rt-syl { white-space: nowrap; }
 .syl-chip.is-old { background: #eef3fa; color: #2a3f60; border-color: #d7e2f1; }
 .syl-chip.is-none { background: #fff; color: var(--jain-link); border-color: #d9e2ee; }
 .syl-chip[href]:hover { filter: brightness(.96); text-decoration: underline !important; }
-.sheet-wrap.is-flash { animation: sec-flash 1.8s ease; }
+.sheet-wrap.is-flash, .rv-course.is-flash { animation: sec-flash 1.8s ease; }
+/* a course opened by its link stops clear of the top bar */
+.sheet-wrap, .rv-course { scroll-margin-top: 90px; }
 
 /* ==========================================================================
    Buttons: dark blue throughout; outlined ones in the same blue. Red only
@@ -4873,10 +4875,15 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 .syl-chip.is-yes { background: #e2f1e6; color: #1f6b44; border-color: #cfe6d7; font-weight: 700; }
 .syl-chip.is-no { background: #f4f5f7; color: #6b7280; border-color: #e4e7ec; cursor: default; }
 .syl-yn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.syl-yn .syl-sel { width: 68px; min-width: 68px; padding: 4px 22px 4px 8px; font-size: .8rem; border-radius: 6px; }
-.syl-go { font-size: .78rem; font-weight: 600; color: #1d4ed8; text-decoration: none; }
-.syl-go:hover { text-decoration: underline; }
-.syl-go.is-off { color: #98a2b3; cursor: default; }
+.syl-yn .syl-sel { width: 60px; min-width: 60px; padding: 4px 18px 4px 7px; font-size: .8rem; border-radius: 6px; }
+.syl-go { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid #c7d4ea; background: #f2f6fd; color: #1d4ed8; font-size: .95rem; font-weight: 700;
+  text-decoration: none; line-height: 1; }
+.syl-go:hover, .syl-go:focus-visible { background: #1d4ed8; border-color: #1d4ed8; color: #fff; outline: none; }
+.syl-go.is-off { border-color: var(--line); background: transparent; color: #98a2b3; cursor: default; }
+/* the programme structure and an earlier batch's courses: a wide table, kept tight */
+#sec-semester_structure table.rt td, #sec-batch_courses table.rt td { padding: 5px 4px; }
+#sec-semester_structure table.rt th, #sec-batch_courses table.rt th { padding: 9px 4px; }
 
 /* Syllabus sheet: the course outcomes each module serves (CO1–CO6) */
 .sh-cos { width: 150px; text-align: center; vertical-align: middle; }
@@ -4919,3 +4926,13 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 .sg-bar span { display: block; height: 100%; border-radius: 999px; background: var(--ink-800); }
 .sg-bar.is-high span { background: #b23a2a; }
 @media (max-width: 760px) { .sg-flow { grid-template-columns: 1fr; } }
+#sec-semester_structure table.rt td.rt-idx, #sec-batch_courses table.rt td.rt-idx { width: 28px; padding-top: 12px; }
+#sec-semester_structure table.rt td.rt-del, #sec-batch_courses table.rt td.rt-del { width: 30px; padding-top: 9px; }
+#sec-semester_structure th.rt-syl-head, #sec-batch_courses th.rt-syl-head { white-space: normal; line-height: 1.25; }
+#sec-semester_structure .syl-yn, #sec-batch_courses .syl-yn { gap: 4px; }
+#sec-semester_structure .syl-yn .syl-sel, #sec-batch_courses .syl-yn .syl-sel { width: 52px; min-width: 52px; padding-right: 16px; }
+#sec-semester_structure [data-field=semester] select, #sec-batch_courses [data-field=semester] select { min-width: 54px !important; width: 54px; }
+#sec-semester_structure [data-field=nep_category] select, #sec-batch_courses [data-field=nep_category] select { min-width: 106px; width: 106px; }
+#sec-semester_structure [data-field=course_code] input, #sec-batch_courses [data-field=course_code] input { min-width: 110px !important; width: 110px; padding-left: 7px; padding-right: 5px; }
+#sec-semester_structure table.rt thead th, #sec-batch_courses table.rt thead th { white-space: normal; }
+#sec-semester_structure [data-field=course_title] input, #sec-batch_courses [data-field=course_title] input { min-width: 104px !important; }

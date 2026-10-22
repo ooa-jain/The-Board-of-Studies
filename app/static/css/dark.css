@@ -4951,13 +4951,21 @@ html[data-theme="dark"] .syl-chip.is-no {
   border-color: #2e3542;
 }
 html[data-theme="dark"] .syl-go {
+  border: 1px solid #2d3c54;
+  background: #0e1829;
   color: #a6baf2;
   text-decoration: none;
 }
-html[data-theme="dark"] .syl-go:hover {
-  text-decoration: underline;
+html[data-theme="dark"] .syl-go:hover,
+html[data-theme="dark"] .syl-go:focus-visible {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  outline: none;
 }
 html[data-theme="dark"] .syl-go.is-off {
+  border-color: #2e3542;
+  background: transparent;
   color: #9ba4b5;
 }
 html[data-theme="dark"] .co-sum {
