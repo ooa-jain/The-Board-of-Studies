@@ -376,7 +376,7 @@ def stage(stage_key, programme_code=None):
     syllabi = _syllabus_index(sub, stage_key, programme) if linked else []
     # where each course's Revision link goes
     revision_url = (url_for("dept.stage", stage_key="prog_revision", programme_code=programme["programme_code"])
-                    if linked and programme else "")
+                    if (linked or stage_key == "prog_syllabus") and programme else "")
     course_map, back, back_label, structure_courses = {}, None, "", {}
     if programme and (stage_key.startswith("prog_syllabus") or stage_key == "prog_revision"):
         # each course's semester and course group: an earlier batch's own
@@ -626,6 +626,13 @@ def _guard(stage_key, programme_code=None, light=False):
     return dept, sub, programme, None
 
 
+def _sheet_filled(r):
+    """A course's syllabus sheet has its outcomes and at least one module."""
+    return bool(str(r.get("outcomes") or "").strip()
+                and any(isinstance(m, dict) and str(m.get("revised") or m.get("title") or "").strip()
+                        for m in r.get("modules") or []))
+
+
 def _syllabus_index(sub, stage_key, programme):
     """For a programme's Curriculum: every syllabus it has — the current
     batch's and each earlier batch's — with its courses' codes and titles,
@@ -640,7 +647,9 @@ def _syllabus_index(sub, stage_key, programme):
         sd = STAGE_BY_KEY[k]
         data = programme_stage_state(sub, code, k).get("data") or {}
         courses = [{"code": str(r.get("course_code") or "").strip(),
-                    "title": str(r.get("course_title") or "").strip()}
+                    "title": str(r.get("course_title") or "").strip(),
+                    # its outcomes and a module are in: Course Revision can go on from it
+                    "filled": _sheet_filled(r)}
                    for r in (data.get("courses") or []) if isinstance(r, dict) and r.get("course_code")]
         out.append({"key": k, "current": k == "prog_syllabus",
                     "label": "Batch of " + batches()["current"] + " (current)" if k == "prog_syllabus"

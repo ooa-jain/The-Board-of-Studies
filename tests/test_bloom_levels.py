@@ -35,3 +35,4 @@ def test_a_modules_bta_level_is_kept_and_printed(app, client):
     assert head.index("BTA") == head.index("CO's") + 1
     first = next(r for r in rows if r[0].startswith("Module No. 1"))
     assert "CO1, CO2" in first and "BTA 3 (Applying)" in first
+

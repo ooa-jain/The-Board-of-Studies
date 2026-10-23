@@ -75,5 +75,5 @@ def test_curriculum_rows_link_to_their_syllabus(app, client):
     syllabi = json.loads(syl)
     current = next(s for s in syllabi if s["current"])
     assert current["url"].endswith("/department/stage/prog_syllabus/DEMOBBA")
-    assert {"code": "27BBA1C01", "title": "Principles of Management"} in current["courses"]
+    assert {"code": "27BBA1C01", "title": "Principles of Management", "filled": True} in current["courses"]
     assert any(not s["current"] for s in syllabi), "the earlier batches are there too"

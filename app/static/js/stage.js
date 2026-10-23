@@ -1631,6 +1631,43 @@
   const MUST_HAVE = [1, 2];
   const mustHave = row => !IS_BATCH && MUST_HAVE.includes(num(row.semester));
 
+  // a syllabus sheet with its outcomes and a module in: its Course Revision can go on from it
+  const sheetFilled = r => !!(r && String(r.outcomes || "").trim() &&
+    (r.modules || []).some(m => m && String(m.revised || m.title || "").trim()));
+  // this course's syllabus — the batch's own on an earlier batch, else the current batch's
+  function syllabusFilled(code) {
+    code = String(code || "").toUpperCase();
+    if (IS_BATCH) {
+      return sheetFilled((Array.isArray(state.courses) ? state.courses : [])
+        .find(c => c && String(c.course_code || "").trim().toUpperCase() === code));
+    }
+    const cur = (CTX.syllabi || []).find(x => x.current) || {};
+    return !!((cur.courses || []).find(x => String(x.code).toUpperCase() === code) || {}).filled;
+  }
+  /* Course Revision is worked out from a course's syllabus: a course whose
+     syllabus is not filled yet is sent there first. */
+  function syllabusFirst(code, title, toSyllabus) {
+    const dlg = el("dialog", "flow-dlg");
+    const box = el("div", "flow-dlg-box");
+    box.appendChild(el("h3", null, "Fill the syllabus first"));
+    box.appendChild(el("p", null, `${code}${title ? " — " + title : ""} has no syllabus yet. Its Course Revision ` +
+                                  "is worked out from the syllabus, so fill that in first."));
+    const row = el("div", "flow-dlg-actions");
+    const stay = el("button", "btn btn-ghost btn-sm", "Stay on the Curriculum table");
+    const go = el("button", "btn btn-gold btn-sm", "Go to its Syllabus →");
+    stay.type = go.type = "button";
+    stay.addEventListener("click", () => dlg.close());
+    go.addEventListener("click", () => { dlg.close(); toSyllabus(); });
+    row.appendChild(stay);
+    row.appendChild(go);
+    box.appendChild(row);
+    dlg.appendChild(box);
+    dlg.addEventListener("close", () => dlg.remove());
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    go.focus();
+  }
+
   function courseLink(type, row) {
     const K = COURSE_LINKS[type];
     const wrap = el("span", "syl-yn");
@@ -1666,6 +1703,16 @@
     go.href = t.href;
     go.title = K.title;
     go.setAttribute("aria-label", `${K.word} of ${code}`);
+    // straight to Course Revision: only once the course's syllabus is in
+    if (type === "revision_link" && !CTX.readonly) go.addEventListener("click", e => {
+      if (row.syllabus === "No" || syllabusFilled(code)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      syllabusFirst(code, row.course_title, () => {
+        if (IS_BATCH && window.__batchView) window.__batchView("syllabus", code);
+        else if (currentSyllabus()) window.location.href = currentSyllabus() + FROM + "#course-" + encodeURIComponent(code);
+      });
+    });
     if (t.here) go.addEventListener("click", e => {
       // the batch's Syllabus or Course Revision page: shown in place, at this course
       if (window.__batchView) { e.preventDefault(); window.__batchView(t.view || "syllabus", t.here); }
@@ -3667,7 +3714,34 @@
       block("Skill Development Activities:", "skill_activities");
       block("Books for reference:", "books", "Note: Latest edition of books may be used.");
       wrap.appendChild(t);
+      if (focus && String(row.course_code || "").trim().toUpperCase() === focus) wrap.appendChild(nextBar(row));
       return wrap;
+    }
+
+    /* Opened from a course of the Curriculum table: when its syllabus is in,
+       on to that course's Course Revision — or back to the table. */
+    function nextBar(row) {
+      const code = String(row.course_code || "").trim().toUpperCase();
+      const bar = el("div", "sheet-next");
+      bar.appendChild(backToTable());
+      const msg = el("span", "sheet-next-note");
+      msg.setAttribute("role", "status");
+      bar.appendChild(msg);
+      if (!CTX.readonly && (IS_BATCH || CTX.revision_url)) {
+        const on = el("a", "btn btn-gold btn-sm", `Course Revision of ${code} →`);
+        on.href = IS_BATCH ? "?view=revision#course-" + encodeURIComponent(code)
+          : CTX.revision_url + FROM + "#course-" + encodeURIComponent(code);
+        on.addEventListener("click", e => {
+          if (!sheetFilled(row)) {
+            e.preventDefault();
+            msg.textContent = "Fill in its Course Outcomes and at least one module first.";
+            return;
+          }
+          if (IS_BATCH && window.__batchView) { e.preventDefault(); window.__batchView("revision", code); }
+        });
+        bar.appendChild(on);
+      }
+      return bar;
     }
 
     /* Semester → course group → course: pick one and only its sheet shows. */
@@ -3700,6 +3774,8 @@
     else if (first >= 0) pick = { sem: info(data[first]).sem, group: "", idx: first };
 
     let query = "";
+    // the course opened from the Curriculum table, if one was
+    let focus = arrived;
     const inPick = (r) => inBatch(r) && (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group) &&
       (!query || `${r.course_code || ""} ${r.course_title || ""}`.toLowerCase().includes(query));
     function paintNav() {
@@ -3803,6 +3879,7 @@
     // added from the list if it is not here yet, chosen, and scrolled to
     window.__openSheet = code => {
       code = String(code || "").toUpperCase();
+      focus = code;
       let i = data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === code);
       if (i < 0) {
         const src = sourceOne(code);
@@ -3831,6 +3908,14 @@
      average. "Fill in all courses" brings every course of the current batch
      syllabus with its modules, and the previous ones from the latest earlier
      batch, so the percentages work themselves out. */
+  // back to the Curriculum table a course was opened from
+  function backToTable() {
+    const a = el("a", "btn btn-ghost btn-sm", "← Back to the Curriculum table");
+    a.href = IS_BATCH ? "?view=curriculum#sec-batch_courses"
+      : (document.querySelector(".back-link") || {}).href || CTX.urls.dept_info || "#";
+    return a;
+  }
+
   // a syllabus module as the revision table shows it: "Title (12 Hrs) — content"
   const moduleText = m => {
     const head = String(m.title || "").trim(), hrs = String(m.hours ?? "").trim();
@@ -3882,6 +3967,8 @@
 
     // arriving from a course row's "Revision →": add that course if it is not here yet
     // (an earlier batch opens it in place, below)
+    // the course opened from the Curriculum table (or its syllabus), if one was
+    let focus = !IS_BATCH && location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
     const srcFor = want => {
       const m = (CTX.course_map || {})[want];
       return fillRows().find(p => String(p.course_code).toUpperCase() === want)
@@ -3961,6 +4048,11 @@
       };
       ic.addEventListener("change", redraw);
       it.addEventListener("change", redraw);
+      if (focus && String(row.course_code || "").trim().toUpperCase() === focus) {
+        const bar = el("div", "sheet-next");
+        bar.appendChild(backToTable());
+        wrap.appendChild(bar);
+      }
       return wrap;
     }
 
@@ -3980,15 +4072,17 @@
     // batch: added from its Syllabus if it is not here yet, and scrolled to
     window.__openRevision = code => {
       code = String(code || "").toUpperCase();
+      focus = code;
       let i = data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === code);
       if (i < 0) {
         const src = srcFor(code);
         if (!src || CTX.readonly) return;
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         data.push(JSON.parse(JSON.stringify(src)));
-        draw(); touch();
+        touch();
         note.textContent = `Added ${src.course_code} — change its revised modules below.`;
       }
+      draw();
       const target = document.getElementById("revision-" + code) || document.getElementById("course-" + code) || list;
       window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
       target.classList.add("is-flash");

@@ -2761,6 +2761,25 @@ html[data-theme="dark"] .sh-mod-foot .is-ok {
 html[data-theme="dark"] .sh-mod-foot .is-off {
   color: #f6966f;
 }
+html[data-theme="dark"] .sheet-next {
+  border: 1px solid #2e3542;
+  background: #181b21;
+}
+html[data-theme="dark"] .sheet-next-note {
+  color: #f6966f;
+}
+html[data-theme="dark"] .flow-dlg {
+  border: 0;
+  box-shadow: 0 24px 64px rgba(9, 19, 36, 0.2);
+  color: #ced8e6;
+  background: #121519;
+}
+html[data-theme="dark"] .flow-dlg::backdrop {
+  background: rgba(43, 90, 171, 0.5);
+}
+html[data-theme="dark"] .flow-dlg-box p {
+  color: #afb8ca;
+}
 html[data-theme="dark"] td.sh-nest {
   border: 0;
 }

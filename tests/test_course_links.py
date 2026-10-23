@@ -74,3 +74,26 @@ def test_semester_one_and_two_courses_cannot_be_marked_no():
     # an earlier batch has no such rule: it has no Yes / No at all
     batch, _ = validate_stage("prog_syllabus_b2025", {"batch_courses": rows}, {})
     assert not [i for i in batch if "semester 1 or 2" in i["message"]]
+
+
+def test_the_curriculum_knows_which_syllabi_are_filled(app, client):
+    """A course's Revision → goes on only once its syllabus is in: the
+    Curriculum page knows, course by course, whether it is."""
+    import json
+
+    from test_workflow import login
+
+    from app import demo_dept
+    with app.app_context():
+        user, pw = demo_dept.create(app.config["ACADEMIC_YEAR"], app.config["UPLOAD_ROOT"])
+    login(client, user, pw)
+    client.post("/department/demo/fill-all")
+    data = client.get("/department/api/record?programme=DEMOBBA").get_json()["items"][1]["data"]
+    data["courses"][1].update(outcomes="", modules=[])
+    assert client.post("/department/api/prog_syllabus/DEMOBBA/save", json=data).get_json()["ok"]
+    page = client.get("/department/stage/prog_curriculum/DEMOBBA").get_data(as_text=True)
+    syllabi = json.loads(page.split("syllabi: ", 1)[1].split(",\n", 1)[0])
+    current = next(s for s in syllabi if s["current"])
+    filled = {c["code"]: c["filled"] for c in current["courses"]}
+    assert filled[data["courses"][0]["course_code"]] is True
+    assert filled[data["courses"][1]["course_code"]] is False
