@@ -47,6 +47,8 @@ def test_an_earlier_batch_offers_only_its_semesters(app, client):
     assert "revision_courses" in page and "Semesters 5 and 6" in page       # its three pages, its semesters
     assert '"batch_semesters": [5, 6]' in page
     assert "Sem 5–6" in page and "Sem 3–4" in page                       # the side menu and the batch switch
+    # the side menu heads the current batch's steps with its year, as it does the earlier batches
+    assert "Current batch · 2026–2027" in page and "Earlier batches" in page
     # its sample data sits in those semesters, and has its Course Revision
     from app.db import get_db
     with app.app_context():

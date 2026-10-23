@@ -1025,6 +1025,8 @@ def _programme_steps(sub, code):
              "earlier": bool(STAGE_BY_KEY[k].get("existing_batch")),
              "short": STAGE_BY_KEY[k].get("batch", "") if STAGE_BY_KEY[k].get("existing_batch") else "",
              "sems": _part_item(sub, code, k, cfg)["sems"],
+             # the current batch's year, for the heading over its steps
+             "batch": "" if STAGE_BY_KEY[k].get("existing_batch") else batches(cfg)["current"],
              "url": url_for("dept.stage", stage_key=k, programme_code=code)}
             for k in parts_for(stage_def, cfg)]
 
