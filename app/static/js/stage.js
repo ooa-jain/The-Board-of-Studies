@@ -3728,7 +3728,10 @@
       msg.setAttribute("role", "status");
       bar.appendChild(msg);
       if (!CTX.readonly && (IS_BATCH || CTX.revision_url)) {
-        const on = el("a", "btn btn-gold btn-sm", `Course Revision of ${code} →`);
+        // named by the course's title (its code when it has none yet)
+        const name = String(row.course_title || "").trim() || code;
+        const on = el("a", "btn btn-gold btn-sm", `Course Revision of ${name} →`);
+        on.title = `Course Revision of ${code}`;
         on.href = IS_BATCH ? "?view=revision#course-" + encodeURIComponent(code)
           : CTX.revision_url + FROM + "#course-" + encodeURIComponent(code);
         on.addEventListener("click", e => {
