@@ -4020,7 +4020,7 @@
           // it can be revised now, but its syllabus is still to add
           const warn = el("div", "rv-nosyl");
           warn.setAttribute("role", "status");
-          warn.appendChild(el("span", null, "Its syllabus is not added yet — the revision is worked out from the syllabus."));
+          warn.appendChild(el("span", null, "Syllabus not added yet. Add the syllabus and proceed with the revision."));
           const go = el("a", null, "Add its syllabus →");
           go.href = IS_BATCH ? "?view=syllabus#course-" + encodeURIComponent(focus)
             : (currentSyllabus() || "#") + "?from=" + encodeURIComponent(CTX.key) + "#course-" + encodeURIComponent(focus);
@@ -4051,7 +4051,7 @@
     const tellNoSyllabus = code => {
       if (CTX.readonly || !code || syllabusFilled(code) || !window.Toast) return;
       const row = data.find(r => String(r.course_code || "").trim().toUpperCase() === code) || {};
-      window.Toast.warning(`${row.course_title || code}: its syllabus is not added yet. Add it, then come back to the revision.`,
+      window.Toast.warning(`${row.course_title || code}: add the syllabus and proceed with the revision.`,
                            { title: "Syllabus not added yet", timeout: 10000, onClick: () => toSyllabus(code) });
     };
     if (focus) setTimeout(() => tellNoSyllabus(focus), 500);
