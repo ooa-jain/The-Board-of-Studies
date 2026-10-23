@@ -4949,5 +4949,6 @@ a.pmap-leaf:hover { border-color: #c8d3e3; box-shadow: 0 2px 8px rgba(14, 61, 12
 .pflow-batch:hover { background: var(--ink-050, #eef1f6); }
 .pflow-batch.is-here { background: var(--ink-800, #0e2a5c); color: #fff; }
 .pflow-batch .pmap-dot { position: static; width: 7px; height: 7px; margin: 0; }
+.pflow-sems { font-size: .68rem; font-weight: 500; opacity: .75; }
 /* an earlier batch: the way back shows only on its Syllabus page */
 .back-bar[hidden], .section-block[hidden] { display: none !important; }

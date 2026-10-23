@@ -695,7 +695,7 @@ def _batch_courses_columns():
         if c["name"] == "syllabus":
             c["help"] = "Opens this course's syllabus in this batch's Syllabus page."
         elif c["name"] == "revision":
-            c["help"] = "Opens this course in Course Revision."
+            c["help"] = "Opens this course on this batch's Course Revision page."
     return cols
 
 
@@ -707,6 +707,16 @@ def _batch_part(start: int) -> dict:
     import copy
     label = batch_label(start)
     sheet = copy.deepcopy(next(x for x in PROGRAMME_SYLLABUS["sections"] if x["key"] == "courses"))
+    # Course Revision for this batch's courses: the same module-by-module table
+    revision = copy.deepcopy(next(x for x in PROGRAMME_REVISION["sections"] if x["key"] == "courses"))
+    revision.update({
+        "key": "revision_courses",
+        "title": f"Course Revision — Batch of {label}",
+        "help": "Each course's modules as the batch studied them beside the revised ones, with the "
+                "% change. Revision → on a course of this batch's Curriculum opens it here; or fill in "
+                "all its courses at once from this batch's Syllabus.",
+        "min_rows": 0,
+    })
     sheet.update({
         "title": f"Syllabus — Batch of {label}",
         "help": "Each course's syllabus for this batch. Syllabus → on a course of this batch's Curriculum "
@@ -727,12 +737,13 @@ def _batch_part(start: int) -> dict:
             "key": "batch_courses",
             "title": f"Curriculum — Batch of {label}",
             "help": "The courses this batch studied, one per row, as in the programme structure. "
-                    "Syllabus → opens the course on this batch's Syllabus page; Revision → opens it in Course Revision.",
+                    "Syllabus → opens the course on this batch's Syllabus page; Revision → opens it on its Course Revision page.",
             "type": "table",
             "min_rows": 0,
             "columns": _batch_courses_columns(),
-            "rules": ["ltpe_credit_arithmetic", "marks_add_up", "unique_course_codes", "batch_has_courses"],
-        }, sheet],
+            "rules": ["ltpe_credit_arithmetic", "marks_add_up", "unique_course_codes", "batch_has_courses",
+                      "semester_within_batch"],
+        }, sheet, revision],
     }
 
 

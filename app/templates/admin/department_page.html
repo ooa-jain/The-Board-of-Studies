@@ -27,7 +27,7 @@
             <span class="od-dl-h">Download as</span>
             <a role="menuitem" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Excel</a>
             <a role="menuitem" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
-            <a role="menuitem" href="{{ url_for('admin.export_department_both', dept_code=dept.dept_code) }}">Both (ZIP)</a>
+            <a role="menuitem" href="{{ url_for('admin.export_department_both', dept_code=dept.dept_code) }}">Everything (ZIP) — Excel, Word and every programme's batches</a>
           </div>
         </details>
         <button class="btn btn-ghost btn-sm" type="button" id="dp-ver-open" aria-controls="dp-vers-panel" aria-expanded="false">
@@ -99,7 +99,9 @@
               </li>
               {% endfor %}
             </ul>
-            <div class="dp-prog-foot"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.programme_report', dept_code=dept.dept_code, programme_code=p.code) }}">Programme report →</a></div>
+            <div class="dp-prog-foot"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.programme_report', dept_code=dept.dept_code, programme_code=p.code) }}">Programme report →</a>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.programme_report_zip', dept_code=dept.dept_code, programme_code=p.code) }}" download
+                 title="The current batch and every earlier batch — Curriculum, Syllabus and Course Revision">All batches (ZIP)</a></div>
           </details>
           {% endfor %}
         </div>

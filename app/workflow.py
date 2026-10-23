@@ -90,6 +90,18 @@ def semester_words(sems) -> str:
     return "semesters " + ", ".join(sems[:-1]) + " and " + sems[-1]
 
 
+def semester_short(sems) -> str:
+    """[5, 6] -> "Sem 5-6"; [3] -> "Sem 3"; [1, 3] -> "Sem 1, 3"."""
+    sems = sorted(int(n) for n in sems or [])
+    if not sems:
+        return ""
+    if len(sems) == 1:
+        return f"Sem {sems[0]}"
+    if sems == list(range(sems[0], sems[-1] + 1)):
+        return f"Sem {sems[0]}\u2013{sems[-1]}"
+    return "Sem " + ", ".join(str(n) for n in sems)
+
+
 def parts_for(stage: dict, s=None) -> list:
     """The parts a programme shows, in order: the current batch — Curriculum,
     Syllabus, Course Revision — then each earlier batch, a part of its own
@@ -778,6 +790,62 @@ def same_course(rows, code, title=""):
             or next((r for r in rows if re.sub(r"^\d{2}", "", key(r)) == no_year), None)
             or (next((r for r in rows if str(r.get("course_title") or "").strip().lower() == title), None)
                 if title else None))
+
+
+def batch_semesters(key, s=None) -> list:
+    """The semesters Settings asks an earlier batch for ([] for all of them)."""
+    b = next((x for x in batches(s)["existing"] if x["key"] == key), None)
+    return list((b or {}).get("semesters") or [])
+
+
+def _sem(row):
+    try:
+        return int(float(row.get("semester")))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def in_semesters(rows, sems):
+    """The rows in these semesters (all of them when none are given)."""
+    rows = [r for r in rows or [] if isinstance(r, dict)]
+    return [r for r in rows if _sem(r) in sems] if sems else rows
+
+
+def batch_revision_rows(data, batch_label, year_latest="", sems=()):
+    """An earlier batch's Course Revision, to start from: each course of its
+    syllabus, the modules as the batch studied them on both sides — the
+    department then changes the revised side."""
+    out, seen = [], set()
+    year = str(batch_label or "")[:4]
+    for c in in_semesters(data.get("courses"), sems):
+        code = str(c.get("course_code") or "").strip()
+        if not code or code.upper() in seen:
+            continue
+        seen.add(code.upper())
+        row = {"course_code": code, "course_title": c.get("course_title", ""),
+               "prev_code": code, "prev_title": c.get("course_title", "")}
+        if c.get("semester") not in (None, ""):
+            row["semester"] = c["semester"]
+        if year.isdigit():
+            row["year_previous"] = year
+        if year_latest:
+            row["year_latest"] = year_latest
+        texts = [t for t in (_module_text(m) for m in c.get("modules") or []) if t]
+        if texts:
+            row["modules"] = [{"previous": t, "revised": t} for t in texts]
+        out.append(row)
+    return out
+
+
+def revision_year(submission) -> str:
+    """The year a revision is approved: the BoS meeting's, else the current batch's first year."""
+    from .schema import batch_start
+    bos = str(((stage_state(submission, "bos_documents").get("data") or {})
+               .get("meeting") or {}).get("bos_date") or "")
+    if bos[:4].isdigit():
+        return bos[:4]
+    start = batch_start(batches()["current"])
+    return str(start) if start else ""
 
 
 def revision_fill_source(submission, programme_code):

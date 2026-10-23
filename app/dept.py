@@ -26,7 +26,7 @@ from .workflow import (OPENABLE, compute_status, get_or_create_submission,
                        programme_fill_source, programme_stage_state, programmes_of,
                        progress, save_draft, stage_board, stage_state,
                        submit_stage, validate_only, batches, parts_for, revision_fill_source,
-                       apply_defaults)
+                       apply_defaults, revision_year, semester_short)
 
 bp = Blueprint("dept", __name__)
 
@@ -85,7 +85,8 @@ def _remember_person(resp, dept_code, person):
 
 
 def _batch_semesters(stage):
-    """An earlier batch's page, naming the semesters Settings asks for."""
+    """An earlier batch's page, naming the semesters Settings asks for — and
+    offering only those."""
     import copy
     from .workflow import semester_words
     b = next((x for x in batches()["existing"] if x["key"] == stage["key"]), None)
@@ -93,15 +94,17 @@ def _batch_semesters(stage):
     if not words:
         return stage
     s = copy.deepcopy(stage)
+    s["batch_semesters"] = list(b["semesters"])
+    named = f" · {words[0].upper()}{words[1:]}"
     for sec in s["sections"]:
-        if sec["key"] == "courses":
-            sec["title"] += f" · {words[0].upper()}{words[1:]}"
-        elif sec["key"] == "batch_courses":
-            # only the semesters Settings asks this batch for
-            sec["title"] += f" · {words[0].upper()}{words[1:]}"
+        if sec["key"] in ("courses", "batch_courses", "revision_courses"):
+            sec["title"] += named
+        if sec["key"] == "batch_courses":
             sec["help"] = (f"The courses the Batch of {b['label']} studied in {words}, one per row, as in the "
                            "programme structure. Syllabus → opens the course on this batch's Syllabus page; "
-                           "Revision → opens it in Course Revision.")
+                           "Revision → opens it on its Course Revision page.")
+        if sec["key"] in ("batch_courses", "revision_courses"):
+            # only the semesters Settings asks this batch for
             for c in sec["columns"]:
                 if c["name"] == "semester":
                     c["choices"], c["min"], c["max"] = list(b["semesters"]), min(b["semesters"]), max(b["semesters"])
@@ -456,7 +459,7 @@ def stage(stage_key, programme_code=None):
                            final=final, record=record, syllabi=syllabi, revision_url=revision_url, comments=comments,
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back, back_label=back_label,
-                           structure_courses=structure_courses,
+                           structure_courses=structure_courses, revision_year=revision_year(sub),
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),
                            back_to=(url_for("dept.stage", stage_key="curriculum")
@@ -510,7 +513,11 @@ def _part_item(sub, code, k, s=None):
         tag = batches(s)["current"]
     elif d.get("existing_batch"):
         tag = d["batch"]
-    return {"key": k, "title": d["title"], "tag": tag,
+    sems = ""
+    if d.get("existing_batch"):
+        b = next((x for x in batches(s)["existing"] if x["key"] == k), None)
+        sems = semester_short((b or {}).get("semesters"))
+    return {"key": k, "title": d["title"], "tag": tag, "sems": sems,
             "existing": bool(d.get("existing_batch")), "optional": bool(d.get("optional")),
             "status": part_status(sub, code, k)}
 
@@ -1017,6 +1024,7 @@ def _programme_steps(sub, code):
              # the earlier batches are listed apart, by their years
              "earlier": bool(STAGE_BY_KEY[k].get("existing_batch")),
              "short": STAGE_BY_KEY[k].get("batch", "") if STAGE_BY_KEY[k].get("existing_batch") else "",
+             "sems": _part_item(sub, code, k, cfg)["sems"],
              "url": url_for("dept.stage", stage_key=k, programme_code=code)}
             for k in parts_for(stage_def, cfg)]
 
@@ -1097,6 +1105,9 @@ def api_record():
         items = [{**i, "title": _step_label(i["key"])} for i in items if i["programme"] == only]
         name = next((p.get("programme_name") for p in programmes_of(sub, dept)
                      if p["programme_code"] == only), only)
+        # every batch's Curriculum, Syllabus and Course Revision, in one ZIP
+        return jsonify({"ok": True, "dept_name": name, "items": items,
+                        "zip": url_for("dept.programme_report_zip", programme_code=only)})
     return jsonify({"ok": True, "dept_name": name, "items": items})
 
 
@@ -1346,3 +1357,17 @@ def export_word():
                      download_name=f"BoS-Report-{dept['dept_code']}-{_year()}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument."
                               "wordprocessingml.document")
+
+
+@bp.route("/programme/<programme_code>/report.zip")
+@department_required
+def programme_report_zip(programme_code):
+    """One programme's whole record in one ZIP: the current batch and each
+    earlier batch, each with its Curriculum, Syllabus and Course Revision."""
+    from .docgen import programme_zip
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    if not any(p["programme_code"] == programme_code for p in programmes_of(sub, dept)):
+        abort(404)
+    buf, name = programme_zip(get_db(), dept["dept_code"], _year(), programme_code) or abort(404)
+    return send_file(buf, as_attachment=True, download_name=name, mimetype="application/zip")

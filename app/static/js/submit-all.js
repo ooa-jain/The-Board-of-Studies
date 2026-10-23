@@ -89,6 +89,14 @@
     const copy = el("button", "btn btn-ghost", "Download a copy");
     copy.type = "button";
     row.appendChild(copy);
+    if (j.zip) {
+      // the programme's every batch — Curriculum, Syllabus, Course Revision — in one ZIP
+      const z = el("a", "btn btn-ghost", "Download all (ZIP)");
+      z.href = j.zip;
+      z.setAttribute("download", "");
+      z.title = "The current batch and every earlier batch, each Curriculum, Syllabus and Course Revision in the Office's templates";
+      row.appendChild(z);
+    }
     row.appendChild(el("span", "spacer"));
     if (pending.length) {
       go = el("button", "btn btn-gold", `Submit all ${pending.length} now`);

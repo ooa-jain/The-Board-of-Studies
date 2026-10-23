@@ -205,7 +205,7 @@
       {% endif %}
       <a class="side-sub-link{{ ' is-on' if ps.key == stage.key }}" href="{{ ps.url }}"
          {% if ps.key == stage.key %}aria-current="page"{% endif %}>
-        <i class="side-dot st-{{ ps.status }}"></i><span class="side-text">{{ ps.short or ps.label }}</span></a>
+        <i class="side-dot st-{{ ps.status }}"></i><span class="side-text">{{ ps.short or ps.label }}{% if ps.sems %}<small class="side-sems">{{ ps.sems }}</small>{% endif %}</span></a>
       {% endfor %}
     </div>
     {% endif %}
@@ -415,9 +415,12 @@
     if (!sk) return;
     var timer = null;
     var FILE = /(\.xlsx|\.docx|\.pdf|\.zip)(\?|$)|\/file\/|\/export|thumb=|inline=/i;
-    function show() {
+    // e: the click or submit; a handler after this one may still keep the
+    // page where it is (a view switched in place), so it is asked again
+    function show(e) {
       clearTimeout(timer);
       timer = setTimeout(function () {
+        if (e && e.defaultPrevented) return;
         sk.hidden = false;
         document.body.setAttribute("aria-busy", "true");
         requestAnimationFrame(function () { sk.classList.add("is-on"); });
@@ -436,13 +439,13 @@
       var url = new URL(a.href, location.href);
       if (url.origin !== location.origin || FILE.test(url.pathname + url.search)) return;
       if (url.pathname === location.pathname && url.search === location.search) return;
-      show();
+      show(e);
     });
     document.addEventListener("submit", function (e) {
       var f = e.target;
       if (e.defaultPrevented || f.target === "_blank" || f.dataset.noSkeleton !== undefined) return;
       if (FILE.test(f.getAttribute("action") || "")) return;
-      show();
+      show(e);
     });
     // back / forward from the browser's cache, or a submit a script stopped
     window.addEventListener("pageshow", hide);

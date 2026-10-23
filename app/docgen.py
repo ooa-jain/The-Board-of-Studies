@@ -704,12 +704,29 @@ def _course_sheet(doc, programme_name, c, width):
     _widths(t, [width * 0.30, width * 0.36, width * 0.18, width * 0.16])
 
 
-def syllabus_docx(db, dept_code, year, programme_code):
+def _earlier(db, dept_code, year, prog, part):
+    """An earlier batch's stored data, its label and its semesters (in words)."""
+    from .workflow import batch_semesters, semester_words
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+    data = ((((sub.get("programmes") or {}).get(prog["programme_code"]) or {}).get(part) or {})
+            .get("data") or {})
+    sems = batch_semesters(part)
+    words = semester_words(sems)
+    label = STAGE_BY_KEY[part].get("batch", "")
+    return data, sems, f"Batch of {label}" + (f" · {words[0].upper()}{words[1:]}" if words else "")
+
+
+def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
     rec = programme_record(db, dept_code, year, programme_code)
     if not rec:
         return None
     _dept, prog, cur, courses = rec
     name, spec, batch = _title_line(prog, cur)
+    if part != "prog_syllabus":
+        # an earlier batch: its own syllabus, in its own semesters
+        from .workflow import in_semesters
+        data, sems, batch = _earlier(db, dept_code, year, prog, part)
+        courses = in_semesters(data.get("courses"), sems)
     doc = _letterhead(_version_line(name, batch), portrait=True)
     sec = doc.sections[0]
     width = int(sec.page_width - sec.left_margin - sec.right_margin)
@@ -718,7 +735,8 @@ def syllabus_docx(db, dept_code, year, programme_code):
     _para(doc, name, bold=True, size=13)
     if spec:
         _para(doc, spec, size=12)
-    _para(doc, f"Syllabus {batch}".strip(), bold=True, size=13, after=8)
+    _para(doc, (f"Syllabus — {batch}" if part != "prog_syllabus" else f"Syllabus {batch}").strip(),
+          bold=True, size=13, after=8)
     if not courses:
         _para(doc, "No syllabus entered yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
     courses = sorted(courses, key=lambda c: (_num(c.get("semester")) or 99))
@@ -815,16 +833,23 @@ def _pct(v):
     return "—" if v is None else f"{_fmt(v)}%"
 
 
-def revision_docx(db, dept_code, year, programme_code):
-    """The programme's Course Revision in the Office's revision template."""
+def revision_docx(db, dept_code, year, programme_code, part="prog_revision"):
+    """The programme's Course Revision in the Office's revision template —
+    the current batch's, or (part: an earlier batch) that batch's own."""
     from .exporter import revision_summary
     rec = programme_record(db, dept_code, year, programme_code)
     if not rec:
         return None
     dept, prog, cur, _ = rec
-    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
-    stored = ((sub.get("programmes") or {}).get(prog["programme_code"]) or {}).get("prog_revision") or {}
-    courses = [c for c in ((stored.get("data") or {}).get("courses") or []) if isinstance(c, dict)]
+    batch = ""
+    if part == "prog_revision":
+        sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+        stored = ((sub.get("programmes") or {}).get(prog["programme_code"]) or {}).get("prog_revision") or {}
+        courses = [c for c in ((stored.get("data") or {}).get("courses") or []) if isinstance(c, dict)]
+    else:
+        from .workflow import in_semesters
+        data, sems, batch = _earlier(db, dept_code, year, prog, part)
+        courses = in_semesters(data.get("revision_courses"), sems)
     name = _title_line(prog, cur)[0]
     rev_year = next((str(c.get("year_latest")) for c in courses if c.get("year_latest")), year[:4])
 
@@ -835,7 +860,8 @@ def revision_docx(db, dept_code, year, programme_code):
     s = revision_summary(courses, THRESHOLD)
 
     # --- page 1: who and when, (A)–(D), the note, the signatures
-    _orange_band(doc, "Percentage of change in syllabus revision for all Courses", width * 0.72, underline=False)
+    _orange_band(doc, "Percentage of change in syllabus revision for all Courses" + (f" — {batch}" if batch else ""),
+                 width * 0.72, underline=False)
     t = doc.add_table(rows=2, cols=4)
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -887,7 +913,7 @@ def revision_docx(db, dept_code, year, programme_code):
     if not courses:
         _page_break(doc)
         _para(doc, "No Course Revision has been entered for this programme yet.", size=11)
-        doc.core_properties.title = _title(f"{name} — Course Revision {rev_year}")
+        doc.core_properties.title = _title(f"{name} — Course Revision {batch or rev_year}")
         return _save(doc)
 
     pairs = list(zip(s["rows"], s["avgs"]))
@@ -963,8 +989,110 @@ def revision_docx(db, dept_code, year, programme_code):
             _shade(cells[3], YELLOW if (avg or 0) > THRESHOLD else GREY)
             _widths(t, [width * x for x in (0.16, 0.34, 0.34, 0.12)])
 
-    doc.core_properties.title = _title(f"{name} — Course Revision {rev_year}")
+    doc.core_properties.title = _title(f"{name} — Course Revision {batch or rev_year}")
     return _save(doc)
+
+
+# ---------------------------------------------------------------------------
+# an earlier batch's Curriculum: the courses it studied, in its semesters
+# ---------------------------------------------------------------------------
+
+def batch_curriculum_docx(db, dept_code, year, programme_code, part):
+    """An earlier batch's course list as the Curriculum lays it out: the
+    classification of its credits and its programme structure (a PG
+    programme: semester by semester), in the semesters Settings asks for."""
+    rec = programme_record(db, dept_code, year, programme_code)
+    if not rec:
+        return None
+    _dept, prog, cur, _ = rec
+    from .schema import category_groups, is_pg
+    from .workflow import in_semesters
+    data, sems, batch = _earlier(db, dept_code, year, prog, part)
+    deg = (cur.get("details") or {}).get("degree_level") or prog.get("degree_level")
+    data = category_groups(data, deg, "batch_courses")
+    rows = [r for r in in_semesters(data.get("batch_courses"), sems) if _num(r.get("semester")) is not None]
+    name, spec, _ = _title_line(prog, cur)
+    doc = _letterhead(_version_line(name, STAGE_BY_KEY[part].get("batch", "")))
+    sec = doc.sections[0]
+    width = int(sec.page_width - sec.left_margin - sec.right_margin)
+    _para(doc, "JAIN (Deemed-to-be University), Bangalore", bold=True, size=15)
+    _para(doc, name, bold=True, size=14)
+    if spec:
+        _para(doc, spec, size=14)
+    _para(doc, f"Curriculum — {batch}", bold=True, size=14, after=6)
+    if not rows:
+        _para(doc, "No courses entered for this batch yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
+    elif is_pg(deg):
+        _classification_table(doc, rows, width, title="SUMMARY")
+        _page_break(doc)
+        _pg_semester_tables(doc, rows, width)
+    else:
+        _classification_table(doc, rows, width)
+        _page_break(doc)
+        _para(doc, "Programme Structure", bold=True, size=13, color=NAVY, after=6)
+        _structure_table(doc, rows, width)
+        doc.add_paragraph()
+        _summary_table(doc, rows, width)
+    doc.core_properties.title = _title(f"{name} — Curriculum, {batch}")
+    return _save(doc)
+
+
+# ---------------------------------------------------------------------------
+# a programme's whole record, every batch, as one ZIP
+# ---------------------------------------------------------------------------
+
+def _file_name(text):
+    """A name a file or folder can carry on any computer."""
+    text = re.sub(r'[\\/:*?"<>|\r\n\t]+', " ", str(text or "")).replace("\u2013", "-").strip(" .")
+    return re.sub(r"\s+", " ", text)[:90].strip() or "Untitled"
+
+
+def programme_files(db, dept_code, year, programme_code):
+    """[(path, bytes)] — a folder for the programme, and in it one for the
+    current batch and one for each earlier batch, each with its Curriculum,
+    Syllabus and Course Revision in the Office's templates. None if there is
+    no such programme."""
+    from .workflow import batches, semester_short
+    rec = programme_record(db, dept_code, year, programme_code)
+    if not rec:
+        return None
+    _dept, prog, cur, _ = rec
+    code = prog["programme_code"]
+    root = _file_name(f"{code} - {_title_line(prog, cur)[0]}")
+    b = batches()
+    folders = [(f"1 Current batch {b['current']}", curriculum_docx, syllabus_docx, revision_docx, None)]
+    for n, e in enumerate(b["existing"], start=2):
+        sems = semester_short(e["semesters"])
+        folders.append((f"{n} Earlier batch {e['label']}" + (f" ({sems})" if sems else ""),
+                        batch_curriculum_docx, syllabus_docx, revision_docx, e["key"]))
+    out = []
+    for folder, make_c, make_s, make_r, part in folders:
+        path = f"{root}/{_file_name(folder)}"
+        for title, make, kw in (("Curriculum", make_c, {"part": part} if part else {}),
+                                ("Syllabus", make_s, {"part": part} if part else {}),
+                                ("Course Revision", make_r, {"part": part} if part else {})):
+            try:
+                buf = make(db, dept_code, year, code, **kw)
+                if buf is not None:
+                    out.append((f"{path}/{title}.docx", buf.getvalue()))
+            except Exception as e:            # one document's trouble does not cost the rest
+                out.append((f"{path}/{title} - could not be made.txt",
+                            f"The {title} could not be made: {e.__class__.__name__}: {e}\n".encode()))
+    return out
+
+
+def programme_zip(db, dept_code, year, programme_code):
+    """(buffer, file name) for the programme's whole record, or None."""
+    import zipfile
+    files = programme_files(db, dept_code, year, programme_code)
+    if files is None:
+        return None
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for path, data in files:
+            z.writestr(path, data)
+    buf.seek(0)
+    return buf, f"BoS-{_file_name(programme_code)}-{year}.zip"
 
 
 # ---------------------------------------------------------------------------

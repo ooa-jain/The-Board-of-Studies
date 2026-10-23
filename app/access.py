@@ -69,6 +69,7 @@ ENDPOINTS = {
     "export_institution": ("overview", "view"), "export_department": ("overview", "view"),
     "export_department_word": ("overview", "view"), "export_preview": ("overview", "view"),
     "programme_report": ("overview", "view"), "programme_docx": ("overview", "view"),
+    "programme_report_zip": ("overview", "view"),
     "sheets_excel": ("overview", "view"),
     "document": ("documents", "view"), "document_summary": ("documents", "view"),
     "comment_add": ("comments", "edit"), "comment_close": ("comments", "edit"),

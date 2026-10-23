@@ -574,6 +574,13 @@ def fill_from_drive(dept, year, actor):
                 if not data.get("batch_courses"):
                     structure = programme_stage_state(sub, pcode, "prog_curriculum").get("data") or {}
                     data["batch_courses"] = _batch_course_list(structure, data.get("courses"), label)
+                # only the semesters Settings asks this batch for, and its Course Revision
+                from .workflow import batch_revision_rows, batch_semesters, in_semesters, revision_year
+                sems = batch_semesters(part)
+                for k in ("batch_courses", "courses"):
+                    data[k] = in_semesters(data.get(k), sems)
+                if not data.get("revision_courses"):
+                    data["revision_courses"] = batch_revision_rows(data, label, revision_year(fresh()), sems)
                 base = prefill_for(part, dept, year, programme, fresh())
                 for k, v in base.items():
                     data.setdefault(k, v)

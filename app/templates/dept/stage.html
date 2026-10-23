@@ -182,6 +182,8 @@
     <span class="spacer"></span>
     <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
     <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
+    {% if programme and stage.parent %}<a class="btn btn-ghost" href="{{ url_for('dept.programme_report_zip', programme_code=programme.programme_code) }}" download
+       title="This programme's current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download all (ZIP)</a>{% endif %}
     <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
     {% if step and next_step %}<a class="btn btn-gold" href="{{ next_step.url }}">Go to {{ next_step.label }} →</a>{% endif %}
   </div>
@@ -207,6 +209,7 @@
     programme_review: {{ (step is not none and last_step)|tojson }},
     syllabi: {{ syllabi|tojson }},
     revision_url: {{ (revision_url or '')|tojson }},
+    revision_year: {{ (revision_year or '')|tojson }},
     course_map: {{ course_map|tojson }},
     structure_courses: {{ structure_courses|tojson }},
     record: {{ record|tojson }},

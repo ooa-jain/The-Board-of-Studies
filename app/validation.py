@@ -501,6 +501,22 @@ def r_first_year_has_syllabus_and_revision(data, ctx, sk):
     return out
 
 
+def r_semester_within_batch(data, ctx, sk):
+    """An earlier batch lists only the semesters Settings asks it for."""
+    from .workflow import batches, semester_words
+    b = next((x for x in batches()["existing"] if x["key"] == ctx.get("stage_key")), None)
+    sems = (b or {}).get("semesters") or []
+    if not sems:
+        return []
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        s = _int(r.get("semester"))
+        if s is not None and s not in sems:
+            out.append(err(f"{r.get('course_code') or f'Row {i + 1}'}: semester {s} is not one of this "
+                           f"batch's — it covers {semester_words(sems)}.", section=sk, row=i, field="semester"))
+    return out
+
+
 def r_unique_course_codes(data, ctx, sk):
     """A code may appear once per track: semester 7 of Honours and of
     Honours with Research often share courses."""
@@ -717,7 +733,7 @@ RULES = {name[2:]: fn for name, fn in list(globals().items())
 
 def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     """Validate one stage payload. Returns (issues, summary)."""
-    ctx = ctx or {}
+    ctx = {**(ctx or {}), "stage_key": stage_key}
     stage = STAGE_BY_KEY.get(stage_key)
     if not stage:
         return [err(f"Unknown stage “{stage_key}”.")], {"errors": 1, "warnings": 0}

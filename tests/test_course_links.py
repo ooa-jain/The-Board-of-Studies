@@ -51,10 +51,11 @@ def test_course_revision_finds_the_earlier_batch_course_whatever_its_year(app):
     assert "Variables" in row["modules"][0]["previous"]
 
 
-def test_an_earlier_batch_has_its_courses_and_their_syllabi_and_no_upload():
+def test_an_earlier_batch_has_its_curriculum_syllabus_and_revision_and_no_upload():
     sections = STAGE_BY_KEY["prog_syllabus_b2025"]["sections"]
-    assert [s["key"] for s in sections] == ["batch_courses", "courses"]
+    assert [s["key"] for s in sections] == ["batch_courses", "courses", "revision_courses"]
     assert sections[1]["display"] == "sheet" and sections[1]["min_rows"] == 0
+    assert sections[2]["display"] == "revision" and sections[2]["min_rows"] == 0
     assert not any(f.get("type") == "file" for s in sections for f in s.get("fields", []))
 
 

@@ -227,10 +227,18 @@ def programme_context(db, dept, year, programme_code, links):
     code = programme["programme_code"]
     stored = (sub.get("programmes") or {}).get(code) or {}
     parts = []
-    for k in PARTS:
+    from .workflow import batches, semester_short
+    # the current batch's three parts, then each earlier batch (its Curriculum,
+    # Syllabus and Course Revision in one part)
+    titles = {k: STAGE_BY_KEY[k]["title"] for k in PARTS}
+    for b in batches()["existing"]:
+        sems = semester_short(b["semesters"])
+        titles[b["key"]] = f"Earlier batch {b['label']}" + (f" · {sems}" if sems else "") + \
+            " — Curriculum, Syllabus, Course Revision"
+    for k in titles:
         st = stored.get(k) or {}
         status = part_status(sub, code, k)
-        parts.append({"key": k, "title": STAGE_BY_KEY[k]["title"], "status": status,
+        parts.append({"key": k, "title": titles[k], "status": status,
                       "status_word": status_word(status), "submitted_at": st.get("submitted_at"),
                       "note": st.get("returned_note"),
                       "errors": (st.get("summary") or {}).get("errors", 0),

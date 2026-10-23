@@ -1453,14 +1453,25 @@ def export_department(dept_code):
 @bp.route("/export/<dept_code>.zip")
 @admin_required
 def export_department_both(dept_code):
-    """The department's Excel and Word report together, in one ZIP."""
+    """The department's Excel and Word report together, in one ZIP — with
+    every programme's Curriculum, Syllabus and Course Revision, the current
+    batch's and each earlier batch's."""
     import zipfile
-    get_db().departments.find_one({"dept_code": dept_code}) or abort(404)
+
+    from .docgen import programme_files
+    from .workflow import programmes_of
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     year = _year()
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr(f"BoS-{dept_code}-{year}.xlsx", department_excel(dept_code, year, ShareLinks(dept_code, year)).getvalue())
         z.writestr(f"BoS-Report-{dept_code}-{year}.docx", submission_word(dept_code, year, ShareLinks(dept_code, year)).getvalue())
+        # each programme: the current batch and every earlier batch, Curriculum, Syllabus, Course Revision
+        for p in programmes_of(sub, dept):
+            for path, data in programme_files(db, dept_code, year, p["programme_code"]) or []:
+                z.writestr(f"Programmes/{path}", data)
     buf.seek(0)
     audit(_actor(), "export.department", dept_code, {"kind": "both"})
     return send_file(buf, as_attachment=True, download_name=f"BoS-{dept_code}-{year}.zip", mimetype="application/zip")
@@ -1474,7 +1485,20 @@ def programme_report(dept_code, programme_code):
     db = get_db()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     ctx = programme_context(db, dept, _year(), programme_code, AdminLinks(dept_code, _year())) or abort(404)
-    return render_template("admin/programme_report.html", **ctx)
+    return render_template("admin/programme_report.html", **ctx,
+                           zip_url=url_for("admin.programme_report_zip", dept_code=dept_code,
+                                           programme_code=ctx["programme"]["programme_code"]))
+
+
+@bp.route("/report/<dept_code>/<programme_code>/report.zip")
+@admin_required
+def programme_report_zip(dept_code, programme_code):
+    """One programme's whole record in one ZIP: the current batch and each
+    earlier batch, each with its Curriculum, Syllabus and Course Revision."""
+    from .docgen import programme_zip
+    out = programme_zip(get_db(), dept_code, _year(), programme_code) or abort(404)
+    audit(_actor(), "export.programme", f"{dept_code}/{programme_code}")
+    return send_file(out[0], as_attachment=True, download_name=out[1], mimetype="application/zip")
 
 
 @bp.route("/export/<dept_code>/preview/<kind>")

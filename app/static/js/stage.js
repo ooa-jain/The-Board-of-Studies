@@ -1563,6 +1563,10 @@
      batch's own Syllabus page. Revision opens the course in Course Revision.
      Each link says where it was clicked, so the page it opens leads back. */
   const IS_BATCH = !!STAGE.existing_batch;
+  // the semesters Settings asks an earlier batch for (none set: all), and the
+  // page of it the address asks for: curriculum, syllabus or revision
+  const BATCH_SEMS = (STAGE.batch_semesters || []).map(Number);
+  const START_VIEW = new URLSearchParams(location.search).get("view") || "";
   const FROM = "?from=" + encodeURIComponent(CTX.key);
   const currentSyllabus = () => ((CTX.syllabi || []).find(x => x.current) || {}).url;
   const COURSE_LINKS = {
@@ -1576,16 +1580,11 @@
                      allTitle: "Open the syllabus — pick a semester, a course category or search",
                      aria: "Syllabus for this course" },
     revision_link: { field: "revision", word: "Revision", all: "All revisions",
-                     targets: (code, row) => {
-                       if (!CTX.revision_url) return [];
-                       // an earlier batch's course is revised as the current course of the same name
-                       if (IS_BATCH) {
-                         const m = sameCourse(structureCourses(), code, row && row.course_title);
-                         if (m) code = String(m.course_code).toUpperCase();
-                       }
-                       return [{ href: CTX.revision_url + FROM + "#course-" + encodeURIComponent(code) }];
-                     },
-                     allHref: () => CTX.revision_url ? CTX.revision_url + FROM : "",
+                     // an earlier batch revises its own courses, on its own Course Revision page
+                     targets: code => IS_BATCH
+                       ? [{ href: "?view=revision#course-" + encodeURIComponent(code), here: code, view: "revision" }]
+                       : CTX.revision_url ? [{ href: CTX.revision_url + FROM + "#course-" + encodeURIComponent(code) }] : [],
+                     allHref: () => IS_BATCH ? "?view=revision" : CTX.revision_url ? CTX.revision_url + FROM : "",
                      off: "Course Revision is not open yet",
                      title: "Open this course in Course Revision (added there if it is not yet)",
                      allTitle: "Open Course Revision — every revised course",
@@ -1602,9 +1601,6 @@
       || list.find(p => noYear(p.course_code) === noYear(code))
       || (t ? list.find(p => String(p.course_title || "").trim().toLowerCase() === t) : undefined);
   }
-  // the programme structure's courses, as {course_code, course_title}
-  const structureCourses = () => Object.entries(CTX.structure_courses || {})
-    .map(([course_code, course_title]) => ({ course_code, course_title }));
 
   /* An earlier batch's own courses, as the syllabus sheets take them: from
      the course list on the same page, as it stands (saved or not). */
@@ -1671,8 +1667,8 @@
     go.title = K.title;
     go.setAttribute("aria-label", `${K.word} of ${code}`);
     if (t.here) go.addEventListener("click", e => {
-      // the batch's Syllabus page: shown in place, at this course
-      if (window.__batchView) { e.preventDefault(); window.__batchView("syllabus", t.here); }
+      // the batch's Syllabus or Course Revision page: shown in place, at this course
+      if (window.__batchView) { e.preventDefault(); window.__batchView(t.view || "syllabus", t.here); }
     });
     wrap.appendChild(go);
     return wrap;
@@ -3419,7 +3415,8 @@
     const sourceAll = () => IS_BATCH ? batchCourses() : (CTX.fill || []);
     const sourceOne = code => (IS_BATCH ? sameCourse(batchCourses(), code) : undefined)
       || (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === code);
-    const hashCode = location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
+    const hashCode = location.hash.startsWith("#course-") && !(IS_BATCH && START_VIEW === "revision")
+      ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
     // the course the link meant, as this page names it
     const arrived = hashCode ? String((sourceOne(hashCode) || {}).course_code || hashCode).toUpperCase() : "";
     const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
@@ -3676,27 +3673,31 @@
       return { sem: String(r.semester || m.semester || ""), group: m.group || "Other courses" };
     };
     const isFilled = r => !!(String(r.outcomes || "").trim() && (r.modules || []).some(m => m && String(m.revised || m.title || "").trim()));
+    // an earlier batch shows only the semesters Settings asks it for
+    const inBatch = r => !IS_BATCH || !BATCH_SEMS.length || BATCH_SEMS.includes(+info(r).sem);
     let pick = { sem: "", group: "", idx: -1 };
     const wanted = arrived;
     const hit = wanted ? data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === wanted) : -1;
+    const first = data.findIndex(inBatch);
     if (hit >= 0) pick = { sem: info(data[hit]).sem, group: info(data[hit]).group, idx: hit };
-    else if (data.length) pick = { sem: info(data[0]).sem, group: "", idx: 0 };
+    else if (first >= 0) pick = { sem: info(data[first]).sem, group: "", idx: first };
 
     let query = "";
-    const inPick = (r) => (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group) &&
+    const inPick = (r) => inBatch(r) && (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group) &&
       (!query || `${r.course_code || ""} ${r.course_title || ""}`.toLowerCase().includes(query));
     function paintNav() {
       nav.textContent = "";
       if (!USE_NAV || data.length < 2) { nav.hidden = true; return; }
       nav.hidden = false;
       const row1 = el("div", "syl-nav-row");
-      const sems = [...new Set(data.map(r => info(r).sem).filter(Boolean))].sort((a, b) => +a - +b);
+      const sems = IS_BATCH && BATCH_SEMS.length ? BATCH_SEMS.map(String)
+        : [...new Set(data.map(r => info(r).sem).filter(Boolean))].sort((a, b) => +a - +b);
       const semSel = el("select");
       semSel.setAttribute("aria-label", "Semester");
       semSel.appendChild(new Option("All semesters", ""));
       sems.forEach(x => semSel.appendChild(new Option("Semester " + x, x)));
       semSel.value = pick.sem;
-      const groups = [...new Set(data.filter(r => !pick.sem || info(r).sem === pick.sem).map(r => info(r).group))];
+      const groups = [...new Set(data.filter(r => inBatch(r) && (!pick.sem || info(r).sem === pick.sem)).map(r => info(r).group))];
       const grpSel = el("select");
       grpSel.setAttribute("aria-label", "Course category");
       grpSel.appendChild(new Option("All course categories", ""));
@@ -3712,8 +3713,8 @@
       find.value = query;
       find.setAttribute("aria-label", "Search courses by code or title");
       row1.appendChild(lab("Search", find));
-      const done = data.filter(isFilled).length;
-      row1.appendChild(el("span", "syl-nav-count", `${done} of ${data.length} courses filled`));
+      const shown = data.filter(inBatch);
+      row1.appendChild(el("span", "syl-nav-count", `${shown.filter(isFilled).length} of ${shown.length} courses filled`));
       const structure = document.querySelector(".back-link");
       if (IS_BATCH) {
         const go = el("a", "btn btn-ghost btn-sm", "Check / add in this batch's Curriculum →");
@@ -3813,9 +3814,45 @@
      average. "Fill in all courses" brings every course of the current batch
      syllabus with its modules, and the previous ones from the latest earlier
      batch, so the percentages work themselves out. */
+  // a syllabus module as the revision table shows it: "Title (12 Hrs) — content"
+  const moduleText = m => {
+    const head = String(m.title || "").trim(), hrs = String(m.hours ?? "").trim();
+    const first = head + (hrs ? ` (${hrs} Hrs)` : "");
+    return [first, String(m.revised || "").trim()].filter(Boolean).join(" — ");
+  };
+  /* An earlier batch's courses for its own Course Revision: each course of
+     its Syllabus (then any of its Curriculum not there yet), in its
+     semesters, with the modules as the batch studied them on both sides to
+     start — the department changes the revised side. */
+  function batchRevisionRows() {
+    const year = String(STAGE.batch || "").slice(0, 4);
+    const semOf = code => ((batchCourses().find(p => String(p.course_code).toUpperCase() === code) || {}).semester);
+    const out = [], seen = new Set();
+    const add = (c, mods) => {
+      const code = String(c.course_code || "").trim().toUpperCase();
+      if (!code || seen.has(code)) return;
+      const sem = c.semester || semOf(code);
+      if (BATCH_SEMS.length && sem && !BATCH_SEMS.includes(num(sem))) return;
+      seen.add(code);
+      const row = { course_code: c.course_code, course_title: c.course_title || "",
+                    prev_code: c.course_code, prev_title: c.course_title || "" };
+      if (sem) row.semester = sem;
+      if (/^\d{4}$/.test(year)) row.year_previous = year;
+      if (CTX.revision_year) row.year_latest = CTX.revision_year;
+      const texts = (mods || []).filter(Boolean).map(moduleText).filter(Boolean);
+      if (texts.length) row.modules = texts.map(t => ({ previous: t, revised: t }));
+      out.push(row);
+    };
+    (Array.isArray(state.courses) ? state.courses : []).forEach(c => c && add(c, c.modules));
+    batchCourses().forEach(c => add(c, []));
+    return out;
+  }
+
   function renderRevisionCourses(section, host) {
     const data = rows(section.key);
-    if (!data.length && !CTX.readonly) data.push({});
+    if (!data.length && !CTX.readonly && !IS_BATCH) data.push({});
+    // where its courses come from: the syllabi — or, on an earlier batch, that batch's own
+    const fillRows = () => IS_BATCH ? batchRevisionRows() : (CTX.fill || []);
     const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
     const blank = r => !String(r.course_code || "").trim() && !String(r.course_title || "").trim()
       && !(r.modules || []).some(m => m && (m.previous || m.revised));
@@ -3827,26 +3864,36 @@
     host.appendChild(list);
 
     // arriving from a course row's "Revision →": add that course if it is not here yet
-    if (!CTX.readonly && location.hash.startsWith("#course-")) {
+    // (an earlier batch opens it in place, below)
+    const srcFor = want => {
+      const m = (CTX.course_map || {})[want];
+      return fillRows().find(p => String(p.course_code).toUpperCase() === want)
+        || (m ? { course_code: want, course_title: m.title || "", semester: m.semester || "" } : null);
+    };
+    if (!CTX.readonly && !IS_BATCH && location.hash.startsWith("#course-")) {
       const want = decodeURIComponent(location.hash.slice(8)).toUpperCase();
       const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
-      const m = (CTX.course_map || {})[want];
-      const src = (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === want)
-        || (m ? { course_code: want, course_title: m.title || "", semester: m.semester || "" } : null);
+      const src = srcFor(want);
       if (want && src && !have.has(want)) {
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         data.push(JSON.parse(JSON.stringify(src)));
         setTimeout(() => { touch(); note.textContent = `Added ${src.course_code} — enter the % change for each module.`; }, 0);
       }
     }
-    if (!CTX.readonly && (CTX.fill || []).length) {
-      const fb = el("button", "btn btn-ghost btn-sm", "Fill in all courses from the syllabi");
+    if (!CTX.readonly && (IS_BATCH || (CTX.fill || []).length)) {
+      const fb = el("button", "btn btn-ghost btn-sm",
+        IS_BATCH ? "Fill in all courses from this batch's Syllabus" : "Fill in all courses from the syllabi");
       fb.type = "button";
-      fb.title = "Revised modules from the current batch syllabus, previous ones from the latest earlier batch";
+      fb.title = IS_BATCH ? "Every course of this batch, its modules as the batch studied them — then change the revised side"
+        : "Revised modules from the current batch syllabus, previous ones from the latest earlier batch";
       fb.addEventListener("click", () => {
         const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
-        const add = CTX.fill.filter(p => !have.has(String(p.course_code).toUpperCase()));
-        if (!add.length) { note.textContent = "Every course is already here."; return; }
+        const add = fillRows().filter(p => !have.has(String(p.course_code).toUpperCase()));
+        if (!add.length) {
+          note.textContent = IS_BATCH && !fillRows().length ? "List this batch's courses in its Curriculum first."
+            : "Every course is already here.";
+          return;
+        }
         for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
         add.forEach(p => data.push(JSON.parse(JSON.stringify(p))));
         draw(); touch();
@@ -3870,7 +3917,8 @@
     function course(row, i) {
       const wrap = el("section", "rv-course");
       wrap.dataset.row = i;
-      if (row.course_code) wrap.id = "course-" + String(row.course_code).trim().toUpperCase();
+      // an earlier batch's page holds its syllabus sheets too: their ids stay theirs
+      if (row.course_code) wrap.id = (IS_BATCH ? "revision-" : "course-") + String(row.course_code).trim().toUpperCase();
       const head = el("div", "rv-course-head");
       head.appendChild(el("span", "rv-course-no", String(i + 1).padStart(2, "0")));
       const [hc, ic] = input(row, "course_code");
@@ -3911,6 +3959,24 @@
       refresh();
     }
     host.showRow = () => draw();
+    // open one course here — from a course list's Revision → on an earlier
+    // batch: added from its Syllabus if it is not here yet, and scrolled to
+    window.__openRevision = code => {
+      code = String(code || "").toUpperCase();
+      let i = data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === code);
+      if (i < 0) {
+        const src = srcFor(code);
+        if (!src || CTX.readonly) return;
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(JSON.parse(JSON.stringify(src)));
+        draw(); touch();
+        note.textContent = `Added ${src.course_code} — change its revised modules below.`;
+      }
+      const target = document.getElementById("revision-" + code) || document.getElementById("course-" + code) || list;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+      target.classList.add("is-flash");
+      setTimeout(() => target.classList.remove("is-flash"), 1900);
+    };
     draw();
   }
 
@@ -4773,26 +4839,26 @@
   render();
   refresh();
   if (fromCopy) { dirty = true; edits++; save(); }
-  /* An earlier batch is two pages of one part: its Curriculum (the courses
-     it studied) and its Syllabus. Moving between them happens in place —
-     the address follows (?view=…), the steps at the top follow, and nothing
-     typed is lost on the way. */
+  /* An earlier batch is three pages of one part, as the current batch is:
+     its Curriculum (the courses it studied), its Syllabus and its Course
+     Revision. Moving between them happens in place — the address follows
+     (?view=…), the steps at the top follow, and nothing typed is lost. */
   if (IS_BATCH) {
-    const VIEW_OF = { batch_courses: "curriculum", courses: "syllabus" };
+    const VIEW_OF = { batch_courses: "curriculum", courses: "syllabus", revision_courses: "revision" };
     const setView = (v, push) => {
-      v = v === "syllabus" ? "syllabus" : "curriculum";
+      v = ["syllabus", "revision"].includes(v) ? v : "curriculum";
       document.querySelectorAll(".section-block").forEach(b => {
         const key = (b.id || "").replace(/^sec-/, "");
         if (VIEW_OF[key]) b.hidden = VIEW_OF[key] !== v;
       });
-      document.querySelectorAll(".pflow-simple .pmap-node").forEach((li, i) => {
-        const on = (i === 0) === (v === "curriculum");
+      document.querySelectorAll(".pflow-simple .pmap-node").forEach(li => {
+        const on = li.dataset.view === v;
         li.classList.toggle("is-here", on);
         const a = li.querySelector("a");
         if (a) { if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
       });
-      // the way back to the batch's Curriculum shows on its Syllabus page
-      document.querySelectorAll(".back-bar").forEach(b => { b.hidden = v !== "syllabus"; });
+      // the way back to the batch's Curriculum shows on its Syllabus and Course Revision pages
+      document.querySelectorAll(".back-bar").forEach(b => { b.hidden = v === "curriculum"; });
       if (push) {
         const url = new URL(location.href);
         url.searchParams.set("view", v);
@@ -4803,15 +4869,22 @@
     };
     window.__batchView = (v, code) => {
       setView(v, true);
-      if (code && window.__openSheet) window.__openSheet(code);
+      const open = v === "revision" ? window.__openRevision : window.__openSheet;
+      if (code && open) open(code);
     };
     // a section the page needs to show (a check's "fix it", the review's "edit")
     window.__showSection = id => {
       const key = String(id || "").replace(/^sec-/, "");
       if (VIEW_OF[key]) setView(VIEW_OF[key], true);
     };
-    const params = new URLSearchParams(location.search);
-    setView(params.get("view") === "syllabus" || location.hash.startsWith("#course-") ? "syllabus" : "curriculum", false);
+    const arrival = location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)) : "";
+    setView(START_VIEW === "revision" ? "revision"
+      : START_VIEW === "syllabus" || arrival ? "syllabus" : "curriculum", false);
+    if (START_VIEW === "revision" && arrival && window.__openRevision) {
+      // after the browser's own jump to the address's #course-…, which is not this page's
+      const go = () => setTimeout(() => window.__openRevision(arrival), 150);
+      if (document.readyState === "complete") go(); else window.addEventListener("load", go, { once: true });
+    }
     window.addEventListener("popstate", () => setView(new URLSearchParams(location.search).get("view"), false));
     // links to the other page of this batch: in place, too
     document.addEventListener("click", e => {
@@ -4847,7 +4920,7 @@
   // opened from a curriculum row: that course is already chosen — start at
   // the semester / course group / search bar above it, where the department
   // can move on to any other course
-  if (location.hash.startsWith("#course-")) {
+  if (location.hash.startsWith("#course-") && !(IS_BATCH && START_VIEW === "revision")) {
     setTimeout(() => {
       const named = document.querySelector("[data-arrived]");
       const target = (named && document.getElementById("course-" + named.dataset.arrived))

@@ -288,9 +288,13 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
     if stage_key.startswith("prog_syllabus_b"):
         # an earlier batch: its course list and each course's syllabus, the
         # codes carrying that batch's year
+        from .workflow import batch_revision_rows, batch_semesters, in_semesters
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
-        own = [{**c, "course_code": y[2:] + c["course_code"][2:]} for c in courses]
-        return {"batch_courses": own, "courses": [_syllabus_row(c, y) for c in own]}
+        sems = batch_semesters(stage_key)
+        own = in_semesters([{**c, "course_code": y[2:] + c["course_code"][2:]} for c in courses], sems)
+        out = {"batch_courses": own, "courses": [_syllabus_row(c, y) for c in own]}
+        out["revision_courses"] = batch_revision_rows(out, batch, year[:4], sems)
+        return out
     if stage_key == "prog_syllabus":
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
         out = {"courses": [_syllabus_row(c, y) for c in courses]}

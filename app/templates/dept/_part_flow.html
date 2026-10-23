@@ -18,19 +18,19 @@
 
 {% macro syllabus_flow(parts, code, here, older, words) %}
 {# The programme page, kept simple. The current batch: Curriculum →
-   Syllabus → Course Revision. An earlier batch: its own Curriculum (the
-   courses it studied) → its Syllabus, two pages of one part. Beside them,
-   the batches to switch between. #}
+   Syllabus → Course Revision. An earlier batch the same three — its own
+   Curriculum (the courses it studied), Syllabus and Course Revision, three
+   pages of one part. Beside them, the batches to switch between. #}
 {% set older_keys = older|map(attribute='key')|list %}
 {% set on_older = here in older_keys %}
 {% set this = (older|selectattr('key', 'equalto', here)|first) if on_older else none %}
-{% set view = 'syllabus' if request.args.get('view') == 'syllabus' else 'curriculum' %}
+{% set view = request.args.get('view') if request.args.get('view') in ('syllabus', 'revision') else 'curriculum' %}
 {% set cur = parts|selectattr('key', 'equalto', 'prog_syllabus')|first %}
 <div class="pflow-simple">
 <ol class="pmap pmap-tree" aria-label="{{ ('Batch of ' ~ this.tag) if on_older else 'The current batch' }}, step by step">
   {% if on_older %}
-  {% for v, kind, title in [('curriculum', 'curriculum', 'Curriculum'), ('syllabus', 'current', 'Syllabus')] %}
-  <li class="pmap-node pmap-c{{ 1 if v == 'curriculum' else 2 }} is-{{ this.status }}{{ ' is-here' if view == v }}">
+  {% for v, kind, title in [('curriculum', 'curriculum', 'Curriculum'), ('syllabus', 'current', 'Syllabus'), ('revision', 'revision', 'Course Revision')] %}
+  <li class="pmap-node pmap-c{{ {'curriculum': 1, 'syllabus': 2, 'revision': 4}[v] }} is-{{ this.status }}{{ ' is-here' if view == v }}" data-view="{{ v }}">
     <a class="pmap-pill" href="{{ url_for('dept.stage', stage_key=this.key, programme_code=code, view=v) }}"
        {% if view == v %}aria-current="page"{% endif %} title="{{ title }} of the Batch of {{ this.tag }}">
       <span class="pmap-ico">{{ icon(kind) }}</span>
@@ -67,7 +67,7 @@
   <span class="pflow-batches-k is-sub">Earlier</span>
   {% for ob in older %}
   <a class="pflow-batch is-{{ ob.status }}{{ ' is-here' if ob.key == here }}" href="{{ url_for('dept.stage', stage_key=ob.key, programme_code=code) }}"
-     {% if ob.key == here %}aria-current="true"{% endif %} title="Batch of {{ ob.tag }} — {{ words.get(ob.status, ob.status) }}"><i class="pmap-dot"></i>{{ ob.tag }}</a>
+     {% if ob.key == here %}aria-current="true"{% endif %} title="Batch of {{ ob.tag }}{% if ob.sems %} · {{ ob.sems }}{% endif %} — {{ words.get(ob.status, ob.status) }}"><i class="pmap-dot"></i>{{ ob.tag }}{% if ob.sems %}<small class="pflow-sems">{{ ob.sems }}</small>{% endif %}</a>
   {% endfor %}
 </nav>
 {% endif %}
