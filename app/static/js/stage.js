@@ -3522,6 +3522,21 @@
       return box;
     }
 
+    /* The level of Bloom's Taxonomy a module reaches: one of BTA 1 – BTA 6. */
+    const BTA = ["BTA 1 (Remembering)", "BTA 2 (Understanding)", "BTA 3 (Applying)",
+                 "BTA 4 (Analyzing)", "BTA 5 (Evaluating)", "BTA 6 (Creating)"];
+    function btaPick(m) {
+      const sel = el("select", "bta-sel");
+      sel.setAttribute("aria-label", "Bloom's Taxonomy level");
+      sel.appendChild(new Option(CTX.readonly ? "—" : "Choose", ""));
+      BTA.forEach(b => sel.appendChild(new Option(b, b)));
+      sel.value = BTA.includes(m.bta) ? m.bta : "";
+      sel.disabled = !!CTX.readonly;
+      sel.classList.toggle("is-empty", !sel.value);
+      sel.addEventListener("change", () => { m.bta = sel.value; sel.classList.toggle("is-empty", !sel.value); touch(); });
+      return sel;
+    }
+
     function modulesRows(row, i, tbody) {
       if (!Array.isArray(row.modules)) row.modules = [];
       const mods = row.modules;
@@ -3529,6 +3544,7 @@
       const head = el("tr", "sh-syl-head");
       head.appendChild(cell("th", "sh-left", ["Syllabus:"]));
       head.appendChild(cell("th", "sh-cos", ["CO's"]));
+      head.appendChild(cell("th", "sh-bta", ["BTA"]));
       head.appendChild(cell("th", "sh-hours", ["Hours"]));
       tbody.appendChild(head);
       const sum = el("span");
@@ -3555,6 +3571,7 @@
         }
         tr.appendChild(cell("td", "sh-left", [lab]));
         tr.appendChild(cell("td", "sh-cos", [coPick(m)]));
+        tr.appendChild(cell("td", "sh-bta", [btaPick(m)]));
         const h = el("input", "sh-mod-hours");
         h.type = "text"; h.inputMode = "numeric"; h.value = m.hours ?? ""; h.placeholder = "—";
         h.addEventListener("input", () => {
@@ -3569,11 +3586,11 @@
         ta.rows = 4; ta.value = m.revised ?? ""; ta.placeholder = "Content of the module";
         ta.addEventListener("input", () => { m.revised = ta.value; touch(); });
         if (CTX.readonly) t.disabled = h.disabled = ta.disabled = true;
-        tr2.appendChild(cell("td", null, [ta], 3));
+        tr2.appendChild(cell("td", null, [ta], 4));
         tbody.appendChild(tr2);
       });
       const foot = el("tr", "sh-mod-foot");
-      const td = cell("td", null, [], 3);
+      const td = cell("td", null, [], 4);
       if (!CTX.readonly) {
         const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
         add.type = "button";

@@ -111,7 +111,7 @@
       {% if c.outcomes %}<p class="small"><strong>Course outcomes</strong></p>
       <ol class="small">{% for o in c.outcomes.splitlines() if o.strip() %}<li>{{ o }}</li>{% endfor %}</ol>{% endif %}
       {% if c.modules %}<p class="small"><strong>Syllabus</strong></p>
-      <ol class="small">{% for m in c.modules %}<li><strong>{{ m.title }}</strong>{% if m.hours %} ({{ m.hours }} hours){% endif %}{% if m.revised %} — <span class="pre">{{ m.revised }}</span>{% endif %}</li>{% endfor %}</ol>{% endif %}
+      <ol class="small">{% for m in c.modules %}<li><strong>{{ m.title }}</strong>{% if m.hours %} ({{ m.hours }} hours){% endif %}{% if m.bta %} · {{ m.bta }}{% endif %}{% if m.revised %} — <span class="pre">{{ m.revised }}</span>{% endif %}</li>{% endfor %}</ol>{% endif %}
       {% if c.skill_activities %}<p class="small"><strong>Skill development activities:</strong> <span class="pre">{{ c.skill_activities }}</span></p>{% endif %}
       {% if c.books %}<p class="small"><strong>Books for reference</strong></p>
       <ul class="small">{% for b in c.books.splitlines() if b.strip() %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
