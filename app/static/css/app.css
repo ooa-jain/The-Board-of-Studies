@@ -3350,16 +3350,11 @@ table.sheet input:focus, table.sheet textarea:focus { border: 1px solid var(--lv
 .sheet-next { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 14px;
   border: 1px solid var(--line, #e4e7ec); border-radius: 10px; background: var(--ink-050, #f5f7fb); }
 .sheet-next .btn-gold { margin-left: auto; }
-.sheet-next-note { color: #c2410c; font-size: .82rem; font-weight: 600; }
-.sheet-next-note:empty { display: none; }
-/* "Fill the syllabus first" */
-.flow-dlg { width: min(440px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: var(--radius, 12px);
-  box-shadow: var(--shadow-lg, 0 24px 48px -16px rgba(16, 24, 40, .35)); color: var(--ink, #111); background: var(--surface, #fff); }
-.flow-dlg::backdrop { background: rgba(9, 19, 36, .5); }
-.flow-dlg-box { display: grid; gap: 10px; padding: 22px; }
-.flow-dlg-box h3 { margin: 0; font-size: 1.1rem; }
-.flow-dlg-box p { margin: 0; color: var(--ink-soft, #475467); font-size: .9rem; line-height: 1.5; }
-.flow-dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+/* a course's revision whose syllabus is not added yet */
+.rv-nosyl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 10px 0 4px; padding: 9px 12px;
+  border: 1px solid #f5c26b; border-left-width: 4px; border-radius: 8px; background: #fff8eb; color: #8a4b08;
+  font-size: .84rem; font-weight: 600; }
+.rv-nosyl a { color: #0e2a5c; font-weight: 700; }
 table.sheet:not(.sh-syl) { table-layout: fixed; }
 td.sh-nest { padding: 0; border: 0; }
 table.sh-syl { box-shadow: none; margin: -1.5px 0; width: calc(100% + 0px); }

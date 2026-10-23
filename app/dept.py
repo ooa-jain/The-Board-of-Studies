@@ -373,7 +373,8 @@ def stage(stage_key, programme_code=None):
             fill = revision_fill_source(sub, programme["programme_code"])
 
     linked = stage_key == "prog_curriculum" or bool(stage_def.get("existing_batch"))
-    syllabi = _syllabus_index(sub, stage_key, programme) if linked else []
+    # (Course Revision too: it says when a course's syllabus is not added yet)
+    syllabi = _syllabus_index(sub, stage_key, programme) if linked or stage_key == "prog_revision" else []
     # where each course's Revision link goes
     revision_url = (url_for("dept.stage", stage_key="prog_revision", programme_code=programme["programme_code"])
                     if (linked or stage_key == "prog_syllabus") and programme else "")

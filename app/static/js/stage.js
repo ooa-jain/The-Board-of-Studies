@@ -1644,28 +1644,10 @@
     const cur = (CTX.syllabi || []).find(x => x.current) || {};
     return !!((cur.courses || []).find(x => String(x.code).toUpperCase() === code) || {}).filled;
   }
-  /* Course Revision is worked out from a course's syllabus: a course whose
-     syllabus is not filled yet is sent there first. */
-  function syllabusFirst(code, title, toSyllabus) {
-    const dlg = el("dialog", "flow-dlg");
-    const box = el("div", "flow-dlg-box");
-    box.appendChild(el("h3", null, "Fill the syllabus first"));
-    box.appendChild(el("p", null, `${code}${title ? " — " + title : ""} has no syllabus yet. Its Course Revision ` +
-                                  "is worked out from the syllabus, so fill that in first."));
-    const row = el("div", "flow-dlg-actions");
-    const stay = el("button", "btn btn-ghost btn-sm", "Stay on the Curriculum table");
-    const go = el("button", "btn btn-gold btn-sm", "Go to its Syllabus →");
-    stay.type = go.type = "button";
-    stay.addEventListener("click", () => dlg.close());
-    go.addEventListener("click", () => { dlg.close(); toSyllabus(); });
-    row.appendChild(stay);
-    row.appendChild(go);
-    box.appendChild(row);
-    dlg.appendChild(box);
-    dlg.addEventListener("close", () => dlg.remove());
-    document.body.appendChild(dlg);
-    dlg.showModal();
-    go.focus();
+  // where a course's syllabus is filled in: its batch's Syllabus page, at the course
+  function toSyllabus(code) {
+    if (IS_BATCH && window.__batchView) window.__batchView("syllabus", code);
+    else if (currentSyllabus()) window.location.href = currentSyllabus() + FROM + "#course-" + encodeURIComponent(code);
   }
 
   function courseLink(type, row) {
@@ -1703,16 +1685,6 @@
     go.href = t.href;
     go.title = K.title;
     go.setAttribute("aria-label", `${K.word} of ${code}`);
-    // straight to Course Revision: only once the course's syllabus is in
-    if (type === "revision_link" && !CTX.readonly) go.addEventListener("click", e => {
-      if (row.syllabus === "No" || syllabusFilled(code)) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      syllabusFirst(code, row.course_title, () => {
-        if (IS_BATCH && window.__batchView) window.__batchView("syllabus", code);
-        else if (currentSyllabus()) window.location.href = currentSyllabus() + FROM + "#course-" + encodeURIComponent(code);
-      });
-    });
     if (t.here) go.addEventListener("click", e => {
       // the batch's Syllabus or Course Revision page: shown in place, at this course
       if (window.__batchView) { e.preventDefault(); window.__batchView(t.view || "syllabus", t.here); }
@@ -3724,9 +3696,6 @@
       const code = String(row.course_code || "").trim().toUpperCase();
       const bar = el("div", "sheet-next");
       bar.appendChild(backToTable());
-      const msg = el("span", "sheet-next-note");
-      msg.setAttribute("role", "status");
-      bar.appendChild(msg);
       if (!CTX.readonly && (IS_BATCH || CTX.revision_url)) {
         // named by the course's title (its code when it has none yet)
         const name = String(row.course_title || "").trim() || code;
@@ -3735,11 +3704,6 @@
         on.href = IS_BATCH ? "?view=revision#course-" + encodeURIComponent(code)
           : CTX.revision_url + FROM + "#course-" + encodeURIComponent(code);
         on.addEventListener("click", e => {
-          if (!sheetFilled(row)) {
-            e.preventDefault();
-            msg.textContent = "Fill in its Course Outcomes and at least one module first.";
-            return;
-          }
           if (IS_BATCH && window.__batchView) { e.preventDefault(); window.__batchView("revision", code); }
         });
         bar.appendChild(on);
@@ -4052,6 +4016,18 @@
       ic.addEventListener("change", redraw);
       it.addEventListener("change", redraw);
       if (focus && String(row.course_code || "").trim().toUpperCase() === focus) {
+        if (!CTX.readonly && !syllabusFilled(focus)) {
+          // it can be revised now, but its syllabus is still to add
+          const warn = el("div", "rv-nosyl");
+          warn.setAttribute("role", "status");
+          warn.appendChild(el("span", null, "Its syllabus is not added yet — the revision is worked out from the syllabus."));
+          const go = el("a", null, "Add its syllabus →");
+          go.href = IS_BATCH ? "?view=syllabus#course-" + encodeURIComponent(focus)
+            : (currentSyllabus() || "#") + "?from=" + encodeURIComponent(CTX.key) + "#course-" + encodeURIComponent(focus);
+          go.addEventListener("click", e => { if (IS_BATCH) { e.preventDefault(); toSyllabus(focus); } });
+          warn.appendChild(go);
+          wrap.insertBefore(warn, head.nextSibling);
+        }
         const bar = el("div", "sheet-next");
         bar.appendChild(backToTable());
         wrap.appendChild(bar);
@@ -4071,6 +4047,14 @@
       refresh();
     }
     host.showRow = () => draw();
+    // arriving for a course whose syllabus is not added yet: an alert at the top
+    const tellNoSyllabus = code => {
+      if (CTX.readonly || !code || syllabusFilled(code) || !window.Toast) return;
+      const row = data.find(r => String(r.course_code || "").trim().toUpperCase() === code) || {};
+      window.Toast.warning(`${row.course_title || code}: its syllabus is not added yet. Add it, then come back to the revision.`,
+                           { title: "Syllabus not added yet", timeout: 10000, onClick: () => toSyllabus(code) });
+    };
+    if (focus) setTimeout(() => tellNoSyllabus(focus), 500);
     // open one course here — from a course list's Revision → on an earlier
     // batch: added from its Syllabus if it is not here yet, and scrolled to
     window.__openRevision = code => {
@@ -4088,6 +4072,7 @@
       draw();
       const target = document.getElementById("revision-" + code) || document.getElementById("course-" + code) || list;
       window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+      tellNoSyllabus(code);
       target.classList.add("is-flash");
       setTimeout(() => target.classList.remove("is-flash"), 1900);
     };
