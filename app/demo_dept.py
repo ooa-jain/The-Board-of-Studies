@@ -213,31 +213,36 @@ def _courses(prefix):
     return rows
 
 
-def _modules(title, previous=False):
+def _modules(title, previous=False, total=60):
     out = []
-    for m, (name, hrs) in enumerate([("Foundations", 12), ("Concepts and frameworks", 12),
-                                      ("Tools and techniques", 12), ("Applications", 12),
-                                      ("Contemporary issues", 12)], 1):
+    # five modules, their hours adding up to the course's contact hours
+    total = int(total or 60)
+    hours = [total // 5 + (1 if k < total % 5 else 0) for k in range(5)]
+    for m, (name, hrs) in enumerate(zip(["Foundations", "Concepts and frameworks", "Tools and techniques",
+                                         "Applications", "Contemporary issues"], hours), 1):
         now_text = f"{name} ({hrs} Hrs) — {title}: {name.lower()}, with cases from Indian business."
         if previous:
             out.append({"previous": f"{name} ({hrs} Hrs) — {title}: {name.lower()}.",
                         "revised": now_text, "pct": 30 if m % 2 else 10, "pct_manual": True})
         else:
-            out.append({"previous": "", "revised": now_text, "pct": None})
+            # a syllabus module, as the sample lays it out: its title and hours, then its content
+            out.append({"title": name, "hours": hrs, "previous": "", "pct": None,
+                        "revised": f"{title}: {name.lower()}, with cases from Indian business.",
+                        "cos": [f"CO{n}" for n in ((1,), (1, 2), (2,), (2, 3), (3,))[m - 1]]})
     return out
 
 
 def _syllabus_row(c, batch_year, previous=False):
-    hours = c["credits"] if c["credits"] else 2
-    return {"course_code": c["course_code"], "course_title": c["course_title"],
-            "semester": c["semester"], "credits": c["credits"], "hours_per_week": hours,
-            "teaching_hours": hours * 15, "year_latest": batch_year,
+    from .schema import course_info
+    from .workflow import complete_syllabus
+    return complete_syllabus({"course_code": c["course_code"], "course_title": c["course_title"],
+            **course_info(c), "year_latest": batch_year,
             "pedagogy": "Lectures, case studies, group discussion and a field visit.",
             "outcomes": f"Explain the key ideas of {c['course_title']}\n"
                         f"Apply them to business problems\nAnalyse a real case and present findings",
-            "modules": _modules(c["course_title"], previous),
+            "modules": _modules(c["course_title"], previous, course_info(c).get("teaching_hours")),
             "skill_activities": "A short project with a local business, presented in class.",
-            "books": "Kotler, P. Principles (latest edition)\nRobbins, S. Management (latest edition)"}
+            "books": "Kotler, P. Principles (latest edition)\nRobbins, S. Management (latest edition)"})
 
 
 def sample(stage_key, programme=None, files=None, year="2027-28"):

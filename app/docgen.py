@@ -624,86 +624,121 @@ def _pg_curriculum_docx(prog, cur, deg):
 # Syllabus
 # ---------------------------------------------------------------------------
 
-def _course_sheet(doc, programme_name, c, width):
-    # five columns: the module rows need Syllabus | CO's | BTA | Hours
-    t = doc.add_table(rows=0, cols=5)
-    _borders(t, size=8)
+def _course_sheet(doc, programme_name, c, width, cols=None):
+    """One course as the sample syllabus lays it out: Course Information,
+    Course Objectives, the Course Outcomes with their Bloom's Taxonomy level,
+    the CO-PO-PSO Mapping with its Articulation row, the Course Content, and
+    the Text Books, Book References and Web References (then Pedagogy and
+    Skill Development Activities, when they are given)."""
+    from .schema import bloom_level, outcome_columns
+    cols = cols or outcome_columns({})
+    center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
+
+    def heading(text):
+        _para(doc, text, bold=True, size=11, align=left, after=3)
+
+    def numbered(text):
+        for n, line in enumerate(_lines(text), start=1):
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent = Pt(18)
+            p.paragraph_format.space_after = Pt(1)
+            p.add_run(f"{n}.  {line}").font.size = Pt(10)
+
+    # Course Information
+    heading("Course Information:")
+    t = doc.add_table(rows=4, cols=4)
+    _borders(t, size=6)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
-    center = WD_ALIGN_PARAGRAPH.CENTER
+    top = t.rows[0].cells
+    _write(top[0], "Course Title", bold=True, size=10)
+    _write(top[1].merge(top[3]), c.get("course_title") or "", bold=True, size=10)
+    sem = _num(c.get("semester"))
+    for r, (k1, v1, k2, v2) in enumerate((
+            ("Course Code", c.get("course_code") or "", "L-T-P-E", c.get("ltpe") or ""),
+            ("Semester", ROMAN[int(sem) - 1] if sem and 1 <= sem <= len(ROMAN) else _fmt(c.get("semester")),
+             "Contact Hours", _fmt(c.get("teaching_hours"))),
+            ("Credits", _fmt(c.get("credits")), "CA: ESE", c.get("ca_ese") or "")), start=1):
+        cells = t.rows[r].cells
+        for n, (v, bold) in enumerate(((k1, True), (v1, False), (k2, True), (v2, False))):
+            _write(cells[n], str(v), bold=bold, size=10)
+    _widths(t, [width * 0.2, width * 0.3, width * 0.2, width * 0.3])
 
-    def full():
-        row = t.add_row()
-        cell = row.cells[0].merge(row.cells[4])
-        cell.text = ""
-        return cell
+    heading("Course Objectives:")
+    numbered(c.get("objectives"))
 
-    head = full()
-    _labelled(head, "Name of the Program:", programme_name, align=center)
-    _labelled(head, "Course Code:", c.get("course_code") or "", align=center)
-    _labelled(head, "Name of the Course:", "", align=center).add_run(
-        " " + (c.get("course_title") or "")).bold = True
+    # Course Outcomes, each with its Bloom's Taxonomy level
+    cos = [x for x in (c.get("co_table") or []) if isinstance(x, dict) and str(x.get("text") or "").strip()] \
+        if isinstance(c.get("co_table"), list) else \
+        [{"text": line, "bloom": bloom_level(line) or ""} for line in _lines(c.get("outcomes"))]
+    heading("Course Outcomes (COs):")
+    _para(doc, "At the end of the course, the learner will be able to:", size=10, align=left, after=3)
+    t = doc.add_table(rows=1, cols=3)
+    _borders(t, size=6)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for n, h in enumerate(("Course Outcome", "Description", "Bloom’s Taxonomy Level")):
+        _write(t.rows[0].cells[n], h, bold=True, size=10, align=center)
+    for n, co in enumerate(cos, start=1):
+        cells = t.add_row().cells
+        _write(cells[0], f"CO {n}", bold=True, size=10, align=center)
+        _write(cells[1], str(co.get("text") or "").strip(), size=10, align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+        _write(cells[2], str(co.get("bloom") or ""), size=10, align=center)
+    _widths(t, [width * 0.16, width * 0.64, width * 0.2])
 
-    hr = t.add_row().cells
-    hr = [hr[0], hr[1], hr[2].merge(hr[4])]
-    for i, h in enumerate(("Course Credits", "No. of Hours per Week", "Total No. of Teaching Hours")):
-        _write(hr[i], h, bold=True, size=10, align=center)
-    vr = t.add_row().cells
-    vr = [vr[0], vr[1], vr[2].merge(vr[4])]
-    for i, v in enumerate((f"{_fmt(c.get('credits'))} Credits" if _fmt(c.get("credits")) else "",
-                           f"{_fmt(c.get('hours_per_week'))} Hrs" if _fmt(c.get("hours_per_week")) else "",
-                           f"{_fmt(c.get('teaching_hours'))} Hrs" if _fmt(c.get("teaching_hours")) else "")):
-        _write(vr[i], v, bold=True, size=10, align=center)
+    # CO-PO-PSO Mapping, and each column's average
+    heading("CO-PO-PSO Mapping:")
+    rows = c.get("co_po") if isinstance(c.get("co_po"), list) else []
+    t = doc.add_table(rows=1, cols=len(cols) + 1)
+    _borders(t, size=6)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for n, h in enumerate(["CO"] + cols):
+        _write(t.rows[0].cells[n], h, bold=True, size=8.5, align=center)
+    for n in range(len(cos)):
+        m = rows[n] if n < len(rows) and isinstance(rows[n], dict) else {}
+        cells = t.add_row().cells
+        _write(cells[0], f"CO{n + 1}", bold=True, size=8.5, align=center)
+        for k, col in enumerate(cols, start=1):
+            v = str(m.get(col) or "").strip()
+            _write(cells[k], v if v in ("1", "2", "3") else "-", size=8.5, align=center)
+    cells = t.add_row().cells
+    _write(cells[0], "Articulation", bold=True, size=8.5, align=center)
+    for k, col in enumerate(cols, start=1):
+        vals = [float(m.get(col)) for m in rows[:len(cos)] if isinstance(m, dict) and str(m.get(col) or "").strip() in ("1", "2", "3")]
+        _write(cells[k], _fmt(round(sum(vals) / len(vals), 1)) if vals else "-", bold=True, size=8.5, align=center)
+    _widths(t, [width * 0.12] + [width * 0.88 / max(len(cols), 1)] * len(cols))
+    _para(doc, "3-High, 2-Medium, 1-Low", size=9, align=left, after=4)
 
-    ped = full()
-    _labelled(ped, "Pedagogy:", c.get("pedagogy") or
-              "Classrooms lecture, Case studies, Tutorial Classes, Group discussion, Seminar & field work etc.,")
-
-    co = full()
-    _labelled(co, "Course Outcomes: On successful completion of the course, the students' will be able to",
-              "")
-    for i, line in enumerate(_lines(c.get("outcomes"))):
-        p = co.add_paragraph()
-        p.paragraph_format.left_indent = Pt(18)
-        p.paragraph_format.space_after = Pt(0)
-        p.add_run(f"{chr(97 + i % 26)})  {line}").font.size = Pt(10)
-
-    row = t.add_row()
-    left = row.cells[0].merge(row.cells[1])
-    _write(left, "Syllabus:", bold=True, size=10)
-    _write(row.cells[2], "CO's", bold=True, size=10, align=center)
-    _write(row.cells[3], "BTA", bold=True, size=10, align=center)
-    _write(row.cells[4], "Hours", bold=True, size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    # Course Content
+    heading("Course Content:")
     for n, m in enumerate([m for m in (c.get("modules") or []) if isinstance(m, dict)], start=1):
-        row = t.add_row()
-        left = row.cells[0].merge(row.cells[1])
-        _write(left, f"Module No. {n}: {m.get('title') or ''}".rstrip(": "), bold=True, size=10)
-        cos = m.get("cos")
-        cos = ", ".join(cos) if isinstance(cos, list) else str(cos or "")
-        _write(row.cells[2], cos, size=10, align=center)
-        _write(row.cells[3], str(m.get("bta") or ""), size=9, align=center)
-        _write(row.cells[4], _fmt(m.get("hours")), bold=True, size=10, align=WD_ALIGN_PARAGRAPH.RIGHT)
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(1)
+        p.paragraph_format.tab_stops.add_tab_stop(Emu(int(width)), alignment=2)   # the hours, on the right
+        r = p.add_run(f"Module {n}: {m.get('title') or ''}".rstrip(": "))
+        r.bold, r.font.size = True, Pt(10)
+        tags = [", ".join(m["cos"]) if isinstance(m.get("cos"), list) and m.get("cos") else "", m.get("bta") or ""]
+        if any(tags):
+            extra = p.add_run("  (" + "; ".join(x for x in tags if x) + ")")
+            extra.font.size = Pt(9)
+        if _fmt(m.get("hours")):
+            h = p.add_run(f"\t{_fmt(m.get('hours'))} Hours")
+            h.bold, h.font.size = True, Pt(10)
         body = str(m.get("revised") or m.get("content") or "").strip()
         if body:
-            cell = full()
-            _write(cell, body, size=10, align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+            _para(doc, body, size=10, align=WD_ALIGN_PARAGRAPH.JUSTIFY, after=4)
 
-    def numbered(label, text, note=None):
-        cell = full()
-        _labelled(cell, label, "")
-        for i, line in enumerate(_lines(text), start=1):
-            p = cell.add_paragraph()
-            p.paragraph_format.left_indent = Pt(18)
-            p.paragraph_format.space_after = Pt(0)
-            p.add_run(f"{i}.  {line}").font.size = Pt(10)
-        if note:
-            p = cell.add_paragraph()
-            r = p.add_run(note)
-            r.bold = True
-            r.font.size = Pt(10)
-
-    numbered("Skill Development Activities:", c.get("skill_activities"))
-    numbered("Books for reference:", c.get("books"), "Note: Latest edition of books may be used.")
-    _widths(t, [width * 0.28, width * 0.30, width * 0.14, width * 0.16, width * 0.12])
+    heading("Text Books:")
+    numbered(c.get("text_books"))
+    heading("Book References:")
+    numbered(c.get("books"))
+    if _lines(c.get("web_references")):
+        heading("Web References:")
+        numbered(c.get("web_references"))
+    if str(c.get("pedagogy") or "").strip():
+        heading("Pedagogy:")
+        _para(doc, str(c["pedagogy"]).strip(), size=10, align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+    if _lines(c.get("skill_activities")):
+        heading("Skill Development Activities:")
+        numbered(c.get("skill_activities"))
 
 
 def _earlier(db, dept_code, year, prog, part):
@@ -742,14 +777,19 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
     if not courses:
         _para(doc, "No syllabus entered yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
     courses = sorted(courses, key=lambda c: (_num(c.get("semester")) or 99))
+    # the CO-PO-PSO Mapping's columns: as many POs and PSOs as the programme sets
+    from .schema import outcome_columns
+    cols = outcome_columns(cur.get("details"))
     sem = object()
     for n, c in enumerate(courses):
         if n:
             _page_break(doc)
         if c.get("semester") != sem and _num(c.get("semester")):
             sem = c.get("semester")
-            _para(doc, f"SEMESTER {_fmt(sem)}", bold=True, size=11, color=NAVY, after=4)
-        _course_sheet(doc, name, copy.deepcopy(c), width)
+            s_n = int(_num(sem))
+            _para(doc, f"SEMESTER {ROMAN[s_n - 1] if 1 <= s_n <= len(ROMAN) else _fmt(sem)}",
+                  bold=True, size=11, color=NAVY, after=4)
+        _course_sheet(doc, name, copy.deepcopy(c), width, cols)
     doc.core_properties.title = _title(f"{name} — Syllabus {batch}".strip())
     return _save(doc)
 

@@ -687,30 +687,19 @@ def course_fill_source(submission, programme_code):
     bos = str(((stage_state(submission, "bos_documents").get("data") or {})
                .get("meeting") or {}).get("bos_date") or "")
     year = bos[:4] if bos[:4].isdigit() else ""
+    from .schema import course_info
     out, seen = [], set()
     for r in data.get("semester_structure") or []:
         if not isinstance(r, dict) or r.get("syllabus") == "No":
             continue          # the department said this course has no syllabus
-        hours = 0
-        for k in ("l", "t", "p", "e"):
-            try:
-                hours += int(float(r.get(k) or 0))
-            except (TypeError, ValueError):
-                pass
         for code, title in course_options(r.get("course_code"), r.get("course_title")):
             if code.upper() in seen:
                 continue
             seen.add(code.upper())
-            row = {"course_code": code, "course_title": title}
-            if r.get("semester") not in (None, ""):
-                row["semester"] = r["semester"]
-            if r.get("credits") not in (None, ""):
-                row["credits"] = r["credits"]
+            # its semester, credits, L-T-P-E, contact hours and CA : ESE, as the table has them
+            row = {"course_code": code, "course_title": title, **course_info(r)}
             if year:
                 row["year_latest"] = year
-            if hours:
-                row["hours_per_week"] = hours
-                row["teaching_hours"] = hours * 15
             out.append(row)
     return out
 
@@ -790,6 +779,32 @@ def same_course(rows, code, title=""):
             or next((r for r in rows if re.sub(r"^\d{2}", "", key(r)) == no_year), None)
             or (next((r for r in rows if str(r.get("course_title") or "").strip().lower() == title), None)
                 if title else None))
+
+
+def complete_syllabus(c, cols=None):
+    """A sample (or Drive) syllabus sheet made whole for the template: its
+    objectives, each course outcome with its Bloom's level (from its opening
+    verb), a CO-PO-PSO Mapping, text books and web references — whatever it
+    does not have already."""
+    from .schema import bloom_level, outcome_columns
+    cols = cols or outcome_columns({})
+    title = c.get("course_title") or "the course"
+    lines = lambda v: [x.strip() for x in str(v or "").splitlines() if x.strip()]
+    if not lines(c.get("objectives")):
+        c["objectives"] = (f"To explain the core concepts and principles of {title}.\n"
+                           f"To develop the skills to apply {title} to practical problems.\n"
+                           f"To build the ability to analyse and evaluate practice in {title}.")
+    if not isinstance(c.get("co_table"), list):
+        c["co_table"] = [{"text": t, "bloom": str(bloom_level(t) or 3)} for t in lines(c.get("outcomes"))]
+    if not isinstance(c.get("co_po"), list):
+        # every CO high on the first PO, medium on every third column after it
+        c["co_po"] = [{col: "3" if j == 0 else "2" if (j + k) % 3 == 0 else "-" for j, col in enumerate(cols)}
+                      for k in range(len(c["co_table"]))]
+    if not lines(c.get("text_books")):
+        c["text_books"] = "\n".join(lines(c.get("books"))[:1]) or "Core text of the discipline, latest edition."
+    if not lines(c.get("web_references")):
+        c["web_references"] = "University Grants Commission https://www.ugc.gov.in\nSWAYAM https://swayam.gov.in"
+    return c
 
 
 def batch_semesters(key, s=None) -> list:

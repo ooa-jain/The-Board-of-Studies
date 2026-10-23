@@ -210,6 +210,9 @@
     syllabi: {{ syllabi|tojson }},
     revision_url: {{ (revision_url or '')|tojson }},
     revision_year: {{ (revision_year or '')|tojson }},
+    // a syllabus's CO-PO-PSO Mapping columns, and the verbs that suggest a CO's Bloom's level
+    outcome_cols: {{ (outcome_cols or [])|tojson }},
+    bloom_verbs: {{ (bloom_verbs or {})|tojson }},
     course_map: {{ course_map|tojson }},
     structure_courses: {{ structure_courses|tojson }},
     record: {{ record|tojson }},

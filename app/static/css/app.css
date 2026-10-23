@@ -3362,6 +3362,38 @@ table.sh-syl td.sh-hours, table.sh-syl th.sh-hours { width: 92px; }
 table.sheet td.sh-nest { padding: 0; border-left: 0; border-right: 0; }
 table.sheet.sh-syl { margin: 0; border-style: hidden; }
 
+/* ---------- the syllabus, as the sample syllabus lays it out: Course
+   Information, Objectives, Course Outcomes with their Bloom's level, the
+   CO-PO-PSO Mapping, Course Content, the references ---------- */
+.sh-stack { display: grid; gap: 0; }
+.sh-stack > table.sheet { box-shadow: none; }
+.sh-stack > table.sheet + table.sheet { margin-top: -1.5px; }
+.sh-stack > table.sh-syl { border: 1.5px solid #2b2b2b; border-style: solid; margin-top: -1.5px; }
+.sh-part { margin: 14px 0 6px; font-weight: 700; color: var(--ink-800, #0e2a5c); }
+.sh-stack > .sh-part:first-child { margin-top: 0; }
+.sh-part + table.sheet { margin-top: 0 !important; }
+table.sheet th.sh-k { width: 18%; text-align: left; background: #f3f6fb; }
+table.sheet td.sh-v { width: 32%; }
+.sh-auto { font-weight: 700; padding: 4px 2px; }
+td.sh-missing { font-size: .84rem; color: #8a4b08; background: #fff8eb; }
+td.sh-missing .btn { margin-left: 4px; }
+.sh-opt { font-weight: 400; font-size: .8rem; color: var(--ink-faint, #98a2b3); }
+td.sh-lead { font-weight: 600; background: #fff; }
+.sh-cot-head th { background: #f3f6fb; }
+td.sh-con { width: 92px; font-weight: 700; text-align: center; vertical-align: middle; white-space: nowrap; }
+td.sh-co-lv { width: 210px; vertical-align: middle; }
+td.sh-co-lv { white-space: nowrap; }
+td.sh-co-lv .sh-co-level { width: calc(100% - 32px); }
+td.sh-co-lv .sh-x { margin-left: 6px; vertical-align: middle; }
+table.sheet .sh-co-text { min-height: 52px; resize: vertical; }
+table.sheet .sh-co-level.is-auto { border-style: dashed; border-color: #f5c26b; background: #fffaf0; }
+table.sh-map { font-size: .84rem; }
+table.sh-map th, table.sh-map td { padding: 4px 3px; text-align: center; vertical-align: middle; }
+table.sh-map .sh-map-co { width: 84px; white-space: nowrap; font-weight: 700; }
+table.sheet .sh-map-sel { min-width: 40px; padding: 3px 2px; text-align: center; text-align-last: center; }
+.sh-map-avg td, .sh-map-avg th { font-weight: 700; background: #f3f6fb; }
+td.sh-legend { text-align: left !important; font-size: .8rem; color: var(--ink-soft, #475467); background: #fff; }
+
 /* ---------- the department's identity: a profile card (after Uiverse.io,
    Smit-Prajapati) that opens as it scrolls into view ---------- */
 .pcard {

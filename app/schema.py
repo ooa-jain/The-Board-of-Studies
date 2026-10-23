@@ -53,6 +53,71 @@ NEP_CATEGORIES = [
     "Research Project / Dissertation",
 ]
 
+# Bloom's Taxonomy: the level a course outcome reaches (1-6), and the verbs a
+# CO usually opens with at each level — a suggestion; the department chooses
+BLOOM_LEVELS = ["Remembering", "Understanding", "Applying", "Analyzing", "Evaluating", "Creating"]
+BLOOM_VERB_LEVEL = {v: n for n, verbs in enumerate((
+    "remember recall define list identify name state recognise recognize label match memorise memorize "
+    "record repeat",
+    "understand explain describe discuss summarise summarize interpret classify paraphrase infer outline "
+    "translate express report review",
+    "apply use demonstrate solve prepare compute calculate implement execute illustrate operate employ "
+    "perform determine practise practice show",
+    "analyse analyze examine compare contrast differentiate distinguish reconcile investigate categorise "
+    "categorize organise organize attribute deconstruct",
+    "evaluate assess critique justify judge appraise defend argue recommend prioritise prioritize verify "
+    "validate",
+    "create design develop formulate construct compose plan produce generate propose devise build invent "
+    "integrate",
+), start=1) for v in verbs.split()}
+
+
+def bloom_level(text):
+    """The level a course outcome's opening verb usually stands for, or None."""
+    words = str(text or "").strip().split()
+    return BLOOM_VERB_LEVEL.get(words[0].lower().strip(".,:;")) if words else None
+
+
+def outcome_columns(details):
+    """The columns of a course's CO-PO-PSO Mapping — PO1 … then PSO1 … — as
+    many as the programme's Curriculum sets (9 and 4 when it does not)."""
+    def count(name, default, top):
+        try:
+            n = int(str((details or {}).get(name) or "").strip())
+        except ValueError:
+            return default
+        return n if 0 <= n <= top else default
+    return ([f"PO{n}" for n in range(1, count("po_count", 9, 15) + 1)]
+            + [f"PSO{n}" for n in range(1, count("pso_count", 4, 8) + 1)])
+
+
+def course_info(r):
+    """A course's Course Information, from its line of the Curriculum table:
+    semester, credits, L-T-P-E, contact hours (15 for every credit) and
+    CA : ESE — so the syllabus never asks for them again."""
+    def num(k):
+        try:
+            v = float(str(r.get(k)).strip())
+        except (TypeError, ValueError):
+            return None
+        return int(v) if v == int(v) else v
+    out = {}
+    if r.get("semester") not in (None, ""):
+        out["semester"] = r["semester"]
+    hours = [num(k) for k in ("l", "t", "p", "e")]
+    if all(h is not None for h in hours):
+        out["ltpe"] = "-".join(str(h) for h in hours)
+        out["hours_per_week"] = sum(hours)
+    credits = num("credits")
+    if credits is not None:
+        out["credits"] = credits
+        out["teaching_hours"] = int(round(credits * 15))
+    cia, ese = num("cia"), num("ese")
+    if cia is not None and ese is not None:
+        out["ca_ese"] = f"{cia}:{ese}"
+    return out
+
+
 # what each is called in the Course category list: the credit table's own headings
 CATEGORY_LABELS = {
     "Major (Core)": "Major",
@@ -372,6 +437,14 @@ PROGRAMME_CURRICULUM = {
                  "required": True, "options": DEGREE_LEVELS, "prefill": "degree_level",
                  "reload_on_change": True},
                 {"name": "specialisation", "label": "Specialisation", "type": "text"},
+                # how many Programme Outcomes and Programme Specific Outcomes it has:
+                # every syllabus's CO-PO-PSO Mapping has that many columns
+                {"name": "po_count", "label": "Number of POs", "type": "select",
+                 "options": [str(n) for n in range(1, 16)],
+                 "help": "Programme Outcomes — the columns PO1, PO2 … of every course's CO-PO-PSO Mapping. Left empty: 9."},
+                {"name": "pso_count", "label": "Number of PSOs", "type": "select",
+                 "options": [str(n) for n in range(0, 9)],
+                 "help": "Programme Specific Outcomes — the columns PSO1, PSO2 … Left empty: 4."},
                 # worked out, never typed: the current batch's first year to the
                 # year the programme ends (2026-29 for a 3-year UG)
                 {"name": "batch", "label": "Batch", "type": "readonly", "prefill": "batch_auto",
@@ -550,32 +623,51 @@ PROGRAMME_SYLLABUS = {
             "display": "sheet",
             "card": {"code": "course_code", "name": "course_title", "noun": "course"},
             "columns": [
+                # Course Information: the course's own line of the Curriculum table —
+                # its semester, credits, L-T-P-E and CA : ESE come from there, not typed again
+                {"name": "course_title", "label": "Course Title", "type": "text", "required": True},
                 {"name": "course_code", "label": "Course Code", "type": "text", "required": True},
-                {"name": "course_title", "label": "Name of the Course", "type": "text", "required": True},
-                # kept for the curriculum link and the order of courses; not on the sheet
                 {"name": "semester", "label": "Semester", "type": "integer", "min": 1, "max": 10,
                  "hidden": True},
-                {"name": "credits", "label": "Course Credits", "type": "number", "required": True,
+                {"name": "ltpe", "label": "L-T-P-E", "type": "readonly", "hidden": True},
+                {"name": "credits", "label": "Credits", "type": "number", "required": True,
                  "min": 0, "max": 20},
-                {"name": "hours_per_week", "label": "No. of Hours per Week", "type": "integer",
-                 "required": True, "min": 0, "max": 40},
-                {"name": "teaching_hours", "label": "Total No. of Teaching Hours", "type": "integer",
+                {"name": "hours_per_week", "label": "Hours per week", "type": "integer",
+                 "min": 0, "max": 40, "hidden": True},
+                # contact hours: 15 for every credit
+                {"name": "teaching_hours", "label": "Contact Hours", "type": "integer",
                  "required": True, "min": 0, "max": 600},
-                {"name": "pedagogy", "label": "Pedagogy", "type": "textarea", "required": True,
+                {"name": "ca_ese", "label": "CA : ESE", "type": "readonly", "hidden": True},
+                {"name": "objectives", "label": "Course Objectives", "type": "textarea", "required": True,
+                 "rows": 5, "min_items": 1,
+                 "placeholder": "To explain …\nTo develop …  — one per line"},
+                # the Course Outcomes, each with its Bloom's Taxonomy level ([{text, bloom}]);
+                # "outcomes" is the same, one per line, for the checks and the exports
+                {"name": "co_table", "label": "Course Outcomes and Bloom's levels", "type": "readonly",
+                 "hidden": True},
+                {"name": "outcomes", "label": "Course Outcomes", "type": "textarea", "required": True,
+                 "rows": 5, "min_items": 3},
+                # CO-PO-PSO Mapping: one row a CO, {"PO1": "3", …, "PSO4": "-"}
+                {"name": "co_po", "label": "CO-PO-PSO Mapping", "type": "readonly", "hidden": True},
+                {"name": "modules", "label": "Course Content", "type": "module_compare", "compare": False,
+                 "required": True},
+                {"name": "text_books", "label": "Text Books", "type": "textarea", "required": True,
+                 "rows": 4, "min_items": 1,
+                 "placeholder": "Author (Year). Title (edition). Publisher.  — one per line"},
+                {"name": "books", "label": "Book References", "type": "textarea", "required": True,
+                 "rows": 4, "min_items": 1,
+                 "placeholder": "Author: Year, Title, Publisher  — one per line"},
+                {"name": "web_references", "label": "Web References", "type": "textarea", "rows": 3,
+                 "placeholder": "Name of the site  https://…  — one per line"},
+                # kept from the earlier template, now optional
+                {"name": "pedagogy", "label": "Pedagogy", "type": "textarea",
                  "rows": 2, "placeholder": "Classrooms lecture, Case studies, Tutorial Classes, "
                                            "Group discussion, Seminar & field work etc.,"},
-                {"name": "outcomes", "label": "Course Outcomes", "type": "textarea", "required": True,
-                 "rows": 5, "min_items": 3,
-                 "placeholder": "a) Understand …\nb) Apply …\nc) …  — one per line"},
-                {"name": "modules", "label": "Syllabus", "type": "module_compare", "compare": False,
-                 "required": True},
                 {"name": "skill_activities", "label": "Skill Development Activities", "type": "textarea",
-                 "required": True, "rows": 5, "min_items": 1,
-                 "placeholder": "1. …\n2. …  — one per line"},
-                {"name": "books", "label": "Books for reference", "type": "textarea", "required": True,
-                 "rows": 5, "min_items": 2, "placeholder": "1. Author, Title, Publisher.  — one per line"},
+                 "rows": 4, "placeholder": "1. …\n2. …  — one per line"},
             ],
-            "rules": ["course_codes_known", "bloom_verbs_present"],
+            "rules": ["course_codes_known", "bloom_verbs_present", "outcomes_have_bloom_levels",
+                      "co_po_mapping_valid"],
         },
     ],
 }
@@ -723,7 +815,7 @@ def _batch_part(start: int) -> dict:
                 "opens it here; or fill in all its courses at once.",
         "min_rows": 0,
         # its courses are this batch's own, not the current programme structure's
-        "rules": ["bloom_verbs_present"],
+        "rules": ["bloom_verbs_present", "outcomes_have_bloom_levels", "co_po_mapping_valid"],
     })
     return {
         "key": batch_key(start),

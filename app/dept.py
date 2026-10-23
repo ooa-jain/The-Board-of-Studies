@@ -16,7 +16,7 @@ from .db import audit, get_db, now, rules_doc, settings, to_ist
 from .db import settings as app_settings_doc
 from .exporter import department_excel, submission_word
 from .report import ShareLinks
-from .schema import STAGE_BY_KEY, STAGE_KEYS, course_category
+from .schema import BLOOM_VERB_LEVEL, STAGE_BY_KEY, STAGE_KEYS, course_category
 from . import people
 from .notify import describe_changes
 from .notify import record as notify_record
@@ -413,6 +413,12 @@ def stage(stage_key, programme_code=None):
             back = url_for("dept.stage", stage_key="prog_curriculum",
                            programme_code=programme["programme_code"]) + "#sec-semester_structure"
             back_label = "Programme structure — semester scheme"
+    # a syllabus's CO-PO-PSO Mapping: as many POs and PSOs as the programme's Curriculum sets
+    outcome_cols = []
+    if programme and stage_key.startswith("prog_syllabus"):
+        from .schema import outcome_columns
+        outcome_cols = outcome_columns((programme_stage_state(sub, programme["programme_code"], "prog_curriculum")
+                                        .get("data") or {}).get("details"))
     comments = list(get_db().comments.find({
         "dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
         "programme_code": (programme or {}).get("programme_code", ""),
@@ -461,6 +467,7 @@ def stage(stage_key, programme_code=None):
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back, back_label=back_label,
                            structure_courses=structure_courses, revision_year=revision_year(sub),
+                           outcome_cols=outcome_cols, bloom_verbs=BLOOM_VERB_LEVEL,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),
                            back_to=(url_for("dept.stage", stage_key="curriculum")

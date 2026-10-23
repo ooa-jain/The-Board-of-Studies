@@ -107,14 +107,21 @@
       <summary><span class="mono">{{ c.course_code or '—' }}</span> <strong>{{ c.course_title }}</strong>
         <span class="small muted">· {{ c.credits }} credits · {{ c.teaching_hours or '—' }} hours</span>
         {% if c.outcomes and c.modules %}<span class="pill pill-ok">✓</span>{% endif %}</summary>
-      {% if c.pedagogy %}<p class="small"><strong>Pedagogy:</strong> {{ c.pedagogy }}</p>{% endif %}
-      {% if c.outcomes %}<p class="small"><strong>Course outcomes</strong></p>
+      <p class="small">L-T-P-E {{ c.ltpe or '—' }} · Semester {{ c.semester or '—' }} · Contact Hours {{ c.teaching_hours or '—' }} · Credits {{ c.credits or '—' }} · CA : ESE {{ c.ca_ese or '—' }}</p>
+      {% if c.objectives %}<p class="small"><strong>Course Objectives</strong></p>
+      <ol class="small">{% for o in c.objectives.splitlines() if o.strip() %}<li>{{ o }}</li>{% endfor %}</ol>{% endif %}
+      {% if c.co_table is iterable and c.co_table is not string and c.co_table %}<p class="small"><strong>Course Outcomes</strong></p>
+      <ol class="small">{% for o in c.co_table if o is mapping and (o.text or '').strip() %}<li>{{ o.text }}{% if o.bloom %} <span class="muted">· Bloom's level {{ o.bloom }}</span>{% endif %}</li>{% endfor %}</ol>
+      {% elif c.outcomes %}<p class="small"><strong>Course Outcomes</strong></p>
       <ol class="small">{% for o in c.outcomes.splitlines() if o.strip() %}<li>{{ o }}</li>{% endfor %}</ol>{% endif %}
-      {% if c.modules %}<p class="small"><strong>Syllabus</strong></p>
+      {% if c.modules %}<p class="small"><strong>Course Content</strong></p>
       <ol class="small">{% for m in c.modules %}<li><strong>{{ m.title }}</strong>{% if m.hours %} ({{ m.hours }} hours){% endif %}{% if m.bta %} · {{ m.bta }}{% endif %}{% if m.revised %} — <span class="pre">{{ m.revised }}</span>{% endif %}</li>{% endfor %}</ol>{% endif %}
-      {% if c.skill_activities %}<p class="small"><strong>Skill development activities:</strong> <span class="pre">{{ c.skill_activities }}</span></p>{% endif %}
-      {% if c.books %}<p class="small"><strong>Books for reference</strong></p>
-      <ul class="small">{% for b in c.books.splitlines() if b.strip() %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+      {% for label, key in (("Text Books", "text_books"), ("Book References", "books"), ("Web References", "web_references")) %}
+      {% if c[key] %}<p class="small"><strong>{{ label }}</strong></p>
+      <ul class="small">{% for b in c[key].splitlines() if b.strip() %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+      {% endfor %}
+      {% if c.pedagogy %}<p class="small"><strong>Pedagogy:</strong> {{ c.pedagogy }}</p>{% endif %}
+      {% if c.skill_activities %}<p class="small"><strong>Skill Development Activities:</strong> <span class="pre">{{ c.skill_activities }}</span></p>{% endif %}
     </details>
     {% else %}<p class="small muted">No syllabus entered yet.</p>{% endfor %}
   </div>

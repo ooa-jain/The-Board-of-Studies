@@ -426,13 +426,16 @@ def test_the_syllabus_is_one_template_sheet_per_course(app, client):
     from docx import Document
     code = _load(app)["dept"]["dept_code"]
     url = next(u for u in _generated_links(app, client, code) if "/share/s/" in u)
-    assert "Module No. 1:" in app.test_client().get(urlparse(url).path).get_data(as_text=True)
+    assert "Module 1:" in app.test_client().get(urlparse(url).path).get_data(as_text=True)
     doc = Document(io.BytesIO(app.test_client().get(urlparse(url).path + "/file").data))
     cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
-    for words in ("Name of the Program:", "Course Credits", "No. of Hours per Week",
-                  "Course Outcomes", "Module No. 1:", "Books for reference:",
-                  "Note: Latest edition of books may be used."):
+    for words in ("Course Title", "L-T-P-E", "Contact Hours", "CA: ESE", "Bloom’s Taxonomy Level",
+                  "PO1", "PSO1", "Articulation"):
         assert words in cells
+    text = " ".join(p.text for p in doc.paragraphs)
+    for words in ("Course Information:", "Course Objectives:", "Course Outcomes (COs):", "CO-PO-PSO Mapping:",
+                  "Course Content:", "Module 1:", "Text Books:", "Book References:"):
+        assert words in text
     assert len(doc.tables) > 10                                     # one sheet per course
     sec = doc.sections[0]
     assert sec.page_height > sec.page_width                         # portrait

@@ -2783,6 +2783,43 @@ html[data-theme="dark"] table.sheet td.sh-nest {
   border-left: 0;
   border-right: 0;
 }
+html[data-theme="dark"] .sh-stack > table.sheet {
+  box-shadow: none;
+}
+html[data-theme="dark"] .sh-stack > table.sh-syl {
+  border: 1.5px solid #5a657c;
+}
+html[data-theme="dark"] .sh-part {
+  color: #acc7ec;
+}
+html[data-theme="dark"] table.sheet th.sh-k {
+  background: #0e182a;
+}
+html[data-theme="dark"] td.sh-missing {
+  color: #f7b56e;
+  background: #2c220f;
+}
+html[data-theme="dark"] .sh-opt {
+  color: #aab2c1;
+}
+html[data-theme="dark"] td.sh-lead {
+  background: #121519;
+}
+html[data-theme="dark"] .sh-cot-head th {
+  background: #0e182a;
+}
+html[data-theme="dark"] table.sheet .sh-co-level.is-auto {
+  border-color: #f5c26b;
+  background: #29200e;
+}
+html[data-theme="dark"] .sh-map-avg td,
+html[data-theme="dark"] .sh-map-avg th {
+  background: #0e182a;
+}
+html[data-theme="dark"] td.sh-legend {
+  color: #afb8ca;
+  background: #121519;
+}
 html[data-theme="dark"] .pcard {
   background: #121519;
   box-shadow: rgba(15, 36, 64, 0.18) 0 60px 30px -50px, 0 1px 0 #20252e;

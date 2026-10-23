@@ -167,10 +167,17 @@ MODULES = [("Foundations", 9), ("Core concepts", 9), ("Techniques and methods", 
            ("Tools and practice", 9), ("Applications and case studies", 9)]
 
 
-def _module_rows(title):
+def _module_rows(title, total=None):
+    """Five modules; their hours add up to the course's contact hours, when it has them."""
+    try:
+        total = int(float(total))
+    except (TypeError, ValueError):
+        total = 0
+    hours = ([total // len(MODULES) + (1 if k < total % len(MODULES) else 0) for k in range(len(MODULES))]
+             if total >= len(MODULES) else [hrs for _, hrs in MODULES])
     return [{"title": name, "hours": hrs, "previous": "", "pct": None,
              "revised": f"{name} of {title}: key concepts, worked examples and exercises."}
-            for name, hrs in MODULES]
+            for (name, _), hrs in zip(MODULES, hours)]
 
 
 # ---------------------------------------------------------------------------
@@ -268,6 +275,16 @@ def _syllabus(sub, programme, stored, year):
         courses = [dict(c) for c in course_fill_source(sub, code)]
     out, used = [], {str(c.get("course_code") or "").strip().upper() for c in courses}
     prefix = re.sub(r"[^A-Z]", "", code.upper())[:5] or "CS"
+    # each course's Course Information, from its line of the Curriculum table
+    from .schema import course_info, outcome_columns
+    from .workflow import complete_syllabus
+    cur = programme_stage_state(sub, code, "prog_curriculum").get("data") or {}
+    info = {}
+    for r in cur.get("semester_structure") or []:
+        if isinstance(r, dict):
+            for one in str(r.get("course_code") or "").split("/"):
+                info.setdefault(one.strip().upper(), course_info(r))
+    cols = outcome_columns(cur.get("details"))
     for n, c in enumerate(courses, 1):
         c = dict(c)
         if not str(c.get("course_code") or "").strip():
@@ -288,13 +305,14 @@ def _syllabus(sub, programme, stored, year):
             c["pedagogy"] = PEDAGOGY
         if not str(c.get("outcomes") or "").strip():
             c["outcomes"] = OUTCOMES.format(t=title)
-        if not [m for m in c.get("modules") or [] if str((m or {}).get("revised") or "").strip()]:
-            c["modules"] = _module_rows(title)
         if not str(c.get("skill_activities") or "").strip():
             c["skill_activities"] = ACTIVITIES
         if len([x for x in str(c.get("books") or "").splitlines() if x.strip()]) < 2:
             c["books"] = (str(c.get("books") or "").strip() + "\n" + BOOKS).strip()
-        out.append(c)
+        c.update(info.get(str(c["course_code"]).strip().upper()) or {})
+        if not [m for m in c.get("modules") or [] if str((m or {}).get("revised") or "").strip()]:
+            c["modules"] = _module_rows(title, c.get("teaching_hours"))
+        out.append(complete_syllabus(c, cols))
     data["courses"] = out
     return data
 

@@ -593,6 +593,57 @@ def r_bloom_verbs_present(data, ctx, sk):
     return out
 
 
+def _course_name(r, i):
+    return r.get("course_code") or r.get("course_title") or f"row {i + 1}"
+
+
+def r_outcomes_have_bloom_levels(data, ctx, sk):
+    """Every course outcome names the level of Bloom's Taxonomy it reaches (1-6)."""
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        cos = r.get("co_table")
+        if not isinstance(cos, list):
+            if _lines(r.get("outcomes")):        # an older sheet: the levels are still to choose
+                out.append(err(f"Course {_course_name(r, i)}: choose each course outcome's Bloom's "
+                               f"Taxonomy level.", section=sk, row=i, field="outcomes"))
+            continue
+        for n, c in enumerate(cos, 1):
+            if not isinstance(c, dict) or not str(c.get("text") or "").strip():
+                continue
+            if str(c.get("bloom") or "") not in {"1", "2", "3", "4", "5", "6"}:
+                out.append(err(f"Course {_course_name(r, i)}, CO {n}: choose its Bloom's Taxonomy level (1–6).",
+                               section=sk, row=i, field="outcomes"))
+    return out
+
+
+def r_co_po_mapping_valid(data, ctx, sk):
+    """The CO-PO-PSO Mapping holds 3, 2, 1 or – in each cell, and every
+    course outcome is mapped to at least one PO or PSO."""
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        cos = [c for c in (r.get("co_table") or []) if isinstance(c, dict) and str(c.get("text") or "").strip()] \
+            if isinstance(r.get("co_table"), list) else []
+        if not cos:
+            continue
+        rows = r.get("co_po") if isinstance(r.get("co_po"), list) else []
+        mapped = 0
+        for n in range(1, len(cos) + 1):
+            m = rows[n - 1] if n - 1 < len(rows) and isinstance(rows[n - 1], dict) else {}
+            bad = [k for k, v in m.items() if str(v).strip() not in ("", "-", "–", "1", "2", "3")]
+            if bad:
+                out.append(err(f"Course {_course_name(r, i)}, CO{n}: the mapping to {', '.join(bad)} must be "
+                               f"3, 2, 1 or –.", section=sk, row=i, field="outcomes"))
+            if any(str(v).strip() in ("1", "2", "3") for v in m.values()):
+                mapped += 1
+            else:
+                out.append(warn(f"Course {_course_name(r, i)}, CO{n} is not mapped to any PO or PSO.",
+                                section=sk, row=i, field="outcomes"))
+        if not mapped:
+            out.append(err(f"Course {_course_name(r, i)}: fill in its CO-PO-PSO Mapping.",
+                           section=sk, row=i, field="outcomes"))
+    return out
+
+
 def r_co_po_wellformed(data, ctx, sk):
     pat = re.compile(r"^(CO\d+\s*-\s*(PO|PSO)\d+\s*\([123]\)\s*,?\s*)+$", re.I)
     out = []

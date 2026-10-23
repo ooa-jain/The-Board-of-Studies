@@ -1604,6 +1604,21 @@
 
   /* An earlier batch's own courses, as the syllabus sheets take them: from
      the course list on the same page, as it stands (saved or not). */
+  /* A course's Course Information, from its line of the Curriculum table —
+     semester, credits, L-T-P-E, contact hours (15 for every credit) and
+     CA : ESE — as the server's course_info works it out. */
+  function courseInfo(r) {
+    const out = {};
+    if (r.semester !== undefined && r.semester !== null && r.semester !== "") out.semester = r.semester;
+    const h = ["l", "t", "p", "e"].map(k => num(r[k]));
+    if (h.every(x => x !== null)) { out.ltpe = h.join("-"); out.hours_per_week = h.reduce((a, b) => a + b, 0); }
+    const cr = num(r.credits);
+    if (cr !== null) { out.credits = cr; out.teaching_hours = Math.round(cr * 15); }
+    const ca = num(r.cia), es = num(r.ese);
+    if (ca !== null && es !== null) out.ca_ese = `${ca}:${es}`;
+    return out;
+  }
+
   function batchCourses() {
     const out = [];
     const year = String(STAGE.batch || "").slice(0, 4);
@@ -1612,13 +1627,9 @@
       const codes = String(r.course_code || "").split("/").map(x => x.trim()).filter(Boolean);
       let titles = String(r.course_title || "").split(" / ").map(x => x.trim());
       if (titles.length !== codes.length) titles = codes.map(() => String(r.course_title || "").trim());
-      const hours = ["l", "t", "p", "e"].reduce((a, k) => a + (num(r[k]) || 0), 0);
       codes.forEach((code, i) => {
-        const p = { course_code: code, course_title: titles[i] };
-        if (r.semester !== undefined && r.semester !== "") p.semester = r.semester;
-        if (num(r.credits) !== null) p.credits = r.credits;
+        const p = Object.assign({ course_code: code, course_title: titles[i] }, courseInfo(r));
         if (/^\d{4}$/.test(year)) p.year_latest = year;
-        if (hours) { p.hours_per_week = hours; p.teaching_hours = hours * 15; }
         out.push(p);
       });
     });
@@ -3561,7 +3572,7 @@
       const mods = row.modules;
       if (!mods.length && !CTX.readonly) mods.push({});
       const head = el("tr", "sh-syl-head");
-      head.appendChild(cell("th", "sh-left", ["Syllabus:"]));
+      head.appendChild(cell("th", "sh-left", ["Course Content:"]));
       head.appendChild(cell("th", "sh-cos", ["CO's"]));
       head.appendChild(cell("th", "sh-bta", ["BTA"]));
       head.appendChild(cell("th", "sh-hours", ["Hours"]));
@@ -3571,7 +3582,7 @@
         const total = mods.reduce((a, m) => a + (num(m.hours) || 0), 0);
         const want = num(row.teaching_hours);
         sum.textContent = `Total ${total} hours` + (want === null ? "" :
-          total === want ? ` — matches the ${want} teaching hours` : ` — the course has ${want} teaching hours`);
+          total === want ? ` — matches the ${want} contact hours` : ` — the course has ${want} contact hours`);
         sum.className = want === null ? "" : total === want ? "is-ok" : "is-off";
       };
       mods.forEach((m, k) => {
@@ -3580,7 +3591,7 @@
         t.type = "text"; t.value = m.title ?? ""; t.placeholder = "Title of the module";
         t.addEventListener("input", () => { m.title = t.value; touch(); });
         const lab = el("div", "sh-mod-line");
-        lab.appendChild(el("strong", null, `Module No. ${k + 1}:`));
+        lab.appendChild(el("strong", null, `Module ${k + 1}:`));
         lab.appendChild(t);
         if (!CTX.readonly && mods.length > 1) {
           const rm = el("button", "sh-x", "×");
@@ -3622,6 +3633,177 @@
       paintSum();
     }
 
+    const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    // a fixed-layout table takes its column widths from its first row: name them
+    const colWidths = (t, widths) => {
+      const cg = el("colgroup");
+      widths.forEach(w => { const c = el("col"); if (w) c.style.width = w; cg.appendChild(c); });
+      t.insertBefore(cg, t.firstChild);
+    };
+    const INFO = ["semester", "credits", "ltpe", "hours_per_week", "teaching_hours", "ca_ese"];
+    // the course's line of the Curriculum table — this batch's own on an earlier batch
+    const infoSource = code => IS_BATCH ? sameCourse(batchCourses(), code)
+      : (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === code);
+    // its Course Information kept in step with that line; false when there is none
+    function syncInfo(row) {
+      const code = String(row.course_code || "").trim().toUpperCase();
+      const src = code ? infoSource(code) : null;
+      if (!src) return false;
+      if (CTX.readonly) return true;
+      let changed = false;
+      INFO.forEach(k => {
+        if (src[k] !== undefined && String(row[k] ?? "") !== String(src[k])) { row[k] = src[k]; changed = true; }
+      });
+      if (changed) setTimeout(touch, 0);
+      return true;
+    }
+
+    /* Course Outcomes: CO 1, CO 2 … each with what the learner will be able to
+       do and the level of Bloom's Taxonomy it reaches (1–6) — suggested from
+       its opening verb until one is chosen. "outcomes" keeps the same, one
+       per line, for the checks and the documents. */
+    const BLOOM = ["Remembering", "Understanding", "Applying", "Analyzing", "Evaluating", "Creating"];
+    const suggestLevel = text => {
+      const w = String(text || "").trim().split(/\s+/)[0] || "";
+      const n = (CTX.bloom_verbs || {})[w.toLowerCase().replace(/[.,:;]+$/, "")];
+      return n ? String(n) : "";
+    };
+    function coRows(row) {
+      if (!Array.isArray(row.co_table)) {
+        row.co_table = String(row.outcomes || "").split("\n")
+          .map(x => x.replace(/^\s*(CO\s*\d+|[a-z]\)|\d+[.)])\s*[:.\-–]?\s*/i, "").trim()).filter(Boolean)
+          .map(text => ({ text: text, bloom: suggestLevel(text), auto: true }));
+      }
+      return row.co_table;
+    }
+    const syncOutcomes = row => {
+      row.outcomes = row.co_table.map(c => String((c && c.text) || "").trim()).filter(Boolean).join("\n");
+    };
+    function coBlock(row, i, part) {
+      const cos = coRows(row);
+      if (!cos.length && !CTX.readonly) for (let k = 0; k < 3; k++) cos.push({ text: "", bloom: "" });
+      if (!Array.isArray(row.co_po)) row.co_po = [];
+      const trs = [];
+      const h = el("tr", "sh-cot-head");
+      ["Course Outcome", "Description", "Bloom’s Taxonomy Level"].forEach(x => h.appendChild(cell("th", null, [x])));
+      trs.push(h);
+      cos.forEach((c, k) => {
+        const tr = el("tr");
+        tr.appendChild(cell("td", "sh-con", [`CO ${k + 1}`]));
+        const ta = el("textarea", "sh-co-text");
+        ta.rows = 2;
+        ta.value = c.text || "";
+        ta.placeholder = k ? "Analyse … / Evaluate … / Design …" : "Apply … — begin with what the learner will do";
+        ta.disabled = !!CTX.readonly;
+        const sel = el("select", "sh-co-level");
+        sel.setAttribute("aria-label", `Bloom's Taxonomy level of CO ${k + 1}`);
+        sel.appendChild(new Option(CTX.readonly ? "—" : "Choose", ""));
+        BLOOM.forEach((b, n) => sel.appendChild(new Option(`${n + 1} – ${b}`, String(n + 1))));
+        sel.value = c.bloom || "";
+        sel.disabled = !!CTX.readonly;
+        sel.classList.toggle("is-auto", !!c.auto && !!c.bloom);
+        sel.title = c.auto && c.bloom ? "Suggested from the opening verb — change it if needed" : "";
+        ta.addEventListener("input", () => {
+          c.text = ta.value;
+          if (!c.bloom || c.auto) {
+            const n = suggestLevel(ta.value);
+            if (n) { c.bloom = n; c.auto = true; sel.value = n; sel.classList.add("is-auto"); }
+          }
+          syncOutcomes(row);
+          touch();
+        });
+        sel.addEventListener("change", () => {
+          c.bloom = sel.value;
+          delete c.auto;
+          sel.classList.remove("is-auto");
+          sel.title = "";
+          touch();
+        });
+        const tdText = cell("td", "sh-co-desc", [ta]);
+        const tdLevel = cell("td", "sh-co-lv", [sel]);
+        if (!CTX.readonly && cos.length > 1) {
+          const rm = el("button", "sh-x", "×");
+          rm.type = "button";
+          rm.title = `Remove CO ${k + 1}`;
+          rm.addEventListener("click", () => {
+            cos.splice(k, 1);
+            row.co_po.splice(k, 1);
+            syncOutcomes(row);
+            draw(); touch();
+          });
+          tdLevel.appendChild(rm);
+        }
+        tr.appendChild(tdText);
+        tr.appendChild(tdLevel);
+        trs.push(tr);
+      });
+      if (!CTX.readonly) {
+        const tr = el("tr", "sh-mod-foot");
+        const td = cell("td", null, [], 3);
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add a course outcome");
+        add.type = "button";
+        add.addEventListener("click", () => { cos.push({ text: "", bloom: "" }); row.co_po.push({}); draw(); touch(); });
+        td.appendChild(add);
+        tr.appendChild(td);
+        trs.push(tr);
+      }
+      const tb = part("Course Outcomes (COs):", [], "sh-cot");
+      const lead = el("tr");
+      lead.appendChild(cell("td", "sh-lead", ["At the end of the course, the learner will be able to:"], 3));
+      tb.appendChild(lead);
+      trs.forEach(tr => tb.appendChild(tr));
+      tb.closest("table").dataset.field = "outcomes";
+      tb.closest("table").dataset.row = i;
+      colWidths(tb.closest("table"), ["92px", "", "240px"]);
+    }
+
+    /* CO-PO-PSO Mapping: each CO against the programme's POs and PSOs —
+       3 High, 2 Medium, 1 Low, – none — and the Articulation row, each
+       column's average, worked out as it is filled. */
+    const fmtAvg = v => (Math.round(v * 10) / 10).toString();
+    function mapBlock(row, i, part) {
+      const cols = (CTX.outcome_cols || []).length ? CTX.outcome_cols
+        : [...Array.from({ length: 9 }, (_, n) => "PO" + (n + 1)), ...Array.from({ length: 4 }, (_, n) => "PSO" + (n + 1))];
+      const cos = row.co_table || [];
+      if (!Array.isArray(row.co_po)) row.co_po = [];
+      while (row.co_po.length < cos.length) row.co_po.push({});
+      const trs = [];
+      const h = el("tr");
+      h.appendChild(cell("th", "sh-map-co", ["CO"]));
+      cols.forEach(c => h.appendChild(cell("th", null, [c])));
+      trs.push(h);
+      const avgCells = {};
+      const paintAvg = () => cols.forEach(c => {
+        const vals = row.co_po.slice(0, cos.length).map(m => num((m || {})[c])).filter(v => v !== null && v > 0);
+        avgCells[c].textContent = vals.length ? fmtAvg(vals.reduce((a, b) => a + b, 0) / vals.length) : "–";
+      });
+      cos.forEach((_, k) => {
+        const m = row.co_po[k] && typeof row.co_po[k] === "object" ? row.co_po[k] : (row.co_po[k] = {});
+        const tr = el("tr");
+        tr.appendChild(cell("td", "sh-map-co", [`CO${k + 1}`]));
+        cols.forEach(c => {
+          const sel = el("select", "sh-map-sel");
+          sel.setAttribute("aria-label", `CO${k + 1} to ${c}`);
+          [["", "–"], ["3", "3"], ["2", "2"], ["1", "1"]].forEach(([v, t]) => sel.appendChild(new Option(t, v)));
+          sel.value = ["1", "2", "3"].includes(String(m[c] ?? "")) ? String(m[c]) : "";
+          sel.disabled = !!CTX.readonly;
+          sel.addEventListener("change", () => { m[c] = sel.value || "-"; paintAvg(); touch(); });
+          tr.appendChild(cell("td", "sh-map-v", [sel]));
+        });
+        trs.push(tr);
+      });
+      const at = el("tr", "sh-map-avg");
+      at.appendChild(cell("th", "sh-map-co", ["Articulation"]));
+      cols.forEach(c => { const td = el("td", "sh-map-v"); avgCells[c] = td; at.appendChild(td); });
+      trs.push(at);
+      const legend = el("tr");
+      legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"], cols.length + 1));
+      trs.push(legend);
+      const tb = part("CO-PO-PSO Mapping:", trs, "sh-map");
+      tb.closest("table").dataset.field = "outcomes";
+      paintAvg();
+    }
+
     function sheet(row, i) {
       const wrap = el("section", "sheet-wrap");
       wrap.dataset.row = i;
@@ -3639,53 +3821,76 @@
       }
       wrap.appendChild(cap);
 
-      const t = el("table", "sheet");
-      const tb = el("tbody");
-      t.appendChild(tb);
-      const r1 = el("tr");
-      const head = el("td", "sh-head");
-      head.colSpan = 3;
-      const prog = el("div", "sh-line sh-center");
-      prog.appendChild(el("strong", "sh-lab", "Name of the Program:"));
-      prog.appendChild(el("span", "sh-prog", CTX.programme_name || ""));
-      head.appendChild(prog);
-      head.appendChild(label("Course Code:", field(row, i, "course_code")));
-      head.appendChild(label("Name of the Course:", field(row, i, "course_title")));
-      r1.appendChild(head);
-      tb.appendChild(r1);
-
-      const r2 = el("tr", "sh-grid-h");
-      ["credits", "hours_per_week", "teaching_hours"].forEach(n => r2.appendChild(cell("th", null, [C[n].label])));
-      tb.appendChild(r2);
-      const r3 = el("tr", "sh-grid");
-      ["credits", "hours_per_week", "teaching_hours"].forEach(n => r3.appendChild(cell("td", null, [field(row, i, n)])));
-      tb.appendChild(r3);
-
-      const block = (lab, name, after) => {
-        const tr = el("tr");
-        const td = cell("td", "sh-block", [], 3);
-        td.appendChild(el("strong", "sh-lab", lab));
-        td.appendChild(field(row, i, name));
-        if (after) td.appendChild(el("strong", "sh-note", after));
-        tr.appendChild(td);
-        tb.appendChild(tr);
+      const stack = el("div", "sh-stack");
+      wrap.appendChild(stack);
+      // a heading, then its own bordered box
+      const part = (title, kids, cls) => {
+        if (title) stack.appendChild(el("p", "sh-part", title));
+        const t = el("table", "sheet" + (cls ? " " + cls : ""));
+        const tb = el("tbody");
+        t.appendChild(tb);
+        (kids || []).forEach(k => tb.appendChild(k));
+        stack.appendChild(t);
+        return tb;
       };
-      block("Pedagogy:", "pedagogy");
-      block("Course Outcomes: On successful completion of the course, the students' will be able to", "outcomes");
-      // the modules sit in a table of their own, so the sheet keeps its
-      // three equal columns above
-      const mr = el("tr");
-      const mtd = cell("td", "sh-nest", [], 3);
+      const block = (lab, name, opt) => {
+        const tr = el("tr");
+        const td = cell("td", "sh-block", []);
+        const head = el("strong", "sh-lab", lab);
+        if (opt) head.appendChild(el("span", "sh-opt", " (optional)"));
+        td.appendChild(head);
+        td.appendChild(field(row, i, name));
+        tr.appendChild(td);
+        return tr;
+      };
+
+      // Course Information: from the course's line of the Curriculum table
+      const found = syncInfo(row);
+      const auto = (name, text) => {
+        const d = el("div", "sh-auto");
+        d.dataset.field = name;
+        d.dataset.row = i;
+        d.textContent = text === undefined || text === null || text === "" ? "—" : String(text);
+        d.title = "From the Curriculum table — change it there";
+        return d;
+      };
+      const kv = (...pairs) => {
+        const tr = el("tr");
+        pairs.forEach(([k, v, span]) => { tr.appendChild(cell("th", "sh-k", [k])); tr.appendChild(cell("td", "sh-v", [v], span)); });
+        return tr;
+      };
+      const codeBox = field(row, i, "course_code");
+      const codeIn = codeBox.querySelector("input");
+      if (codeIn) codeIn.addEventListener("change", () => draw());       // another course: its information follows
+      const rowsInfo = [
+        kv(["Course Title", field(row, i, "course_title"), 3]),
+        kv(["Course Code", codeBox], ["L-T-P-E", auto("ltpe", row.ltpe)]),
+        kv(["Semester", auto("semester", ROMAN[num(row.semester) - 1] || row.semester)],
+           ["Contact Hours", auto("teaching_hours", row.teaching_hours)]),
+        kv(["Credits", auto("credits", row.credits)], ["CA : ESE", auto("ca_ese", row.ca_ese)]),
+      ];
+      if (!found && !CTX.readonly) {
+        const tr = el("tr");
+        const td = cell("td", "sh-missing", [], 4);
+        td.appendChild(el("span", null, "Not in the Curriculum table yet — add this course there, and its semester, credits, " +
+                                        "L-T-P-E, contact hours and CA : ESE come in by themselves. "));
+        td.appendChild(backToTable());
+        tr.appendChild(td);
+        rowsInfo.push(tr);
+      }
+      colWidths(part("Course Information:", rowsInfo, "sh-info").closest("table"), ["18%", "32%", "18%", "32%"]);
+      part("", [block("Course Objectives:", "objectives")]);
+      coBlock(row, i, part);
+      mapBlock(row, i, part);
+      // the modules sit in a table of their own
       const mt = el("table", "sheet sh-syl");
       const mtb = el("tbody");
       mt.appendChild(mtb);
       modulesRows(row, i, mtb);
-      mtd.appendChild(mt);
-      mr.appendChild(mtd);
-      tb.appendChild(mr);
-      block("Skill Development Activities:", "skill_activities");
-      block("Books for reference:", "books", "Note: Latest edition of books may be used.");
-      wrap.appendChild(t);
+      stack.appendChild(mt);
+      part("", [block("Text Books:", "text_books"), block("Book References:", "books"),
+                block("Web References:", "web_references", true)]);
+      part("", [block("Pedagogy:", "pedagogy", true), block("Skill Development Activities:", "skill_activities", true)]);
       if (focus && String(row.course_code || "").trim().toUpperCase() === focus) wrap.appendChild(nextBar(row));
       return wrap;
     }
