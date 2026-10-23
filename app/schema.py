@@ -78,17 +78,16 @@ def bloom_level(text):
     return BLOOM_VERB_LEVEL.get(words[0].lower().strip(".,:;")) if words else None
 
 
-def outcome_columns(details):
-    """The columns of a course's CO-PO-PSO Mapping — PO1 … then PSO1 … — as
-    many as the programme's Curriculum sets (9 and 4 when it does not)."""
-    def count(name, default, top):
-        try:
-            n = int(str((details or {}).get(name) or "").strip())
-        except ValueError:
-            return default
-        return n if 0 <= n <= top else default
-    return ([f"PO{n}" for n in range(1, count("po_count", 9, 15) + 1)]
-            + [f"PSO{n}" for n in range(1, count("pso_count", 4, 8) + 1)])
+# the columns of every course's CO-PO-PSO Mapping, as the sample syllabus has them
+OUTCOME_COLUMNS = [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1, 5)]
+
+
+def objective_lines(text):
+    """The programme's Objective, one per line, without the numbering it was
+    typed with — each course's Course Objectives starts from it."""
+    lines = (re.sub(r"^\s*(\d+|[a-zA-Z]|[ivxIVX]+)[.)]\s+|^\s*[-•*]\s*", "", x).strip()
+             for x in str(text or "").splitlines())
+    return [x for x in lines if x]
 
 
 def course_info(r):
@@ -437,14 +436,6 @@ PROGRAMME_CURRICULUM = {
                  "required": True, "options": DEGREE_LEVELS, "prefill": "degree_level",
                  "reload_on_change": True},
                 {"name": "specialisation", "label": "Specialisation", "type": "text"},
-                # how many Programme Outcomes and Programme Specific Outcomes it has:
-                # every syllabus's CO-PO-PSO Mapping has that many columns
-                {"name": "po_count", "label": "Number of POs", "type": "select",
-                 "options": [str(n) for n in range(1, 16)],
-                 "help": "Programme Outcomes — the columns PO1, PO2 … of every course's CO-PO-PSO Mapping. Left empty: 9."},
-                {"name": "pso_count", "label": "Number of PSOs", "type": "select",
-                 "options": [str(n) for n in range(0, 9)],
-                 "help": "Programme Specific Outcomes — the columns PSO1, PSO2 … Left empty: 4."},
                 # worked out, never typed: the current batch's first year to the
                 # year the programme ends (2026-29 for a 3-year UG)
                 {"name": "batch", "label": "Batch", "type": "readonly", "prefill": "batch_auto",

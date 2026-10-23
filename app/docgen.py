@@ -624,14 +624,13 @@ def _pg_curriculum_docx(prog, cur, deg):
 # Syllabus
 # ---------------------------------------------------------------------------
 
-def _course_sheet(doc, programme_name, c, width, cols=None):
+def _course_sheet(doc, programme_name, c, width):
     """One course as the sample syllabus lays it out: Course Information,
     Course Objectives, the Course Outcomes with their Bloom's Taxonomy level,
     the CO-PO-PSO Mapping with its Articulation row, the Course Content, and
     the Text Books, Book References and Web References (then Pedagogy and
     Skill Development Activities, when they are given)."""
-    from .schema import bloom_level, outcome_columns
-    cols = cols or outcome_columns({})
+    from .schema import OUTCOME_COLUMNS as cols, bloom_level
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
 
     def heading(text):
@@ -777,9 +776,10 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
     if not courses:
         _para(doc, "No syllabus entered yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
     courses = sorted(courses, key=lambda c: (_num(c.get("semester")) or 99))
-    # the CO-PO-PSO Mapping's columns: as many POs and PSOs as the programme sets
-    from .schema import outcome_columns
-    cols = outcome_columns(cur.get("details"))
+    # Course Objectives the course has not written itself are the programme's Objective
+    from .schema import objective_lines
+    from .workflow import course_objectives
+    goals = "\n".join(objective_lines((cur.get("profile") or {}).get("objective")))
     sem = object()
     for n, c in enumerate(courses):
         if n:
@@ -789,7 +789,9 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
             s_n = int(_num(sem))
             _para(doc, f"SEMESTER {ROMAN[s_n - 1] if 1 <= s_n <= len(ROMAN) else _fmt(sem)}",
                   bold=True, size=11, color=NAVY, after=4)
-        _course_sheet(doc, name, copy.deepcopy(c), width, cols)
+        c = copy.deepcopy(c)
+        c["objectives"] = course_objectives(c, goals)
+        _course_sheet(doc, name, c, width)
     doc.core_properties.title = _title(f"{name} — Syllabus {batch}".strip())
     return _save(doc)
 

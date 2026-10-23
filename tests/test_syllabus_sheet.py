@@ -1,8 +1,9 @@
 """A syllabus sheet follows the University's sample: Course Information taken
 from the Curriculum table (never typed again), Course Objectives, the Course
-Outcomes each with its Bloom's Taxonomy level, the CO-PO-PSO Mapping with its
-Articulation row — as many POs and PSOs as the programme sets — the Course
-Content, and the Text Books, Book References and Web References."""
+Outcomes each with its Bloom's Taxonomy level, the CO-PO-PSO Mapping (PO1-PO9,
+PSO1-PSO4) with its Articulation row, the Course Content, and the Text Books,
+Book References and Web References. Course Objectives start from the
+programme's Objective."""
 
 import io
 
@@ -19,13 +20,24 @@ def test_course_information_comes_from_the_curriculum_line():
     assert course_info({}) == {}
 
 
-def test_a_programme_sets_its_own_number_of_pos_and_psos():
-    from app.schema import outcome_columns
-    assert outcome_columns({}) == [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1, 5)]
-    assert outcome_columns({"po_count": "6", "pso_count": "2"}) == \
-        ["PO1", "PO2", "PO3", "PO4", "PO5", "PO6", "PSO1", "PSO2"]
-    assert outcome_columns({"po_count": "12", "pso_count": "0"})[-1] == "PO12"
-    assert len(outcome_columns({"po_count": "99", "pso_count": "x"})) == 13    # out of range: the defaults
+def test_the_programmes_objective_is_read_line_by_line():
+    from app.schema import objective_lines
+    assert objective_lines("1. To build skills\n2) To prepare students\n\n- To develop ethics\nii) To lead") == \
+        ["To build skills", "To prepare students", "To develop ethics", "To lead"]
+    assert objective_lines("") == [] and objective_lines(None) == []
+
+
+def test_course_objectives_follow_the_programmes_until_the_course_writes_its_own():
+    from app.workflow import complete_syllabus, course_objectives
+    c = complete_syllabus({"course_title": "Accounting", "outcomes": "Apply"}, "To build skills")
+    assert c["objectives"] == "To build skills"
+    assert course_objectives(c, "To build skills\nTo serve") == "To build skills\nTo serve"   # it follows
+    assert course_objectives({"objectives": ""}, "To serve") == "To serve"
+    c["objectives"] = "To keep books of account"                                        # its own
+    assert course_objectives(c, "To serve") == "To keep books of account"
+    assert complete_syllabus(dict(c), "To serve")["objectives"] == "To keep books of account"
+    # a programme with no Objective yet: the course's own, or a start to edit
+    assert complete_syllabus({"course_title": "Accounting"})["objectives"].startswith("To explain")
 
 
 def test_an_outcomes_opening_verb_suggests_its_level():
@@ -80,12 +92,18 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     client.post("/department/demo/fill-all")
     items = client.get("/department/api/record?programme=DEMOBBA").get_json()["items"]
 
-    # the Curriculum sets 6 POs and 2 PSOs: the syllabus maps to those
+    # the Curriculum no longer asks how many POs and PSOs: the mapping has the sample's
     cur = items[0]["data"]
-    cur["details"].update(po_count="6", pso_count="2")
+    assert "Number of POs" not in client.get("/department/stage/prog_curriculum/DEMOBBA").get_data(as_text=True)
+    page = client.get("/department/stage/prog_syllabus/DEMOBBA").get_data(as_text=True)
+    assert 'outcome_cols: ["PO1", "PO2", "PO3", "PO4", "PO5", "PO6", "PO7", "PO8", "PO9", ' \
+           '"PSO1", "PSO2", "PSO3", "PSO4"]' in page
+    # the programme's Objective is what each course's Course Objectives start from
+    cur["profile"]["objective"] = "1. To build sound knowledge\n2. To prepare students for careers"
     assert client.post("/department/api/prog_curriculum/DEMOBBA/save", json=cur).get_json()["ok"]
     page = client.get("/department/stage/prog_syllabus/DEMOBBA").get_data(as_text=True)
-    assert 'outcome_cols: ["PO1", "PO2", "PO3", "PO4", "PO5", "PO6", "PSO1", "PSO2"]' in page
+    assert 'programme_objectives: "To build sound knowledge\\nTo prepare students for careers"' in page
+    assert all(c["objectives"].startswith("To give students of the") for c in items[1]["data"]["courses"])
     # each course's information is there already, from its line of the table
     first = next(r for r in cur["semester_structure"] if r.get("course_code") and "/" not in r["course_code"])
     assert f'"ltpe": "{first["l"]}-{first["t"]}-{first["p"]}-{first["e"]}"' in page.replace(".0", "")
@@ -99,6 +117,8 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     with app.app_context():
         doc = Document(io.BytesIO(syllabus_docx(get_db(), "DEMO", app.config["ACADEMIC_YEAR"], "DEMOBBA").getvalue()))
     text = "\n".join(p.text for p in doc.paragraphs)
+    # the sample courses' objectives were never edited: they follow the programme's
+    assert "1.  To build sound knowledge\n2.  To prepare students for careers\nCourse Outcomes (COs):" in text
     for heading in ("Course Information:", "Course Objectives:", "Course Outcomes (COs):",
                     "CO-PO-PSO Mapping:", "Course Content:", "Text Books:", "Book References:",
                     "3-High, 2-Medium, 1-Low"):
@@ -111,5 +131,5 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     assert outcomes[0] == ["Course Outcome", "Description", "Bloom’s Taxonomy Level"]
     assert outcomes[1][0] == "CO 1" and outcomes[1][2] in {"1", "2", "3", "4", "5", "6"}
     mapping = next(t for t in tables if t[0][0] == "CO")
-    assert mapping[0] == ["CO", "PO1", "PO2", "PO3", "PO4", "PO5", "PO6", "PSO1", "PSO2"]
+    assert mapping[0] == ["CO"] + [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1, 5)]
     assert mapping[-1][0] == "Articulation" and len(mapping) == len(outcomes) + 1

@@ -3450,8 +3450,10 @@
     // the course the link meant, as this page names it
     const arrived = hashCode ? String((sourceOne(hashCode) || {}).course_code || hashCode).toUpperCase() : "";
     const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
+    // (objectives as the programme's Objective put them in are not the course's own yet)
     const blank = r => Object.keys(r).filter(k => !k.startsWith("_"))
-      .every(k => r[k] === "" || r[k] == null || (Array.isArray(r[k]) && !r[k].some(m => m && (m.title || m.revised || m.hours))));
+      .every(k => r[k] === "" || r[k] == null || (k === "objectives" && r[k] === CTX.programme_objectives)
+        || (Array.isArray(r[k]) && !r[k].some(m => m && (m.title || m.revised || m.hours || m.text))));
 
     const top = el("div", "sheet-bar");
     const note = el("span", "sheet-note");
@@ -3879,6 +3881,13 @@
         rowsInfo.push(tr);
       }
       colWidths(part("Course Information:", rowsInfo, "sh-info").closest("table"), ["18%", "32%", "18%", "32%"]);
+      // Course Objectives are the programme's Objective (and follow it) until the course writes its own
+      const goals = CTX.programme_objectives;
+      if (goals && !CTX.readonly && row.objectives !== goals &&
+          (row.objectives == null || String(row.objectives).trim() === "" || row.objectives === row._objectives_auto)) {
+        row.objectives = row._objectives_auto = goals;
+        setTimeout(touch, 0);
+      }
       part("", [block("Course Objectives:", "objectives")]);
       coBlock(row, i, part);
       mapBlock(row, i, part);

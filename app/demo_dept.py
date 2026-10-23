@@ -232,7 +232,7 @@ def _modules(title, previous=False, total=60):
     return out
 
 
-def _syllabus_row(c, batch_year, previous=False):
+def _syllabus_row(c, batch_year, previous=False, objectives=""):
     from .schema import course_info
     from .workflow import complete_syllabus
     return complete_syllabus({"course_code": c["course_code"], "course_title": c["course_title"],
@@ -242,7 +242,8 @@ def _syllabus_row(c, batch_year, previous=False):
                         f"Apply them to business problems\nAnalyse a real case and present findings",
             "modules": _modules(c["course_title"], previous, course_info(c).get("teaching_hours")),
             "skill_activities": "A short project with a local business, presented in class.",
-            "books": "Kotler, P. Principles (latest edition)\nRobbins, S. Management (latest edition)"})
+            "books": "Kotler, P. Principles (latest edition)\nRobbins, S. Management (latest edition)"},
+            objectives)
 
 
 def sample(stage_key, programme=None, files=None, year="2027-28"):
@@ -290,6 +291,9 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                if "prog_curriculum.document" in files else {}),
         }
     batch = (STAGE_BY_KEY.get(stage_key) or {}).get("batch") or ""
+    # each course's Course Objectives start from the programme's Objective
+    from .schema import objective_lines
+    goals = "\n".join(objective_lines(sample("prog_curriculum", programme, files, year)["profile"]["objective"]))
     if stage_key.startswith("prog_syllabus_b"):
         # an earlier batch: its course list and each course's syllabus, the
         # codes carrying that batch's year
@@ -297,12 +301,12 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
         sems = batch_semesters(stage_key)
         own = in_semesters([{**c, "course_code": y[2:] + c["course_code"][2:]} for c in courses], sems)
-        out = {"batch_courses": own, "courses": [_syllabus_row(c, y) for c in own]}
+        out = {"batch_courses": own, "courses": [_syllabus_row(c, y, objectives=goals) for c in own]}
         out["revision_courses"] = batch_revision_rows(out, batch, year[:4], sems)
         return out
     if stage_key == "prog_syllabus":
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
-        out = {"courses": [_syllabus_row(c, y) for c in courses]}
+        out = {"courses": [_syllabus_row(c, y, objectives=goals) for c in courses]}
         if stage_key == "prog_syllabus" and "prog_syllabus.document" in files:
             out["syllabus_file"] = {"document": files["prog_syllabus.document"]}
         return out

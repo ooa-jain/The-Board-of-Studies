@@ -276,7 +276,7 @@ def _syllabus(sub, programme, stored, year):
     out, used = [], {str(c.get("course_code") or "").strip().upper() for c in courses}
     prefix = re.sub(r"[^A-Z]", "", code.upper())[:5] or "CS"
     # each course's Course Information, from its line of the Curriculum table
-    from .schema import course_info, outcome_columns
+    from .schema import course_info, objective_lines
     from .workflow import complete_syllabus
     cur = programme_stage_state(sub, code, "prog_curriculum").get("data") or {}
     info = {}
@@ -284,7 +284,8 @@ def _syllabus(sub, programme, stored, year):
         if isinstance(r, dict):
             for one in str(r.get("course_code") or "").split("/"):
                 info.setdefault(one.strip().upper(), course_info(r))
-    cols = outcome_columns(cur.get("details"))
+    # each course's Course Objectives start from the programme's Objective
+    objectives = "\n".join(objective_lines((cur.get("profile") or {}).get("objective")))
     for n, c in enumerate(courses, 1):
         c = dict(c)
         if not str(c.get("course_code") or "").strip():
@@ -312,7 +313,7 @@ def _syllabus(sub, programme, stored, year):
         c.update(info.get(str(c["course_code"]).strip().upper()) or {})
         if not [m for m in c.get("modules") or [] if str((m or {}).get("revised") or "").strip()]:
             c["modules"] = _module_rows(title, c.get("teaching_hours"))
-        out.append(complete_syllabus(c, cols))
+        out.append(complete_syllabus(c, objectives))
     data["courses"] = out
     return data
 

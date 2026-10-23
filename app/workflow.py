@@ -781,16 +781,17 @@ def same_course(rows, code, title=""):
                 if title else None))
 
 
-def complete_syllabus(c, cols=None):
+def complete_syllabus(c, objectives=""):
     """A sample (or Drive) syllabus sheet made whole for the template: its
-    objectives, each course outcome with its Bloom's level (from its opening
-    verb), a CO-PO-PSO Mapping, text books and web references — whatever it
-    does not have already."""
-    from .schema import bloom_level, outcome_columns
-    cols = cols or outcome_columns({})
+    objectives (the programme's Objective, when it has one), each course
+    outcome with its Bloom's level (from its opening verb), a CO-PO-PSO
+    Mapping, text books and web references — whatever it does not have already."""
+    from .schema import OUTCOME_COLUMNS as cols, bloom_level
     title = c.get("course_title") or "the course"
     lines = lambda v: [x.strip() for x in str(v or "").splitlines() if x.strip()]
-    if not lines(c.get("objectives")):
+    if objectives and (not lines(c.get("objectives")) or c.get("objectives") == c.get("_objectives_auto")):
+        c["objectives"] = c["_objectives_auto"] = objectives
+    elif not lines(c.get("objectives")):
         c["objectives"] = (f"To explain the core concepts and principles of {title}.\n"
                            f"To develop the skills to apply {title} to practical problems.\n"
                            f"To build the ability to analyse and evaluate practice in {title}.")
@@ -805,6 +806,15 @@ def complete_syllabus(c, cols=None):
     if not lines(c.get("web_references")):
         c["web_references"] = "University Grants Commission https://www.ugc.gov.in\nSWAYAM https://swayam.gov.in"
     return c
+
+
+def course_objectives(c, objectives):
+    """A course's Course Objectives: its own — or the programme's Objective as
+    it is now, while the course has none or still has it as it was put in."""
+    own = str(c.get("objectives") or "").strip()
+    if objectives and (not own or own == str(c.get("_objectives_auto") or "").strip()):
+        return objectives
+    return c.get("objectives") or ""
 
 
 def batch_semesters(key, s=None) -> list:
