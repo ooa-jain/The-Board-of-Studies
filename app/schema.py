@@ -107,35 +107,25 @@ def outcome_texts(v):
     return texts
 
 
+def outcome_items(v):
+    """A programme's POs (or PSOs) as the Curriculum shows them: one per box,
+    described or not — and PO1 alone, open, while none is added."""
+    if isinstance(v, str):
+        items = [x.strip() for x in v.splitlines() if x.strip()]
+    elif isinstance(v, list):
+        items = [str((x.get("text") if isinstance(x, dict) else x) or "").strip() for x in v]
+    else:
+        items = []
+    return items or [""]
+
+
 def programme_columns(profile):
-    """The CO-PO-PSO Mapping's columns the programme's Curriculum sets — its
-    POs, then its PSOs — each with its description: [("PO1", "…"), …]."""
+    """The CO-PO-PSO Mapping's columns: the POs, then the PSOs, the programme's
+    Curriculum has a box for — each with its description: [("PO1", "…"), …]."""
     out = []
     for key, prefix in (("programme_outcomes", "PO"), ("programme_specific_outcomes", "PSO")):
-        out += [(f"{prefix}{n}", t) for n, t in enumerate(outcome_texts((profile or {}).get(key)), start=1)]
+        out += [(f"{prefix}{n}", t) for n, t in enumerate(outcome_items((profile or {}).get(key)), start=1)]
     return out
-
-
-def mapping_columns(profile, course=None):
-    """A course's CO-PO-PSO Mapping columns: the programme's POs and PSOs — or,
-    while its Curriculum has none, as many as the course's mapping holds."""
-    return [n for n, _ in programme_columns(profile)] or course_columns(course or {})
-
-
-def course_columns(c):
-    """One course's CO-PO-PSO Mapping columns as its own mapping holds them,
-    PO1 … then PSO1 … (at least PO1 and PSO1)."""
-    rows = [m for m in (c.get("co_po") or []) if isinstance(m, dict)] if isinstance(c.get("co_po"), list) else []
-
-    def count(name, prefix, top):
-        try:
-            n = int(c.get(name))
-        except (TypeError, ValueError):
-            n = max([int(k[len(prefix):]) for m in rows for k in m
-                     if re.fullmatch(prefix + r"\d+", str(k))] or [1])
-        return max(1, min(n, top))
-    return ([f"PO{n}" for n in range(1, count("po_count", "PO", PO_MAX) + 1)]
-            + [f"PSO{n}" for n in range(1, count("pso_count", "PSO", PSO_MAX) + 1)])
 
 
 def objective_lines(text):

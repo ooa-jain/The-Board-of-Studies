@@ -636,8 +636,8 @@ def _course_sheet(doc, programme_name, c, width, cols=None):
     the CO-PO-PSO Mapping with its Articulation row, the Course Content, and
     the Text Books, Book References and Web References (then Pedagogy and
     Skill Development Activities, when they are given)."""
-    from .schema import bloom_level, course_columns, mapping_value
-    cols = cols or course_columns(c)          # the programme's POs and PSOs
+    from .schema import bloom_level, mapping_value, programme_columns
+    cols = cols or [n for n, _ in programme_columns({})]          # the programme's POs and PSOs
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
 
     def heading(text):
@@ -788,8 +788,9 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
     from .schema import objective_lines
     from .workflow import course_objectives
     goals = "\n".join(objective_lines((cur.get("profile") or {}).get("objective")))
-    # the mapping's columns: the programme's POs and PSOs
-    from .schema import mapping_columns
+    # the mapping's columns: the programme's POs and PSOs, as its Curriculum has them
+    from .schema import programme_columns
+    cols = [n for n, _ in programme_columns(cur.get("profile"))]
     sem = object()
     for n, c in enumerate(courses):
         if n:
@@ -801,7 +802,7 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
                   bold=True, size=11, color=NAVY, after=4)
         c = copy.deepcopy(c)
         c["objectives"] = course_objectives(c, goals)
-        _course_sheet(doc, name, c, width, mapping_columns(cur.get("profile"), c))
+        _course_sheet(doc, name, c, width, cols)
     doc.core_properties.title = _title(f"{name} — Syllabus {batch}".strip())
     return _save(doc)
 

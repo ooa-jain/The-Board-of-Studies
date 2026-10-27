@@ -3394,6 +3394,9 @@ table.sheet .sh-map-in { width: 100%; min-width: 0; max-width: 64px; padding: 4p
 /* a PO or PSO column: its description on hover */
 table.sh-map th.sh-map-h { white-space: nowrap; }
 table.sh-map th.sh-map-h[title] { cursor: help; text-decoration: underline dotted #98a2b3; text-underline-offset: 3px; }
+table.sh-map td.sh-map-from, table.sh-map td.sh-missing { text-align: left !important; }
+table.sh-map td.sh-map-from { font-size: .8rem; color: var(--ink-soft, #475467); background: #f8fafc; }
+table.sh-map td.sh-map-from .btn, table.sh-map td.sh-missing .btn { margin-left: 4px; }
 .sh-map-avg td, .sh-map-avg th { font-weight: 700; background: #f3f6fb; }
 td.sh-legend { text-align: left !important; font-size: .8rem; color: var(--ink-soft, #475467); background: #fff; }
 

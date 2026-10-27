@@ -3827,20 +3827,9 @@
        1 Low), empty for none, and the Articulation row, each column's average,
        worked out as it is filled. */
     const fmtAvg = v => (Math.round(v * 10) / 10).toString();
-    // while the Curriculum has no POs: as many as the course's mapping holds
-    function colCount(row, prefix) {
-      const re = new RegExp("^" + prefix + "(\\d+)$");
-      let most = 1;
-      (Array.isArray(row.co_po) ? row.co_po : []).forEach(m => Object.keys(m || {}).forEach(k => {
-        const x = re.exec(k);
-        if (x) most = Math.max(most, +x[1]);
-      }));
-      return most;
-    }
     function mapBlock(row, i, part) {
-      const own = CTX.outcome_cols || [];              // [["PO1", "its description"], …]
-      const list = (prefix, n) => Array.from({ length: n }, (_, k) => [prefix + (k + 1), ""]);
-      const defs = own.length ? own : [...list("PO", colCount(row, "PO")), ...list("PSO", colCount(row, "PSO"))];
+      // the Curriculum's POs and PSOs, one column for each box it has: [["PO1", "its description"], …]
+      const defs = (CTX.outcome_cols || []).length ? CTX.outcome_cols : [["PO1", ""], ["PSO1", ""]];
       const pos = defs.filter(([c]) => c.startsWith("PO")).map(([c]) => c);
       const psos = defs.filter(([c]) => c.startsWith("PSO")).map(([c]) => c);
       const about = Object.fromEntries(defs);
@@ -3894,17 +3883,17 @@
       const legend = el("tr");
       legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"], cols.length + 1));
       trs.push(legend);
-      if (!own.length && edit) {
-        // the columns come from the Curriculum's POs and PSOs: say where
+      if (edit && CTX.outcomes_url) {
+        // the columns are the Curriculum's: more (or fewer) are added there
+        const described = defs.some(([, t]) => String(t || "").trim());
         const tr = el("tr");
-        const td = cell("td", "sh-missing", [], cols.length + 1);
-        td.appendChild(el("span", null, "The Programme Outcomes (POs) and PSOs are not in the Curriculum yet — add them there " +
-                                        "(1.A and 1.B, under Objective) and this mapping takes a column for each. "));
-        if (CTX.outcomes_url) {
-          const a = el("a", "btn btn-ghost btn-sm", "Add them in the Curriculum →");
-          a.href = CTX.outcomes_url;
-          td.appendChild(a);
-        }
+        const td = cell("td", described ? "sh-map-from" : "sh-missing", [], cols.length + 1);
+        td.appendChild(el("span", null, described
+          ? "The columns are the POs and PSOs of the Curriculum (1.A and 1.B). To add or remove one, do it there. "
+          : "Describe the POs and PSOs in the Curriculum (1.A and 1.B) — this mapping has a column for each. "));
+        const a = el("a", "btn btn-ghost btn-sm", "POs and PSOs in the Curriculum →");
+        a.href = CTX.outcomes_url;
+        td.appendChild(a);
         tr.appendChild(td);
         trs.push(tr);
       }

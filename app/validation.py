@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime
 
 from . import ugc_rules as U
-from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, course_columns, mapping_value, programme_columns
+from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, mapping_value, programme_columns
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
@@ -641,8 +641,8 @@ def r_co_po_mapping_valid(data, ctx, sk):
         if not cos:
             continue
         rows = r.get("co_po") if isinstance(r.get("co_po"), list) else []
-        # the programme's POs and PSOs (or, while it has none, the course's own)
-        cols = ctx.get("outcome_cols") or course_columns(r)
+        # the programme's POs and PSOs, as its Curriculum has them
+        cols = ctx.get("outcome_cols") or [n for n, _ in programme_columns({})]
         mapped = 0
         for n in range(1, len(cos) + 1):
             m = rows[n - 1] if n - 1 < len(rows) and isinstance(rows[n - 1], dict) else {}

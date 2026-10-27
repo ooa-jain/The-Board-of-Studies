@@ -50,16 +50,17 @@ def test_an_outcomes_opening_verb_suggests_its_level():
 
 
 def test_the_mapping_has_a_column_for_each_po_and_pso_of_the_curriculum():
-    from app.schema import mapping_columns, outcome_texts, programme_columns
+    from app.schema import outcome_texts, programme_columns
     profile = {"programme_outcomes": ["Knowledge", "Problem solving", "Communication", ""],
                "programme_specific_outcomes": ["Accounts"]}
     assert outcome_texts(profile["programme_outcomes"]) == ["Knowledge", "Problem solving", "Communication"]
+    # a column for every box the Curriculum has, described or not
     assert programme_columns(profile) == [("PO1", "Knowledge"), ("PO2", "Problem solving"),
-                                          ("PO3", "Communication"), ("PSO1", "Accounts")]
-    assert mapping_columns(profile, {"co_po": [{"PO9": "3"}]}) == ["PO1", "PO2", "PO3", "PSO1"]
-    # while the Curriculum has none: as many as the course's mapping holds
-    assert mapping_columns({}, {"co_po": [{"PO1": "3", "PO9": "2", "PSO4": "1"}]})[-2:] == ["PSO3", "PSO4"]
-    assert mapping_columns({}, {}) == ["PO1", "PSO1"]
+                                          ("PO3", "Communication"), ("PO4", ""), ("PSO1", "Accounts")]
+    two_three = {"programme_outcomes": ["", ""], "programme_specific_outcomes": ["", "", ""]}
+    assert [n for n, _ in programme_columns(two_three)] == ["PO1", "PO2", "PSO1", "PSO2", "PSO3"]
+    # none added yet: PO1 and PSO1, as the Curriculum shows them open
+    assert programme_columns({}) == [("PO1", ""), ("PSO1", "")]
     # the rule reads the programme's columns only
     from app.validation import r_co_po_mapping_valid as rule
     ctx = {"outcome_cols": ["PO1", "PSO1"]}
@@ -101,15 +102,16 @@ def test_every_course_outcome_needs_its_level():
 
 def test_the_mapping_holds_a_number_in_each_cell():
     from app.validation import r_co_po_mapping_valid as rule
-    assert rule(_sheet(), {}, "courses") == []
+    cols = {"outcome_cols": ["PO1", "PO2", "PSO1"]}          # the programme's POs and PSOs
+    assert rule(_sheet(), cols, "courses") == []
     # any number is taken, as typed
-    assert rule(_sheet(co_po=[{"PO1": "5"}, {"PO2": "2.5"}]), {}, "courses") == []
-    issues = rule(_sheet(co_po=[{"PO1": "high"}, {"PO2": "2"}]), {}, "courses")
+    assert rule(_sheet(co_po=[{"PO1": "5"}, {"PO2": "2.5"}]), cols, "courses") == []
+    issues = rule(_sheet(co_po=[{"PO1": "high"}, {"PO2": "2"}]), cols, "courses")
     assert any(i["level"] == "error" and "must be a number" in i["message"] for i in issues)
     # a CO left unmapped is a warning; a course with no mapping at all is an error
-    issues = rule(_sheet(co_po=[{"PO1": "3"}, {"PO1": "-"}]), {}, "courses")
+    issues = rule(_sheet(co_po=[{"PO1": "3"}, {"PO1": "-"}]), cols, "courses")
     assert [i["level"] for i in issues] == ["warning"] and "CO2" in issues[0]["message"]
-    issues = rule(_sheet(co_po=[]), {}, "courses")
+    issues = rule(_sheet(co_po=[]), cols, "courses")
     assert any(i["level"] == "error" and "fill in its CO-PO-PSO Mapping" in i["message"] for i in issues)
 
 

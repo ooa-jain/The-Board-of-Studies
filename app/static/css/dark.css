@@ -2815,6 +2815,10 @@ html[data-theme="dark"] table.sheet .sh-co-level.is-auto {
 html[data-theme="dark"] table.sh-map th.sh-map-h[title] {
   text-decoration: underline dotted #9ba4b5;
 }
+html[data-theme="dark"] table.sh-map td.sh-map-from {
+  color: #afb8ca;
+  background: #0f1924;
+}
 html[data-theme="dark"] .sh-map-avg td,
 html[data-theme="dark"] .sh-map-avg th {
   background: #0e182a;
