@@ -82,6 +82,32 @@
 </div>
 
 
+{% if prog_rows %}
+{# each programme's submission: its report to read, and every batch's documents in one ZIP #}
+<section class="card mb-2 subs-card">
+  <div class="card-head"><h3>Submissions</h3>
+    <span class="spacer small muted">{{ prog_rows|selectattr('done')|list|length }} of {{ prog_rows|length }} programmes submitted</span></div>
+  <div class="card-body tight">
+    <table class="data subs-table">
+      <tbody>
+      {% for p in prog_rows %}
+        <tr>
+          <td><span class="mono small">{{ p.code }}</span> <strong>{{ p.name }}</strong></td>
+          <td class="small">{% if p.done %}<span class="pill pill-ok">✓ Submitted</span>
+            {% else %}<span class="muted">{{ p.submitted }} of {{ p.parts }} parts submitted</span>{% endif %}</td>
+          <td class="subs-go">
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report', programme_code=p.code) }}">View</a>
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report_zip', programme_code=p.code) }}" download
+               title="The current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download (ZIP)</a>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 {% if open_comments %}
 <div class="office-comment">
   <div class="oc-head"><span class="oc-icon">💬</span><strong>{{ open_comments|length }} comment{{ 's' if open_comments|length != 1 }} from the Office of Academic Affairs</strong></div>

@@ -1,9 +1,9 @@
 """A syllabus sheet follows the University's sample: Course Information taken
 from the Curriculum table (never typed again), Course Objectives, the Course
-Outcomes each with its Bloom's Taxonomy level, the CO-PO-PSO Mapping (PO1-PO9,
-PSO1-PSO4) with its Articulation row, the Course Content, and the Text Books,
-Book References and Web References. Course Objectives start from the
-programme's Objective."""
+Outcomes each with its Bloom's Taxonomy level, the CO-PO-PSO Mapping with its
+Articulation row — each course with its own PO and PSO columns, from PO1 and
+PSO1 — the Course Content, and the Text Books, Book References and Web
+References. Course Objectives start from the programme's Objective."""
 
 import io
 
@@ -47,6 +47,19 @@ def test_an_outcomes_opening_verb_suggests_its_level():
     assert bloom_level("Design a ledger") == 6
     assert bloom_level("Be aware of things") is None
     assert bloom_level("") is None
+
+
+def test_each_course_has_its_own_po_and_pso_columns():
+    from app.schema import course_columns
+    assert course_columns({}) == ["PO1", "PSO1"]                       # a new course starts with one of each
+    assert course_columns({"po_count": 3, "pso_count": 2}) == ["PO1", "PO2", "PO3", "PSO1", "PSO2"]
+    # a sheet that never said: as many as its mapping holds
+    cols = course_columns({"co_po": [{"PO1": "3", "PO9": "2", "PSO4": "1"}]})
+    assert len(cols) == 13 and cols[8] == "PO9" and cols[-1] == "PSO4"
+    assert course_columns({"po_count": "99", "pso_count": "0"}) == [f"PO{n}" for n in range(1, 16)] + ["PSO1"]
+    # the rule reads the course's own columns only
+    from app.validation import r_co_po_mapping_valid as rule
+    assert rule(_sheet(po_count=1, pso_count=1, co_po=[{"PO1": "3", "PO5": "9"}, {"PSO1": "2"}]), {}, "courses") == []
 
 
 def _sheet(**kw):
@@ -96,8 +109,7 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     cur = items[0]["data"]
     assert "Number of POs" not in client.get("/department/stage/prog_curriculum/DEMOBBA").get_data(as_text=True)
     page = client.get("/department/stage/prog_syllabus/DEMOBBA").get_data(as_text=True)
-    assert 'outcome_cols: ["PO1", "PO2", "PO3", "PO4", "PO5", "PO6", "PO7", "PO8", "PO9", ' \
-           '"PSO1", "PSO2", "PSO3", "PSO4"]' in page
+    assert 'outcome_max: {"po": 15, "pso": 8}' in page
     # the programme's Objective is what each course's Course Objectives start from
     cur["profile"]["objective"] = "1. To build sound knowledge\n2. To prepare students for careers"
     assert client.post("/department/api/prog_curriculum/DEMOBBA/save", json=cur).get_json()["ok"]
@@ -112,6 +124,10 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     data = items[1]["data"]
     j = client.post("/department/api/prog_syllabus/DEMOBBA/validate", json=data).get_json()
     assert not [i for i in j["issues"] if i["level"] == "error"], j["issues"]
+    # every course takes PO1-PO3 and PSO1-PSO2: the Word syllabus maps to those
+    for c in data["courses"]:
+        c.update(po_count=3, pso_count=2)
+    assert client.post("/department/api/prog_syllabus/DEMOBBA/save", json=data).get_json()["ok"]
 
     from app.docgen import syllabus_docx
     with app.app_context():
@@ -131,5 +147,5 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     assert outcomes[0] == ["Course Outcome", "Description", "Bloom’s Taxonomy Level"]
     assert outcomes[1][0] == "CO 1" and outcomes[1][2] in {"1", "2", "3", "4", "5", "6"}
     mapping = next(t for t in tables if t[0][0] == "CO")
-    assert mapping[0] == ["CO"] + [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1, 5)]
+    assert mapping[0] == ["CO", "PO1", "PO2", "PO3", "PSO1", "PSO2"]
     assert mapping[-1][0] == "Articulation" and len(mapping) == len(outcomes) + 1

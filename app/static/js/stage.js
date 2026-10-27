@@ -3759,21 +3759,86 @@
       colWidths(tb.closest("table"), ["92px", "", "240px"]);
     }
 
-    /* CO-PO-PSO Mapping: each CO against the programme's POs and PSOs —
-       3 High, 2 Medium, 1 Low, – none — and the Articulation row, each
-       column's average, worked out as it is filled. */
+    /* CO-PO-PSO Mapping: each CO against the course's POs and PSOs — 3 High,
+       2 Medium, 1 Low, – none — and the Articulation row, each column's
+       average, worked out as it is filled. A course starts with PO1 and PSO1:
+       + adds the next one, × takes one away (the columns after it move up). */
     const fmtAvg = v => (Math.round(v * 10) / 10).toString();
+    const MAP_MAX = Object.assign({ po: 15, pso: 8 }, CTX.outcome_max || {});
+    // how many PO (or PSO) columns a course has: as it says, or as its mapping holds
+    function colCount(row, prefix, key, top) {
+      const n = parseInt(row[key], 10);
+      if (n > 0) return Math.min(n, top);
+      const re = new RegExp("^" + prefix + "(\\d+)$");
+      let most = 1;
+      (Array.isArray(row.co_po) ? row.co_po : []).forEach(m => Object.keys(m || {}).forEach(k => {
+        const x = re.exec(k);
+        if (x) most = Math.max(most, +x[1]);
+      }));
+      return Math.min(most, top);
+    }
     function mapBlock(row, i, part) {
-      const cols = (CTX.outcome_cols || []).length ? CTX.outcome_cols
-        : [...Array.from({ length: 9 }, (_, n) => "PO" + (n + 1)), ...Array.from({ length: 4 }, (_, n) => "PSO" + (n + 1))];
+      const nPo = colCount(row, "PO", "po_count", MAP_MAX.po);
+      const nPso = colCount(row, "PSO", "pso_count", MAP_MAX.pso);
+      const list = (prefix, n) => Array.from({ length: n }, (_, k) => prefix + (k + 1));
+      const pos = list("PO", nPo), psos = list("PSO", nPso), cols = [...pos, ...psos];
       const cos = row.co_table || [];
       if (!Array.isArray(row.co_po)) row.co_po = [];
       while (row.co_po.length < cos.length) row.co_po.push({});
+      const edit = !CTX.readonly;
+      const addPo = edit && nPo < MAP_MAX.po, addPso = edit && nPso < MAP_MAX.pso;
+      const counts = (po, pso) => { row.po_count = po; row.pso_count = pso; draw(); touch(); };
+      // take column k away: each later column moves up one, keeping its values
+      const drop = (prefix, k, n) => {
+        const name = prefix + k;
+        if (row.co_po.some(m => m && ["1", "2", "3"].includes(String(m[name] ?? ""))) &&
+            !window.confirm(`Remove ${name} and what is mapped to it?`)) return;
+        row.co_po.forEach(m => {
+          if (!m) return;
+          for (let j = k; j < n; j++) {
+            const v = m[prefix + (j + 1)];
+            if (v === undefined) delete m[prefix + j]; else m[prefix + j] = v;
+          }
+          delete m[prefix + n];
+        });
+        if (prefix === "PO") counts(nPo - 1, nPso); else counts(nPo, nPso - 1);
+      };
+      const head = (name, prefix, k, n) => {
+        const th = cell("th", "sh-map-h", [name]);
+        if (edit && n > 1) {
+          const x = el("button", "sh-map-x", "×");
+          x.type = "button";
+          x.title = `Remove ${name}`;
+          x.setAttribute("aria-label", `Remove ${name}`);
+          x.addEventListener("click", () => drop(prefix, k, n));
+          th.appendChild(x);
+        }
+        return th;
+      };
+      const plus = (next, fn) => {
+        const b = el("button", "sh-map-plus", "+");
+        b.type = "button";
+        b.title = `Add ${next}`;
+        b.setAttribute("aria-label", `Add ${next}`);
+        b.addEventListener("click", fn);
+        return cell("th", "sh-map-add", [b]);
+      };
+      const gap = () => el("td", "sh-map-gap");
       const trs = [];
       const h = el("tr");
       h.appendChild(cell("th", "sh-map-co", ["CO"]));
-      cols.forEach(c => h.appendChild(cell("th", null, [c])));
+      pos.forEach((c, k) => h.appendChild(head(c, "PO", k + 1, nPo)));
+      if (addPo) h.appendChild(plus("PO" + (nPo + 1), () => counts(nPo + 1, nPso)));
+      psos.forEach((c, k) => h.appendChild(head(c, "PSO", k + 1, nPso)));
+      if (addPso) h.appendChild(plus("PSO" + (nPso + 1), () => counts(nPo, nPso + 1)));
       trs.push(h);
+      // a row's cells, with the + columns left empty
+      const fill = (tr, make) => {
+        pos.forEach(c => tr.appendChild(make(c)));
+        if (addPo) tr.appendChild(gap());
+        psos.forEach(c => tr.appendChild(make(c)));
+        if (addPso) tr.appendChild(gap());
+      };
       const avgCells = {};
       const paintAvg = () => cols.forEach(c => {
         const vals = row.co_po.slice(0, cos.length).map(m => num((m || {})[c])).filter(v => v !== null && v > 0);
@@ -3783,23 +3848,24 @@
         const m = row.co_po[k] && typeof row.co_po[k] === "object" ? row.co_po[k] : (row.co_po[k] = {});
         const tr = el("tr");
         tr.appendChild(cell("td", "sh-map-co", [`CO${k + 1}`]));
-        cols.forEach(c => {
+        fill(tr, c => {
           const sel = el("select", "sh-map-sel");
           sel.setAttribute("aria-label", `CO${k + 1} to ${c}`);
           [["", "–"], ["3", "3"], ["2", "2"], ["1", "1"]].forEach(([v, t]) => sel.appendChild(new Option(t, v)));
           sel.value = ["1", "2", "3"].includes(String(m[c] ?? "")) ? String(m[c]) : "";
-          sel.disabled = !!CTX.readonly;
+          sel.disabled = !edit;
           sel.addEventListener("change", () => { m[c] = sel.value || "-"; paintAvg(); touch(); });
-          tr.appendChild(cell("td", "sh-map-v", [sel]));
+          return cell("td", "sh-map-v", [sel]);
         });
         trs.push(tr);
       });
       const at = el("tr", "sh-map-avg");
       at.appendChild(cell("th", "sh-map-co", ["Articulation"]));
-      cols.forEach(c => { const td = el("td", "sh-map-v"); avgCells[c] = td; at.appendChild(td); });
+      fill(at, c => { const td = el("td", "sh-map-v"); avgCells[c] = td; return td; });
       trs.push(at);
       const legend = el("tr");
-      legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"], cols.length + 1));
+      legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"],
+                              cols.length + 1 + (addPo ? 1 : 0) + (addPso ? 1 : 0)));
       trs.push(legend);
       const tb = part("CO-PO-PSO Mapping:", trs, "sh-map");
       tb.closest("table").dataset.field = "outcomes";
@@ -5278,14 +5344,6 @@
 
   if (!CTX.readonly) {
     document.getElementById("btn-submit").addEventListener("click", submit);
-    // Save draft: keep what is there now, to come back to later
-    const draftBtn = document.getElementById("btn-save-draft");
-    if (draftBtn) draftBtn.addEventListener("click", () => {
-      dirty = true;
-      save().then(() => {
-        if (window.Toast) window.Toast.success("Your draft is saved. Pick up from here any time.", { title: "Draft saved" });
-      });
-    });
     const sampleBtn = document.getElementById("btn-sample");
     if (sampleBtn) sampleBtn.addEventListener("click", () => {
       sampleBtn.disabled = true;

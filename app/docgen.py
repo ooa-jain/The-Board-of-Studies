@@ -630,7 +630,8 @@ def _course_sheet(doc, programme_name, c, width):
     the CO-PO-PSO Mapping with its Articulation row, the Course Content, and
     the Text Books, Book References and Web References (then Pedagogy and
     Skill Development Activities, when they are given)."""
-    from .schema import OUTCOME_COLUMNS as cols, bloom_level
+    from .schema import bloom_level, course_columns
+    cols = course_columns(c)          # the PO and PSO columns this course has
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
 
     def heading(text):

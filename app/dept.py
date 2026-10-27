@@ -268,9 +268,11 @@ def _dashboard_ctx():
         # an earlier batch not begun is optional, not overdue
         shown = [{**st, "status": "optional" if st["optional"] and st["status"] == "open" else st["status"]}
                  for st in steps]
+        needed = [st for st in steps if not st["optional"]]
         prog_rows.append({"code": p["programme_code"], "name": p["programme_name"], "level": p.get("level") or "",
                           "steps": shown, "url": steps[0]["url"] if steps else "#",
-                          "done": all(st["status"] == "submitted" for st in steps if not st["optional"])})
+                          "done": all(st["status"] == "submitted" for st in needed),
+                          "submitted": sum(st["status"] == "submitted" for st in needed), "parts": len(needed)})
     return dict(dept=dept, submission=sub, open_comments=open_comments, person=_person(),
                            prog_rows=prog_rows, prog_heads=prog_heads,
                            drive=drive and {"title": drive["title"],
@@ -413,12 +415,11 @@ def stage(stage_key, programme_code=None):
             back = url_for("dept.stage", stage_key="prog_curriculum",
                            programme_code=programme["programme_code"]) + "#sec-semester_structure"
             back_label = "Programme structure — semester scheme"
-    # a syllabus: its CO-PO-PSO Mapping's columns, and the programme's Objective,
-    # which each course's Course Objectives starts from
-    outcome_cols, programme_objectives = [], ""
+    # a syllabus: the programme's Objective, which each course's Course Objectives starts from
+    programme_objectives, outcome_max = "", {}
     if programme and stage_key.startswith("prog_syllabus"):
-        from .schema import OUTCOME_COLUMNS, objective_lines
-        outcome_cols = OUTCOME_COLUMNS
+        from .schema import PO_MAX, PSO_MAX, objective_lines
+        outcome_max = {"po": PO_MAX, "pso": PSO_MAX}
         programme_objectives = "\n".join(objective_lines(
             ((programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {})
              .get("profile") or {}).get("objective")))
@@ -443,6 +444,12 @@ def stage(stage_key, programme_code=None):
                 np_ = _next_programme(sub, dept, programme["programme_code"])
                 next_step = np_ and {**np_, "label": "the next programme"}
     _note_place(dept, stage_key, (programme or {}).get("programme_code"))
+    # every part of the programme submitted: its report, as the Office sees it, under the page
+    programme_report = None
+    if steps and all(st["status"] == "submitted" for st in steps if not st["optional"]):
+        from .report import programme_context
+        programme_report = programme_context(get_db(), dept, _year(), programme["programme_code"],
+                                             ShareLinks(dept["dept_code"], _year()))
     # a PG programme fills the PG Course Matrix: its own course groups and wording
     from .schema import for_level, category_groups
     deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
@@ -470,7 +477,8 @@ def stage(stage_key, programme_code=None):
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back, back_label=back_label,
                            structure_courses=structure_courses, revision_year=revision_year(sub),
-                           outcome_cols=outcome_cols, programme_objectives=programme_objectives,
+                           programme_objectives=programme_objectives, outcome_max=outcome_max,
+                           programme_report=programme_report,
                            bloom_verbs=BLOOM_VERB_LEVEL,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),
@@ -1380,6 +1388,19 @@ def export_word():
                      download_name=f"BoS-Report-{dept['dept_code']}-{_year()}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument."
                               "wordprocessingml.document")
+
+
+@bp.route("/programme/<programme_code>/report")
+@department_required
+def programme_report(programme_code):
+    """One programme's whole record, the same page the Office reads."""
+    from .report import programme_context
+    dept = _dept()
+    ctx = programme_context(get_db(), dept, _year(), programme_code,
+                            ShareLinks(dept["dept_code"], _year())) or abort(404)
+    return render_template("admin/programme_report.html", **ctx, back_url=url_for("dept.dashboard"),
+                           zip_url=url_for("dept.programme_report_zip",
+                                           programme_code=ctx["programme"]["programme_code"]))
 
 
 @bp.route("/programme/<programme_code>/report.zip")

@@ -78,8 +78,26 @@ def bloom_level(text):
     return BLOOM_VERB_LEVEL.get(words[0].lower().strip(".,:;")) if words else None
 
 
-# the columns of every course's CO-PO-PSO Mapping, as the sample syllabus has them
+# the columns of the sample syllabus's CO-PO-PSO Mapping (the sample sheets use them)
 OUTCOME_COLUMNS = [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1, 5)]
+PO_MAX, PSO_MAX = 15, 8
+
+
+def course_columns(c):
+    """One course's CO-PO-PSO Mapping columns, PO1 … then PSO1 …: as many as the
+    course has added — or, for a sheet that never said, as many as its mapping
+    holds — and at least PO1 and PSO1."""
+    rows = [m for m in (c.get("co_po") or []) if isinstance(m, dict)] if isinstance(c.get("co_po"), list) else []
+
+    def count(name, prefix, top):
+        try:
+            n = int(c.get(name))
+        except (TypeError, ValueError):
+            n = max([int(k[len(prefix):]) for m in rows for k in m
+                     if re.fullmatch(prefix + r"\d+", str(k))] or [1])
+        return max(1, min(n, top))
+    return ([f"PO{n}" for n in range(1, count("po_count", "PO", PO_MAX) + 1)]
+            + [f"PSO{n}" for n in range(1, count("pso_count", "PSO", PSO_MAX) + 1)])
 
 
 def objective_lines(text):
@@ -640,6 +658,9 @@ PROGRAMME_SYLLABUS = {
                  "rows": 5, "min_items": 3},
                 # CO-PO-PSO Mapping: one row a CO, {"PO1": "3", …, "PSO4": "-"}
                 {"name": "co_po", "label": "CO-PO-PSO Mapping", "type": "readonly", "hidden": True},
+                # how many PO and PSO columns this course's mapping has (+ adds one, × removes one)
+                {"name": "po_count", "label": "POs", "type": "readonly", "hidden": True},
+                {"name": "pso_count", "label": "PSOs", "type": "readonly", "hidden": True},
                 {"name": "modules", "label": "Course Content", "type": "module_compare", "compare": False,
                  "required": True},
                 {"name": "text_books", "label": "Text Books", "type": "textarea", "required": True,

@@ -160,6 +160,29 @@
       </div>
     </section>
     {% endif %}
+
+    {% if programme_report %}
+    {# every part of the programme is submitted: its report, as the Office sees it #}
+    <section class="prog-report" id="programme-report">
+      <div class="prog-report-head">
+        <div>
+          <h2>Programme report</h2>
+          <p class="small muted">Every part of {{ programme.programme_code }} is submitted. This is the report the Office of Academic Affairs sees.</p>
+        </div>
+        <div class="spacer prog-report-actions">
+          {% if programme_report.curriculum_doc %}<a class="btn btn-ghost btn-sm" href="{{ programme_report.curriculum_doc }}" target="_blank" rel="noopener">Curriculum →</a>{% endif %}
+          {% if programme_report.syllabus_doc %}<a class="btn btn-ghost btn-sm" href="{{ programme_report.syllabus_doc }}" target="_blank" rel="noopener">Syllabus →</a>{% endif %}
+          {% if programme_report.revision_doc %}<a class="btn btn-ghost btn-sm" href="{{ programme_report.revision_doc }}" target="_blank" rel="noopener">Course Revision →</a>{% endif %}
+          <a class="btn btn-gold btn-sm" href="{{ url_for('dept.programme_report_zip', programme_code=programme.programme_code) }}" download
+             title="This programme's current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download all (ZIP)</a>
+        </div>
+      </div>
+      {% with parts=programme_report.parts, profile=programme_report.profile, semesters=programme_report.semesters,
+              minors=programme_report.minors, syllabus=programme_report.syllabus, revision=programme_report.revision %}
+      {% include "admin/_programme_body.html" %}
+      {% endwith %}
+    </section>
+    {% endif %}
   </div>
 
 </div>
@@ -170,7 +193,6 @@
     <span class="save-note" id="save-note" role="status" aria-live="polite">Changes save automatically</span>
     <span class="spacer"></span>
     {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
-    <button class="btn btn-ghost" type="button" id="btn-save-draft">Save draft</button>
     <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% elif step and last_step %}Review &amp; submit this programme →{% elif step and next_step %}Submit {{ step.label }} &amp; go to {{ next_step.label }} →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
   </div>
 </div>
@@ -210,9 +232,9 @@
     syllabi: {{ syllabi|tojson }},
     revision_url: {{ (revision_url or '')|tojson }},
     revision_year: {{ (revision_year or '')|tojson }},
-    // a syllabus's CO-PO-PSO Mapping columns, the programme's Objective (each
-    // course's Course Objectives starts from it) and the verbs that suggest a CO's Bloom's level
-    outcome_cols: {{ (outcome_cols or [])|tojson }},
+    // a syllabus: the most PO and PSO columns a mapping takes, the programme's Objective
+    // (each course's Course Objectives starts from it) and the verbs that suggest a CO's Bloom's level
+    outcome_max: {{ (outcome_max or {})|tojson }},
     programme_objectives: {{ (programme_objectives or '')|tojson }},
     bloom_verbs: {{ (bloom_verbs or {})|tojson }},
     course_map: {{ course_map|tojson }},
