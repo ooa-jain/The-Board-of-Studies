@@ -82,11 +82,13 @@ def test_every_course_outcome_needs_its_level():
     assert rule(old, {}, "courses")[0]["level"] == "error"
 
 
-def test_the_mapping_holds_three_two_one_or_dash():
+def test_the_mapping_holds_a_number_in_each_cell():
     from app.validation import r_co_po_mapping_valid as rule
     assert rule(_sheet(), {}, "courses") == []
-    issues = rule(_sheet(co_po=[{"PO1": "5"}, {"PO2": "2"}]), {}, "courses")
-    assert any(i["level"] == "error" and "must be 3, 2, 1 or –" in i["message"] for i in issues)
+    # any number is taken, as typed
+    assert rule(_sheet(co_po=[{"PO1": "5"}, {"PO2": "2.5"}]), {}, "courses") == []
+    issues = rule(_sheet(co_po=[{"PO1": "high"}, {"PO2": "2"}]), {}, "courses")
+    assert any(i["level"] == "error" and "must be a number" in i["message"] for i in issues)
     # a CO left unmapped is a warning; a course with no mapping at all is an error
     issues = rule(_sheet(co_po=[{"PO1": "3"}, {"PO1": "-"}]), {}, "courses")
     assert [i["level"] for i in issues] == ["warning"] and "CO2" in issues[0]["message"]

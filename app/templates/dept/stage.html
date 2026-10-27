@@ -148,6 +148,32 @@
       </div>
     </form>
 
+    {# Submit and the other actions: at the end of the form, where the page is read to — not fixed on the screen #}
+    {% if not readonly %}
+    <div class="savebar savebar-end">
+      <div class="wrap">
+        <span class="save-note" id="save-note" role="status" aria-live="polite">Changes save automatically</span>
+        <span class="spacer"></span>
+        {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
+        <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% elif step and last_step %}Review &amp; submit this programme →{% elif step and next_step %}Submit {{ step.label }} &amp; go to {{ next_step.label }} →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="savebar savebar-end">
+      <div class="wrap">
+        <span class="save-note">Submitted on
+          {{ (state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
+        <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
+        {% if programme and stage.parent %}<a class="btn btn-ghost" href="{{ url_for('dept.programme_report_zip', programme_code=programme.programme_code) }}" download
+           title="This programme's current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download all (ZIP)</a>{% endif %}
+        <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
+        {% if step and next_step %}<a class="btn btn-gold" href="{{ next_step.url }}">Go to {{ next_step.label }} →</a>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if all_revisions_done %}
     {# every programme's Course Revision is in: the whole record can go #}
     <section class="panel submit-all-panel">
@@ -187,30 +213,6 @@
 
 </div>
 
-{% if not readonly %}
-<div class="savebar">
-  <div class="wrap">
-    <span class="save-note" id="save-note" role="status" aria-live="polite">Changes save automatically</span>
-    <span class="spacer"></span>
-    {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
-    <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% elif step and last_step %}Review &amp; submit this programme →{% elif step and next_step %}Submit {{ step.label }} &amp; go to {{ next_step.label }} →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
-  </div>
-</div>
-{% else %}
-<div class="savebar">
-  <div class="wrap">
-    <span class="save-note">Submitted on
-      {{ (state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
-    <span class="spacer"></span>
-    <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
-    <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
-    {% if programme and stage.parent %}<a class="btn btn-ghost" href="{{ url_for('dept.programme_report_zip', programme_code=programme.programme_code) }}" download
-       title="This programme's current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download all (ZIP)</a>{% endif %}
-    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
-    {% if step and next_step %}<a class="btn btn-gold" href="{{ next_step.url }}">Go to {{ next_step.label }} →</a>{% endif %}
-  </div>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}

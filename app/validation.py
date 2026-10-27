@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime
 
 from . import ugc_rules as U
-from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, course_columns
+from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, course_columns, mapping_value
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
@@ -617,8 +617,8 @@ def r_outcomes_have_bloom_levels(data, ctx, sk):
 
 
 def r_co_po_mapping_valid(data, ctx, sk):
-    """The CO-PO-PSO Mapping holds 3, 2, 1 or – in each cell, and every
-    course outcome is mapped to at least one PO or PSO."""
+    """The CO-PO-PSO Mapping holds a number (or nothing) in each cell, and
+    every course outcome is mapped to at least one PO or PSO."""
     out = []
     for i, r in enumerate(_rows(data, sk)):
         cos = [c for c in (r.get("co_table") or []) if isinstance(c, dict) and str(c.get("text") or "").strip()] \
@@ -631,11 +631,11 @@ def r_co_po_mapping_valid(data, ctx, sk):
         for n in range(1, len(cos) + 1):
             m = rows[n - 1] if n - 1 < len(rows) and isinstance(rows[n - 1], dict) else {}
             m = {k: m.get(k, "") for k in cols}
-            bad = [k for k, v in m.items() if str(v).strip() not in ("", "-", "–", "1", "2", "3")]
+            bad = [k for k, v in m.items() if str(v).strip() not in ("", "-", "–") and mapping_value(v) is None]
             if bad:
                 out.append(err(f"Course {_course_name(r, i)}, CO{n}: the mapping to {', '.join(bad)} must be "
-                               f"3, 2, 1 or –.", section=sk, row=i, field="outcomes"))
-            if any(str(v).strip() in ("1", "2", "3") for v in m.values()):
+                               f"a number.", section=sk, row=i, field="outcomes"))
+            if any((mapping_value(v) or 0) > 0 for v in m.values()):
                 mapped += 1
             else:
                 out.append(warn(f"Course {_course_name(r, i)}, CO{n} is not mapped to any PO or PSO.",

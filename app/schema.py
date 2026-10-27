@@ -83,6 +83,16 @@ OUTCOME_COLUMNS = [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1
 PO_MAX, PSO_MAX = 15, 8
 
 
+def mapping_value(v):
+    """A CO-PO-PSO Mapping cell as a number (3 High, 2 Medium, 1 Low …), or
+    None when it is empty, "–" or not a number."""
+    try:
+        n = float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if n >= 0 and n == n and n != float("inf") else None
+
+
 def course_columns(c):
     """One course's CO-PO-PSO Mapping columns, PO1 … then PSO1 …: as many as the
     course has added — or, for a sheet that never said, as many as its mapping

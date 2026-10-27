@@ -5145,6 +5145,10 @@ html[data-theme="dark"] .subs-table tr {
   border-bottom: 1px solid #2e3542;
 }
 }
+html[data-theme="dark"] .stage-layout .savebar.savebar-end {
+  border: 1px solid #2e3542;
+  box-shadow: none;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

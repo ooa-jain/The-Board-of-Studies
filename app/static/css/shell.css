@@ -220,7 +220,7 @@ body.erp .page-head p { white-space: normal !important; overflow: visible !impor
 .ugc-strip-tally { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .ugc-strip-tally > * { margin: 0 !important; }
 /* the checks float above the save bar, beside the form */
-.checks-float { position: fixed; right: 20px; bottom: 76px; z-index: 60; width: min(360px, calc(100vw - 32px));
+.checks-float { position: fixed; right: 20px; bottom: 20px; z-index: 60; width: min(360px, calc(100vw - 32px));
   max-height: 55vh; display: flex; flex-direction: column; margin: 0;
   box-shadow: 0 18px 40px -16px rgba(16, 24, 40, .35) !important; }
 .checks-float[hidden] { display: none; }

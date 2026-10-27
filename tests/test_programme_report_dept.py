@@ -19,6 +19,8 @@ def test_a_submitted_programme_shows_its_report(app, client):
     page = client.get(f"/department/stage/prog_syllabus/{code}").get_data(as_text=True)
     assert 'id="programme-report"' not in page                 # not every part is in yet
     assert 'id="btn-save-draft"' not in page                   # changes save by themselves
+    # Submit sits at the end of the form, not fixed on the screen
+    assert 'class="savebar savebar-end"' in page and page.index('id="stage-form"') < page.index('id="btn-submit"')
 
     # the home page: every programme, to view or download
     home = client.get("/department/").get_data(as_text=True)

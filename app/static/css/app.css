@@ -3390,7 +3390,7 @@ table.sheet .sh-co-level.is-auto { border-style: dashed; border-color: #f5c26b; 
 table.sh-map { font-size: .84rem; }
 table.sh-map th, table.sh-map td { padding: 4px 3px; text-align: center; vertical-align: middle; }
 table.sh-map .sh-map-co { width: 84px; white-space: nowrap; font-weight: 700; }
-table.sheet .sh-map-sel { width: 100%; min-width: 0; max-width: 64px; padding: 3px 2px; text-align: center; text-align-last: center; }
+table.sheet .sh-map-in { width: 100%; min-width: 0; max-width: 64px; padding: 4px 2px; text-align: center; }
 /* a column's × (remove it) and the + after the last PO and the last PSO (add one) */
 table.sh-map th.sh-map-h { white-space: nowrap; }
 .sh-map-x { margin-left: 3px; padding: 0 3px; border: 0; background: none; color: #98a2b3; font-size: .95rem;
@@ -5029,3 +5029,8 @@ table.sheet .bta-sel.is-empty { color: #98a2b3; font-weight: 400; }
   .subs-table tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--line, #e3e8ef); }
   .subs-table td.subs-go { text-align: left; }
 }
+
+/* the stage page's Submit bar: at the end of the form, not fixed on the screen */
+.stage-layout .savebar.savebar-end { position: static; margin-top: 18px; padding: 12px 0; z-index: auto;
+  border: 1px solid var(--lv-border, var(--line)); border-radius: 12px; box-shadow: none; backdrop-filter: none; }
+.stage-layout .savebar.savebar-end .wrap { max-width: none; padding: 0 16px; }

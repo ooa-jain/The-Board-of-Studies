@@ -3759,9 +3759,9 @@
       colWidths(tb.closest("table"), ["92px", "", "240px"]);
     }
 
-    /* CO-PO-PSO Mapping: each CO against the course's POs and PSOs — 3 High,
-       2 Medium, 1 Low, – none — and the Articulation row, each column's
-       average, worked out as it is filled. A course starts with PO1 and PSO1:
+    /* CO-PO-PSO Mapping: each CO against the course's POs and PSOs — a number
+       typed in (3 High, 2 Medium, 1 Low), empty for none — and the Articulation
+       row, each column's average, worked out as it is filled. A course starts with PO1 and PSO1:
        + adds the next one, × takes one away (the columns after it move up). */
     const fmtAvg = v => (Math.round(v * 10) / 10).toString();
     const MAP_MAX = Object.assign({ po: 15, pso: 8 }, CTX.outcome_max || {});
@@ -3791,7 +3791,7 @@
       // take column k away: each later column moves up one, keeping its values
       const drop = (prefix, k, n) => {
         const name = prefix + k;
-        if (row.co_po.some(m => m && ["1", "2", "3"].includes(String(m[name] ?? ""))) &&
+        if (row.co_po.some(m => m && num(m[name]) !== null) &&
             !window.confirm(`Remove ${name} and what is mapped to it?`)) return;
         row.co_po.forEach(m => {
           if (!m) return;
@@ -3849,13 +3849,21 @@
         const tr = el("tr");
         tr.appendChild(cell("td", "sh-map-co", [`CO${k + 1}`]));
         fill(tr, c => {
-          const sel = el("select", "sh-map-sel");
-          sel.setAttribute("aria-label", `CO${k + 1} to ${c}`);
-          [["", "–"], ["3", "3"], ["2", "2"], ["1", "1"]].forEach(([v, t]) => sel.appendChild(new Option(t, v)));
-          sel.value = ["1", "2", "3"].includes(String(m[c] ?? "")) ? String(m[c]) : "";
-          sel.disabled = !edit;
-          sel.addEventListener("change", () => { m[c] = sel.value || "-"; paintAvg(); touch(); });
-          return cell("td", "sh-map-v", [sel]);
+          // a number typed in (3 High, 2 Medium, 1 Low…); empty is none
+          const box = el("input", "sh-map-in");
+          box.type = "text";
+          box.inputMode = "decimal";
+          box.placeholder = "–";
+          box.setAttribute("aria-label", `CO${k + 1} to ${c}`);
+          box.value = num(m[c]) !== null ? String(m[c]).trim() : "";
+          box.disabled = !edit;
+          box.addEventListener("input", () => {
+            const clean = box.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+            if (clean !== box.value) box.value = clean;
+            m[c] = clean === "" || clean === "." ? "-" : clean;
+            paintAvg(); touch();
+          });
+          return cell("td", "sh-map-v", [box]);
         });
         trs.push(tr);
       });
