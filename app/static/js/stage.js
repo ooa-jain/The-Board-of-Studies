@@ -301,6 +301,68 @@
     return Math.round(v.reduce((a, b) => a + b, 0) / v.length * 100) / 100;
   }
 
+  /** A programme's POs (or PSOs): PO1 open to describe, "+ Add PO2" for the
+      next, × on the last to take it away. Every course's CO-PO-PSO Mapping
+      has a column for each. */
+  function outcomeList(def, value, onChange) {
+    const prefix = def.prefix || "";
+    const items = (Array.isArray(value) ? value : [])
+      .map(x => String((x && typeof x === "object" ? x.text : x) ?? ""));
+    if (!items.length) items.push("");
+    const box = el("div", "ol-box");
+    const list = el("div", "ol-list");
+    const foot = el("div", "ol-foot");
+    box.appendChild(list);
+    box.appendChild(foot);
+    const emit = () => onChange(items.slice());
+    function draw() {
+      list.textContent = "";
+      foot.textContent = "";
+      items.forEach((t, i) => {
+        const name = prefix + (i + 1);
+        const row = el("div", "ol-item");
+        row.appendChild(el("span", "ol-name", name));
+        const ta = el("textarea");
+        ta.rows = 2;
+        ta.value = t;
+        ta.placeholder = `Describe ${name}`;
+        ta.setAttribute("aria-label", name);
+        ta.disabled = !!CTX.readonly;
+        ta.addEventListener("input", () => { items[i] = ta.value; emit(); });
+        row.appendChild(ta);
+        // only the last one comes away: the courses' mappings keep their columns
+        if (!CTX.readonly && items.length > 1 && i === items.length - 1) {
+          const x = el("button", "ol-x", "×");
+          x.type = "button";
+          x.title = `Remove ${name}`;
+          x.setAttribute("aria-label", `Remove ${name}`);
+          x.addEventListener("click", () => {
+            if (items[i].trim() && !window.confirm(`Remove ${name}? Its column goes from every course's mapping.`)) return;
+            items.pop();
+            draw();
+            emit();
+          });
+          row.appendChild(x);
+        }
+        list.appendChild(row);
+      });
+      if (!CTX.readonly && items.length < (def.max_items || 20)) {
+        const add = el("button", "btn btn-ghost btn-sm", `+ Add ${prefix}${items.length + 1}`);
+        add.type = "button";
+        add.addEventListener("click", () => {
+          items.push("");
+          draw();
+          emit();
+          const last = list.querySelector(".ol-item:last-child textarea");
+          if (last) last.focus();
+        });
+        foot.appendChild(add);
+      }
+    }
+    draw();
+    return box;
+  }
+
   /** Module by module: the previous syllabus beside the revised one, and the
       % change between them, typed by the department. */
   function moduleCompare(def, value, onChange) {
@@ -717,6 +779,7 @@
     let input;
     if (def.type === "fixed") return fixedBlock(def);
     if (def.type === "module_compare") return moduleCompare(def, value, onChange);
+    if (def.type === "outcome_list") return outcomeList(def, value, onChange);
     if (def.type === "textarea") {
       input = el("textarea");
       input.rows = def.rows || 3;
@@ -3759,86 +3822,43 @@
       colWidths(tb.closest("table"), ["92px", "", "240px"]);
     }
 
-    /* CO-PO-PSO Mapping: each CO against the course's POs and PSOs — a number
-       typed in (3 High, 2 Medium, 1 Low), empty for none — and the Articulation
-       row, each column's average, worked out as it is filled. A course starts with PO1 and PSO1:
-       + adds the next one, × takes one away (the columns after it move up). */
+    /* CO-PO-PSO Mapping: each CO against the programme's POs and PSOs — the
+       ones its Curriculum describes — a number typed in (3 High, 2 Medium,
+       1 Low), empty for none, and the Articulation row, each column's average,
+       worked out as it is filled. */
     const fmtAvg = v => (Math.round(v * 10) / 10).toString();
-    const MAP_MAX = Object.assign({ po: 15, pso: 8 }, CTX.outcome_max || {});
-    // how many PO (or PSO) columns a course has: as it says, or as its mapping holds
-    function colCount(row, prefix, key, top) {
-      const n = parseInt(row[key], 10);
-      if (n > 0) return Math.min(n, top);
+    // while the Curriculum has no POs: as many as the course's mapping holds
+    function colCount(row, prefix) {
       const re = new RegExp("^" + prefix + "(\\d+)$");
       let most = 1;
       (Array.isArray(row.co_po) ? row.co_po : []).forEach(m => Object.keys(m || {}).forEach(k => {
         const x = re.exec(k);
         if (x) most = Math.max(most, +x[1]);
       }));
-      return Math.min(most, top);
+      return most;
     }
     function mapBlock(row, i, part) {
-      const nPo = colCount(row, "PO", "po_count", MAP_MAX.po);
-      const nPso = colCount(row, "PSO", "pso_count", MAP_MAX.pso);
-      const list = (prefix, n) => Array.from({ length: n }, (_, k) => prefix + (k + 1));
-      const pos = list("PO", nPo), psos = list("PSO", nPso), cols = [...pos, ...psos];
+      const own = CTX.outcome_cols || [];              // [["PO1", "its description"], …]
+      const list = (prefix, n) => Array.from({ length: n }, (_, k) => [prefix + (k + 1), ""]);
+      const defs = own.length ? own : [...list("PO", colCount(row, "PO")), ...list("PSO", colCount(row, "PSO"))];
+      const pos = defs.filter(([c]) => c.startsWith("PO")).map(([c]) => c);
+      const psos = defs.filter(([c]) => c.startsWith("PSO")).map(([c]) => c);
+      const about = Object.fromEntries(defs);
+      const cols = [...pos, ...psos];
       const cos = row.co_table || [];
       if (!Array.isArray(row.co_po)) row.co_po = [];
       while (row.co_po.length < cos.length) row.co_po.push({});
       const edit = !CTX.readonly;
-      const addPo = edit && nPo < MAP_MAX.po, addPso = edit && nPso < MAP_MAX.pso;
-      const counts = (po, pso) => { row.po_count = po; row.pso_count = pso; draw(); touch(); };
-      // take column k away: each later column moves up one, keeping its values
-      const drop = (prefix, k, n) => {
-        const name = prefix + k;
-        if (row.co_po.some(m => m && num(m[name]) !== null) &&
-            !window.confirm(`Remove ${name} and what is mapped to it?`)) return;
-        row.co_po.forEach(m => {
-          if (!m) return;
-          for (let j = k; j < n; j++) {
-            const v = m[prefix + (j + 1)];
-            if (v === undefined) delete m[prefix + j]; else m[prefix + j] = v;
-          }
-          delete m[prefix + n];
-        });
-        if (prefix === "PO") counts(nPo - 1, nPso); else counts(nPo, nPso - 1);
-      };
-      const head = (name, prefix, k, n) => {
-        const th = cell("th", "sh-map-h", [name]);
-        if (edit && n > 1) {
-          const x = el("button", "sh-map-x", "×");
-          x.type = "button";
-          x.title = `Remove ${name}`;
-          x.setAttribute("aria-label", `Remove ${name}`);
-          x.addEventListener("click", () => drop(prefix, k, n));
-          th.appendChild(x);
-        }
-        return th;
-      };
-      const plus = (next, fn) => {
-        const b = el("button", "sh-map-plus", "+");
-        b.type = "button";
-        b.title = `Add ${next}`;
-        b.setAttribute("aria-label", `Add ${next}`);
-        b.addEventListener("click", fn);
-        return cell("th", "sh-map-add", [b]);
-      };
-      const gap = () => el("td", "sh-map-gap");
       const trs = [];
       const h = el("tr");
       h.appendChild(cell("th", "sh-map-co", ["CO"]));
-      pos.forEach((c, k) => h.appendChild(head(c, "PO", k + 1, nPo)));
-      if (addPo) h.appendChild(plus("PO" + (nPo + 1), () => counts(nPo + 1, nPso)));
-      psos.forEach((c, k) => h.appendChild(head(c, "PSO", k + 1, nPso)));
-      if (addPso) h.appendChild(plus("PSO" + (nPso + 1), () => counts(nPo, nPso + 1)));
+      cols.forEach(c => {
+        const th = cell("th", "sh-map-h", [c]);
+        if (about[c]) th.title = `${c}: ${about[c]}`;      // its description, on hover
+        h.appendChild(th);
+      });
       trs.push(h);
-      // a row's cells, with the + columns left empty
-      const fill = (tr, make) => {
-        pos.forEach(c => tr.appendChild(make(c)));
-        if (addPo) tr.appendChild(gap());
-        psos.forEach(c => tr.appendChild(make(c)));
-        if (addPso) tr.appendChild(gap());
-      };
+      const fill = (tr, make) => cols.forEach(c => tr.appendChild(make(c)));
       const avgCells = {};
       const paintAvg = () => cols.forEach(c => {
         const vals = row.co_po.slice(0, cos.length).map(m => num((m || {})[c])).filter(v => v !== null && v > 0);
@@ -3872,9 +3892,22 @@
       fill(at, c => { const td = el("td", "sh-map-v"); avgCells[c] = td; return td; });
       trs.push(at);
       const legend = el("tr");
-      legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"],
-                              cols.length + 1 + (addPo ? 1 : 0) + (addPso ? 1 : 0)));
+      legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"], cols.length + 1));
       trs.push(legend);
+      if (!own.length && edit) {
+        // the columns come from the Curriculum's POs and PSOs: say where
+        const tr = el("tr");
+        const td = cell("td", "sh-missing", [], cols.length + 1);
+        td.appendChild(el("span", null, "The Programme Outcomes (POs) and PSOs are not in the Curriculum yet — add them there " +
+                                        "(1.A and 1.B, under Objective) and this mapping takes a column for each. "));
+        if (CTX.outcomes_url) {
+          const a = el("a", "btn btn-ghost btn-sm", "Add them in the Curriculum →");
+          a.href = CTX.outcomes_url;
+          td.appendChild(a);
+        }
+        tr.appendChild(td);
+        trs.push(tr);
+      }
       const tb = part("CO-PO-PSO Mapping:", trs, "sh-map");
       tb.closest("table").dataset.field = "outcomes";
       paintAvg();

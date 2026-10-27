@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime
 
 from . import ugc_rules as U
-from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, course_columns, mapping_value
+from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, course_columns, mapping_value, programme_columns
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
@@ -125,6 +125,21 @@ def validate_field(fdef, value, section_key=None, row=None):
             pct = _num(m.get("pct"))
             if m.get("pct") not in (None, "") and (pct is None or pct < 0 or pct > 100):
                 out.append(err(f"Module {k}: the % change must be between 0 and 100.", **where))
+        return out
+
+    if ftype == "outcome_list":
+        # a programme's POs (or PSOs): each one described, PO1 at least
+        prefix = fdef.get("prefix") or ""
+        items = value if isinstance(value, list) else []
+        texts = [str((x.get("text") if isinstance(x, dict) else x) or "").strip() for x in items]
+        if fdef.get("required") and not any(texts):
+            out.append(err(f"{label}: describe {prefix}1.", **where))
+        elif len(texts) > 1:
+            for n, t in enumerate(texts, start=1):
+                if not t:
+                    out.append(err(f"{label}: describe {prefix}{n}, or remove it.", **where))
+        if fdef.get("max_items") and len(texts) > fdef["max_items"]:
+            out.append(err(f"{label}: at most {fdef['max_items']}.", **where))
         return out
 
     if _is_blank(value):
@@ -626,7 +641,8 @@ def r_co_po_mapping_valid(data, ctx, sk):
         if not cos:
             continue
         rows = r.get("co_po") if isinstance(r.get("co_po"), list) else []
-        cols = course_columns(r)          # the PO and PSO columns this course has
+        # the programme's POs and PSOs (or, while it has none, the course's own)
+        cols = ctx.get("outcome_cols") or course_columns(r)
         mapped = 0
         for n in range(1, len(cos) + 1):
             m = rows[n - 1] if n - 1 < len(rows) and isinstance(rows[n - 1], dict) else {}
@@ -867,6 +883,8 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
                   .get(programme.get("programme_code"), {})
                   .get("prog_curriculum", {}).get("data", {}))
         # an elective pair "A1 / A2" in the structure is two courses
+        # the CO-PO-PSO Mapping's columns: the programme's POs and PSOs
+        ctx["outcome_cols"] = [n for n, _ in programme_columns(curric.get("profile") or {})]
         ctx["known_course_codes"] = {
             code.strip().upper()
             for r in (curric.get("semester_structure") or [])

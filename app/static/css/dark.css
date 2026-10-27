@@ -2812,30 +2812,8 @@ html[data-theme="dark"] table.sheet .sh-co-level.is-auto {
   border-color: #f5c26b;
   background: #29200e;
 }
-html[data-theme="dark"] .sh-map-x {
-  border: 0;
-  background: none;
-  color: #9ba4b5;
-}
-html[data-theme="dark"] .sh-map-x:hover,
-html[data-theme="dark"] .sh-map-x:focus-visible {
-  color: #e38b82;
-  background: #2d120f;
-}
-html[data-theme="dark"] table.sh-map th.sh-map-add {
-  background: #0f1924;
-}
-html[data-theme="dark"] table.sh-map td.sh-map-gap {
-  background: #0f1924;
-}
-html[data-theme="dark"] .sh-map-plus {
-  border: 1px dashed #8a9cbf;
-  background: #121519;
-  color: #acc7ec;
-}
-html[data-theme="dark"] .sh-map-plus:hover,
-html[data-theme="dark"] .sh-map-plus:focus-visible {
-  background: #0f1a2c;
+html[data-theme="dark"] table.sh-map th.sh-map-h[title] {
+  text-decoration: underline dotted #9ba4b5;
 }
 html[data-theme="dark"] .sh-map-avg td,
 html[data-theme="dark"] .sh-map-avg th {
@@ -5148,6 +5126,18 @@ html[data-theme="dark"] .subs-table tr {
 html[data-theme="dark"] .stage-layout .savebar.savebar-end {
   border: 1px solid #2e3542;
   box-shadow: none;
+}
+html[data-theme="dark"] .ol-name {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .ol-x {
+  border: 1px solid #54312d;
+  background: #121519;
+  color: #e38b82;
+}
+html[data-theme="dark"] .ol-x:hover,
+html[data-theme="dark"] .ol-x:focus-visible {
+  background: #2d120f;
 }
 
 /* ---- erp.css ---- */

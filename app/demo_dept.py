@@ -270,6 +270,7 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
     prefix = "BBA" if "BBA" in code else "BCM"
     courses = _courses(prefix)
     if stage_key == "prog_curriculum":
+        from .autofill import PROGRAMME_OUTCOMES
         return {
             "details": {"degree_level": "UG - 3 Year", "specialisation": "General"},
             "profile": {
@@ -277,6 +278,12 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                              "in business knowledge and skills.\nTo prepare them for careers in industry, "
                              "for entrepreneurship and for higher study.\nTo build ethical values and "
                              "social responsibility.",
+                "programme_outcomes": list(PROGRAMME_OUTCOMES),
+                "programme_specific_outcomes": [
+                    "Apply the principles of management to business decisions.",
+                    "Analyse financial and market information to support decisions.",
+                    "Plan and run a business project with the tools of the trade.",
+                    "Build entrepreneurial and leadership skills for business."],
                 "duration_months": 36, "intake": 120,
                 "eligibility": "A pass in 10+2 or equivalent from a recognised board, with at least "
                                "45% marks in aggregate (40% for reserved categories).",

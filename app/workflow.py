@@ -800,7 +800,6 @@ def complete_syllabus(c, objectives=""):
     if not isinstance(c.get("co_po"), list):
         # the sample's PO1-PO9 and PSO1-PSO4: every CO high on the first PO,
         # medium on every third column after it
-        c["po_count"], c["pso_count"] = 9, 4
         c["co_po"] = [{col: "3" if j == 0 else "2" if (j + k) % 3 == 0 else "-" for j, col in enumerate(cols)}
                       for k in range(len(c["co_table"]))]
     if not lines(c.get("text_books")):

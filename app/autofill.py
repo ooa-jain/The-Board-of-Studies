@@ -167,6 +167,28 @@ MODULES = [("Foundations", 9), ("Core concepts", 9), ("Techniques and methods", 
            ("Tools and practice", 9), ("Applications and case studies", 9)]
 
 
+# the programme outcomes a sample Curriculum starts from (UGC LOCF graduate
+# attributes): nine POs and four PSOs, the sample syllabus's mapping columns
+PROGRAMME_OUTCOMES = [
+    "Disciplinary knowledge: apply the knowledge of the discipline to understand and solve its problems.",
+    "Critical thinking and problem solving: identify, analyse and solve problems with suitable methods.",
+    "Communication: present ideas clearly and effectively, in writing and in speech.",
+    "Research and inquiry: plan an inquiry, gather evidence and interpret what it shows.",
+    "Digital skills: use modern tools and technology effectively in the discipline.",
+    "Teamwork and leadership: work well in teams and lead them towards shared goals.",
+    "Ethics and values: act with professional ethics, integrity and social responsibility.",
+    "Society and sustainability: understand the effect of their work on society and the environment.",
+    "Lifelong learning: learn independently and keep their knowledge and skills current.",
+]
+
+
+def specific_outcomes(title):
+    return [f"Apply the core knowledge of {title} to practical problems.",
+            f"Use the methods and tools of {title} to design and build solutions.",
+            f"Carry out a project in {title} and present its results.",
+            f"Be ready for employment, entrepreneurship or higher study in {title}."]
+
+
 def _module_rows(title, total=None):
     """Five modules; their hours add up to the course's contact hours, when it has them."""
     try:
@@ -231,6 +253,11 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
                        f"To build sound knowledge and practical skills in {prog_name}.\n"
                        "To prepare students for careers in the computing industry and for higher study.\n"
                        "To develop ethical, communication and teamwork skills.")
+    # its POs and PSOs: the columns of every course's CO-PO-PSO Mapping
+    if not [x for x in profile.get("programme_outcomes") or [] if str(x).strip()]:
+        profile["programme_outcomes"] = list(PROGRAMME_OUTCOMES)
+    if not [x for x in profile.get("programme_specific_outcomes") or [] if str(x).strip()]:
+        profile["programme_specific_outcomes"] = specific_outcomes(prog_name)
     years = degree_years(details["degree_level"]) or (4 if ug else 2)
     profile.setdefault("duration_months", years * 12)
     profile.setdefault("intake", 60)

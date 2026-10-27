@@ -93,10 +93,38 @@ def mapping_value(v):
     return n if n >= 0 and n == n and n != float("inf") else None
 
 
+def outcome_texts(v):
+    """A programme's POs (or PSOs) as the Curriculum holds them: each one's
+    description, in order (one per line, when typed as text)."""
+    if isinstance(v, str):
+        texts = [x.strip() for x in v.splitlines()]
+    elif isinstance(v, list):
+        texts = [str((x.get("text") if isinstance(x, dict) else x) or "").strip() for x in v]
+    else:
+        texts = []
+    while texts and not texts[-1]:
+        texts.pop()
+    return texts
+
+
+def programme_columns(profile):
+    """The CO-PO-PSO Mapping's columns the programme's Curriculum sets — its
+    POs, then its PSOs — each with its description: [("PO1", "…"), …]."""
+    out = []
+    for key, prefix in (("programme_outcomes", "PO"), ("programme_specific_outcomes", "PSO")):
+        out += [(f"{prefix}{n}", t) for n, t in enumerate(outcome_texts((profile or {}).get(key)), start=1)]
+    return out
+
+
+def mapping_columns(profile, course=None):
+    """A course's CO-PO-PSO Mapping columns: the programme's POs and PSOs — or,
+    while its Curriculum has none, as many as the course's mapping holds."""
+    return [n for n, _ in programme_columns(profile)] or course_columns(course or {})
+
+
 def course_columns(c):
-    """One course's CO-PO-PSO Mapping columns, PO1 … then PSO1 …: as many as the
-    course has added — or, for a sheet that never said, as many as its mapping
-    holds — and at least PO1 and PSO1."""
+    """One course's CO-PO-PSO Mapping columns as its own mapping holds them,
+    PO1 … then PSO1 … (at least PO1 and PSO1)."""
     rows = [m for m in (c.get("co_po") or []) if isinstance(m, dict)] if isinstance(c.get("co_po"), list) else []
 
     def count(name, prefix, top):
@@ -479,6 +507,14 @@ PROGRAMME_CURRICULUM = {
                 {"name": "objective", "label": "1. Objective", "type": "textarea", "required": True,
                  "rows": 5, "min_items": 2, "wide": True,
                  "help": "Please provide 2–6 learning objectives, aligned with Bloom’s Taxonomy."},
+                # the programme's outcomes, side by side, one box each: every course's
+                # CO-PO-PSO Mapping in the Syllabus has a column for each
+                {"name": "programme_outcomes", "label": "1.A Programme Outcomes (POs)", "type": "outcome_list",
+                 "prefix": "PO", "required": True, "max_items": PO_MAX,
+                 "help": "PO1 is open — add PO2, PO3 … as the programme has them. Each is a column of every course's CO-PO-PSO Mapping."},
+                {"name": "programme_specific_outcomes", "label": "1.B Programme Specific Outcomes (PSOs)",
+                 "type": "outcome_list", "prefix": "PSO", "required": True, "max_items": PSO_MAX,
+                 "help": "PSO1 is open — add PSO2, PSO3 … Each is a column of every course's CO-PO-PSO Mapping."},
                 {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
                  "required": True, "min": 6, "max": 72},
                 {"name": "intake", "label": "3. Student Intake", "type": "integer", "required": True,
@@ -668,9 +704,6 @@ PROGRAMME_SYLLABUS = {
                  "rows": 5, "min_items": 3},
                 # CO-PO-PSO Mapping: one row a CO, {"PO1": "3", …, "PSO4": "-"}
                 {"name": "co_po", "label": "CO-PO-PSO Mapping", "type": "readonly", "hidden": True},
-                # how many PO and PSO columns this course's mapping has (+ adds one, × removes one)
-                {"name": "po_count", "label": "POs", "type": "readonly", "hidden": True},
-                {"name": "pso_count", "label": "PSOs", "type": "readonly", "hidden": True},
                 {"name": "modules", "label": "Course Content", "type": "module_compare", "compare": False,
                  "required": True},
                 {"name": "text_books", "label": "Text Books", "type": "textarea", "required": True,

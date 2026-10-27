@@ -234,9 +234,11 @@
     syllabi: {{ syllabi|tojson }},
     revision_url: {{ (revision_url or '')|tojson }},
     revision_year: {{ (revision_year or '')|tojson }},
-    // a syllabus: the most PO and PSO columns a mapping takes, the programme's Objective
-    // (each course's Course Objectives starts from it) and the verbs that suggest a CO's Bloom's level
-    outcome_max: {{ (outcome_max or {})|tojson }},
+    // a syllabus: the programme's POs and PSOs (its mapping's columns, each with its
+    // description) and where they are added, its Objective (each course's Course
+    // Objectives starts from it) and the verbs that suggest a CO's Bloom's level
+    outcome_cols: {{ (outcome_cols or [])|tojson }},
+    outcomes_url: {{ (outcomes_url or '')|tojson }},
     programme_objectives: {{ (programme_objectives or '')|tojson }},
     bloom_verbs: {{ (bloom_verbs or {})|tojson }},
     course_map: {{ course_map|tojson }},

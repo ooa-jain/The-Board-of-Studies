@@ -1,8 +1,8 @@
 """A syllabus sheet follows the University's sample: Course Information taken
 from the Curriculum table (never typed again), Course Objectives, the Course
 Outcomes each with its Bloom's Taxonomy level, the CO-PO-PSO Mapping with its
-Articulation row — each course with its own PO and PSO columns, from PO1 and
-PSO1 — the Course Content, and the Text Books, Book References and Web
+Articulation row — a column for each PO and PSO the programme's Curriculum
+describes — the Course Content, and the Text Books, Book References and Web
 References. Course Objectives start from the programme's Objective."""
 
 import io
@@ -49,17 +49,34 @@ def test_an_outcomes_opening_verb_suggests_its_level():
     assert bloom_level("") is None
 
 
-def test_each_course_has_its_own_po_and_pso_columns():
-    from app.schema import course_columns
-    assert course_columns({}) == ["PO1", "PSO1"]                       # a new course starts with one of each
-    assert course_columns({"po_count": 3, "pso_count": 2}) == ["PO1", "PO2", "PO3", "PSO1", "PSO2"]
-    # a sheet that never said: as many as its mapping holds
-    cols = course_columns({"co_po": [{"PO1": "3", "PO9": "2", "PSO4": "1"}]})
-    assert len(cols) == 13 and cols[8] == "PO9" and cols[-1] == "PSO4"
-    assert course_columns({"po_count": "99", "pso_count": "0"}) == [f"PO{n}" for n in range(1, 16)] + ["PSO1"]
-    # the rule reads the course's own columns only
+def test_the_mapping_has_a_column_for_each_po_and_pso_of_the_curriculum():
+    from app.schema import mapping_columns, outcome_texts, programme_columns
+    profile = {"programme_outcomes": ["Knowledge", "Problem solving", "Communication", ""],
+               "programme_specific_outcomes": ["Accounts"]}
+    assert outcome_texts(profile["programme_outcomes"]) == ["Knowledge", "Problem solving", "Communication"]
+    assert programme_columns(profile) == [("PO1", "Knowledge"), ("PO2", "Problem solving"),
+                                          ("PO3", "Communication"), ("PSO1", "Accounts")]
+    assert mapping_columns(profile, {"co_po": [{"PO9": "3"}]}) == ["PO1", "PO2", "PO3", "PSO1"]
+    # while the Curriculum has none: as many as the course's mapping holds
+    assert mapping_columns({}, {"co_po": [{"PO1": "3", "PO9": "2", "PSO4": "1"}]})[-2:] == ["PSO3", "PSO4"]
+    assert mapping_columns({}, {}) == ["PO1", "PSO1"]
+    # the rule reads the programme's columns only
     from app.validation import r_co_po_mapping_valid as rule
-    assert rule(_sheet(po_count=1, pso_count=1, co_po=[{"PO1": "3", "PO5": "9"}, {"PSO1": "2"}]), {}, "courses") == []
+    ctx = {"outcome_cols": ["PO1", "PSO1"]}
+    assert rule(_sheet(co_po=[{"PO1": "3", "PO5": "high"}, {"PSO1": "2"}]), ctx, "courses") == []
+
+
+def test_the_curriculum_describes_each_po_and_pso():
+    from app.validation import validate_field
+    from app.schema import STAGE_BY_KEY
+    fields = {f["name"]: f for s in STAGE_BY_KEY["prog_curriculum"]["sections"] if s["key"] == "profile"
+              for f in s["fields"]}
+    po, pso = fields["programme_outcomes"], fields["programme_specific_outcomes"]
+    assert po["label"].startswith("1.A") and pso["label"].startswith("1.B") and not po.get("wide")
+    assert validate_field(po, ["Knowledge", "Skills"]) == []
+    assert "describe PO1" in validate_field(po, [])[0]["message"]
+    assert "describe PO1" in validate_field(po, [""])[0]["message"]                  # PO1 open, left empty
+    assert "describe PSO2, or remove it" in validate_field(pso, ["Accounts", " "])[0]["message"]
 
 
 def _sheet(**kw):
@@ -107,11 +124,11 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     client.post("/department/demo/fill-all")
     items = client.get("/department/api/record?programme=DEMOBBA").get_json()["items"]
 
-    # the Curriculum no longer asks how many POs and PSOs: the mapping has the sample's
+    # the mapping's columns are the POs and PSOs the Curriculum describes, each with its description
     cur = items[0]["data"]
-    assert "Number of POs" not in client.get("/department/stage/prog_curriculum/DEMOBBA").get_data(as_text=True)
+    assert len(cur["profile"]["programme_outcomes"]) == 9 and len(cur["profile"]["programme_specific_outcomes"]) == 4
     page = client.get("/department/stage/prog_syllabus/DEMOBBA").get_data(as_text=True)
-    assert 'outcome_max: {"po": 15, "pso": 8}' in page
+    assert 'outcome_cols: [["PO1", "Disciplinary knowledge: ' in page and '["PSO4", "Build entrepreneurial' in page
     # the programme's Objective is what each course's Course Objectives start from
     cur["profile"]["objective"] = "1. To build sound knowledge\n2. To prepare students for careers"
     assert client.post("/department/api/prog_curriculum/DEMOBBA/save", json=cur).get_json()["ok"]
@@ -126,10 +143,17 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     data = items[1]["data"]
     j = client.post("/department/api/prog_syllabus/DEMOBBA/validate", json=data).get_json()
     assert not [i for i in j["issues"] if i["level"] == "error"], j["issues"]
-    # every course takes PO1-PO3 and PSO1-PSO2: the Word syllabus maps to those
-    for c in data["courses"]:
-        c.update(po_count=3, pso_count=2)
-    assert client.post("/department/api/prog_syllabus/DEMOBBA/save", json=data).get_json()["ok"]
+    # the programme keeps three POs and two PSOs: the Word syllabus maps to those
+    cur["profile"]["programme_outcomes"] = cur["profile"]["programme_outcomes"][:3]
+    cur["profile"]["programme_specific_outcomes"] = cur["profile"]["programme_specific_outcomes"][:2]
+    assert client.post("/department/api/prog_curriculum/DEMOBBA/save", json=cur).get_json()["ok"]
+    from app.docgen import curriculum_docx
+    with app.app_context():
+        cdoc = Document(io.BytesIO(curriculum_docx(get_db(), "DEMO", app.config["ACADEMIC_YEAR"], "DEMOBBA").getvalue()))
+    rows = [[c.text for c in r.cells] for t in cdoc.tables for r in t.rows]
+    assert any(r[0] == "1.A" and r[1] == "Programme Outcomes (POs)" and r[2].startswith("PO1: Disciplinary")
+               and "\nPO3: " in r[2] for r in rows)
+    assert any(r[0] == "1.B" and r[2].startswith("PSO1: ") for r in rows)
 
     from app.docgen import syllabus_docx
     with app.app_context():

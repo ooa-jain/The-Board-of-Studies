@@ -35,6 +35,9 @@
   }
 
   function text(v, def) {
+    // a programme's POs or PSOs: PO1: …, PO2: …
+    if (def && def.type === "outcome_list" && Array.isArray(v))
+      return v.map((x, i) => `${def.prefix || ""}${i + 1}: ${x}`).join("\n");
     if (v === true) return "Yes";
     if (v === false) return "No";
     if (Array.isArray(v)) return v.map(x => typeof x === "object" ? (x.name || x.label || JSON.stringify(x)) : x).join(", ");

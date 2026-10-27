@@ -338,9 +338,11 @@ def _profile_table(doc, cur, width, degree_level=None):
                   if s["key"] == "profile")["fields"]
     defaults = {**DEFAULT_REGULATIONS, **(PG_REGULATIONS if is_pg(degree_level) else {})}
     for n, f in enumerate(fields, start=1):
-        label = re.sub(r"^\d+\.\s*", "", f["label"])
+        # numbered as the form numbers it: 1, 1.A, 1.B, 2 …
+        no = re.match(r"^(\d+(?:\.[A-Z])?)\.?\s", f["label"])
+        label = re.sub(r"^\d+(?:\.[A-Z])?\.?\s*", "", f["label"])
         row = t.add_row().cells
-        _write(row[0], str(n), align=WD_ALIGN_PARAGRAPH.CENTER, size=9.5)
+        _write(row[0], no.group(1) if no else str(n), align=WD_ALIGN_PARAGRAPH.CENTER, size=9.5)
         _write(row[1], label, size=9.5)
         value = prof.get(f["name"])
         if f["name"] == "reservation_policy":
@@ -362,6 +364,10 @@ def _profile_table(doc, cur, width, degree_level=None):
         if f["name"] == "objective":
             items = _lines(value)
             value = "\n".join(f"{i}. {x}" for i, x in enumerate(items, start=1))
+        if f.get("type") == "outcome_list":
+            # PO1: … one per line
+            from .schema import outcome_texts
+            value = "\n".join(f"{f.get('prefix', '')}{i}: {x}" for i, x in enumerate(outcome_texts(value), start=1))
         _write(row[2], _fmt(value) if isinstance(value, (int, float)) else (value or ""), size=9.5)
     _widths(t, [width * 0.06, width * 0.17, width * 0.77])
 
@@ -624,14 +630,14 @@ def _pg_curriculum_docx(prog, cur, deg):
 # Syllabus
 # ---------------------------------------------------------------------------
 
-def _course_sheet(doc, programme_name, c, width):
+def _course_sheet(doc, programme_name, c, width, cols=None):
     """One course as the sample syllabus lays it out: Course Information,
     Course Objectives, the Course Outcomes with their Bloom's Taxonomy level,
     the CO-PO-PSO Mapping with its Articulation row, the Course Content, and
     the Text Books, Book References and Web References (then Pedagogy and
     Skill Development Activities, when they are given)."""
     from .schema import bloom_level, course_columns, mapping_value
-    cols = course_columns(c)          # the PO and PSO columns this course has
+    cols = cols or course_columns(c)          # the programme's POs and PSOs
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
 
     def heading(text):
@@ -782,6 +788,8 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
     from .schema import objective_lines
     from .workflow import course_objectives
     goals = "\n".join(objective_lines((cur.get("profile") or {}).get("objective")))
+    # the mapping's columns: the programme's POs and PSOs
+    from .schema import mapping_columns
     sem = object()
     for n, c in enumerate(courses):
         if n:
@@ -793,7 +801,7 @@ def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
                   bold=True, size=11, color=NAVY, after=4)
         c = copy.deepcopy(c)
         c["objectives"] = course_objectives(c, goals)
-        _course_sheet(doc, name, c, width)
+        _course_sheet(doc, name, c, width, mapping_columns(cur.get("profile"), c))
     doc.core_properties.title = _title(f"{name} — Syllabus {batch}".strip())
     return _save(doc)
 

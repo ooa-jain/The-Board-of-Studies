@@ -416,13 +416,16 @@ def stage(stage_key, programme_code=None):
                            programme_code=programme["programme_code"]) + "#sec-semester_structure"
             back_label = "Programme structure — semester scheme"
     # a syllabus: the programme's Objective, which each course's Course Objectives starts from
-    programme_objectives, outcome_max = "", {}
+    # and its POs and PSOs, the columns of every course's CO-PO-PSO Mapping
+    programme_objectives, outcome_cols, outcomes_url = "", [], ""
     if programme and stage_key.startswith("prog_syllabus"):
-        from .schema import PO_MAX, PSO_MAX, objective_lines
-        outcome_max = {"po": PO_MAX, "pso": PSO_MAX}
-        programme_objectives = "\n".join(objective_lines(
-            ((programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {})
-             .get("profile") or {}).get("objective")))
+        from .schema import objective_lines, programme_columns
+        profile = ((programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {})
+                   .get("profile") or {})
+        programme_objectives = "\n".join(objective_lines(profile.get("objective")))
+        outcome_cols = programme_columns(profile)
+        outcomes_url = url_for("dept.stage", stage_key="prog_curriculum",
+                               programme_code=programme["programme_code"]) + "#f-programme_outcomes"
     comments = list(get_db().comments.find({
         "dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
         "programme_code": (programme or {}).get("programme_code", ""),
@@ -477,7 +480,8 @@ def stage(stage_key, programme_code=None):
                            step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
                            course_map=course_map, back_to_structure=back, back_label=back_label,
                            structure_courses=structure_courses, revision_year=revision_year(sub),
-                           programme_objectives=programme_objectives, outcome_max=outcome_max,
+                           programme_objectives=programme_objectives, outcome_cols=outcome_cols,
+                           outcomes_url=outcomes_url,
                            programme_report=programme_report,
                            bloom_verbs=BLOOM_VERB_LEVEL,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")

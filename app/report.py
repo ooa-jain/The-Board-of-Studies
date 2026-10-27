@@ -98,6 +98,14 @@ def _text(v, limit=240):
     return s if len(s) <= limit else s[:limit - 1] + "…"
 
 
+def _field_text(f, v):
+    """A field's value to read: a programme's POs or PSOs as "PO1: …" lines."""
+    if f.get("type") == "outcome_list":
+        from .schema import outcome_texts
+        return "\n".join(f"{f.get('prefix', '')}{n}: {t}" for n, t in enumerate(outcome_texts(v), start=1))
+    return v
+
+
 def section_items(stage_key, data, links):
     """What one stage or part holds, field by field: (filled, label, text, [(name, url)])."""
     items = []
@@ -109,7 +117,7 @@ def section_items(stage_key, data, links):
             for f in section.get("fields", []):
                 if f.get("type") == "fixed" or f.get("hidden"):
                     continue
-                v = vals.get(f["name"])
+                v = _field_text(f, vals.get(f["name"]))
                 docs = [(x.get("name") or "file", links.file(stage_key, x)) for x in files_in(v)]
                 text = "" if docs else _text(v)
                 if not f.get("required") and not docs and not text:
@@ -249,7 +257,7 @@ def programme_context(db, dept, year, programme_code, links):
     deg = (cur.get("details") or {}).get("degree_level") or programme.get("degree_level")
     cur = category_groups(cur, deg)
     # in the template's own order, items 1 to 12
-    profile = [(f["label"], (cur.get(sec["key"]) or {}).get(f["name"]))
+    profile = [(f["label"], _field_text(f, (cur.get(sec["key"]) or {}).get(f["name"])))
                for sec in for_level(STAGE_BY_KEY["prog_curriculum"], deg)["sections"]
                if sec["key"] in ("details", "profile") for f in sec["fields"]
                if not f.get("hidden") and f.get("type") != "fixed"
