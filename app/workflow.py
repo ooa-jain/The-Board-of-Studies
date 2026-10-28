@@ -802,6 +802,14 @@ def complete_syllabus(c, objectives=""):
         # medium on every third column after it
         c["co_po"] = [{col: "3" if j == 0 else "2" if (j + k) % 3 == 0 else "-" for j, col in enumerate(cols)}
                       for k in range(len(c["co_table"]))]
+    if not isinstance(c.get("articulation"), dict):
+        # the sample's Articulation: each column's average, as a department would enter it
+        art = {}
+        for col in cols:
+            vals = [int(m[col]) for m in c["co_po"] if isinstance(m, dict) and str(m.get(col)) in ("1", "2", "3")]
+            if vals:
+                art[col] = f"{sum(vals) / len(vals):.1f}".rstrip("0").rstrip(".")
+        c["articulation"] = art
     if not lines(c.get("text_books")):
         c["text_books"] = "\n".join(lines(c.get("books"))[:1]) or "Core text of the discipline, latest edition."
     if not lines(c.get("web_references")):

@@ -704,13 +704,14 @@ def _course_sheet(doc, programme_name, c, width, cols=None):
         _write(cells[0], f"CO{n + 1}", bold=True, size=8.5, align=center)
         for k, col in enumerate(cols, start=1):
             v = str(m.get(col) or "").strip()
-            _write(cells[k], _fmt(mapping_value(v)) if mapping_value(v) is not None else "-", size=8.5, align=center)
+            _write(cells[k], v if v in ("1", "2", "3") else "-", size=8.5, align=center)
+    # the Articulation row, as the department entered it
+    art = c.get("articulation") if isinstance(c.get("articulation"), dict) else {}
     cells = t.add_row().cells
     _write(cells[0], "Articulation", bold=True, size=8.5, align=center)
     for k, col in enumerate(cols, start=1):
-        vals = [mapping_value(m.get(col)) for m in rows[:len(cos)] if isinstance(m, dict)]
-        vals = [v for v in vals if v]
-        _write(cells[k], _fmt(round(sum(vals) / len(vals), 1)) if vals else "-", bold=True, size=8.5, align=center)
+        v = mapping_value(art.get(col))
+        _write(cells[k], _fmt(v) if v is not None else "-", bold=True, size=8.5, align=center)
     _widths(t, [width * 0.12] + [width * 0.88 / max(len(cols), 1)] * len(cols))
     _para(doc, "3-High, 2-Medium, 1-Low", size=9, align=left, after=4)
 

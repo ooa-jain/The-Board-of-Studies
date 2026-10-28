@@ -3823,10 +3823,8 @@
     }
 
     /* CO-PO-PSO Mapping: each CO against the programme's POs and PSOs — the
-       ones its Curriculum describes — a number typed in (3 High, 2 Medium,
-       1 Low), empty for none, and the Articulation row, each column's average,
-       worked out as it is filled. */
-    const fmtAvg = v => (Math.round(v * 10) / 10).toString();
+       ones its Curriculum describes — chosen as 1, 2 or 3 (– for none), and
+       the Articulation row, which the department types in itself. */
     function mapBlock(row, i, part) {
       // the Curriculum's POs and PSOs, one column for each box it has: [["PO1", "its description"], …]
       const defs = (CTX.outcome_cols || []).length ? CTX.outcome_cols : [["PO1", ""], ["PSO1", ""]];
@@ -3848,37 +3846,45 @@
       });
       trs.push(h);
       const fill = (tr, make) => cols.forEach(c => tr.appendChild(make(c)));
-      const avgCells = {};
-      const paintAvg = () => cols.forEach(c => {
-        const vals = row.co_po.slice(0, cos.length).map(m => num((m || {})[c])).filter(v => v !== null && v > 0);
-        avgCells[c].textContent = vals.length ? fmtAvg(vals.reduce((a, b) => a + b, 0) / vals.length) : "–";
-      });
       cos.forEach((_, k) => {
         const m = row.co_po[k] && typeof row.co_po[k] === "object" ? row.co_po[k] : (row.co_po[k] = {});
         const tr = el("tr");
         tr.appendChild(cell("td", "sh-map-co", [`CO${k + 1}`]));
         fill(tr, c => {
-          // a number typed in (3 High, 2 Medium, 1 Low…); empty is none
-          const box = el("input", "sh-map-in");
-          box.type = "text";
-          box.inputMode = "decimal";
-          box.placeholder = "–";
-          box.setAttribute("aria-label", `CO${k + 1} to ${c}`);
-          box.value = num(m[c]) !== null ? String(m[c]).trim() : "";
-          box.disabled = !edit;
-          box.addEventListener("input", () => {
-            const clean = box.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
-            if (clean !== box.value) box.value = clean;
-            m[c] = clean === "" || clean === "." ? "-" : clean;
-            paintAvg(); touch();
-          });
-          return cell("td", "sh-map-v", [box]);
+          // 1 Low, 2 Medium, 3 High, or – for none
+          const sel = el("select", "sh-map-sel");
+          sel.setAttribute("aria-label", `CO${k + 1} to ${c}`);
+          [["1", "1"], ["2", "2"], ["3", "3"], ["", "–"]].forEach(([v, t]) => sel.appendChild(new Option(t, v)));
+          const was = String(m[c] ?? "").trim();
+          // a value typed in before the list (2.5, 4 …) stays shown until it is changed
+          if (was && !["1", "2", "3", "-", "–"].includes(was)) sel.appendChild(new Option(was, was));
+          sel.value = ["-", "–"].includes(was) ? "" : was;
+          sel.disabled = !edit;
+          sel.addEventListener("change", () => { m[c] = sel.value || "-"; touch(); });
+          return cell("td", "sh-map-v", [sel]);
         });
         trs.push(tr);
       });
+      // the Articulation of each column, as the department works it out
+      if (!row.articulation || typeof row.articulation !== "object" || Array.isArray(row.articulation)) row.articulation = {};
       const at = el("tr", "sh-map-avg");
       at.appendChild(cell("th", "sh-map-co", ["Articulation"]));
-      fill(at, c => { const td = el("td", "sh-map-v"); avgCells[c] = td; return td; });
+      fill(at, c => {
+        const box = el("input", "sh-map-in");
+        box.type = "text";
+        box.inputMode = "decimal";
+        box.placeholder = "–";
+        box.setAttribute("aria-label", `Articulation of ${c}`);
+        box.value = String(row.articulation[c] ?? "");
+        box.disabled = !edit;
+        box.addEventListener("input", () => {
+          const clean = box.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+          if (clean !== box.value) box.value = clean;
+          if (clean === "" || clean === ".") delete row.articulation[c]; else row.articulation[c] = clean;
+          touch();
+        });
+        return cell("td", "sh-map-v", [box]);
+      });
       trs.push(at);
       const legend = el("tr");
       legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"], cols.length + 1));
@@ -3899,7 +3905,6 @@
       }
       const tb = part("CO-PO-PSO Mapping:", trs, "sh-map");
       tb.closest("table").dataset.field = "outcomes";
-      paintAvg();
     }
 
     function sheet(row, i) {

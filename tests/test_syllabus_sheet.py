@@ -84,7 +84,8 @@ def _sheet(**kw):
     c = {"course_code": "26BCM1C01", "course_title": "Financial Accounting",
          "co_table": [{"text": "Apply accounting concepts", "bloom": "3"},
                       {"text": "Prepare final accounts", "bloom": "3"}],
-         "co_po": [{"PO1": "3", "PSO1": "2"}, {"PO2": "2"}]}
+         "co_po": [{"PO1": "3", "PSO1": "2"}, {"PO2": "2"}],
+         "articulation": {"PO1": "3", "PO2": "2", "PSO1": "2"}}
     c.update(kw)
     return {"courses": [c]}
 
@@ -100,19 +101,34 @@ def test_every_course_outcome_needs_its_level():
     assert rule(old, {}, "courses")[0]["level"] == "error"
 
 
-def test_the_mapping_holds_a_number_in_each_cell():
+def test_the_mapping_holds_one_two_three_or_dash():
     from app.validation import r_co_po_mapping_valid as rule
     cols = {"outcome_cols": ["PO1", "PO2", "PSO1"]}          # the programme's POs and PSOs
     assert rule(_sheet(), cols, "courses") == []
-    # any number is taken, as typed
-    assert rule(_sheet(co_po=[{"PO1": "5"}, {"PO2": "2.5"}]), cols, "courses") == []
-    issues = rule(_sheet(co_po=[{"PO1": "high"}, {"PO2": "2"}]), cols, "courses")
-    assert any(i["level"] == "error" and "must be a number" in i["message"] for i in issues)
+    issues = rule(_sheet(co_po=[{"PO1": "4"}, {"PO2": "2"}]), cols, "courses")
+    assert any(i["level"] == "error" and "must be 1, 2, 3 or –" in i["message"] for i in issues)
     # a CO left unmapped is a warning; a course with no mapping at all is an error
     issues = rule(_sheet(co_po=[{"PO1": "3"}, {"PO1": "-"}]), cols, "courses")
     assert [i["level"] for i in issues] == ["warning"] and "CO2" in issues[0]["message"]
     issues = rule(_sheet(co_po=[]), cols, "courses")
     assert any(i["level"] == "error" and "fill in its CO-PO-PSO Mapping" in i["message"] for i in issues)
+
+
+def test_the_articulation_is_entered_not_worked_out():
+    from app.validation import r_co_po_mapping_valid as rule
+    cols = {"outcome_cols": ["PO1", "PO2", "PSO1"]}
+    # any figure the department enters is taken as it is
+    assert rule(_sheet(articulation={"PO1": "2.4", "PO2": "1", "PSO1": "3"}), cols, "courses") == []
+    # a column with something mapped needs its Articulation; one with nothing mapped does not
+    issues = rule(_sheet(articulation={"PO1": "3"}), cols, "courses")
+    assert [i["message"] for i in issues] == ["Course 26BCM1C01: enter the Articulation of PO2, PSO1."]
+    issues = rule(_sheet(articulation={"PO1": "3", "PO2": "high", "PSO1": "2"}), cols, "courses")
+    assert any("the Articulation of PO2 must be a number" in i["message"] for i in issues)
+    # the sample sheets come with theirs
+    from app.workflow import complete_syllabus
+    c = complete_syllabus({"course_title": "Accounting", "outcomes": "Apply\nPrepare"})
+    assert c["articulation"]["PO1"] == "3" and set(c["articulation"]) <= {f"PO{n}" for n in range(1, 10)} | \
+        {f"PSO{n}" for n in range(1, 5)}
 
 
 def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
@@ -177,3 +193,6 @@ def test_the_page_and_the_word_syllabus_follow_the_sample(app, client):
     mapping = next(t for t in tables if t[0][0] == "CO")
     assert mapping[0] == ["CO", "PO1", "PO2", "PO3", "PSO1", "PSO2"]
     assert mapping[-1][0] == "Articulation" and len(mapping) == len(outcomes) + 1
+    # the Articulation as entered, not worked out again
+    first = sorted(data["courses"], key=lambda c: int(c["semester"]))[0]
+    assert mapping[-1][1:] == [first["articulation"].get(c, "-") for c in ("PO1", "PO2", "PO3", "PSO1", "PSO2")]

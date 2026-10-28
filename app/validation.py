@@ -632,8 +632,9 @@ def r_outcomes_have_bloom_levels(data, ctx, sk):
 
 
 def r_co_po_mapping_valid(data, ctx, sk):
-    """The CO-PO-PSO Mapping holds a number (or nothing) in each cell, and
-    every course outcome is mapped to at least one PO or PSO."""
+    """The CO-PO-PSO Mapping holds 1, 2, 3 or – in each cell, every course
+    outcome is mapped to at least one PO or PSO, and each mapped column has
+    its Articulation, a number the department enters."""
     out = []
     for i, r in enumerate(_rows(data, sk)):
         cos = [c for c in (r.get("co_table") or []) if isinstance(c, dict) and str(c.get("text") or "").strip()] \
@@ -647,17 +648,30 @@ def r_co_po_mapping_valid(data, ctx, sk):
         for n in range(1, len(cos) + 1):
             m = rows[n - 1] if n - 1 < len(rows) and isinstance(rows[n - 1], dict) else {}
             m = {k: m.get(k, "") for k in cols}
-            bad = [k for k, v in m.items() if str(v).strip() not in ("", "-", "–") and mapping_value(v) is None]
+            bad = [k for k, v in m.items() if str(v).strip() not in ("", "-", "–", "1", "2", "3")]
             if bad:
                 out.append(err(f"Course {_course_name(r, i)}, CO{n}: the mapping to {', '.join(bad)} must be "
-                               f"a number.", section=sk, row=i, field="outcomes"))
-            if any((mapping_value(v) or 0) > 0 for v in m.values()):
+                               f"1, 2, 3 or –.", section=sk, row=i, field="outcomes"))
+            if any(str(v).strip() in ("1", "2", "3") for v in m.values()):
                 mapped += 1
             else:
                 out.append(warn(f"Course {_course_name(r, i)}, CO{n} is not mapped to any PO or PSO.",
                                 section=sk, row=i, field="outcomes"))
         if not mapped:
             out.append(err(f"Course {_course_name(r, i)}: fill in its CO-PO-PSO Mapping.",
+                           section=sk, row=i, field="outcomes"))
+            continue
+        # the Articulation row: a number for each column something is mapped to
+        art = r.get("articulation") if isinstance(r.get("articulation"), dict) else {}
+        used = [k for k in cols if any(isinstance(m, dict) and str(m.get(k) or "").strip() in ("1", "2", "3")
+                                       for m in rows[:len(cos)])]
+        missing = [k for k in used if not str(art.get(k) or "").strip()]
+        if missing:
+            out.append(err(f"Course {_course_name(r, i)}: enter the Articulation of {', '.join(missing)}.",
+                           section=sk, row=i, field="outcomes"))
+        wrong = [k for k in cols if str(art.get(k) or "").strip() and mapping_value(art.get(k)) is None]
+        if wrong:
+            out.append(err(f"Course {_course_name(r, i)}: the Articulation of {', '.join(wrong)} must be a number.",
                            section=sk, row=i, field="outcomes"))
     return out
 

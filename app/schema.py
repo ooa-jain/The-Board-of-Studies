@@ -694,6 +694,8 @@ PROGRAMME_SYLLABUS = {
                  "rows": 5, "min_items": 3},
                 # CO-PO-PSO Mapping: one row a CO, {"PO1": "3", …, "PSO4": "-"}
                 {"name": "co_po", "label": "CO-PO-PSO Mapping", "type": "readonly", "hidden": True},
+                # its Articulation row, each column's figure as the department enters it
+                {"name": "articulation", "label": "Articulation", "type": "readonly", "hidden": True},
                 {"name": "modules", "label": "Course Content", "type": "module_compare", "compare": False,
                  "required": True},
                 {"name": "text_books", "label": "Text Books", "type": "textarea", "required": True,
