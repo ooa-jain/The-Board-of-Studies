@@ -5143,6 +5143,36 @@ html[data-theme="dark"] .ol-x:hover,
 html[data-theme="dark"] .ol-x:focus-visible {
   background: #2d120f;
 }
+html[data-theme="dark"] .subm-batch {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .subm-doc {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: #acc7ec;
+  text-decoration: none;
+}
+html[data-theme="dark"] a.subm-doc:hover {
+  border-color: #4582d3;
+}
+html[data-theme="dark"] .subm-doc.is-on {
+  background: #2962ae;
+  border-color: #4582d3;
+  color: #ffffff;
+}
+html[data-theme="dark"] .subm-doc.is-off {
+  color: #aab2c1;
+  background: transparent;
+}
+html[data-theme="dark"] .subm-note {
+  border: 1px solid #5b4c31;
+  background: #2c220f;
+  color: #f7b56e;
+}
+html[data-theme="dark"] .subm-doc-wrap .gen-doc {
+  border: 1px solid #2e3542;
+  box-shadow: 0 10px 28px -20px rgba(15, 36, 64, 0.45);
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

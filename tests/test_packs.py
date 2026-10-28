@@ -301,21 +301,6 @@ def test_the_programme_report_opens_in_the_browser(app, client):
     assert "Data Structures" in page and "Total: 90 credits" in page
 
 
-def test_a_departments_own_download_links_to_its_own_pages(app, client):
-    import io
-
-    from openpyxl import load_workbook
-    from app.db import get_db
-    code = _signed_in_department(app, client)
-    with app.app_context():          # the download is the finished record
-        get_db().submissions.update_one({"dept_code": code}, {"$set": {"status": "sealed"}})
-    r = client.get("/department/export.xlsx")
-    ws = load_workbook(io.BytesIO(r.data))["Report"]
-    links = [c.hyperlink.target for row in ws.iter_rows() for c in row if c.hyperlink]
-    assert links and all("/share/" in u for u in links)
-
-
-
 # ---------------------------------------------------------------- share links (no sign-in)
 
 def _download_links(app, client, code):

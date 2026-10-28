@@ -165,9 +165,8 @@
           {{ (state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
         <span class="spacer"></span>
         <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
-        <button class="btn btn-ghost" type="button" id="btn-copy">Download a copy</button>
-        {% if programme and stage.parent %}<a class="btn btn-ghost" href="{{ url_for('dept.programme_report_zip', programme_code=programme.programme_code) }}" download
-           title="This programme's current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download all (ZIP)</a>{% endif %}
+        {% if my_doc %}<a class="btn btn-ghost" href="{{ url_for('dept.programme_report', programme_code=programme.programme_code, batch=my_doc.batch, doc=my_doc.doc) }}"
+           title="This document as the Office's template lays it out — view only">See your submission</a>{% endif %}
         <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
         {% if step and next_step %}<a class="btn btn-gold" href="{{ next_step.url }}">Go to {{ next_step.label }} →</a>{% endif %}
       </div>
@@ -187,26 +186,17 @@
     </section>
     {% endif %}
 
-    {% if programme_report %}
-    {# every part of the programme is submitted: its report, as the Office sees it #}
-    <section class="prog-report" id="programme-report">
-      <div class="prog-report-head">
+    {% if programme_done %}
+    {# every part of the programme is submitted: its documents, to see #}
+    <section class="panel submit-all-panel subm-done" id="programme-done">
+      <div class="submit-all-body">
         <div>
-          <h2>Programme report</h2>
-          <p class="small muted">Every part of {{ programme.programme_code }} is submitted. This is the report the Office of Academic Affairs sees.</p>
+          <strong>Every part of {{ programme.programme_code }} is submitted.</strong>
+          <p class="small muted">See its Curriculum, Syllabus and Course Revision — every batch — as the Office's templates lay them out.
+            View only; for a copy, contact the Office of Academic Affairs.</p>
         </div>
-        <div class="spacer prog-report-actions">
-          {% if programme_report.curriculum_doc %}<a class="btn btn-ghost btn-sm" href="{{ programme_report.curriculum_doc }}" target="_blank" rel="noopener">Curriculum →</a>{% endif %}
-          {% if programme_report.syllabus_doc %}<a class="btn btn-ghost btn-sm" href="{{ programme_report.syllabus_doc }}" target="_blank" rel="noopener">Syllabus →</a>{% endif %}
-          {% if programme_report.revision_doc %}<a class="btn btn-ghost btn-sm" href="{{ programme_report.revision_doc }}" target="_blank" rel="noopener">Course Revision →</a>{% endif %}
-          <a class="btn btn-gold btn-sm" href="{{ url_for('dept.programme_report_zip', programme_code=programme.programme_code) }}" download
-             title="This programme's current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download all (ZIP)</a>
-        </div>
+        <a class="btn btn-gold" href="{{ url_for('dept.programme_report', programme_code=programme.programme_code) }}">See your submission →</a>
       </div>
-      {% with parts=programme_report.parts, profile=programme_report.profile, semesters=programme_report.semesters,
-              minors=programme_report.minors, syllabus=programme_report.syllabus, revision=programme_report.revision %}
-      {% include "admin/_programme_body.html" %}
-      {% endwith %}
     </section>
     {% endif %}
   </div>
@@ -238,6 +228,8 @@
     // description) and where they are added, its Objective (each course's Course
     // Objectives starts from it) and the verbs that suggest a CO's Bloom's level
     outcome_cols: {{ (outcome_cols or [])|tojson }},
+    // this page's document in "Your submission" (view only)
+    submission_url: {{ (url_for('dept.programme_report', programme_code=programme.programme_code, batch=my_doc.batch, doc=my_doc.doc) if my_doc else '')|tojson }},
     outcomes_url: {{ (outcomes_url or '')|tojson }},
     programme_objectives: {{ (programme_objectives or '')|tojson }},
     bloom_verbs: {{ (bloom_verbs or {})|tojson }},

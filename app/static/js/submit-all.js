@@ -86,17 +86,8 @@
       tick.addEventListener("change", () => { go.disabled = !tick.checked; });
     }
     const row = el("div", "rv-actions");
-    const copy = el("button", "btn btn-ghost", "Download a copy");
-    copy.type = "button";
-    row.appendChild(copy);
-    if (j.zip) {
-      // the programme's every batch — Curriculum, Syllabus, Course Revision — in one ZIP
-      const z = el("a", "btn btn-ghost", "Download all (ZIP)");
-      z.href = j.zip;
-      z.setAttribute("download", "");
-      z.title = "The current batch and every earlier batch, each Curriculum, Syllabus and Course Revision in the Office's templates";
-      row.appendChild(z);
-    }
+    // view only: a copy comes from the Office of Academic Affairs
+    row.appendChild(el("span", "small muted", "View only — for a copy, contact the Office of Academic Affairs."));
     row.appendChild(el("span", "spacer"));
     if (pending.length) {
       go = el("button", "btn btn-gold", `Submit all ${pending.length} now`);
@@ -107,15 +98,6 @@
     foot.appendChild(row);
 
     const ctl = Review.modal({ title: opts.title || "Review & submit all stages", sub: j.dept_name, top, body, foot });
-    const printAll = () => {
-      const all = el("div");
-      items.forEach(it => {
-        all.appendChild(el("h2", null, it.title));
-        all.appendChild(Review.build(it.stage, it.data, {}));
-      });
-      Review.print("Board of Studies record", j.dept_name, all);
-    };
-    copy.addEventListener("click", printAll);
     if (!go) return;
 
     go.addEventListener("click", () => {

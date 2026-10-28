@@ -83,7 +83,7 @@
 
 
 {% if prog_rows %}
-{# each programme's submission: its report to read, and every batch's documents in one ZIP #}
+{# each programme's submission, to see — a copy comes from the Office #}
 <section class="card mb-2 subs-card">
   <div class="card-head"><h3>Submissions</h3>
     <span class="spacer small muted">{{ prog_rows|selectattr('done')|list|length }} of {{ prog_rows|length }} programmes submitted</span></div>
@@ -95,15 +95,13 @@
           <td><span class="mono small">{{ p.code }}</span> <strong>{{ p.name }}</strong></td>
           <td class="small">{% if p.done %}<span class="pill pill-ok">✓ Submitted</span>
             {% else %}<span class="muted">{{ p.submitted }} of {{ p.parts }} parts submitted</span>{% endif %}</td>
-          <td class="subs-go">
-            <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report', programme_code=p.code) }}">View</a>
-            <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report_zip', programme_code=p.code) }}" download
-               title="The current batch and every earlier batch — Curriculum, Syllabus and Course Revision">Download (ZIP)</a>
-          </td>
+          <td class="subs-go">{% if p.submitted %}<a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report', programme_code=p.code) }}">See your submission →</a>
+            {% else %}<span class="small muted">Nothing submitted yet</span>{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    <p class="small muted subs-foot">View only — for a copy, contact the Office of Academic Affairs.</p>
   </div>
 </section>
 {% endif %}
@@ -119,12 +117,6 @@
 {% if all_revisions_done %}
 <div class="dash-all">
   <button class="btn btn-all" type="button" id="btn-all">Review &amp; submit all stages</button>
-</div>
-{% endif %}
-{% if submission.status == 'sealed' %}
-<div class="flex mt-1">
-  <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
-  <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -560,24 +560,17 @@ def test_the_department_identity_is_frozen(app, client):
     assert "Renamed by the department" not in html
 
 
-def test_exports_produce_real_files(app, client):
+def test_a_department_has_no_report_download(app, client):
+    """Reports are view only for a department: a copy comes from the Office."""
     from app.db import get_db
     u, p = make_department(app)
     login(client, u, p)
-
-    # not before the record is finished — and not offered in the bar either
-    r = client.get("/department/export.xlsx")
-    assert r.status_code == 302 and r.headers["Location"].endswith("/department/")
+    with app.app_context():
+        get_db().submissions.update_one({"dept_code": "COM"}, {"$set": {"status": "sealed"}}, upsert=True)
     body = client.get("/department/").get_data(as_text=True)
     assert "export.xlsx" not in body and "export.docx" not in body
-
-    with app.app_context():
-        get_db().submissions.update_one({"dept_code": "COM"}, {"$set": {"status": "sealed"}})
-    assert "export.xlsx" in client.get("/department/").get_data(as_text=True)
-    x = client.get("/department/export.xlsx")
-    assert x.status_code == 200 and x.data[:2] == b"PK"
-    w = client.get("/department/export.docx")
-    assert w.status_code == 200 and w.data[:2] == b"PK"
+    assert client.get("/department/export.xlsx").status_code == 404
+    assert client.get("/department/export.docx").status_code == 404
 
 
 def test_admin_can_edit_the_credit_rules(app, client):

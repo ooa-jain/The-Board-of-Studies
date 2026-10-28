@@ -5145,14 +5145,11 @@
       "record goes to the Office of Academic Affairs and is locked — only the Office can send a part back for correction."));
     foot.appendChild(terms);
     const row = el("div", "rv-actions");
-    const copy = el("button", "btn btn-ghost", "Download a copy");
-    copy.type = "button";
     const backBtn = el("button", "btn btn-ghost", "Back to editing");
     backBtn.type = "button";
     const go = el("button", "btn btn-gold", "Submit now");
     go.type = "button";
     go.disabled = true;
-    row.appendChild(copy);
     row.appendChild(el("span", "spacer"));
     row.appendChild(backBtn);
     row.appendChild(go);
@@ -5166,7 +5163,6 @@
       body: draw(),
       foot
     });
-    copy.addEventListener("click", () => Review.print(reviewTitle(), CTX.dept_name + " · copy before submitting", ctl.body.firstChild));
     backBtn.addEventListener("click", () => ctl.close());
     go.addEventListener("click", () => reallySubmit(ctl, go));
   }
@@ -5185,7 +5181,6 @@
         dirty = false;
         btn.disabled = true;
         btn.textContent = "Submitted";
-        const reviewed = ctl.body.firstChild;
         // the review becomes the receipt: the copy to keep, then onward
         ctl.panel.querySelector(".rv-head h3").textContent = "Submitted";
         ctl.panel.querySelector(".rv-sub").textContent = reviewTitle() + " — " + CTX.dept_name + " · " + new Date().toLocaleString();
@@ -5199,18 +5194,21 @@
         done.appendChild(el("span", "rv-done-tick", "✓"));
         const w = el("div");
         w.appendChild(el("strong", null, "Submitted to the Office of Academic Affairs."));
-        w.appendChild(el("span", null, j.next ? `Next: ${j.next.title}. Keep a copy of what you sent first.` : "Keep a copy of what you sent."));
+        w.appendChild(el("span", null, (j.next ? `Next: ${j.next.title}. ` : "") +
+          "See what you sent any time under Reports — view only; for a copy, contact the Office of Academic Affairs."));
         done.appendChild(w);
         ctl.panel.querySelector(".rv-stats").replaceWith(done);
         const foot = ctl.panel.querySelector(".rv-foot");
         foot.textContent = "";
         const row = el("div", "rv-actions");
-        const copy = el("button", "btn btn-ghost", "Download a copy");
-        copy.type = "button";
-        copy.addEventListener("click", () => Review.print(reviewTitle(), CTX.dept_name + " · submitted " + new Date().toLocaleString(), reviewed));
+        // what was sent, as the Office's template lays it out — to see
+        if (CTX.submission_url) {
+          const see = el("a", "btn btn-ghost", "See your submission");
+          see.href = CTX.submission_url;
+          row.appendChild(see);
+        }
         const on = el("a", "btn btn-gold", j.next ? "Continue to " + j.next.title : "Done");
         on.href = j.redirect || CTX.urls.dashboard;
-        row.appendChild(copy);
         row.appendChild(el("span", "spacer"));
         row.appendChild(on);
         foot.appendChild(row);
@@ -5416,8 +5414,5 @@
                      (CTX.submitted_at ? " · submitted " + CTX.submitted_at : ""),
                      top: statsBar(Review.stats(STAGE, state), 0), body: show() });
     });
-    const cp = document.getElementById("btn-copy");
-    if (cp) cp.addEventListener("click", () => Review.print(reviewTitle(),
-      CTX.dept_name + (CTX.submitted_at ? " · submitted " + CTX.submitted_at : ""), show()));
   }
 })();

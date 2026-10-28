@@ -189,6 +189,8 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="side-text">Home</span></a>
     <a class="side-link{{ ' is-on' if ep == 'dept.progress_page' }}" href="{{ url_for('dept.progress_page') }}" title="Progress">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="side-text">Progress</span></a>
+    <a class="side-link{{ ' is-on' if ep in ('dept.reports', 'dept.programme_report') }}" href="{{ url_for('dept.reports') }}" title="Reports — your submission">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span class="side-text">Reports</span></a>
     <span class="side-label">Stages</span>
     {% for st in dept_nav %}
     <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}" title="{{ st.title }}">

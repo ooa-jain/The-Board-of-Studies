@@ -14,8 +14,6 @@ from . import ugc_rules as U
 from .auth import department_required
 from .db import audit, get_db, now, rules_doc, settings, to_ist
 from .db import settings as app_settings_doc
-from .exporter import department_excel, submission_word
-from .report import ShareLinks
 from .schema import BLOOM_VERB_LEVEL, STAGE_BY_KEY, STAGE_KEYS, course_category
 from . import people
 from .notify import describe_changes
@@ -448,11 +446,15 @@ def stage(stage_key, programme_code=None):
                 next_step = np_ and {**np_, "label": "the next programme"}
     _note_place(dept, stage_key, (programme or {}).get("programme_code"))
     # every part of the programme submitted: its report, as the Office sees it, under the page
-    programme_report = None
-    if steps and all(st["status"] == "submitted" for st in steps if not st["optional"]):
-        from .report import programme_context
-        programme_report = programme_context(get_db(), dept, _year(), programme["programme_code"],
-                                             ShareLinks(dept["dept_code"], _year()))
+    # every part of the programme submitted: its submission, to see
+    programme_done = bool(steps) and all(st["status"] == "submitted" for st in steps if not st["optional"])
+    # this page's own document in "Your submission"
+    my_doc = None
+    if programme and stage_def.get("parent"):
+        if stage_def.get("existing_batch"):
+            my_doc = {"batch": stage_key, "doc": {"syllabus": "s", "revision": "v"}.get(request.args.get("view"), "c")}
+        elif stage_key in ("prog_curriculum", "prog_syllabus", "prog_revision"):
+            my_doc = {"batch": "current", "doc": {v: k for k, v in CURRENT_PART.items()}[stage_key]}
     # a PG programme fills the PG Course Matrix: its own course groups and wording
     from .schema import for_level, category_groups
     deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
@@ -482,7 +484,7 @@ def stage(stage_key, programme_code=None):
                            structure_courses=structure_courses, revision_year=revision_year(sub),
                            programme_objectives=programme_objectives, outcome_cols=outcome_cols,
                            outcomes_url=outcomes_url,
-                           programme_report=programme_report,
+                           programme_done=programme_done, my_doc=my_doc,
                            bloom_verbs=BLOOM_VERB_LEVEL,
                            add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
                                       and stage_key == "dept_info" else ""),
@@ -1140,9 +1142,7 @@ def api_record():
         items = [{**i, "title": _step_label(i["key"])} for i in items if i["programme"] == only]
         name = next((p.get("programme_name") for p in programmes_of(sub, dept)
                      if p["programme_code"] == only), only)
-        # every batch's Curriculum, Syllabus and Course Revision, in one ZIP
-        return jsonify({"ok": True, "dept_name": name, "items": items,
-                        "zip": url_for("dept.programme_report_zip", programme_code=only)})
+        return jsonify({"ok": True, "dept_name": name, "items": items})
     return jsonify({"ok": True, "dept_name": name, "items": items})
 
 
@@ -1359,63 +1359,76 @@ def file_summary(stage_key, stored):
 # department's own exports
 # ---------------------------------------------------------------------------
 
-def _not_finished(dept):
-    """The downloads are the finished record: until every stage is
-    submitted, send the department back to its submission instead."""
-    sub = get_or_create_submission(dept["dept_code"], _year())
-    if sub.get("status") == "sealed":
+DOCS = (("c", "Curriculum"), ("s", "Syllabus"), ("v", "Course Revision"))
+# which part a current-batch document is submitted with
+CURRENT_PART = {"c": "prog_curriculum", "s": "prog_syllabus", "v": "prog_revision"}
+
+
+def _submission_docs(sub, code):
+    """A programme's documents, batch by batch — the current batch's
+    Curriculum, Syllabus and Course Revision, then each earlier batch's —
+    each marked with whether it is submitted."""
+    b = batches()
+    url = lambda batch, doc: url_for("dept.programme_report", programme_code=code, batch=batch, doc=doc)
+    groups = [{"label": f"Current batch · {b['current']}", "batch": "current",
+               "docs": [{"doc": d, "title": t, "batch": "current", "url": url("current", d),
+                         "submitted": part_status(sub, code, CURRENT_PART[d]) == "submitted"} for d, t in DOCS]}]
+    for e in b["existing"]:
+        done = part_status(sub, code, e["key"]) == "submitted"
+        sems = semester_short(e["semesters"])
+        groups.append({"label": f"Earlier batch · {e['label']}" + (f" · {sems}" if sems else ""), "batch": e["key"],
+                       "docs": [{"doc": d, "title": t, "batch": e["key"], "url": url(e["key"], d),
+                                 "submitted": done} for d, t in DOCS]})
+    return groups
+
+
+def _submission_view(dept, code, pick):
+    """The picked document as its Word template lays it out (None if it cannot be made)."""
+    from .docgen import batch_curriculum_docx, curriculum_docx, revision_docx, syllabus_docx, to_view
+    db, year, part = get_db(), _year(), pick["batch"]
+    if part == "current":
+        make = {"c": curriculum_docx, "s": syllabus_docx, "v": revision_docx}[pick["doc"]]
+        kw = {}
+    else:
+        make = {"c": batch_curriculum_docx, "s": syllabus_docx, "v": revision_docx}[pick["doc"]]
+        kw = {"part": part}
+    try:
+        buf = make(db, dept["dept_code"], year, code, **kw)
+        return to_view(buf) if buf is not None else None
+    except Exception:
+        current_app.logger.exception("could not show %s %s %s", code, part, pick["doc"])
         return None
-    flash("The Excel and Word downloads appear once every stage is submitted.", "info")
-    return redirect(url_for("dept.dashboard"))
 
 
-@bp.route("/export.xlsx")
+@bp.route("/reports")
 @department_required
-def export_excel():
+def reports():
+    """Every programme's submission, to see — not to download."""
     dept = _dept()
-    if (back := _not_finished(dept)):
-        return back
-    buf = department_excel(dept["dept_code"], _year(), ShareLinks(dept["dept_code"], _year()))
-    return send_file(buf, as_attachment=True,
-                     download_name=f"BoS-{dept['dept_code']}-{_year()}.xlsx",
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-
-@bp.route("/export.docx")
-@department_required
-def export_word():
-    dept = _dept()
-    if (back := _not_finished(dept)):
-        return back
-    buf = submission_word(dept["dept_code"], _year(), ShareLinks(dept["dept_code"], _year()))
-    return send_file(buf, as_attachment=True,
-                     download_name=f"BoS-Report-{dept['dept_code']}-{_year()}.docx",
-                     mimetype="application/vnd.openxmlformats-officedocument."
-                              "wordprocessingml.document")
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    rows = []
+    for p in programmes_of(sub, dept):
+        docs = [d for g in _submission_docs(sub, p["programme_code"]) for d in g["docs"]]
+        rows.append({"code": p["programme_code"], "name": p["programme_name"],
+                     "submitted": sum(d["submitted"] for d in docs), "total": len(docs),
+                     "url": url_for("dept.programme_report", programme_code=p["programme_code"])})
+    return render_template("dept/reports.html", dept=dept, rows=rows, year=_year())
 
 
 @bp.route("/programme/<programme_code>/report")
 @department_required
 def programme_report(programme_code):
-    """One programme's whole record, the same page the Office reads."""
-    from .report import programme_context
-    dept = _dept()
-    ctx = programme_context(get_db(), dept, _year(), programme_code,
-                            ShareLinks(dept["dept_code"], _year())) or abort(404)
-    return render_template("admin/programme_report.html", **ctx, back_url=url_for("dept.dashboard"),
-                           zip_url=url_for("dept.programme_report_zip",
-                                           programme_code=ctx["programme"]["programme_code"]))
-
-
-@bp.route("/programme/<programme_code>/report.zip")
-@department_required
-def programme_report_zip(programme_code):
-    """One programme's whole record in one ZIP: the current batch and each
-    earlier batch, each with its Curriculum, Syllabus and Course Revision."""
-    from .docgen import programme_zip
+    """Your submission: one programme's submitted documents, each as the
+    Office's Word template lays it out — to read; a copy comes from the
+    Office of Academic Affairs."""
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
-    if not any(p["programme_code"] == programme_code for p in programmes_of(sub, dept)):
-        abort(404)
-    buf, name = programme_zip(get_db(), dept["dept_code"], _year(), programme_code) or abort(404)
-    return send_file(buf, as_attachment=True, download_name=name, mimetype="application/zip")
+    programme = next((p for p in programmes_of(sub, dept) if p["programme_code"] == programme_code), None) \
+        or abort(404)
+    groups = _submission_docs(sub, programme_code)
+    docs = [d for g in groups for d in g["docs"] if d["submitted"]]
+    want = (request.args.get("batch") or "current", request.args.get("doc") or "")
+    pick = next((d for d in docs if (d["batch"], d["doc"]) == want), None) or (docs[0] if docs else None)
+    view = _submission_view(dept, programme_code, pick) if pick else None
+    return render_template("dept/submission.html", dept=dept, programme=programme, groups=groups,
+                           pick=pick, view=view, year=_year())

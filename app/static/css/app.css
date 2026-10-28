@@ -5042,3 +5042,22 @@ table.sheet .bta-sel.is-empty { color: #98a2b3; font-weight: 400; }
   color: #c0392b; line-height: 1; cursor: pointer; padding: 0; }
 .ol-x:hover, .ol-x:focus-visible { background: #fdecea; }
 .ol-foot { padding-left: 54px; }
+
+/* "Your submission": a programme's submitted documents, as their Word
+   templates lay them out — to read, not to download or print */
+.subm-docs { display: grid; gap: 8px; margin: 0 0 12px; }
+.subm-row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.subm-batch { min-width: 230px; font-weight: 700; font-size: .85rem; color: var(--ink-800, #0e2a5c); }
+.subm-doc { padding: 6px 13px; border: 1px solid var(--line, #d6dde8); border-radius: 999px; background: #fff;
+  font-size: .85rem; font-weight: 600; color: var(--ink-800, #0e2a5c); text-decoration: none; }
+a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
+.subm-doc.is-on { background: var(--ink-800, #0e2a5c); border-color: var(--ink-800, #0e2a5c); color: #fff; }
+.subm-doc.is-off { color: var(--ink-faint, #98a2b3); background: transparent; border-style: dashed; font-weight: 500; cursor: not-allowed; }
+.subm-doc.is-off small { font-size: .75rem; }
+.subm-note { margin: 0 0 14px; padding: 8px 12px; border: 1px solid #f5d9a8; border-radius: 8px; background: #fff8eb;
+  color: #8a4b08; font-size: .84rem; }
+.subm-doc-wrap .gen-doc { border: 1px solid var(--line, #d6dde8); box-shadow: 0 10px 28px -20px rgba(15, 36, 64, .45); }
+.subm-noprint { display: none; }
+@media print { .subm-doc-wrap { display: none !important; } .subm-noprint { display: block; font-size: 14px; } }
+@media (max-width: 640px) { .subm-batch { min-width: 0; width: 100%; } }
+.subs-foot { margin: 8px 12px 4px; }

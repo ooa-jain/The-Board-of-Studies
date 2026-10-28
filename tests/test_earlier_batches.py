@@ -1,6 +1,7 @@
 """An earlier batch is three pages, as the current batch is — its Curriculum,
 Syllabus and Course Revision — in only the semesters Settings asks it for;
-and a programme's whole record, every batch, downloads as one ZIP."""
+and a programme's whole record, every batch, downloads as one ZIP for the
+Office (the department sees it, without a download)."""
 
 import io
 import zipfile
@@ -66,9 +67,21 @@ def test_an_earlier_batch_offers_only_its_semesters(app, client):
 def test_a_programme_downloads_every_batch_in_one_zip(app, client):
     _semesters(app, {"2024": [5, 6], "2025": [3, 4]})
     code = _demo(app, client)
+    # the department has no download: a copy comes from the Office
     j = client.get(f"/department/api/record?programme={code}").get_json()
-    assert j["zip"] == f"/department/programme/{code}/report.zip"
-    r = client.get(j["zip"])
+    assert "zip" not in j
+    assert client.get(f"/department/programme/{code}/report.zip").status_code == 404
+    # a submitted part offers "See your submission" beside Review — to see, not to download
+    client.post(f"/department/api/prog_syllabus_b2024/{code}/submit", json=j["items"][3]["data"])
+    page = client.get(f"/department/stage/prog_syllabus_b2024/{code}").get_data(as_text=True)
+    assert "See your submission" in page and "report.zip" not in page and "Download a copy" not in page
+    seen = client.get(f"/department/programme/{code}/report?batch=prog_syllabus_b2024&doc=c").get_data(as_text=True)
+    assert 'class="gen-doc' in seen and "Curriculum — Batch of 2024–2025" in seen
+    assert "Download" not in seen.split("<script")[0]
+
+    client.get("/logout")
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    r = client.get(f"/admin/report/DEMO/{code}/report.zip")
     assert r.status_code == 200 and r.mimetype == "application/zip"
     names = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
     folders = sorted({n.split("/")[1] for n in names})
@@ -86,17 +99,8 @@ def test_a_programme_downloads_every_batch_in_one_zip(app, client):
     assert "Curriculum — Batch of 2024–2025 · Semesters 5 and 6" in text(cur) and "24" in text(cur)
     rev = next(n for n in names if "2 Earlier batch" in n and n.endswith("Course Revision.docx"))
     assert "Batch of 2024–2025" in text(rev)
-    # a submitted part offers it beside Review
-    client.post(f"/department/api/prog_syllabus_b2024/{code}/submit",
-                json=client.get(f"/department/api/record?programme={code}").get_json()["items"][3]["data"])
-    page = client.get(f"/department/stage/prog_syllabus_b2024/{code}").get_data(as_text=True)
-    assert f'href="/department/programme/{code}/report.zip" download' in page
-    # another programme's, or one that is not there, is not given
-    assert client.get("/department/programme/NOPE/report.zip").status_code == 404
 
-    # the Office gets the same, and the department's ZIP holds every programme's
-    client.get("/logout")
-    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+    # the Office's page offers the download, and the department's ZIP holds every programme's
     page = client.get(f"/admin/report/DEMO/{code}").get_data(as_text=True)
     assert "Download all (ZIP)" in page and "Earlier batch 2024–2025 · Sem 5–6" in page
     r = client.get(f"/admin/report/DEMO/{code}/report.zip")
