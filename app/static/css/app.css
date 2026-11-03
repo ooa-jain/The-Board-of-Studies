@@ -5066,3 +5066,19 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .kw-table th.kw-mand-h, .kw-table td.kw-mand { width: 110px; white-space: nowrap; }
 .kw-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: .85rem; font-weight: 600; }
 .kw-switch input { width: 18px; height: 18px; accent-color: var(--ink-800, #0e2a5c); }
+
+/* the Office's review: "Train" beside a file, and its panel of words to add */
+.rv-file-train { margin-left: 6px; padding: 2px 9px; border: 1px solid #b9c6da; border-radius: 999px; background: #fff;
+  color: var(--ink-800, #0e2a5c); font-size: .74rem; font-weight: 700; cursor: pointer; }
+.rv-file-train:hover, .rv-file-train:focus-visible { background: #eef3fb; border-color: var(--ink-800, #0e2a5c); }
+.kw-train { margin: 6px 0 10px; padding: 10px 12px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc;
+  font-size: .86rem; }
+.kw-train.is-done { border-color: #b7e1c6; background: #effaf3; }
+.kw-train > strong { display: block; margin-bottom: 4px; color: var(--ink-800, #0e2a5c); }
+.kw-train p { margin: 4px 0; }
+.kw-train-now .kw-tag { margin: 2px 0; }
+.kw-train-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.kw-train-opt { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid #d6dde8;
+  border-radius: 999px; background: #fff; cursor: pointer; }
+.kw-train-opt:has(input:checked) { border-color: var(--ink-800, #0e2a5c); background: #eef3fb; }
+.kw-train-acts { display: flex; gap: 8px; }

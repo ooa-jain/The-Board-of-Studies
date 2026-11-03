@@ -1221,6 +1221,9 @@ def submission_review(dept_code, stage_key):
         if allows(current_user(), "overview", "edit") else "",
         "unlock_url": url_for("admin.submission_unlock", dept_code=dept_code, stage_key=stage_key)
         if allows(current_user(), "overview", "edit") else "",
+        # "Train" beside each file: its words, to add to its box's keywords
+        "train_url": url_for("admin.keywords_train") if allows(current_user(), "settings", "edit") else "",
+        "train_add_url": url_for("admin.keywords_add") if allows(current_user(), "settings", "edit") else "",
     })
 
 
@@ -1875,6 +1878,64 @@ def keywords_recheck():
     flash(f"Checked {done} file{'s' if done != 1 else ''} again"
           + (f"; {gone} no longer on the server." if gone else "."), "success")
     return redirect(url_for("admin.keywords"))
+
+
+@bp.post("/keywords/train")
+@admin_required
+def keywords_train():
+    """Train on one department's file: the words it carries that its upload
+    box's keywords do not have yet, for the Office to approve."""
+    from .drive_store import ensure_local
+    from .keyword_match import default_keywords, overrides, read_text, suggest
+    from .summarise import field_label
+    j = request.get_json(silent=True) or {}
+    db = get_db()
+    rec = db.files.find_one({"dept_code": str(j.get("dept_code") or ""), "stored_name": str(j.get("stored") or "")})
+    if not rec or not rec.get("field"):
+        return jsonify({"ok": False, "error": "This file is not on record."}), 404
+    field = rec["field"]
+    label = field_label(rec.get("stage", ""), field)
+    current = overrides().get(field) or default_keywords(field, label)
+    path = ensure_local({**rec, "academic_year": rec.get("academic_year") or _year()})
+    text = read_text(path) if path.exists() else None
+    out = {"ok": True, "field": field, "label": label, "current": current,
+           "found": ((rec.get("keyword_match") or {}).get("found") or [])}
+    if text is None:
+        return jsonify({**out, "unread": True, "suggestions": []})
+    return jsonify({**out, "unread": False, "suggestions": suggest(text, current)})
+
+
+@bp.post("/keywords/add")
+@admin_required
+def keywords_add():
+    """Add the approved words to an upload box's keywords, and check the file
+    they came from again."""
+    from .drive_store import ensure_local
+    from .keyword_match import add_keywords, check, default_keywords, overrides, upload_boxes
+    from .summarise import field_label
+    j = request.get_json(silent=True) or {}
+    field = str(j.get("field") or "")
+    box = next((b for b in upload_boxes() if b["field"] == field), None)
+    words = [str(w) for w in (j.get("words") or []) if str(w).strip()][:20]
+    if not box or not words:
+        return jsonify({"ok": False, "error": "Choose at least one keyword."}), 400
+    db = get_db()
+    current = overrides().get(field) or default_keywords(field, box["label"])
+    new = add_keywords(current, words)
+    added = new[len(current):]
+    db.settings.update_one({"_id": "app"}, {"$set": {f"keywords.{field}": new}}, upsert=True)
+    forget_cached()
+    audit(_actor(), "keywords.trained", detail={"field": field, "added": added,
+                                                "from": f"{j.get('dept_code', '')}/{j.get('stored', '')}"})
+    # the file it came from, checked with the new list
+    match = None
+    rec = db.files.find_one({"dept_code": str(j.get("dept_code") or ""), "stored_name": str(j.get("stored") or "")})
+    if rec:
+        path = ensure_local({**rec, "academic_year": rec.get("academic_year") or _year()})
+        if path.exists():
+            match = check(path, field, field_label(rec.get("stage", ""), field))
+            db.files.update_one({"_id": rec["_id"]}, {"$set": {"keyword_match": match}})
+    return jsonify({"ok": True, "added": added, "keywords": new, "match": match})
 
 
 # ---------------------------------------------------------------------------

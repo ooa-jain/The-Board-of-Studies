@@ -82,7 +82,8 @@ ENDPOINTS = {
     "connectors": ("settings", ("view", "edit")), "connector_toggle": ("settings", "edit"),
     "connector_delete": ("settings", "delete"), "connector_test": ("settings", "edit"),
     "keywords": ("settings", ("view", "edit")), "keywords_reset": ("settings", "edit"),
-    "keywords_recheck": ("settings", "edit"),
+    "keywords_recheck": ("settings", "edit"), "keywords_train": ("settings", "edit"),
+    "keywords_add": ("settings", "edit"),
 }
 # open to every admin, whatever their sections: the place they are looking at
 OPEN_TO_ALL = {"set_place"}

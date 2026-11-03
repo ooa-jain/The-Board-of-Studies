@@ -12,6 +12,89 @@
   const WORDS = { submitted: "Submitted", returned: "Sent back", draft: "In progress",
                   open: "Not started", locked: "Locked" };
 
+  const post = (url, body) => fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+  }).then(r => r.json());
+
+  /* Train: the words this file carries that its upload box's keywords do not
+     have yet. The Office ticks the right ones and adds them; the file is
+     checked again with the new list. */
+  function train(v, chip, j) {
+    const next = chip.nextElementSibling;
+    if (next && next.classList.contains("kw-train")) { next.remove(); return; }
+    const box = el("div", "kw-train");
+    box.appendChild(el("p", "small muted", "Reading " + v.name + "…"));
+    chip.after(box);
+    post(j.train_url, { dept_code: j.dept_code, stored: v.stored }).then(r => {
+      box.textContent = "";
+      if (!r.ok) { box.appendChild(el("p", "small rv-warn", r.error || "This file could not be read.")); return; }
+      box.appendChild(el("strong", null, `Train “${r.label}” from ${v.name}`));
+      const now = el("p", "small kw-train-now");
+      now.appendChild(el("span", "muted", "Keywords now: "));
+      r.current.forEach(w => {
+        const t = el("span", "kw-tag" + (r.found.includes(w) ? " is-hit" : ""), w.split("/")[0].trim());
+        t.title = w;
+        now.appendChild(t);
+        now.appendChild(document.createTextNode(" "));
+      });
+      box.appendChild(now);
+      if (r.unread) {
+        box.appendChild(el("p", "small", "This file has no text to read (a scan or an image) — there is nothing to learn from it."));
+        return;
+      }
+      if (!r.suggestions.length) {
+        box.appendChild(el("p", "small", "Nothing new: the words this file uses often are in the list already."));
+        return;
+      }
+      box.appendChild(el("p", "small", "Words this file uses often that the list does not have. Tick the right ones and add them:"));
+      const list = el("div", "kw-train-list");
+      const ticks = r.suggestions.map(sg => {
+        const lab = el("label", "kw-train-opt");
+        const cb = el("input");
+        cb.type = "checkbox";
+        cb.value = sg.word;
+        lab.appendChild(cb);
+        lab.appendChild(el("span", null, sg.word));
+        lab.appendChild(el("small", "muted", ` ×${sg.count}`));
+        list.appendChild(lab);
+        return cb;
+      });
+      box.appendChild(list);
+      const acts = el("div", "kw-train-acts");
+      const add = el("button", "btn btn-sm", "Add to keywords");
+      add.type = "button";
+      add.disabled = true;
+      const paint = () => {
+        const n = ticks.filter(c => c.checked).length;
+        add.disabled = !n;
+        add.textContent = n ? `Add ${n} to keywords` : "Add to keywords";
+      };
+      ticks.forEach(c => c.addEventListener("change", paint));
+      const cancel = el("button", "btn btn-ghost btn-sm", "Cancel");
+      cancel.type = "button";
+      cancel.addEventListener("click", () => box.remove());
+      add.addEventListener("click", () => {
+        const words = ticks.filter(c => c.checked).map(c => c.value);
+        add.disabled = true;
+        post(j.train_add_url, { field: r.field, words, dept_code: j.dept_code, stored: v.stored }).then(a => {
+          if (!a.ok) { if (window.Toast) window.Toast.error(a.error || "Could not add them."); add.disabled = false; return; }
+          box.textContent = "";
+          box.classList.add("is-done");
+          const said = a.added.length ? `Added to “${r.label}”: ${a.added.join(", ")}.` : "They were in the list already.";
+          box.appendChild(el("strong", null, said));
+          if (a.match) box.appendChild(el("p", "small", "This file, checked again: " +
+            ({ match: "keywords match", weak: "few keywords match", miss: "no keywords match", unread: "not readable" }[a.match.status] || a.match.status) + "."));
+          box.appendChild(el("p", "small muted", "The next uploads to this box are checked with the new list. See or change it under Settings › Keywords."));
+          if (window.Toast) window.Toast.success(said, { title: "Keywords trained" });
+        }).catch(() => { add.disabled = false; if (window.Toast) window.Toast.error("Could not reach the server. Try again."); });
+      });
+      acts.appendChild(add);
+      acts.appendChild(cancel);
+      box.appendChild(acts);
+    }).catch(() => { box.textContent = ""; box.appendChild(el("p", "small rv-warn", "Could not reach the server. Try again.")); });
+  }
+
   function open(url) {
     fetch(url, { credentials: "same-origin" }).then(r => r.json()).then(j => {
       const title = (j.programme_name ? j.programme_name + " · " : "") + j.stage.title;
@@ -38,7 +121,7 @@
       if (!j.timing.submitted) fact("Last saved", j.timing.updated);
       top.appendChild(facts);
 
-      const body = Review.build(j.stage, j.data, {});
+      const body = Review.build(j.stage, j.data, j.train_url ? { trainFile: (v, chip) => train(v, chip, j) } : {});
       const foot = el("div", "rv-admin-acts");
       // the links are left out for someone whose access does not reach them
       if (j.status === "submitted" && j.return_url) {

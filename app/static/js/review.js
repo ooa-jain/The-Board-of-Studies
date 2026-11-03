@@ -71,6 +71,14 @@
       mk.title = ok ? "Keywords match" : "Check this is the right file";
       chip.appendChild(mk);
     }
+    if (opts.trainFile && v.stored) {
+      // the Office: learn this box's keywords from this file
+      const tr = el("button", "rv-file-train", "Train");
+      tr.type = "button";
+      tr.title = "Find words in this file that its box's keywords do not have yet";
+      tr.addEventListener("click", () => opts.trainFile(v, chip));
+      chip.appendChild(tr);
+    }
     if (opts.removeFile) {
       const rm = el("button", "rv-file-rm", "Remove");
       rm.type = "button";

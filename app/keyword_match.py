@@ -258,6 +258,64 @@ def _found_one(word: str, text: str) -> bool:
     return re.search(rf"\b{re.escape(word)}", text, re.I) is not None
 
 
+# everyday words that say nothing about which document a file is
+COMMON = set("""a about above after again against all also am an and any are as at be because been before
+being below between both but by can could did do does doing down during each few for from further had has
+have having he her here hers him his how i if in into is it its itself just me more most my no nor not now
+of off on once only or other our ours out over own same she should so some such than that the their them
+then there these they this those through to too under until up very was we were what when where which while
+who whom why will with would you your yours shall may must per via etc also upon within without whereas
+herein hereby thereof dated date page pages sl no name names total yes nil na""".split()) | STOP
+
+
+def suggest(text: str, current: list[str], limit: int = 15) -> list[dict]:
+    """Words and two-word phrases a file carries more than once that the
+    box's keywords do not have yet — for the Office to approve ("Train").
+    [{word, count}], most telling first."""
+    from collections import Counter
+    words = re.findall(r"[A-Za-z][A-Za-z&'-]*[A-Za-z]|[A-Z]{2,}", text or "")
+    low = [w.lower() for w in words]
+    spelled = {}                              # each word as the file most often writes it
+    for w, l in zip(words, low):
+        spelled.setdefault(l, Counter())[w] += 1
+    useful = lambda l: len(l) >= 3 and l not in COMMON
+    singles = Counter(l for l in low if useful(l) and len(l) >= 4)
+    pairs = Counter(f"{a} {b}" for a, b in zip(low, low[1:]) if useful(a) and useful(b) and a != b)
+    have = [a.lower() for k in current or [] for a in alternatives(k)]
+    # already a keyword, or a word of one ("board" of "board of studies")
+    covered = lambda c: any(h == c or h in c.split() or (" " in h and h in c) or c in h.split() for h in have)
+    often = [(p, n) for p, n in pairs.most_common() if n >= 2]
+    # two cells of a table read across ("Expert External"): each word sits in a likelier pair
+    across = lambda p, n: all(any(w in q.split() and q != p and m >= n for q, m in often) for w in p.split())
+    out = []
+    for phrase, n in often:
+        if len(out) >= limit:
+            break
+        if not covered(phrase) and not across(phrase, n):
+            out.append({"word": " ".join(spelled[p].most_common(1)[0][0] for p in phrase.split()),
+                        "count": n, "score": n * 2})
+    taken = {p for o in out for p in o["word"].lower().split()}
+    for one, n in singles.most_common():
+        if n < 2 or len(out) >= limit * 2:
+            break
+        if not covered(one) and one not in taken:
+            out.append({"word": spelled[one].most_common(1)[0][0], "count": n, "score": n})
+    out.sort(key=lambda o: -o["score"])
+    return [{"word": o["word"], "count": o["count"]} for o in out[:limit]]
+
+
+def add_keywords(current: list[str], words: list[str]) -> list[str]:
+    """The box's keywords with these added — none twice, at most 30."""
+    have = {a.lower() for k in current for a in alternatives(k)}
+    out = list(current)
+    for w in words:
+        w = " ".join(str(w).split())[:60]
+        if w and w.lower() not in have:
+            out.append(w)
+            have.add(w.lower())
+    return out[:30]
+
+
 def check(path: Path, field: str, label: str) -> dict:
     """{status, found, seen, expected, label}: status is "match", "weak",
     "miss" or "unread" (no text to check). `found` holds the keywords that

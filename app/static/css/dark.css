@@ -5176,6 +5176,35 @@ html[data-theme="dark"] .subm-doc-wrap .gen-doc {
 html[data-theme="dark"] .kw-switch input {
   accent-color: #acc7ec;
 }
+html[data-theme="dark"] .rv-file-train {
+  border: 1px solid #33445f;
+  background: #121519;
+  color: #acc7ec;
+}
+html[data-theme="dark"] .rv-file-train:hover,
+html[data-theme="dark"] .rv-file-train:focus-visible {
+  background: #0f1a2c;
+  border-color: #4582d3;
+}
+html[data-theme="dark"] .kw-train {
+  border: 1px solid #2c374e;
+  background: #0f1924;
+}
+html[data-theme="dark"] .kw-train.is-done {
+  border-color: #325d41;
+  background: #0f2c1a;
+}
+html[data-theme="dark"] .kw-train > strong {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .kw-train-opt {
+  border: 1px solid #2c374e;
+  background: #121519;
+}
+html[data-theme="dark"] .kw-train-opt:has(input:checked) {
+  border-color: #4582d3;
+  background: #0f1a2c;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
