@@ -5061,3 +5061,8 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 @media print { .subm-doc-wrap { display: none !important; } .subm-noprint { display: block; font-size: 14px; } }
 @media (max-width: 640px) { .subm-batch { min-width: 0; width: 100%; } }
 .subs-foot { margin: 8px 12px 4px; }
+
+/* Admin › Keywords: which upload boxes are mandatory */
+.kw-table th.kw-mand-h, .kw-table td.kw-mand { width: 110px; white-space: nowrap; }
+.kw-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: .85rem; font-weight: 600; }
+.kw-switch input { width: 18px; height: 18px; accent-color: var(--ink-800, #0e2a5c); }

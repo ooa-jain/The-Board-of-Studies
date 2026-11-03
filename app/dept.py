@@ -463,6 +463,9 @@ def stage(stage_key, programme_code=None):
     worked_out = isinstance(data, dict) and isinstance(data.get("details"), dict) \
         and data["details"].get("_degree_auto")
     page_stage = for_level(stage_def, None if worked_out else deg)
+    # an upload box the Office has made not mandatory
+    from .keyword_match import relax
+    page_stage = relax(page_stage)
     if stage_def.get("existing_batch"):
         page_stage = _batch_semesters(page_stage)
     if stage_key == "prog_curriculum":
@@ -863,8 +866,10 @@ def demo_fill_all():
 
 
 def _template_issues(dept, stage_key, data):
-    """A signed composition form with categories left blank cannot be
-    submitted: one error per form, naming what to fill."""
+    """A signed composition form with categories left blank: one reminder
+    per form, naming what is blank. Not every category applies to every
+    department, and a scanned copy cannot be read row by row — so it is a
+    warning, never a block."""
     from .template_check import TEMPLATES, problems
     stage = STAGE_BY_KEY.get(stage_key) or {}
     out = []
@@ -878,9 +883,9 @@ def _template_issues(dept, stage_key, data):
             rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": v["stored"]})
             tpl = ((rec or {}).get("keyword_match") or {}).get("template")
             for msg in problems(tpl):
-                out.append({"level": "error", "section": sec["key"], "field": f["name"],
-                            "message": f"{f.get('label', f['name'])}: {msg}. Fill it in the form, "
-                                       "sign it and upload it again."})
+                out.append({"level": "warning", "section": sec["key"], "field": f["name"],
+                            "message": f"{f.get('label', f['name'])}: {msg} — check it; a category "
+                                       "that does not apply can stay empty."})
     return out
 
 
@@ -896,7 +901,7 @@ def api_validate(stage_key, programme_code=None):
     extra = _template_issues(dept, stage_key, data)
     if extra:
         issues = extra + issues
-        summary = {**summary, "errors": summary.get("errors", 0) + len(extra)}
+        summary = {**summary, "warnings": summary.get("warnings", 0) + len(extra)}
     return jsonify({"ok": True, "issues": issues, "summary": summary})
 
 
@@ -935,16 +940,11 @@ def api_submit(stage_key, programme_code=None):
 
 
 def _submit_one(dept, sub, stage_key, programme, data):
-    """Submit one stage or programme part: the form checks and the signed
-    forms' blanks first, then submitted, told to the Office, logged."""
+    """Submit one stage or programme part: the form checks first, then
+    submitted, told to the Office, logged. (A signed form's blanks are only
+    a reminder in the checks: they do not hold the submission up.)"""
     programme_code = (programme or {}).get("programme_code")
     data = _pin_frozen(stage_key, data or {}, dept, sub, programme)
-    blanks = _template_issues(dept, stage_key, data)
-    if blanks:
-        save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
-        issues, summary = validate_only(sub, stage_key, data, programme)
-        return {"ok": False, "status": "draft", "issues": blanks + issues,
-                "summary": {**summary, "errors": summary.get("errors", 0) + len(blanks)}}
     before = _stored_data(sub, stage_key, programme_code)
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])

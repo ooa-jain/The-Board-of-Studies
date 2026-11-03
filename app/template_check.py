@@ -153,11 +153,11 @@ def check(path: Path, field: str, text: str | None = None) -> dict | None:
     if not tpl:
         return None
     ext = path.suffix.lower()
+    # a Word form is read row by row; a signed PDF or a scanned copy is not
+    # (its text cannot say which category a name sits in): only its keywords are checked
     try:
         if ext == ".docx":
             return check_docx(path, tpl)
-        if text and len(text.strip()) >= 20:
-            return check_text(text, tpl)
     except Exception:
         return None
     return None

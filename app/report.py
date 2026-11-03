@@ -108,8 +108,10 @@ def _field_text(f, v):
 
 def section_items(stage_key, data, links):
     """What one stage or part holds, field by field: (filled, label, text, [(name, url)])."""
+    from .keyword_match import relax
     items = []
-    for section in (STAGE_BY_KEY.get(stage_key) or {}).get("sections", []):
+    # an upload box the Office has made not mandatory is optional here too
+    for section in relax(STAGE_BY_KEY.get(stage_key) or {}).get("sections", []):
         payload = (data or {}).get(section["key"])
         kind = section.get("type", "fields")
         if kind == "fields":

@@ -1,6 +1,7 @@
-"""The signed DIAC and PAC forms: each upload is checked against the
-university's template, and a form with categories left blank is named
-and cannot be submitted."""
+"""The signed DIAC and PAC forms: a Word upload is checked against the
+university's template, and categories left blank are named — as a
+reminder, not a block: a category may not apply, and a signed PDF or a
+scanned copy cannot be read row by row."""
 
 import io
 import tempfile
@@ -45,7 +46,7 @@ def test_a_filled_form_passes_and_a_half_filled_one_names_the_gaps():
         assert problems(r) == ["Blank — fill Alumni, Parent"]
 
 
-def test_a_blank_form_cannot_be_submitted(app, client):
+def test_a_blank_category_is_a_reminder_not_a_block(app, client):
     u, p = make_department(app)
     login(client, u, p)
     assert client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK).get_json()["ok"]
@@ -57,17 +58,20 @@ def test_a_blank_form_cannot_be_submitted(app, client):
 
     data = {"pre_bos_files": {"diac_signed": diac, "dpac_signed": dpac,
                               "pre_bos_minutes": {"name": "minutes.pdf", "stored": "x-minutes.pdf", "size": 900}}}
-    # a blank form still saves — only submitting is refused
     assert client.post("/department/api/pre_bos/save", json=data).get_json()["ok"]
     j = client.post("/department/api/pre_bos/validate", json=data).get_json()
-    assert any("Blank — fill Alumni" in i["message"] for i in j["issues"])
-    j = client.post("/department/api/pre_bos/submit", json=data).get_json()
-    assert not j["ok"] and any("Blank — fill Alumni" in i["message"] for i in j["issues"])
-
-    # filled in and uploaded again: it goes through
-    diac = _up(client, "diac.docx", _filled(DIAC, "diac_signed"), "diac_signed")
-    data["pre_bos_files"]["diac_signed"] = diac
+    blank = [i for i in j["issues"] if "Blank — fill Alumni" in i["message"]]
+    assert blank and all(i["level"] == "warning" for i in blank)
+    # it goes through: a category that does not apply can stay empty
     assert client.post("/department/api/pre_bos/submit", json=data).get_json()["ok"]
+
+
+def test_a_signed_pdf_or_scan_is_not_read_row_by_row(tmp_path):
+    from app.template_check import check
+    pdf = tmp_path / "diac.pdf"
+    pdf.write_bytes(b"%PDF-1.4 scanned")
+    assert check(pdf, "diac_signed", text="Composition of DIAC  Dean  Industry") is None
+    assert check(pdf, "diac_signed", text=None) is None
 
 
 def test_the_templates_can_be_downloaded(client):

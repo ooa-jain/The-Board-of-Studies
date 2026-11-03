@@ -5173,6 +5173,9 @@ html[data-theme="dark"] .subm-doc-wrap .gen-doc {
   border: 1px solid #2e3542;
   box-shadow: 0 10px 28px -20px rgba(15, 36, 64, 0.45);
 }
+html[data-theme="dark"] .kw-switch input {
+  accent-color: #acc7ec;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

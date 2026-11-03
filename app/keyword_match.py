@@ -135,7 +135,9 @@ def upload_boxes():
                     if f["name"] == "batch_syllabus":
                         label = "Syllabus of an earlier batch"
                     out.append({"field": f["name"], "label": label,
-                                "where": stage.get("group") or stage.get("title", "")})
+                                "where": stage.get("group") or stage.get("title", ""),
+                                # mandatory as the form stands (the Office can make it not)
+                                "required": bool(f.get("required"))})
     return out
 
 
@@ -146,6 +148,33 @@ def overrides() -> dict:
         return (settings() or {}).get("keywords") or {}
     except Exception:
         return {}
+
+
+def optional_uploads() -> set:
+    """The upload boxes the Office has made not mandatory (Admin → Keywords)."""
+    try:
+        from .db import settings
+        return set((settings() or {}).get("optional_uploads") or [])
+    except Exception:
+        return set()
+
+
+def relax(stage: dict) -> dict:
+    """The stage as the Office has set it: an upload box made not mandatory
+    is not required — on the page, in the checks and on Submit."""
+    import copy
+    off = optional_uploads()
+    if not stage or not off or not any(f.get("type") == "file" and f.get("name") in off and f.get("required")
+                                       for sec in stage.get("sections", [])
+                                       for f in sec.get("fields", []) + sec.get("columns", [])):
+        return stage
+    s = copy.deepcopy(stage)
+    for sec in s.get("sections", []):
+        for key in ("fields", "columns"):
+            for f in sec.get(key, []):
+                if f.get("type") == "file" and f.get("name") in off:
+                    f["required"] = False
+    return s
 
 
 def default_keywords(field: str, label: str) -> list[str]:

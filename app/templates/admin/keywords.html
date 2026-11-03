@@ -8,7 +8,9 @@
       <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Settings <span>›</span> Keywords</div>
       <h1>Keyword check</h1>
       <p>Each upload is read straight away and searched for the words a document for its box
-         carries. Here you see and edit those words, and how every department's files did.</p>
+         carries. Here you see and edit those words, choose which boxes are mandatory, and see how
+         every department's files did. The check is a guide only — a scanned copy or a partial match
+         never stops a submission.</p>
     </div>
   </div>
 </div>
@@ -36,11 +38,17 @@
   <div class="card-body" style="padding:0">
     <form method="post" id="kw-form">
       <table class="data kw-table">
-        <thead><tr><th scope="col">Upload box</th><th scope="col">Keywords</th><th scope="col" class="num">Files</th></tr></thead>
+        <thead><tr><th scope="col">Upload box</th><th scope="col" class="kw-mand-h">Mandatory</th>
+          <th scope="col">Keywords</th><th scope="col" class="num">Files</th></tr></thead>
         <tbody>
           {% for b in boxes %}
           <tr>
             <td><strong>{{ b.label }}</strong><div class="small muted">{{ b.where }}{% if b.custom %} · <span class="kw-custom">your list</span>{% endif %}</div></td>
+            <td class="kw-mand">{% if b.required %}
+              <label class="kw-switch" title="Off: departments may leave this box empty and still submit">
+                <input type="checkbox" name="mand_{{ b.field }}" value="1"{{ ' checked' if b.mandatory }}
+                       aria-label="{{ b.label }} is mandatory"></label>
+              {% else %}<span class="small muted">Optional</span>{% endif %}</td>
             <td><textarea name="kw_{{ b.field }}" rows="2" aria-label="Keywords for {{ b.label }}">{{ b.words|join(', ') }}</textarea>
               {% if b.custom %}<div class="small muted">Standard: {{ b.default|join(', ') }}</div>{% endif %}</td>
             <td class="num kw-stat">
@@ -52,7 +60,7 @@
         </tbody>
       </table>
       <div class="kw-save">
-        <button class="btn">Save keywords</button>
+        <button class="btn">Save</button>
         <button class="btn btn-ghost" form="kw-reset">Back to standard lists</button>
       </div>
     </form>

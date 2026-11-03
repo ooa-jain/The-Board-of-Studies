@@ -1125,7 +1125,7 @@
     const bad = (t.blank || []).length || (t.half || []).length || t.placeholders;
     const line = el("div", "tpl-check " + (bad ? "is-bad" : "is-ok"));
     line.appendChild(el("span", "kw-icon", bad ? "!" : "✓"));
-    line.appendChild(el("strong", null, bad ? `Blank in the ${t.template} — fill it`
+    line.appendChild(el("strong", null, bad ? `Blank in the ${t.template} — check it`
                                             : `${t.template}: every category filled (${t.filled} of ${t.total})`));
     if (bad) {
       const ul = el("ul");
@@ -1133,7 +1133,7 @@
       if ((t.half || []).length) ul.appendChild(el("li", null, "Designation missing: " + t.half.join(", ")));
       if (t.placeholders) ul.appendChild(el("li", null, `“Words only” still written in ${t.placeholders} place${t.placeholders === 1 ? "" : "s"}`));
       line.appendChild(ul);
-      line.appendChild(el("span", "kw-sub", "Fill these in the form, sign it and upload it again — it cannot be submitted with blanks."));
+      line.appendChild(el("span", "kw-sub", "Fill any that apply and upload it again — a category that does not apply can stay empty; it does not stop Submit."));
     }
     return line;
   }
@@ -1173,7 +1173,8 @@
     const t = m.template;
     if (t && ((t.blank || []).length || (t.half || []).length || t.placeholders)) {
       const what = (t.blank || []).length ? t.blank.join(", ") : (t.half || []).length ? "designation for " + t.half.join(", ") : "the “Words only” places";
-      window.Toast.warning(`${v.name}: blank — fill ${what}.`, { title: "Blank in the form", timeout: 12000 });
+      window.Toast.warning(`${v.name}: blank — ${what}. Fill any that apply; one that does not can stay empty.`,
+                           { title: "Blank in the form", timeout: 12000 });
       return;
     }
     if (t) { window.Toast.success(`${v.name}: every category in the ${t.template} is filled.`, { title: "Form complete" }); return; }
@@ -4466,7 +4467,7 @@
     if (!vals.length) return f.required ? ["is-todo", "Not uploaded"] : ["is-opt", "Optional"];
     const bad = vals.find(x => x.match && x.match.template &&
       ((x.match.template.blank || []).length || (x.match.template.half || []).length || x.match.template.placeholders));
-    if (bad) return ["is-bad", "Blank in the form — fill it"];
+    if (bad) return ["is-warn", "Uploaded · some categories blank"];
     const wrong = vals.find(x => x.match && x.match.looks_like);
     if (wrong) return ["is-bad", "Looks like " + wrong.match.looks_like];
     const miss = vals.find(x => x.match && x.match.status === "miss");

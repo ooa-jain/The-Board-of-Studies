@@ -1800,15 +1800,21 @@ def keywords():
             words = list(dict.fromkeys(w.strip() for w in re.split(r"[,\n]+", raw) if w.strip()))[:30]
             if words and words != default_keywords(b["field"], b["label"]):
                 mine[b["field"]] = words
-        db.settings.update_one({"_id": "app"}, {"$set": {"keywords": mine}}, upsert=True)
+        # a mandatory box switched off: departments may leave it empty and still submit
+        optional = [b["field"] for b in boxes if b["required"] and not request.form.get("mand_" + b["field"])]
+        db.settings.update_one({"_id": "app"}, {"$set": {"keywords": mine, "optional_uploads": optional}},
+                               upsert=True)
         forget_cached()
-        audit(_actor(), "keywords.updated", detail={"boxes": len(mine)})
-        flash("Keywords saved. They apply to the next upload — use “Check all files again” "
-              "for the ones already in.", "success")
+        audit(_actor(), "keywords.updated", detail={"boxes": len(mine), "not_mandatory": optional})
+        flash("Saved. Keywords apply to the next upload — use “Check all files again” for the ones "
+              "already in. A box made not mandatory can be left empty from now on.", "success")
         return redirect(url_for("admin.keywords"))
 
     mine = overrides()
+    from .keyword_match import optional_uploads
+    off = optional_uploads()
     for b in boxes:
+        b["mandatory"] = b["required"] and b["field"] not in off
         b["default"] = default_keywords(b["field"], b["label"])
         b["words"] = mine.get(b["field"]) or b["default"]
         b["custom"] = b["field"] in mine

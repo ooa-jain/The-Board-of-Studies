@@ -376,14 +376,14 @@ PRE_BOS = {
                  "label": "Composition of the Department Industry-Academia Cell (DIAC)",
                  "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
                  "template": "templates/Composition_of_DIAC.docx",
-                 "help": "Fill a name and designation for every category in the template. A Word "
-                         "file is checked row by row; anything left blank is listed."},
+                 "help": "The filled form — Word, or the signed PDF / scanned copy. A Word file is "
+                         "checked row by row and any blank category is listed as a reminder."},
                 {"name": "dpac_signed",
                  "label": "Composition of the Department Programme Assessment Committee (DPAC)",
                  "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
                  "template": "templates/Composition_of_PAC.docx",
-                 "help": "Fill a name and designation for every category in the template. A Word "
-                         "file is checked row by row; anything left blank is listed."},
+                 "help": "The filled form — Word, or the signed PDF / scanned copy. A Word file is "
+                         "checked row by row and any blank category is listed as a reminder."},
                 {"name": "pre_bos_minutes", "label": "Minutes of the Meeting (Pre-BoS)",
                  "type": "file", "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
                  "template": "templates/Minutes_of_Pre-BoS_Meeting.docx",
@@ -425,8 +425,9 @@ BOS_DOCUMENTS = {
             "fields": [
                 {"name": "bos_composition", "label": "Composition of BoS Members", "type": "file", "template": "templates/Composition_of_BoS_Members.docx",
                  "required": True, "wide": True, "accept": ".pdf,.docx,.doc",
-                 "help": "The table of categories, roles and members. A Word file is checked row by "
-                         "row; any category with no member is listed."},
+                 "help": "The table of categories, roles and members — Word, or the signed PDF / scanned "
+                         "copy. A Word file is checked row by row and any category with no member is listed "
+                         "as a reminder."},
                 {"name": "external_profiles", "label": "Profiles of External Experts", "type": "file", "template": "templates/Profile_of_External_Expert.docx",
                  "required": True, "wide": True, "multiple": True, "accept": ".pdf,.docx,.doc,.zip",
                  "help": "One file per expert, or all of them at once."},

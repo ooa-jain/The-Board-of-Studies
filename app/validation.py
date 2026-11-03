@@ -828,6 +828,9 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
         or ctx.get("degree_level")
     stage = for_level(stage, deg)
+    # an upload box the Office has made not mandatory
+    from .keyword_match import relax
+    stage = relax(stage)
     if stage_key == "prog_curriculum":
         data = category_groups(data, deg)
     elif stage.get("existing_batch"):
