@@ -4578,6 +4578,20 @@
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
           if (f.hidden) return;              // kept in the record, not shown
+          // a UG programme's degree is not asked: unless it has one, its structure
+          // says — courses in semesters 7–8 make it 4-year, else 3-year
+          if (f.name === "degree_level" && CTX.key === "prog_curriculum" && !IS_PG) {
+            const d = state[section.key];
+            const sems = (state.semester_structure || []).filter(r => r && num(r.semester) !== null);
+            if (!CTX.readonly && sems.length && (!d.degree_level || d._degree_auto)) {
+              const want = sems.some(r => num(r.semester) > 6) ? "UG - 4 Year (Honours with Research)" : "UG - 3 Year";
+              if (d.degree_level !== want || !d._degree_auto) {
+                d._degree_auto = true;
+                setVal(section.key, "degree_level", want);
+              }
+            }
+            return;
+          }
           // standard wording is the placeholder: an empty box means "use it".
           // A draft that still holds the wording word for word shows it the
           // same way, so the department sees grey text it can type over.

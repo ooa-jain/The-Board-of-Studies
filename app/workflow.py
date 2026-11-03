@@ -394,6 +394,21 @@ def progress(submission: dict):
             "percent": round(done * 100 / len(STAGES)) if STAGES else 0}
 
 
+def curriculum_degree(data, catalogue_degree=""):
+    """A programme's degree: as its Curriculum names it — or, for a UG
+    programme whose Curriculum does not (or names only the worked-out one),
+    from its structure: semesters 7–8 make it 4-year, else 3-year."""
+    from .schema import ug_degree
+    details = (data or {}).get("details") if isinstance((data or {}).get("details"), dict) else {}
+    deg = str(details.get("degree_level") or "")
+    if deg and not details.get("_degree_auto"):
+        return deg
+    if _DEGREE_LEVEL.get(catalogue_degree):           # a PG programme of the catalogue
+        return deg or _DEGREE_LEVEL[catalogue_degree]
+    rows = (data or {}).get("semester_structure") or []
+    return ug_degree(rows) if rows else deg
+
+
 def programmes_of(submission: dict, department: dict | None = None):
     """The programmes mapped to the department — kept in Department
     Information — with the details each one's Curriculum holds."""
@@ -406,11 +421,11 @@ def programmes_of(submission: dict, department: dict | None = None):
         if not code or code.upper() in seen:
             continue
         seen.add(code.upper())
-        details = (programme_stage_state(submission, code, "prog_curriculum")
-                   .get("data") or {}).get("details") or {}
+        curric = programme_stage_state(submission, code, "prog_curriculum").get("data") or {}
+        details = curric.get("details") or {}
         row = {"programme_code": code, "programme_name": p.get("programme_name") or code,
                "degree": p.get("degree", ""), "category": p.get("category", "")}
-        row["degree_level"] = details.get("degree_level") or _DEGREE_LEVEL.get(p.get("degree"), "")
+        row["degree_level"] = curriculum_degree(curric, p.get("degree"))
         row["specialisation"] = details.get("specialisation", "")
         row["batch"] = details.get("batch", "")
         row["degree_tag"] = degree_tag(row["degree_level"])
@@ -456,8 +471,16 @@ def apply_defaults(stage_key, data, programme=None):
     specialisation ("derive_from"), stand in for any box left empty. Applied
     when checking and submitting, so leaving a box empty means accepting it.
     A PG programme's Curriculum takes the PG wording and course groups."""
-    from .schema import for_level, category_groups
+    from .schema import for_level, category_groups, ug_degree
     data = dict(data or {})
+    if stage_key == "prog_curriculum":
+        # a UG programme's degree is not asked: unless it has one, its structure says
+        details = dict(data.get("details") or {}) if isinstance(data.get("details"), dict) else {}
+        named = str(details.get("degree_level") or "")
+        if (programme or {}).get("level") != "PG" and not named.startswith("PG") \
+                and (not named or details.get("_degree_auto")) and data.get("semester_structure"):
+            details.update(degree_level=ug_degree(data.get("semester_structure")), _degree_auto=True)
+            data["details"] = details
     deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
         or (programme or {}).get("degree_level")
     stage = for_level(STAGE_BY_KEY.get(stage_key) or {}, deg)

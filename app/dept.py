@@ -459,7 +459,10 @@ def stage(stage_key, programme_code=None):
     from .schema import for_level, category_groups
     deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
            else {}).get("degree_level") or (programme or {}).get("degree_level")
-    page_stage = for_level(stage_def, deg)
+    # a degree worked out from the structure does not narrow the form: semesters 7–8 stay open to add
+    worked_out = isinstance(data, dict) and isinstance(data.get("details"), dict) \
+        and data["details"].get("_degree_auto")
+    page_stage = for_level(stage_def, None if worked_out else deg)
     if stage_def.get("existing_batch"):
         page_stage = _batch_semesters(page_stage)
     if stage_key == "prog_curriculum":

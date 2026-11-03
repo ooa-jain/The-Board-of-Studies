@@ -478,8 +478,10 @@ PROGRAMME_CURRICULUM = {
                  "prefill": "programme_code", "hidden": True},
                 {"name": "programme_name", "label": "Programme", "type": "readonly",
                  "prefill": "programme_name", "wide": True, "hidden": True},
+                # asked of a PG programme only (for_level); a UG programme's degree is
+                # worked out from its structure (workflow.curriculum_degree)
                 {"name": "degree_level", "label": "Degree / Duration", "type": "select",
-                 "required": True, "options": DEGREE_LEVELS, "prefill": "degree_level",
+                 "required": False, "options": DEGREE_LEVELS, "prefill": "degree_level",
                  "reload_on_change": True},
                 {"name": "specialisation", "label": "Specialisation", "type": "text"},
                 # worked out, never typed: the current batch's first year to the
@@ -926,6 +928,18 @@ def is_pg(degree_level) -> bool:
     return programme_level(degree_level) in ("PG", "PGD") if degree_level else False
 
 
+def ug_degree(rows):
+    """A UG programme's degree as its structure shows it: 4-year (Honours with
+    Research) once it has courses in semesters 7–8, else 3-year."""
+    for r in rows or []:
+        try:
+            if isinstance(r, dict) and float(r.get("semester")) > 6:
+                return "UG - 4 Year (Honours with Research)"
+        except (TypeError, ValueError):
+            continue
+    return "UG - 3 Year"
+
+
 def for_level(stage: dict, degree_level) -> dict:
     """The Curriculum form as a programme of this level fills it. A PG
     programme has no Honours tracks or minors, states its fee, and opens
@@ -962,6 +976,9 @@ def for_level(stage: dict, degree_level) -> dict:
     s["level"] = "PG"
     s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
     for sec in s["sections"]:
+        if sec["key"] == "details":
+            # a PG programme chooses its degree; a UG one's comes from its structure
+            sec["fields"] = [dict(f, required=True) if f["name"] == "degree_level" else f for f in sec["fields"]]
         if sec["key"] == "semester_structure":
             sec["columns"] = list(sec["columns"])
             for c in sec["columns"]:
