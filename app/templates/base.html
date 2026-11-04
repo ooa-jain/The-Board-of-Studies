@@ -220,6 +220,8 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span class="side-text">Version History</span></a>
     <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}" title="Change Password">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span class="side-text">Change Password</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'dept.help_page' }}" href="{{ url_for('dept.help_page') }}" title="Help — video and user manual">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span class="side-text">Help</span></a>
     {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>

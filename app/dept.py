@@ -163,6 +163,23 @@ def who():
                            known=people.known(dept["dept_code"]))
 
 
+@bp.route("/help")
+@department_required
+def help_page():
+    """How the portal works: the walkthrough video, section by section, and
+    the user manual (made by tools/help_media.py into static/help/)."""
+    import json
+    folder = Path(current_app.static_folder) / "help"
+    try:
+        chapters = json.loads((folder / "chapters.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        chapters = []
+    # each file with its date as a version: a new video or manual is not served from a stale cache
+    files = {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
+             for n in ("walkthrough.mp4", "manual.pdf", "poster.jpg")}
+    return render_template("dept/help.html", dept=_dept(), chapters=chapters, files=files)
+
+
 @bp.route("/versions")
 @department_required
 def versions():

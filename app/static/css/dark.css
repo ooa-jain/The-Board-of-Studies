@@ -5205,6 +5205,38 @@ html[data-theme="dark"] .kw-train-opt:has(input:checked) {
   border-color: #4582d3;
   background: #0f1a2c;
 }
+html[data-theme="dark"] .help-video video {
+  background: #1e55b8;
+  box-shadow: 0 18px 40px -24px rgba(15, 36, 64, 0.6);
+}
+html[data-theme="dark"] .help-chapters {
+  background: #121519;
+  border: 1px solid #2e3542;
+}
+html[data-theme="dark"] .help-chapters h2 {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .help-ch {
+  border: 1px solid transparent;
+  background: none;
+  color: #adc4eb;
+}
+html[data-theme="dark"] .help-ch:hover,
+html[data-theme="dark"] .help-ch:focus-visible {
+  background: #0e182a;
+  border-color: #2c374e;
+}
+html[data-theme="dark"] .help-ch.is-on {
+  background: #2962ae;
+  color: #ffffff;
+}
+html[data-theme="dark"] .help-ch-n {
+  background: #0f1a2c;
+  color: #acc7ec;
+}
+html[data-theme="dark"] .help-ch.is-on .help-ch-n {
+  background: #121519;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
