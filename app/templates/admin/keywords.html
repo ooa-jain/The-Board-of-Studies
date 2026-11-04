@@ -20,6 +20,14 @@
 {% macro kw_tags(m) %}{% for w in m.expected or [] %}{% set hit = w in (m.found or []) %}<span class="kw-tag{{ ' is-hit' if hit }}" title="{{ w }}">{{ (m.seen[(m.found).index(w)] if hit and m.seen else w.split('/')[0]|trim) }}</span> {% endfor %}{% endmacro %}
 {% include "admin/_tabs.html" %}
 {% set words = {'match': 'Match', 'weak': 'Few match', 'miss': 'No match', 'unread': 'Not readable'} %}
+{% if not pdf_ok %}
+<div class="alert alert-warning">
+  <div><strong>PDFs cannot be read on this server yet.</strong> Their keywords are not checked and Train cannot learn
+    from them — Word and Excel files are read. The PDF reader (pypdfium2) is in requirements.txt but not installed here:
+    on the server, in the portal's folder, run <code>./venv/bin/pip install -r requirements.txt</code>, restart the
+    portal, then press “Check all files again”.</div>
+</div>
+{% endif %}
 
 <div class="kw-totals">
   {% for k in ('match', 'weak', 'miss', 'unread') %}
@@ -80,7 +88,8 @@
           <td><a href="{{ url_for('admin.submission_detail', dept_code=f.dept_code) }}#documents">{{ f.dept_name }}</a></td>
           <td><a href="{{ f.url }}?inline=1" target="_blank" rel="noopener">{{ f.name }}</a>
             <div class="small muted">{{ f.match.label }}</div></td>
-          <td><span class="kw-pill is-{{ f.match.status }}">{{ words.get(f.match.status, '—') }}</span></td>
+          <td><span class="kw-pill is-{{ f.match.status }}">{{ words.get(f.match.status, '—') }}</span>
+            {% if f.match.status == 'unread' and f.match.why %}<div class="small muted">{{ {'no_reader': 'PDF reader not installed', 'scan': 'a scanned copy — no text', 'kind': 'an image, zip or old .doc', 'unreadable': 'could not be opened'}.get(f.match.why, '') }}</div>{% endif %}</td>
           <td class="small">{{ kw_tags(f.match) }}</td>
           <td class="small muted mono">{{ (f.at|ist).strftime('%d %b %H:%M') if f.at else '' }}</td>
         </tr>

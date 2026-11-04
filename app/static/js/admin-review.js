@@ -40,7 +40,17 @@
       });
       box.appendChild(now);
       if (r.unread) {
-        box.appendChild(el("p", "small", "This file has no text to read (a scan or an image) — there is nothing to learn from it."));
+        const WHY = {
+          no_reader: "This server cannot read PDFs yet: the PDF reader (pypdfium2) is not installed. On the server run " +
+                     "“./venv/bin/pip install -r requirements.txt” in the portal's folder and restart it — then Train " +
+                     "works on PDFs too (Word files are read already).",
+          scan: "This PDF is a scanned copy: it has no text layer, so there is nothing to learn from it. A PDF saved " +
+                "from Word or Google Docs can be trained on.",
+          kind: "This kind of file (an image, a zip or an old .doc) has no text to read.",
+          missing: "This file is no longer on the server.",
+        };
+        box.appendChild(el("p", "small" + (r.why === "no_reader" ? " rv-warn" : ""),
+                           WHY[r.why] || "This file could not be opened to read its text."));
         return;
       }
       if (!r.suggestions.length) {

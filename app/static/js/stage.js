@@ -1146,7 +1146,9 @@
     line.appendChild(el("strong", null, m.looks_like ? "Wrong document — this looks like " + m.looks_like
                                                      : (MATCH_WORDS[m.status] || "")));
     if (m.status === "unread") {
-      line.appendChild(el("span", "kw-sub", "this file has no text to read (a scan, image or zip) — open it to check"));
+      line.appendChild(el("span", "kw-sub", m.why === "no_reader"
+        ? "PDF keywords are not checked yet — fine to submit; open it to check"
+        : "this file has no text to read (a scan, image or zip) — fine to submit; open it to check"));
     } else {
       const tags = el("span", "kw-tags");
       (m.expected || []).forEach(w => {

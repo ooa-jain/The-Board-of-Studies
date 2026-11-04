@@ -196,9 +196,38 @@ def keywords_for(field: str, label: str) -> list[str]:
     return list(dict.fromkeys(words))
 
 
+def pdf_reader_ok() -> bool:
+    """Can this server read a PDF's text? (pypdfium2, in requirements.txt —
+    a server set up before it was added needs `pip install -r requirements.txt`.)"""
+    try:
+        import pypdfium2  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def why_unread(path: Path) -> str:
+    """Why a file's text could not be read: "no_reader" (this server cannot
+    read PDFs yet), "scan" (a PDF with no text layer — a scanned copy),
+    "kind" (an image, a zip, an old .doc) or "unreadable"."""
+    ext = path.suffix.lower()
+    if ext == ".pdf":
+        if not pdf_reader_ok():
+            return "no_reader"
+        try:
+            import pypdfium2 as pdfium
+            from .pdflock import PDF_LOCK
+            with PDF_LOCK:
+                pdfium.PdfDocument(path).close()
+            return "scan"
+        except Exception:
+            return "unreadable"
+    return "kind" if ext not in READABLE else "unreadable"
+
+
 def read_text(path: Path, limit: int = 60000) -> str | None:
     """The file's text, or None for a file whose text cannot be read here
-    (an image, a zip, an old .doc, a scan with no text layer)."""
+    (an image, a zip, an old .doc, a scan with no text layer — why_unread says)."""
     ext = path.suffix.lower()
     try:
         if ext == ".pdf":
@@ -273,14 +302,18 @@ def suggest(text: str, current: list[str], limit: int = 15) -> list[dict]:
     box's keywords do not have yet — for the Office to approve ("Train").
     [{word, count}], most telling first."""
     from collections import Counter
-    words = re.findall(r"[A-Za-z][A-Za-z&'-]*[A-Za-z]|[A-Z]{2,}", text or "")
-    low = [w.lower() for w in words]
+    token = re.compile(r"[A-Za-z][A-Za-z&'-]*[A-Za-z]|[A-Z]{2,}")
     spelled = {}                              # each word as the file most often writes it
-    for w, l in zip(words, low):
-        spelled.setdefault(l, Counter())[w] += 1
+    singles, pairs = Counter(), Counter()
     useful = lambda l: len(l) >= 3 and l not in COMMON
-    singles = Counter(l for l in low if useful(l) and len(l) >= 4)
-    pairs = Counter(f"{a} {b}" for a, b in zip(low, low[1:]) if useful(a) and useful(b) and a != b)
+    # a phrase is two words on one line: a PDF's table cells and wrapped lines are not one phrase
+    for line in (text or "").splitlines():
+        words = token.findall(line)
+        low = [w.lower() for w in words]
+        for w, l in zip(words, low):
+            spelled.setdefault(l, Counter())[w] += 1
+        singles.update(l for l in low if useful(l) and len(l) >= 4)
+        pairs.update(f"{a} {b}" for a, b in zip(low, low[1:]) if useful(a) and useful(b) and a != b)
     have = [a.lower() for k in current or [] for a in alternatives(k)]
     # already a keyword, or a word of one ("board" of "board of studies")
     covered = lambda c: any(h == c or h in c.split() or (" " in h and h in c) or c in h.split() for h in have)
@@ -326,7 +359,7 @@ def check(path: Path, field: str, label: str) -> dict:
         return {**base, "status": "unread"}
     text = read_text(path)
     if text is None:
-        return {**base, "status": "unread"}
+        return {**base, "status": "unread", "why": why_unread(path)}
     found, seen = [], []
     for w in words:
         hit = next((a for a in alternatives(w) if _found_one(a, text)), None)

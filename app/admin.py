@@ -1829,6 +1829,8 @@ def keywords():
         b["stats"] = stats
 
     status = request.args.get("status", "")
+    from .keyword_match import pdf_reader_ok
+    pdf_ok = pdf_reader_ok()
     q = {"academic_year": _year(), "keyword_match": {"$exists": True}, **scope_q()}
     if status:
         q["keyword_match.status"] = status
@@ -1843,7 +1845,7 @@ def keywords():
               for k in ("match", "weak", "miss", "unread")}
     unchecked = db.files.count_documents({"academic_year": _year(), "keyword_match": {"$exists": False}})
     return render_template("admin/keywords.html", boxes=boxes, files=files, totals=totals,
-                           status=status, unchecked=unchecked)
+                           status=status, unchecked=unchecked, pdf_ok=pdf_ok)
 
 
 @bp.post("/keywords/reset")
@@ -1886,7 +1888,7 @@ def keywords_train():
     """Train on one department's file: the words it carries that its upload
     box's keywords do not have yet, for the Office to approve."""
     from .drive_store import ensure_local
-    from .keyword_match import default_keywords, overrides, read_text, suggest
+    from .keyword_match import default_keywords, overrides, read_text, suggest, why_unread
     from .summarise import field_label
     j = request.get_json(silent=True) or {}
     db = get_db()
@@ -1901,7 +1903,8 @@ def keywords_train():
     out = {"ok": True, "field": field, "label": label, "current": current,
            "found": ((rec.get("keyword_match") or {}).get("found") or [])}
     if text is None:
-        return jsonify({**out, "unread": True, "suggestions": []})
+        return jsonify({**out, "unread": True, "why": why_unread(path) if path.exists() else "missing",
+                        "suggestions": []})
     return jsonify({**out, "unread": False, "suggestions": suggest(text, current)})
 
 
