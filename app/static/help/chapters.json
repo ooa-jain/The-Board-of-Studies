@@ -1,0 +1,68 @@
+[
+ {
+  "title": "Signing in and your home page",
+  "sub": "Sign in, say who you are, find your way",
+  "start": 0.0,
+  "end": 86.36
+ },
+ {
+  "title": "Department Information",
+  "sub": "Stage 1 · the programmes you run",
+  "start": 86.36,
+  "end": 125.28
+ },
+ {
+  "title": "Pre-BoS",
+  "sub": "Stage 2 · signed DIAC, DPAC and minutes",
+  "start": 125.28,
+  "end": 181.15
+ },
+ {
+  "title": "BoS Documents",
+  "sub": "Stage 3 · the meeting and its documents",
+  "start": 181.15,
+  "end": 213.31
+ },
+ {
+  "title": "Curriculum",
+  "sub": "Stage 4 · a programme's Curriculum",
+  "start": 213.31,
+  "end": 295.96
+ },
+ {
+  "title": "Syllabus",
+  "sub": "One sheet per course",
+  "start": 295.96,
+  "end": 357.0
+ },
+ {
+  "title": "Course Revision",
+  "sub": "Previous and revised syllabus",
+  "start": 357.0,
+  "end": 383.0
+ },
+ {
+  "title": "Earlier batches",
+  "sub": "The same three parts for each earlier batch",
+  "start": 383.0,
+  "end": 411.12
+ },
+ {
+  "title": "Checking and submitting",
+  "sub": "Autosave, the checks, Submit",
+  "start": 411.12,
+  "end": 511.8
+ },
+ {
+  "title": "Reports",
+  "sub": "See your submission",
+  "start": 511.8,
+  "end": 546.12
+ },
+ {
+  "title": "Version history, password and help",
+  "sub": "",
+  "start": 546.12,
+  "end": 586.32
+ }
+]
