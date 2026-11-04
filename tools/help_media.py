@@ -7,6 +7,10 @@ section by section, and the user manual (PDF).
     python tools/help_media.py --voice      # with a spoken voice (edge-tts;
                                             # needs speech.platform.bing.com)
     python tools/help_media.py --only 3     # one section, to try a change
+    python tools/help_media.py --voice-clips
+        # only the spoken lines, zipped to app/static/help/voice-clips.zip
+        # (needs edge-tts and the internet, nothing else — it runs on the
+        # server; bring the zip back with --use-clips FILE, then --voice)
 
 It runs the portal with an in-memory database (tools/devserver.py), makes the
 demo department, fills it with sample data and records each section with
@@ -236,22 +240,52 @@ def _duration(path):
         return 0.0
 
 
+def spoken():
+    """Every line the voice says: the captions and the title cards."""
+    lines = list(SAY.values())
+    lines += [f"Section {n}. {s['title']}." for n, s in enumerate(SECTIONS, start=1)]
+    lines += ["Thank you."]
+    return list(dict.fromkeys(lines))
+
+
 def make_voice():
     """Every line spoken, once (kept in WORK/voice between runs)."""
+    (WORK / "voice").mkdir(parents=True, exist_ok=True)
+    todo = [t for t in spoken() if not _clip(t).exists() or _clip(t).stat().st_size < 1000]
+    if not todo:
+        return
     import asyncio
     import edge_tts
-    (WORK / "voice").mkdir(parents=True, exist_ok=True)
     proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
 
     async def one(text, path):
         await edge_tts.Communicate(text, VOICE, rate="-4%", proxy=proxy).save(str(path))
 
-    lines = list(SAY.values()) + [s["title"] for s in SECTIONS]
-    for text in lines:
-        p = _clip(text)
-        if not p.exists() or p.stat().st_size < 1000:
-            asyncio.run(one(text, p))
-            print("  voice:", text[:60])
+    for text in todo:
+        asyncio.run(one(text, _clip(text)))
+        print("  voice:", text[:60])
+
+
+def pack_voice(dest):
+    """The clips in one zip, to make the video on another machine."""
+    import zipfile
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_STORED) as z:
+        for text in spoken():
+            z.write(_clip(text), _clip(text).name)
+    print(f"made {dest} ({len(spoken())} clips)")
+
+
+def unpack_voice(src):
+    """Clips made elsewhere (see --voice-clips) into the voice cache."""
+    import zipfile
+    want = {_clip(t).name for t in spoken()}
+    (WORK / "voice").mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(src) as z:
+        names = [n for n in z.namelist() if n in want]   # only the clips, by their own names
+        for n in names:
+            (WORK / "voice" / n).write_bytes(z.read(n))
+    missing = len(want) - len(names)
+    print(f"{len(names)} clips taken from {src}" + (f"; {missing} missing" if missing else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -1016,12 +1050,24 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--voice", action="store_true", help="speak the captions (edge-tts)")
     ap.add_argument("--only", type=int, nargs="*", help="record these sections only (no video or manual made)")
+    ap.add_argument("--voice-clips", action="store_true",
+                    help="only make the spoken lines, zipped to app/static/help/voice-clips.zip")
+    ap.add_argument("--use-clips", metavar="ZIP", help="take the spoken lines from a --voice-clips zip")
     args = ap.parse_args()
+    if args.voice_clips:
+        make_voice()
+        pack_voice(OUT / "voice-clips.zip")
+        return
     if not shutil.which("ffmpeg"):
         raise SystemExit("ffmpeg is needed")
-    if args.only is None:
-        shutil.rmtree(WORK, ignore_errors=True)
+    if args.only is None:                            # a fresh start, but the voice is kept
+        for old in WORK.glob("*") if WORK.exists() else []:
+            if old.name != "voice":
+                shutil.rmtree(old, ignore_errors=True) if old.is_dir() else old.unlink()
     WORK.mkdir(parents=True, exist_ok=True)
+    if args.use_clips:
+        unpack_voice(args.use_clips)
+        args.voice = True
     if args.voice:
         make_voice()
     srv = start_server()
