@@ -227,8 +227,13 @@ OVERLAY_JS = r"""
 # the voice (optional)
 # ---------------------------------------------------------------------------
 
+def _speech(text):
+    """What the voice reads: the caption, with BoS said letter by letter (B-O-S, not "boss")."""
+    return re.sub(r"\bBoS\b", "B O S", text)
+
+
 def _clip(text):
-    return WORK / "voice" / (hashlib.sha1(f"{VOICE}|{text}".encode()).hexdigest()[:16] + ".mp3")
+    return WORK / "voice" / (hashlib.sha1(f"{VOICE}|{_speech(text)}".encode()).hexdigest()[:16] + ".mp3")
 
 
 def _duration(path):
@@ -259,7 +264,7 @@ def make_voice():
     proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
 
     async def one(text, path):
-        await edge_tts.Communicate(text, VOICE, rate="-4%", proxy=proxy).save(str(path))
+        await edge_tts.Communicate(_speech(text), VOICE, rate="-4%", proxy=proxy).save(str(path))
 
     for text in todo:
         asyncio.run(one(text, _clip(text)))
