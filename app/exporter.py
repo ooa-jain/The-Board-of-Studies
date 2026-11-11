@@ -347,7 +347,7 @@ def _programmes_sheet(wb, rep):
         r += 1
         if ctx["semesters"]:
             _put(ws, r, ["Course code", "Course title", "Course category", "L", "T", "P", "E", "Credits",
-                         "CA marks", "TEE marks", "Total"], bold=True, fill=GREEN)
+                         "CA marks", "ESE marks", "Total"], bold=True, fill=GREEN)
             r += 1
             total = 0
             for sem, rows in ctx["semesters"]:

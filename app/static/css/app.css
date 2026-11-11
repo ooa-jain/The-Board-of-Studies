@@ -2154,6 +2154,10 @@ html.is-preloading .preload.is-done { opacity: 0; pointer-events: none; }
 
 /* ---------- filled-in-for-you fields, hints and running totals ---------- */
 input.is-auto { background: #f3f0ff; border-color: #cbb8ff; color: #3c1a8c; }
+/* CA + ESE that do not make 100 */
+input.is-sum-off, input.is-sum-off:focus { border-color: #c0392b; background: #fdecea; color: #8e1f14; }
+.rv-panel.rv-panel-sm { width: min(460px, 100%); }
+.rv-panel-sm .rv-body p { margin: 0 0 8px; }
 .hint-pop {
   position: absolute; z-index: 60; max-width: 300px; padding: 12px 14px;
   display: grid; gap: 4px; background: #fff; color: #1a2b45; border: 1px solid #dfe5ee;

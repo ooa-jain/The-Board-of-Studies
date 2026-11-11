@@ -504,10 +504,10 @@ PROGRAMME_CURRICULUM = {
                 # CO-PO-PSO Mapping in the Syllabus has a column for each
                 {"name": "programme_outcomes", "label": "1.A Programme Outcomes (POs)", "type": "outcome_list",
                  "prefix": "PO", "required": True, "max_items": PO_MAX,
-                 "help": "PO1 is open — add PO2, PO3 … as the programme has them. Each is a column of every course's CO-PO-PSO Mapping."},
+                 "help": "PO1 is open — add PO2, PO3 … as the programme has them; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
                 {"name": "programme_specific_outcomes", "label": "1.B Programme Specific Outcomes (PSOs)",
                  "type": "outcome_list", "prefix": "PSO", "required": True, "max_items": PSO_MAX,
-                 "help": "PSO1 is open — add PSO2, PSO3 … Each is a column of every course's CO-PO-PSO Mapping."},
+                 "help": "PSO1 is open — add PSO2, PSO3 …; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
                 {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
                  "required": True, "min": 6, "max": 72},
                 {"name": "intake", "label": "3. Student Intake", "type": "integer", "required": True,
@@ -585,12 +585,12 @@ PROGRAMME_CURRICULUM = {
                  "width": "56px", "help": "Experiential hours"},
                 {"name": "credits", "label": "Credits", "type": "integer", "required": True,
                  "min": 0, "max": 20, "width": "76px"},
-                # every course is out of 100: type one of the two marks and the
-                # other is 100 minus it (75 → 25, 35 → 65)
+                # every course is out of 100: both marks are typed, and CA + ESE
+                # must make 100 (20 + 80, 50 + 50) — the page says so if not
                 {"name": "cia", "label": "Continuous Assessment marks", "short": "CA marks", "type": "integer",
-                 "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "ese"},
-                {"name": "ese", "label": "Term End Examination marks", "short": "TEE marks", "type": "integer",
-                 "required": True, "min": 0, "max": MARKS_TOTAL, "complement": "cia"},
+                 "required": True, "min": 0, "max": MARKS_TOTAL, "sums_with": "ese"},
+                {"name": "ese", "label": "End Semester Examination marks", "short": "ESE marks", "type": "integer",
+                 "required": True, "min": 0, "max": MARKS_TOTAL, "sums_with": "cia"},
                 {"name": "total_marks", "label": "Total marks", "type": "integer", "required": True,
                  "min": MARKS_TOTAL, "max": MARKS_TOTAL, "fixed_value": MARKS_TOTAL},
                 {"name": "syllabus", "label": "Syllabus", "type": "syllabus_link",

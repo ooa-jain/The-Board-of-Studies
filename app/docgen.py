@@ -414,7 +414,7 @@ def _structure_table(doc, rows, width):
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _band(t, "Programme Structure", GREEN)
     heads = ["Course Code", "Course Title", "Major / Minor", "Credits",
-             "Continuous Assessment Marks", "Term End Examination Marks", "Total Marks"]
+             "Continuous Assessment Marks", "End Semester Examination Marks", "Total Marks"]
     hr = t.add_row().cells
     for i, h in enumerate(heads):
         _write(hr[i], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -523,7 +523,7 @@ def _pg_semester_tables(doc, rows, width):
         head._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
         hr = head.cells
         for i, h in enumerate(("Course Code", "Course Title", "Category", "Credits",
-                               "Continuous Assessment Marks", "Term End Examination Marks", "Total Marks")):
+                               "Continuous Assessment Marks", "End Semester Examination Marks", "Total Marks")):
             _write(hr[i], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
             _shade(hr[i], GREEN)
         _band(t, f"SEMESTER {roman[int(s) - 1] if 0 < int(s) <= 8 else s}", NAVY, color="FFFFFF")

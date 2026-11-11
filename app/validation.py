@@ -479,8 +479,8 @@ def r_marks_add_up(data, ctx, sk):
             continue
         if abs((cia + ese) - tot) > 0.01:
             out.append(err(
-                f"Course {r.get('course_code') or f'in row {i + 1}'}: CIA {cia:g} + ESE {ese:g} "
-                f"= {cia + ese:g}, which does not match the total of {tot:g}.",
+                f"Course {r.get('course_code') or f'in row {i + 1}'}: CA {cia:g} + ESE {ese:g} "
+                f"= {cia + ese:g} — CA and ESE must total {tot:g}.",
                 section=sk, row=i, field="total_marks"))
     return out
 

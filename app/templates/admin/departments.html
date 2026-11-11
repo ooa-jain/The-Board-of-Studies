@@ -154,7 +154,10 @@
           {% for d in departments %}
           <tr {{ 'style=opacity:.5' if not d.active }}>
             <td>
-              <strong>{{ d.dept_name }}</strong>
+              {% if can('overview') %}
+              <a class="dept-open" href="{{ url_for('admin.department_page', dept_code=d.dept_code) }}"
+                 title="Its details, programmes and stages — every year"><strong>{{ d.dept_name }}</strong></a>
+              {% else %}<strong>{{ d.dept_name }}</strong>{% endif %}
               <div class="small muted mono">{{ d.dept_code }}</div>
             </td>
             <td class="small">

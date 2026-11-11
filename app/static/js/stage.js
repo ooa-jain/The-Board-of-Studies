@@ -302,8 +302,8 @@
   }
 
   /** A programme's POs (or PSOs): PO1 open to describe, "+ Add PO2" for the
-      next, × on the last to take it away. Every course's CO-PO-PSO Mapping
-      has a column for each. */
+      next, × on each to take it away — the ones after it move up (PO2
+      becomes PO1), and every course's CO-PO-PSO Mapping moves with them. */
   function outcomeList(def, value, onChange) {
     const prefix = def.prefix || "";
     const items = (Array.isArray(value) ? value : [])
@@ -330,15 +330,19 @@
         ta.disabled = !!CTX.readonly;
         ta.addEventListener("input", () => { items[i] = ta.value; emit(); });
         row.appendChild(ta);
-        // only the last one comes away: the courses' mappings keep their columns
-        if (!CTX.readonly && items.length > 1 && i === items.length - 1) {
+        // any one comes away, the first too; with only one left, × empties it
+        if (!CTX.readonly && (items.length > 1 || t.trim())) {
           const x = el("button", "ol-x", "×");
           x.type = "button";
           x.title = `Remove ${name}`;
           x.setAttribute("aria-label", `Remove ${name}`);
           x.addEventListener("click", () => {
-            if (items[i].trim() && !window.confirm(`Remove ${name}? Its column goes from every course's mapping.`)) return;
-            items.pop();
+            const later = i < items.length - 1
+              ? ` ${prefix}${i + 2} becomes ${name}, and so on — every course's mapping moves with them.`
+              : " Its column goes from every course's mapping.";
+            if (items[i].trim() && !window.confirm(`Remove ${name}?${later}`)) return;
+            items.splice(i, 1);
+            if (!items.length) items.push("");
             draw();
             emit();
           });
@@ -1490,7 +1494,7 @@
       out.push({
         field: "total_marks", title: "Total marks",
         calc: r => num(r.cia) === null || num(r.ese) === null ? null : num(r.cia) + num(r.ese),
-        explain: r => [`Continuous Assessment ${r.cia ?? "–"} + Term End ${r.ese ?? "–"}`],
+        explain: r => [`Continuous Assessment ${r.cia ?? "–"} + End Semester Examination ${r.ese ?? "–"}`],
         empty: "Enter both marks and the total fills itself.",
       });
     }
@@ -1971,19 +1975,40 @@
     }
 
     const FIXED = section.columns.filter(c => c.fixed_value != null);
-    const PAIRS = section.columns.filter(c => c.complement);
+    const PAIRS = section.columns.filter(c => c.sums_with);
     const OUT_OF = (FIXED.find(c => c.name === "total_marks") || {}).fixed_value ?? 100;
-    // a value typed (or read from a file) in one of a pair sets the other
     function settle(row) {
       let changed = false;
       FIXED.forEach(c => { if (row[c.name] !== c.fixed_value) { row[c.name] = c.fixed_value; changed = true; } });
-      const first = PAIRS[0];
-      if (first) {
-        const a = num(row[first.name]), b = num(row[first.complement]);
-        if (a !== null && a >= 0 && a <= OUT_OF && b !== OUT_OF - a) { row[first.complement] = OUT_OF - a; changed = true; }
-        else if (a === null && b !== null && b >= 0 && b <= OUT_OF) { row[first.name] = OUT_OF - b; changed = true; }
-      }
       return changed;
+    }
+    /* CA and ESE are both typed; once both are in, they must make 100
+       (0 + 0, 20 + 70 will not do). A pop-up says so, and the box is
+       marked until it is put right. */
+    const pairTouched = new WeakSet();
+    function checkPair(row, cells, from) {
+      const first = PAIRS[0];
+      if (!first) return;
+      const other = first.sums_with;
+      const a = num(row[first.name]), b = num(row[other]);
+      const wrong = a !== null && b !== null && a + b !== OUT_OF;
+      [first.name, other].forEach(n => cells[n] && cells[n].classList.toggle("is-sum-off", wrong));
+      if (!wrong || !from || document.querySelector(".rv-modal.is-sum")) return;
+      const short = c => String(c.short || c.label).replace(/ marks$/i, "");
+      const second = section.columns.find(c => c.name === other) || {};
+      const course = [row.course_code, row.course_title].filter(Boolean).join(" · ");
+      const body = el("div");
+      body.appendChild(el("p", null, `${course ? course + ": " : ""}${short(first)} ${a} + ${short(second)} ${b} = ${a + b}.`));
+      body.appendChild(el("p", null, `${short(first)} + ${short(second)} must total ${OUT_OF} — for example 20 + 80, 40 + 60 or 50 + 50.`));
+      const ok = el("button", "btn", "OK, I'll correct it");
+      ok.type = "button";
+      const show = window.Review && window.Review.modal;
+      if (!show) { window.alert(`${short(first)} + ${short(second)} must total ${OUT_OF}. Now ${a} + ${b} = ${a + b}.`); from.focus(); return; }
+      const m = show({ title: `The total should be ${OUT_OF}`, body, foot: ok, onClose: () => from.focus() });
+      m.el.classList.add("is-sum");
+      m.panel.classList.add("rv-panel-sm");
+      ok.addEventListener("click", m.close);
+      ok.focus();
     }
 
     const SPAN = section.columns.length + 1 + (!fixed && !CTX.readonly ? 1 : 0);
@@ -2114,24 +2139,22 @@
         }
         const input = makeInput(c, row[c.name], (v) => {
           row[c.name] = v;
-          if (c.complement) {
-            if (cells[c.name]) cells[c.name].classList.remove("is-auto");   // typed, not worked out
-            const n = num(v);
-            if (n !== null && n >= 0 && n <= OUT_OF) {
-              row[c.complement] = OUT_OF - n;
-              if (cells[c.complement]) {
-                cells[c.complement].value = String(OUT_OF - n);
-                cells[c.complement].classList.add("is-auto");
-                fitNum(cells[c.complement]);
-              }
-            }
-          }
           if (DERIVED[c.name]) markManual(row, c.name, cells);
           derive(RULES, row, cells);
           touch();
           showTotals();
         });
         cells[c.name] = input;
+        if (c.sums_with) {
+          // checked once the pair is left: typing CA, then ESE, says nothing in between
+          input.addEventListener("change", () => { pairTouched.add(row); checkPair(row, cells, null); });
+          input.addEventListener("focusout", () => setTimeout(() => {
+            const now = document.activeElement;
+            if (now === cells[c.name] || now === cells[c.sums_with] || !pairTouched.has(row)) return;
+            pairTouched.delete(row);
+            checkPair(row, cells, input);
+          }, 0));
+        }
         if (DERIVED[c.name]) {
           if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
           hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, showTotals));
@@ -2190,6 +2213,7 @@
         tr.appendChild(td);
       }
       if (!CTX.readonly && derive(RULES, row, cells)) touch();
+      checkPair(row, cells, null);                  // marked, without the pop-up, as the page opens
       return tr;
     }
     draw();

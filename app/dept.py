@@ -11,7 +11,7 @@ from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
 from werkzeug.utils import secure_filename
 
 from . import ugc_rules as U
-from .auth import department_required
+from .auth import acting, department_required, page_user
 from .db import audit, get_db, now, rules_doc, settings, to_ist
 from .db import settings as app_settings_doc
 from .schema import BLOOM_VERB_LEVEL, STAGE_BY_KEY, STAGE_KEYS, course_category
@@ -30,16 +30,20 @@ bp = Blueprint("dept", __name__)
 
 
 def _me():
-    return session["user"]
+    # the department — or, while the Office edits it here, the department with the Office's name
+    return page_user()
 
 
 def _year():
+    a = acting()
+    if a and a.get("year"):
+        return a["year"]
     return settings().get("academic_year") or current_app.config["ACADEMIC_YEAR"]
 
 
 def _dept():
     d = get_db().departments.find_one({"dept_code": _me()["dept_code"]})
-    if not d or not d.get("active", True):
+    if not d or (not d.get("active", True) and not acting()):
         abort(403)
     return d
 
@@ -136,6 +140,8 @@ def _ask_who():
 @bp.route("/who", methods=["GET", "POST"])
 @department_required
 def who():
+    if acting():                                     # the Office's name is on its saves already
+        return redirect(url_for("dept.dashboard"))
     dept = _dept()
     me = _me()
     nxt = request.values.get("next") or ""
@@ -220,7 +226,9 @@ def version_restore(vid):
         abort(404)
     sub = get_or_create_submission(dept["dept_code"], _year())
     code = v["programme_code"] or None
-    if _part(sub, v["stage"], code).get("status") in ("submitted", "approved"):
+    was = _part(sub, v["stage"], code).get("status")
+    locked = was in ("submitted", "approved")
+    if locked and not acting():                      # the Office may restore one, and it stays as it was
         flash("That stage is submitted, so it cannot be changed. Ask the Office of Academic Affairs "
               "to send it back first.", "error")
         return redirect(url_for("dept.versions"))
@@ -228,7 +236,8 @@ def version_restore(vid):
     if code:
         programme = next((p for p in programmes_of(sub, dept) if p.get("programme_code") == code), None)
     before = _stored_data(sub, v["stage"], code)
-    save_draft(dept["dept_code"], _year(), v["stage"], v.get("data") or {}, code)
+    save_draft(dept["dept_code"], _year(), v["stage"], v.get("data") or {}, code,
+               status=was if locked else "draft")
     who_was = v.get("name") or "someone"
     people.keep(dept["dept_code"], _year(), v["stage"], code, v.get("data") or {}, _person(), kind="restore")
     _tell(dept, "saved", v["stage"], programme,
@@ -314,6 +323,8 @@ def stage(stage_key, programme_code=None):
 
     top_key = stage_def.get("parent") or stage_key
     status = compute_status(sub, stage_key)
+    if status == "locked" and acting():
+        status = "open"
     if status == "locked":
         prev = STAGE_BY_KEY[STAGE_KEYS[STAGE_KEYS.index(top_key) - 1]]["title"]
         flash(f"“{STAGE_BY_KEY[top_key]['title']}” opens once you have submitted “{prev}”.",
@@ -516,7 +527,7 @@ def stage(stage_key, programme_code=None):
                                     and stage_key == "dept_info" else ""),
                            state=state, data=data, status=status, programme=programme,
                            credit_matrix=credit_matrix, year=_year(),
-                           readonly=(status == "submitted"), synced=synced,
+                           readonly=(status == "submitted" and not acting()), synced=synced,
                            batch_tag=(batches()["current"] if stage_def.get("batch") == "current"
                                       else stage_def.get("batch") or ""),
                            parts=_parts_nav(sub, stage_def, programme),
@@ -659,7 +670,9 @@ def _guard(stage_key, programme_code=None, light=False):
     closed = (jsonify({"ok": False, "error": "This stage is not open for editing."}), 409)
     if not stage_def or stage_def.get("parts"):
         return None, None, None, closed
-    if stage_def.get("parent"):
+    if acting():
+        pass                                         # the Office edits any stage, submitted or not
+    elif stage_def.get("parent"):
         if (not programme_code or compute_status(sub, stage_key) == "locked"
                 or part_status(sub, programme_code, stage_key) == "submitted"):
             return None, None, None, closed
@@ -768,10 +781,19 @@ def api_save(stage_key, programme_code=None):
         return bad
     data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
     before = _stored_data(sub, stage_key, programme_code)
-    save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
+    # the Office correcting a submitted stage leaves it submitted
+    keep = acting() and _stored_status(sub, stage_key, programme_code) == "submitted"
+    save_draft(dept["dept_code"], _year(), stage_key, data, programme_code,
+               status="submitted" if keep else "draft")
     people.keep(dept["dept_code"], _year(), stage_key, programme_code, data, _person())
     _tell(dept, "saved", stage_key, programme, changes=describe_changes(stage_key, before, data))
     return jsonify({"ok": True, "saved_at": now().isoformat()})
+
+
+def _stored_status(sub, stage_key, programme_code=None):
+    if programme_code:
+        return (((sub.get("programmes") or {}).get(programme_code) or {}).get(stage_key) or {}).get("status")
+    return ((sub.get("stages") or {}).get(stage_key) or {}).get("status")
 
 
 def _stored_data(sub, stage_key, programme_code=None):
@@ -781,11 +803,14 @@ def _stored_data(sub, stage_key, programme_code=None):
 
 
 def _person():
-    return (session.get("user") or {}).get("person")
+    return (_me() or {}).get("person")
 
 
 def _tell(dept, event, stage_key=None, programme=None, **kw):
-    """An update for the Office; never in the way of the department's work."""
+    """An update for the Office; never in the way of the department's work.
+    (None for the Office's own edits.)"""
+    if acting():
+        return
     p = _person()
     try:
         notify_record(dept, event, stage_key=stage_key, programme=programme,

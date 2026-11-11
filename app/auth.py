@@ -45,10 +45,39 @@ def department_required(fn):
         u = session.get("user")
         if not u:
             return redirect(url_for("auth.login", next=request.path))
-        if u.get("role") != "department":
+        if u.get("role") != "department" and not acting():
             abort(403)
         return fn(*a, **kw)
     return wrapper
+
+
+def acting():
+    """The department the Office is editing in the department's own pages —
+    {"dept_code", "year"} — or None. Only for an admin who may edit
+    departments and may see this one; checked afresh on every request."""
+    u = session.get("user") or {}
+    a = session.get("act_as")
+    if u.get("role") != "admin" or not isinstance(a, dict) or not a.get("dept_code"):
+        return None
+    from .access import allows, current_user, may_see
+    if not allows(current_user(), "departments", "edit") or not may_see(a["dept_code"]):
+        return None
+    return a
+
+
+def page_user():
+    """Who a page is for: the signed-in account — or, in the department's pages
+    while the Office edits that department, the department, with the Office's
+    name on what is saved."""
+    u = session.get("user") or None
+    a = acting() if request.blueprint == "dept" else None
+    if not a:
+        return u
+    name = u.get("name") or u.get("username")
+    return {"role": "department", "dept_code": a["dept_code"], "username": u.get("username"),
+            "name": name, "acting": True, "year": a.get("year"),
+            "person": {"name": f"{name} (Office of Academic Affairs)",
+                       "email": u.get("email") or u.get("username")}}
 
 
 # ---------------------------------------------------------------------------

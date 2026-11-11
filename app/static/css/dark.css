@@ -1612,6 +1612,12 @@ html[data-theme="dark"] input.is-auto {
   border-color: #362c52;
   color: #bea9ef;
 }
+html[data-theme="dark"] input.is-sum-off,
+html[data-theme="dark"] input.is-sum-off:focus {
+  border-color: #c0392b;
+  background: #2d120f;
+  color: #ec8379;
+}
 html[data-theme="dark"] .hint-pop {
   background: #121519;
   color: #b5c7e3;
@@ -6462,6 +6468,35 @@ html[data-theme="dark"] .dp-dot-btn {
 }
 html[data-theme="dark"] .dp-dot-when {
   color: #aab1bf;
+}
+html[data-theme="dark"] .dp-year label {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .dp-facts dt {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .dp-plist tr.is-off td {
+  color: #a2aab9;
+}
+html[data-theme="dark"] .dp-pform {
+  border: 1px solid #2e3542;
+  background: #0f1924;
+}
+html[data-theme="dark"] .dp-pform label {
+  color: #aab1bf;
+}
+html[data-theme="dark"] .dp-edit-link {
+  border: 1px solid #313d55;
+  background: #121519;
+  color: #a6baf2;
+}
+html[data-theme="dark"] .dp-edit-link:hover {
+  background: #0f1b2d;
+}
+html[data-theme="dark"] .act-bar {
+  background: #322611;
+  border: 1px solid #f2c27a;
+  color: #ffc666;
 }
 html[data-theme="dark"] .dp-danger {
   border-color: #52302c;

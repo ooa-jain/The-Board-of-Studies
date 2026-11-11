@@ -64,6 +64,8 @@ ENDPOINTS = {
     "faculties": ("overview", "view"), "export_group": ("overview", "view"),
     "submission_detail": ("overview", "view"), "submission_review": ("overview", "view"),
     "overview_departments": ("overview", "view"), "department_page": ("overview", "view"),
+    "department_programme_save": ("departments", "edit"), "department_programme_run": ("departments", "edit"),
+    "department_act": ("departments", "edit"),
     "mark_seen": ("overview", "edit"), "submission_return": ("overview", "edit"),
     "submission_unlock": ("overview", "edit"),
     "export_institution": ("overview", "view"), "export_department": ("overview", "view"),
@@ -86,7 +88,7 @@ ENDPOINTS = {
     "keywords_add": ("settings", "edit"),
 }
 # open to every admin, whatever their sections: the place they are looking at
-OPEN_TO_ALL = {"set_place"}
+OPEN_TO_ALL = {"set_place", "act_stop"}
 # Overview's sheet tabs belong to the menu item that opens them
 SHEET_TABS = {"documents": "documents", "comments": "comments"}
 

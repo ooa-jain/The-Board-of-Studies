@@ -699,7 +699,7 @@ body.has-side .wrap { max-width: none !important; }
 .dp-prog-count { font-size: 12px; font-weight: 600; color: #5b6474; white-space: nowrap; }
 .dp-prog-count.is-all { color: #1d6b3e; }
 .dp-branch { position: relative; margin: 0 14px 4px 30px; padding-left: 18px; border-left: 2px solid #e4e7ec; }
-.dp-leaf { position: relative; display: grid; grid-template-columns: 12px minmax(160px, 1fr) minmax(0, 1.2fr) auto 84px; align-items: center;
+.dp-leaf { position: relative; display: grid; grid-template-columns: 12px minmax(160px, 1fr) minmax(0, 1.2fr) auto 84px auto; align-items: center;
   gap: 10px; padding: 8px 0; }
 .dp-leaf::before { content: ""; position: absolute; left: -18px; top: 50%; width: 14px; border-top: 2px solid #e4e7ec; }
 .dp-leaf-l { font-weight: 600; font-size: 13px; }
@@ -727,6 +727,31 @@ body.has-side .wrap { max-width: none !important; }
 .dp-dot-btn:hover .dot, .dp-dot-btn:focus-visible .dot { transform: scale(1.3); }
 .dp-dot-when { display: block; margin-top: 6px; font-size: 11px; color: #5b6474; }
 .dp-hint { margin: 0; padding: 0 16px 12px; }
+/* the department page: its year, its details, its programme list */
+.dp-year { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.dp-year label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #5b6474; white-space: nowrap; }
+.dp-year select { min-width: 130px; padding: 5px 8px; border-radius: 8px; }
+.dp-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 18px; margin: 0; padding: 4px 16px 16px; }
+.dp-facts dt { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #5b6474; }
+.dp-facts dd { margin: 2px 0 0; }
+.dp-plist td, .dp-plist th { vertical-align: middle; }
+.dp-plist tr.is-off td { color: #8a92a0; }
+.dp-plist form.inline { display: inline; }
+.dp-padd { padding: 0 16px 12px; }
+.dp-pform { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding: 12px; border: 1px solid var(--line, #dde3ea);
+  border-radius: 12px; background: #f8fafc; }
+.dp-pform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #5b6474; }
+.dp-pform input, .dp-pform select { min-width: 110px; padding: 6px 8px; border-radius: 8px; font-weight: 400; }
+.dp-pform .dp-pform-wide { flex: 1 1 260px; }
+.dp-pform .dp-pform-wide input { width: 100%; }
+.dp-pform-go { display: flex; gap: 6px; }
+.dp-edit-link { display: inline-block; margin-top: 4px; padding: 1px 8px; border: 1px solid #c9d3e0; border-radius: 999px;
+  background: #fff; font-size: 11px; color: #1d4ed8; cursor: pointer; }
+.dp-edit-link:hover { background: #eef3fa; }
+/* the Office, in a department's own pages */
+.act-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 24px 0; padding: 10px 14px;
+  border-radius: 12px; background: #fff4e0; border: 1px solid #f2c27a; color: #6b4300; font-size: .9rem; }
+.act-bar span { flex: 1; min-width: 220px; }
 .dp-danger { border-color: #f3c7c2; }
 .dp-danger .panel-head { background: #fdf2f1; }
 .dp-danger-body { display: flex; flex-direction: column; }

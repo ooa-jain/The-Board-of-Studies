@@ -28,9 +28,25 @@ bp = Blueprint("admin", __name__)
 bp.before_request(guard_admin_request)
 
 
+_YEAR = re.compile(r"\d{4}-\d{2}")
+
+
 def _year():
+    """The academic year being looked at: the one asked for (?year=2026-27 on a
+    department's page and the links from it), else the portal's current one."""
     from .db import settings
+    asked = (request.args.get("year") or "").strip()
+    if _YEAR.fullmatch(asked):
+        return asked
     return settings().get("academic_year") or current_app.config["ACADEMIC_YEAR"]
+
+
+def _years_of(dept_code):
+    """Every academic year the department has a record for, and the current one, newest first."""
+    from .db import settings
+    now_y = settings().get("academic_year") or current_app.config["ACADEMIC_YEAR"]
+    have = set(get_db().submissions.distinct("academic_year", {"dept_code": dept_code}))
+    return sorted({y for y in have | {now_y} if y and _YEAR.fullmatch(str(y))}, reverse=True), now_y
 
 
 def _actor():
@@ -891,12 +907,143 @@ def department_page(dept_code):
     last = rows[0] if rows else None
     updates = _unread_updates([dept_code]).get(dept_code)
     comments = db.comments.count_documents({"dept_code": dept_code, "academic_year": year, "status": "open"})
+    from .workflow import programme_list
+    plist, confirmed = programme_list(sub, dept)
+    years, current_year = _years_of(dept_code)
     return render_template("admin/department_page.html", dept=dept, submission=sub, board=board,
                            updates=updates, open_comments=comments,
                            done=done, complete=complete,
                            submitted_at=max(x for x in sent if x) if complete else None,
                            updated_at=sub.get("updated_at"), last=last,
-                           levels=levels, versions=rows[:60], year=year)
+                           levels=levels, versions=rows[:60], year=year,
+                           years=years, current_year=current_year,
+                           plist=plist, plist_confirmed=confirmed, degrees=PROGRAMME_DEGREES,
+                           parts=parts)
+
+
+PROGRAMME_DEGREES = [("UG", "UG"), ("PG", "PG (2 years)"), ("PG-1Yr", "PG (1 year)"), ("PGD", "PG Diploma")]
+_PCODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,29}")
+
+
+def _office_person():
+    u = session.get("user") or {}
+    name = u.get("name") or u.get("username") or "Office"
+    return {"name": f"{name} (Office of Academic Affairs)", "email": u.get("email") or u.get("username") or ""}
+
+
+@bp.post("/departments/<dept_code>/programmes")
+@admin_required
+def department_programme_save(dept_code):
+    """Add a programme to a department's list for the year, or change one
+    (code, name, degree, category, year introduced)."""
+    from . import people
+    from .workflow import programme_list, save_programme_list
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = (request.form.get("year") or "").strip()
+    year = year if _YEAR.fullmatch(year) else _year()
+    back = redirect(url_for("admin.department_page", dept_code=dept_code, year=year) + "#programmes")
+    f = request.form
+    was = (f.get("was") or "").strip()
+    code = (f.get("programme_code") or "").strip().upper()
+    name = " ".join((f.get("programme_name") or "").split())
+    degree = f.get("degree") if f.get("degree") in dict(PROGRAMME_DEGREES) else "UG"
+    intro = (f.get("year_introduced") or "").strip()
+    if not _PCODE.fullmatch(code) or not name:
+        flash("A programme needs a code (letters and numbers) and a name.", "error")
+        return back
+    if intro and not re.fullmatch(r"\d{4}", intro):
+        flash("Year introduced is a year, such as 2021.", "error")
+        return back
+    sub = get_or_create_submission(dept_code, year)
+    rows, _ = programme_list(sub, dept)
+    codes = {str(r.get("programme_code") or "").strip().upper(): i for i, r in enumerate(rows)}
+    if code in codes and code != was.upper():
+        flash(f"{code} is already in the list.", "error")
+        return back
+    if was:
+        i = codes.get(was.upper())
+        if i is None:
+            flash("That programme is no longer in the list.", "error")
+            return back
+        row = rows[i]
+        old_code = str(row.get("programme_code") or "").strip()
+        if old_code != code:
+            # its Curriculum, Syllabus and Course Revision follow it to the new code
+            have = (sub.get("programmes") or {})
+            if code in have:
+                flash(f"There is already a record under {code}.", "error")
+                return back
+            if old_code in have:
+                db.submissions.update_one({"_id": sub["_id"]},
+                                          {"$set": {f"programmes.{code}": have[old_code]},
+                                           "$unset": {f"programmes.{old_code}": ""}})
+        row.update(programme_code=code, programme_name=name, degree=degree,
+                   category=(f.get("category") or "").strip(), year_introduced=intro)
+        what = "changed"
+    else:
+        rows.append({"programme_code": code, "programme_name": name, "degree": degree,
+                     "category": (f.get("category") or "").strip(), "year_introduced": intro,
+                     "minors": "", "source": "office", "decision": "keep"})
+        what = "added"
+    data = save_programme_list(dept_code, year, rows)
+    people.keep(dept_code, year, "dept_info", None, data, _office_person())
+    audit(_actor(), f"programme.{what}", dept_code, {"year": year, "programme": code, "was": was or None})
+    flash(f"{code} · {name} {what} for {year.replace('-', '–')}.", "success")
+    return back
+
+
+@bp.post("/departments/<dept_code>/programmes/<programme_code>/run")
+@admin_required
+def department_programme_run(dept_code, programme_code):
+    """Take a programme off the year's list, or put it back. Its record stays."""
+    from . import people
+    from .workflow import programme_list, save_programme_list
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = (request.form.get("year") or "").strip()
+    year = year if _YEAR.fullmatch(year) else _year()
+    sub = get_or_create_submission(dept_code, year)
+    rows, _ = programme_list(sub, dept)
+    row = next((r for r in rows if str(r.get("programme_code") or "").strip().upper() == programme_code.upper()), None)
+    if row is None:
+        abort(404)
+    run = request.form.get("run") == "1"
+    row["decision"] = "keep" if run else "remove"
+    data = save_programme_list(dept_code, year, rows)
+    people.keep(dept_code, year, "dept_info", None, data, _office_person())
+    audit(_actor(), "programme.run" if run else "programme.removed", dept_code,
+          {"year": year, "programme": programme_code})
+    flash(f"{programme_code} {'is back on' if run else 'is taken off'} the list for {year.replace('-', '–')}"
+          f"{'' if run else ' — its record is kept'}.", "success")
+    return redirect(url_for("admin.department_page", dept_code=dept_code, year=year) + "#programmes")
+
+
+@bp.post("/departments/<dept_code>/edit-as")
+@admin_required
+def department_act(dept_code):
+    """Open the department's own pages for the year, to edit as the Office."""
+    db = get_db()
+    db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = (request.form.get("year") or "").strip()
+    year = year if _YEAR.fullmatch(year) else _year()
+    nxt = request.form.get("next") or ""
+    if not re.fullmatch(r"/department/[A-Za-z0-9_/\-]*", nxt):
+        nxt = url_for("dept.dashboard")
+    session["act_as"] = {"dept_code": dept_code, "year": year}
+    audit(_actor(), "department.edit_as", dept_code, {"year": year})
+    return redirect(nxt)
+
+
+@bp.route("/edit-as/stop")
+@admin_required
+def act_stop():
+    """Back from a department's pages to its page in the Office's."""
+    a = session.pop("act_as", None) or {}
+    if a.get("dept_code"):
+        return redirect(url_for("admin.department_page", dept_code=a["dept_code"], year=a.get("year")))
+    from .access import home_url
+    return redirect(home_url())
 
 
 NO_FACULTY, NO_SCHOOL = "Faculty not set", "School not set"

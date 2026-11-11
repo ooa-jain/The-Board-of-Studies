@@ -74,7 +74,9 @@ def create_app(config_object=Config):
     @app.context_processor
     def _inject():
         from .schema import GROUP_ORDER, STAGE_BY_KEY, STAGES
-        user = session.get("user") or {}
+        from .auth import page_user
+        # in the department's pages while the Office edits it: that department
+        user = page_user() or {}
         unread, batch_info = 0, None
         if user.get("role") == "admin":
             try:
@@ -89,7 +91,8 @@ def create_app(config_object=Config):
             # the department's menu: its stages, each with where it stands
             try:
                 from .workflow import get_or_create_submission, stage_board
-                sub = get_or_create_submission(user["dept_code"], database.settings().get("academic_year")
+                sub = get_or_create_submission(user["dept_code"], user.get("year")
+                                               or database.settings().get("academic_year")
                                                or app.config["ACADEMIC_YEAR"])
                 dept_nav = [{"key": s["key"], "title": s["title"], "status": s["status"]}
                             for s in stage_board(sub)]
@@ -103,14 +106,19 @@ def create_app(config_object=Config):
                                       "folder": (pack.get("source") or {}).get("folder")}
             except Exception:
                 dept_nav = None
+        acting_dept = None
+        if user.get("acting"):
+            acting_dept = database.get_db().departments.find_one({"dept_code": user["dept_code"]},
+                                                                {"dept_name": 1, "dept_code": 1})
         from .access import template_helpers
         return {
             **template_helpers(),
+            "acting_dept": acting_dept,
             "dept_nav": dept_nav,
             "dept_drive": dept_drive,
             "updates_unread": unread,
             "batch_info": batch_info,
-            "current_user": session.get("user"),
+            "current_user": user or None,
             "app_settings": database.settings(),
             "STAGES": STAGES,
             "STAGE_BY_KEY": STAGE_BY_KEY,

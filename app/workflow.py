@@ -445,20 +445,92 @@ def _ctx_for(submission, stage_key, programme=None):
     return build_context(submission, programme, rules_doc())
 
 
-def save_draft(dept_code, academic_year, stage_key, data, programme_code=None):
+def outcome_moves(old_profile, new_profile):
+    """A PO or PSO taken out from the middle moves the ones after it up (PO3
+    becomes PO2). What each moved one was called and is called now, the one
+    taken out going to None: {"PO1": None, "PO2": "PO1", "PO3": "PO2"}. Empty
+    when nothing moved — one added, the last one taken off, or text changed."""
+    from .schema import outcome_items
+    moves = {}
+    for key, prefix in (("programme_outcomes", "PO"), ("programme_specific_outcomes", "PSO")):
+        old = outcome_items((old_profile or {}).get(key) if isinstance(old_profile, dict) else None)
+        new = outcome_items((new_profile or {}).get(key) if isinstance(new_profile, dict) else None)
+        if len(old) < 2 or len(new) != len(old) - 1:
+            continue
+
+        def off(r):
+            return sum(a != b for a, b in zip(old[:r] + old[r + 1:], new))
+        # the one taken out: where the rest lines up with what is left (the last of equals)
+        gone = min(range(len(old)), key=lambda r: (off(r), -r))
+        if gone == len(old) - 1 or off(gone) > 1:          # the last one, or not a removal
+            continue
+        for k in range(gone, len(old)):
+            moves[f"{prefix}{k + 1}"] = f"{prefix}{k}" if k > gone else None
+    return moves
+
+
+def _moved(d, moves):
+    out = {}
+    for k, v in d.items():
+        if k not in moves:
+            out[k] = v
+        elif moves[k]:
+            out[moves[k]] = v
+    return out
+
+
+def follow_outcomes(submission, programme_code, new_curriculum):
+    """When the Curriculum takes a PO or PSO out of the middle, every course's
+    CO-PO-PSO Mapping and Articulation in the programme's Syllabus pages
+    move with it, so each figure stays under the outcome it was given for.
+    The $set to make, or {}."""
+    prog = ((submission or {}).get("programmes") or {}).get(programme_code) or {}
+    old = ((prog.get("prog_curriculum") or {}).get("data") or {}).get("profile")
+    moves = outcome_moves(old, (new_curriculum or {}).get("profile"))
+    if not moves:
+        return {}
+    sets = {}
+    for key, st in prog.items():
+        if not (key == "prog_syllabus" or key.startswith("prog_syllabus_b")) or not isinstance(st, dict):
+            continue
+        data = st.get("data")
+        if not isinstance(data, dict):
+            continue
+        changed = False
+        for rows in data.values():
+            for row in rows if isinstance(rows, list) else []:
+                if not isinstance(row, dict):
+                    continue
+                if isinstance(row.get("co_po"), list):
+                    row["co_po"] = [_moved(m, moves) if isinstance(m, dict) else m for m in row["co_po"]]
+                    changed = True
+                if isinstance(row.get("articulation"), dict):
+                    row["articulation"] = _moved(row["articulation"], moves)
+                    changed = True
+        if changed:
+            sets[f"programmes.{programme_code}.{key}.data"] = data
+    return sets
+
+
+def save_draft(dept_code, academic_year, stage_key, data, programme_code=None, status="draft"):
     """Save without validating — used by autosave."""
     db = get_db()
+    moved = {}
     if programme_code:
         path = f"programmes.{programme_code}.{stage_key}"
+        if stage_key == "prog_curriculum":
+            moved = follow_outcomes(db.submissions.find_one({"dept_code": dept_code, "academic_year": academic_year}),
+                                    programme_code, data)
     else:
         path = f"stages.{stage_key}"
     db.submissions.update_one(
         {"dept_code": dept_code, "academic_year": academic_year},
         {"$set": {f"{path}.data": data,
-                  f"{path}.status": "draft",
+                  f"{path}.status": status,
                   f"{path}.updated_at": now(),
                   "updated_at": now(),
-                  "status": "in_progress"},
+                  "status": "in_progress",
+                  **moved},
          # the first time anything was saved here: the start of "time taken"
          "$min": {f"{path}.started_at": now()}},
         upsert=True,
@@ -533,6 +605,8 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
 
     status = "submitted" if summary["errors"] == 0 else "draft"
     update = {
+        **(follow_outcomes(submission, programme_code, data) if programme_code and stage_key == "prog_curriculum"
+           else {}),
         f"{path}.data": data,
         f"{path}.issues": issues,
         f"{path}.summary": summary,
@@ -665,6 +739,30 @@ def catalogue_rows(department, offered=False):
     return [{**{k: r.get(k, "") for k in fields}, "source": "catalogue",
              "decision": "keep" if offered else "remove"}
             for r in catalogue.programmes_for(department or {}, everyone)]
+
+
+def programme_list(submission, department):
+    """Department Information's Programmes offered for the year, every row —
+    run this year or not — and whether the list was ever saved. Never saved,
+    it is the Office's catalogue, each counted as run (as programmes_of does)."""
+    data = stage_state(submission, "dept_info").get("data") or {}
+    rows = data.get("programmes_offered") if isinstance(data, dict) else None
+    if isinstance(rows, list):
+        return [dict(r) for r in rows if isinstance(r, dict)], True
+    return catalogue_rows(department, offered=True), False
+
+
+def save_programme_list(dept_code, academic_year, rows):
+    """The Office's change to a department's Programmes offered, for that year."""
+    db = get_db()
+    sub = get_or_create_submission(dept_code, academic_year)
+    data = stage_state(sub, "dept_info").get("data")
+    data = dict(data) if isinstance(data, dict) else {}
+    data["programmes_offered"] = rows
+    db.submissions.update_one({"_id": sub["_id"]},
+                              {"$set": {"stages.dept_info.data": data, "stages.dept_info.updated_at": now(),
+                                        "updated_at": now()}})
+    return data
 
 
 def offered_programmes(submission):

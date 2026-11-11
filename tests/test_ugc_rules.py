@@ -173,13 +173,29 @@ def test_every_course_is_out_of_100():
                                                                cia=75, ese=25)]}
     issues, _ = validate_stage("prog_curriculum", ok, ctx("UG - 3 Year", 6))
     assert not any("usually carry" in i["message"] for i in issues)
-    assert not any("Total marks" in m or "does not match the total" in m for m in errors(issues))
+    assert not any("Total marks" in m or "must total" in m for m in errors(issues))
 
 
 def test_cia_plus_ese_must_equal_the_total():
-    data = {"credit_summary": {}, "semester_structure": [_course(cia=40, ese=50)]}
+    """CA + ESE must make 100: 40 + 50 and 0 + 0 are refused, 20 + 80 is fine."""
+    for cia, ese in ((40, 50), (0, 0)):
+        data = {"credit_summary": {}, "semester_structure": [_course(cia=cia, ese=ese)]}
+        issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
+        assert any(f"CA {cia} + ESE {ese} = {cia + ese} — CA and ESE must total 100" in m for m in errors(issues))
+    data = {"credit_summary": {}, "semester_structure": [_course(cia=20, ese=80)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
-    assert any("does not match the total" in m for m in errors(issues))
+    assert not any("must total" in m for m in errors(issues))
+
+
+def test_structure_says_ese_and_types_both_marks():
+    """The structure's columns read CA and ESE (not TEE), and neither fills the other in."""
+    from app.schema import STAGE_BY_KEY
+    sec = next(s for s in STAGE_BY_KEY["prog_curriculum"]["sections"] if s["key"] == "semester_structure")
+    cols = {c["name"]: c for c in sec["columns"]}
+    assert cols["ese"]["short"] == "ESE marks" and "End Semester" in cols["ese"]["label"]
+    assert cols["cia"]["short"] == "CA marks"
+    assert not any("complement" in c for c in sec["columns"])
+    assert cols["cia"]["sums_with"] == "ese" and cols["ese"]["sums_with"] == "cia"
 
 
 def test_semester_outside_the_programme_is_rejected():
