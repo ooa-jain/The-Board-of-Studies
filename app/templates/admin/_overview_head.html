@@ -1,0 +1,26 @@
+{# One page for following the departments: Monitor, Faculties, Analysis, Programmes,
+   Documents, Comments — one header, one row of tabs, one Excel download. #}
+{% set ov_tabs = [
+  ('departments', 'Departments', url_for('admin.overview_departments'), 'overview'),
+  ('documents', 'Documents', url_for('admin.sheets', tab='documents'), 'documents'),
+  ('comments', 'Comments', url_for('admin.sheets', tab='comments'), 'comments'),
+] %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <h1>Overview</h1>
+    </div>
+    {% if can('overview') %}
+    <div class="spacer head-aside ov-actions">
+      <a class="btn btn-ghost" href="{{ url_for('admin.sheets_excel') }}">Download all (Excel)</a>
+    </div>
+    {% endif %}
+  </div>
+  <div class="wrap">
+    <nav class="ov-tabs" aria-label="Overview">
+      {% for k, label, href, section in ov_tabs if can(section) %}
+      <a href="{{ href }}" {% if ov_tab == k %}class="is-on" aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</div>

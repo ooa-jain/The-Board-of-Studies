@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Board of Studies Data Repository — the Office of Academics portal where JAIN departments file their Board of Studies record for the academic year.">
-  <meta name="theme-color" content="#1a1c1f">
-  <title>{% block title %}BoS Data Repository{% endblock %} · JAIN Office of Academics</title>
+  <meta name="description" content="BoS Academic Portal — where JAIN departments file their Board of Studies record with the Office of Academic Affairs for the academic year.">
+  <meta name="theme-color" content="#091324">
+  <title>{% block title %}BoS Academic Portal{% endblock %} · JAIN Office of Academic Affairs</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Fragment+Mono&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/erp.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/shell.css') }}">
 
   {# the JGI roundel, the only square part of the lockup #}
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
@@ -19,65 +21,313 @@
         href="{{ url_for('static', filename='img/favicon-512.png') }}">
   <link rel="apple-touch-icon" sizes="180x180"
         href="{{ url_for('static', filename='img/favicon-180.png') }}">
+  {% if current_user and current_user.role == 'admin' %}
+  {# the Office's portal installs as an app (manifest + /sw.js); nobody else is offered it #}
+  <link rel="manifest" href="{{ url_for('public.manifest') }}" crossorigin="use-credentials">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="BoS Portal">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script>
+    /* the browser's offer to install, kept for the "Install app" button */
+    window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); window.__installAsk = e; });
+    if ("serviceWorker" in navigator) window.addEventListener("load", function () {
+      navigator.serviceWorker.register("{{ url_for('public.service_worker') }}").catch(function () {});
+    });
+  </script>
+  {% elif current_user %}
+  <script>
+    /* not the Office: no app here, and none left behind from before */
+    if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations()
+      .then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+  </script>
+  {% endif %}
+  <script>
+    /* light or dark before the first paint, so a dark page never flashes white:
+       the choice made here, else the computer's own setting */
+    try {
+      var t = localStorage.getItem("bos.theme");
+      if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    } catch (e) { document.documentElement.setAttribute("data-theme", "light"); }
+  </script>
+  <script>
+    /* the sidebar's last state, before the first paint, so it never jumps */
+    try { if (localStorage.getItem("bos.side") === "collapsed") document.documentElement.classList.add("side-collapsed"); } catch (e) {}
+  </script>
   {% block head %}{% endblock %}
+  {# last, so they win: the switch, and every page's dark colours (screen only — paper stays white) #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dark.css') }}" media="screen">
 </head>
-<body>
+{% set admin_shell = current_user and current_user.role == 'admin' and not hide_chrome %}
+{% set dept_shell = current_user and current_user.role == 'department' and not hide_chrome and dept_nav is not none %}
+{% set side_shell = admin_shell or dept_shell %}
+<body class="{% block body_class %}{% endblock %}{{ ' has-side erp' if side_shell }}">
+
+{# A page may put a loading curtain here. It is display:none unless the page's
+   own head script reveals it, so it can never cover the site by accident. #}
+{% block curtain %}{% endblock %}
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
-{% if not hide_chrome %}
+{# The light / dark switch (js/theme.js), on every page #}
+{% macro theme_toggle() -%}
+<button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+  <span class="tt-pic" aria-hidden="true">
+    <img class="tt-day" src="{{ url_for('static', filename='img/theme-day.png') }}" alt="" width="72" height="32">
+    <img class="tt-night" src="{{ url_for('static', filename='img/theme-night.png') }}" alt="" width="72" height="32">
+  </span>
+</button>
+{%- endmacro %}
+
+{# Developer mode, while it is on: a laptop in the menu, for everyone, that
+   opens to say what it means (the admin gets the switch) #}
+{% macro dev_item() -%}
+{% if app_settings and app_settings.dev_mode %}
+<details class="side-dev">
+  <summary class="side-link" title="Developer Preview is on — all stages open for testing">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9H5zM2.5 18h19M9 18l.5-1.5h5L15 18"/></svg>
+    <span class="side-text">Developer Preview</span><i class="side-dot st-draft"></i></summary>
+  <div class="side-dev-body">All stages are open for testing. Checks and saving work as usual.
+    {% if current_user and current_user.role == 'admin' and can('settings', 'edit') %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}
+    {% if current_user and current_user.role == 'department' %}
+    {% if dept_drive %}
+    <div class="side-dev-drive">
+      <strong>{{ 'Data imported from your Drive folder' if dept_drive.done else 'Import from your Drive folder' }}</strong>
+      <span>Course matrices, syllabi and supporting documents{% if dept_drive.folder %} (<a href="{{ dept_drive.folder }}" target="_blank" rel="noopener">folder</a>){% endif %}.
+        Missing information can be added manually during the relevant stage.</span>
+      <form method="post" action="{{ url_for('dept.drive_fill') }}"
+            {% if dept_drive.done %}onsubmit="return confirm('Re-sync data from Drive? Existing imported data may be updated.')"{% endif %}>
+        <button class="side-dev-btn is-ghost" type="submit">{{ 'Re-sync from Drive' if dept_drive.done else 'Sync from Drive' }}</button>
+      </form>
+    </div>
+    {% endif %}
+    <a class="side-dev-btn" href="{{ url_for('dept.dashboard', review=1) }}">Review &amp; submit all stages →</a>{% endif %}</div>
+</details>
+{% endif %}
+{%- endmacro %}
+{% if admin_shell %}
+{# The Office's pages: one sidebar on the left, and nothing across the top. #}
+{% set ep = request.endpoint or '' %}
+{% set tab = request.args.get('tab') %}
+{% macro side_link(href, label, icon, is_active=false, extra='') -%}
+  <a href="{{ href }}" class="side-link{{ ' is-on' if is_active }}" title="{{ label }}"{% if is_active %} aria-current="page"{% endif %} {{ extra|safe }}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="{{ icon }}"/></svg><span class="side-text">{{ label }}</span>{{ caller() if caller }}</a>
+{%- endmacro %}
+<aside class="admin-side">
+  <div class="side-head">
+    <a class="side-brand" href="{{ admin_home() }}" title="BoS Academic Portal">
+      <img class="side-logo" alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+      <img class="side-roundel" alt="" src="{{ url_for('static', filename='img/favicon-180.png') }}" width="180" height="180">
+      <span class="side-brand-text">BoS Academic Portal<small>Office of Academic Affairs</small></span>
+    </a>
+    <button class="side-collapse" type="button" id="side-collapse" aria-expanded="true" aria-controls="topnav" title="Collapse the menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2 2 2"/></svg>
+      <span class="sr-only">Collapse the menu</span>
+    </button>
+    <button class="side-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="topnav">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="sr-only">Menu</span>
+    </button>
+  </div>
+  <nav class="side-nav" id="topnav" aria-label="Admin">
+    <button class="side-close" type="button" aria-label="Close the menu" data-side-close>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    {# each person sees only the sections their access gives them #}
+    {% if can('home') %}{{ side_link(url_for('admin.dashboard'), 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z', ep == 'admin.dashboard') }}{% endif %}
+    {% if can('departments') %}{{ side_link(url_for('admin.departments'), 'Departments', 'M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5', 'department' in ep and ep not in ('admin.department_page', 'admin.overview_departments')) }}{% endif %}
+    {# Documents and Comments are Overview tabs; Calendar opens from Updates #}
+    {% if can('overview') or can('documents') or can('comments') %}
+    {% set ov_href = url_for('admin.overview_departments') if can('overview') else url_for('admin.sheets', tab='documents' if can('documents') else 'comments') %}
+    {{ side_link(ov_href, 'Overview', 'M4 20V10M10 20V4M16 20v-7M22 20H2', ep in ('admin.overview_departments', 'admin.department_page', 'admin.submissions', 'admin.faculties', 'admin.analysis', 'admin.sheets', 'admin.submission_detail', 'admin.programme_report')) }}{% endif %}
+    {% if can('flow') %}{{ side_link(url_for('admin.flow'), 'Data Flow', 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM10 9l5 3-5 3z', ep == 'admin.flow') }}{% endif %}
+    <span class="side-sep"></span>
+    {% if can('updates') %}<a class="side-link nav-bell{{ ' is-on' if ep in ('admin.updates', 'admin.calendar') }}" href="{{ url_for('admin.updates') }}"
+       data-updates-url="{{ url_for('admin.updates_json') }}" title="Updates">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span class="side-text">Updates</span>
+      <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
+    </a>{% endif %}
+    {% if can('settings') %}{{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log', 'admin.storage') or ep.startswith('admin.team')) }}{% endif %}
+    <button class="side-link side-install" type="button" id="app-install" hidden title="Install the portal as an app">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg><span class="side-text">Install app</span></button>
+    {{ dev_item() }}
+    <div class="side-foot">
+      <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
+      <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year|ay if app_settings else '' }}</small></span>
+      <a class="side-out" href="{{ url_for('auth.change_password') }}" title="Change Password">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5zM12 15v2"/></svg><span class="sr-only">Change Password</span></a>
+      <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
+    </div>
+  </nav>
+</aside>
+{% elif dept_shell %}
+{# A department's pages: the same left menu as the Office's — home, its four
+   stages with where each stands, its versions and password. #}
+{% set ep = request.endpoint or '' %}
+{% set here_stage = (request.view_args or {}).get('stage_key') %}
+{% set here_top = (STAGE_BY_KEY.get(here_stage) or {}).get('parent') or here_stage %}
+<aside class="admin-side">
+  <div class="side-head">
+    <a class="side-brand" href="{{ url_for('dept.dashboard') }}" title="BoS Academic Portal">
+      <img class="side-logo" alt="JAIN (Deemed-to-be University)" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+      <img class="side-roundel" alt="" src="{{ url_for('static', filename='img/favicon-180.png') }}" width="180" height="180">
+      <span class="side-brand-text">BoS Academic Portal<small>{{ current_user.dept_code }}</small></span>
+    </a>
+    <button class="side-collapse" type="button" id="side-collapse" aria-expanded="true" aria-controls="topnav" title="Collapse the menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 4v16M15 10l-2 2 2 2"/></svg>
+      <span class="sr-only">Collapse the menu</span>
+    </button>
+    <button class="side-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="topnav">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span class="sr-only">Menu</span>
+    </button>
+  </div>
+  <nav class="side-nav" id="topnav" aria-label="Department">
+    <button class="side-close" type="button" aria-label="Close the menu" data-side-close>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <a class="side-link{{ ' is-on' if ep == 'dept.dashboard' }}" href="{{ url_for('dept.dashboard') }}" title="Home">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span class="side-text">Home</span></a>
+    <a class="side-link{{ ' is-on' if ep == 'dept.progress_page' }}" href="{{ url_for('dept.progress_page') }}" title="Progress">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="side-text">Progress</span></a>
+    <a class="side-link{{ ' is-on' if ep in ('dept.reports', 'dept.programme_report') }}" href="{{ url_for('dept.reports') }}" title="Reports — your submission">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span class="side-text">Reports</span></a>
+    <span class="side-label">Stages</span>
+    {% for st in dept_nav %}
+    <a class="side-link{{ ' is-on' if here_top == st.key }}" href="{{ url_for('dept.stage', stage_key=st.key) }}" title="{{ st.title }}">
+      <span class="side-num">{{ loop.index }}</span><span class="side-text">{{ st.title }}</span>
+      <i class="side-dot st-{{ st.status }}" title="{{ {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned', 'open': 'Not started', 'locked': 'Locked'}.get(st.status, st.status) }}"></i></a>
+    {% if st.key == here_top and prog_steps and programme %}
+    {# the programme open now, and its steps, under Curriculum #}
+    <div class="side-sub" aria-label="{{ programme.programme_code }} steps">
+      <a class="side-sub-prog" href="{{ url_for('dept.stage', stage_key='curriculum') }}#prog-{{ programme.programme_code }}"
+         title="{{ programme.programme_name }}">{{ programme.programme_code }}</a>
+      {% for ps in prog_steps %}
+      {% if loop.first and not ps.earlier %}
+      <span class="side-sub-h">Current batch{% if ps.batch %} · {{ ps.batch }}{% endif %}</span>
+      {% endif %}
+      {% if ps.earlier and loop.previtem is defined and not loop.previtem.earlier %}
+      <span class="side-sub-h">Earlier batches</span>
+      {% endif %}
+      <a class="side-sub-link{{ ' is-on' if ps.key == stage.key }}" href="{{ ps.url }}"
+         {% if ps.key == stage.key %}aria-current="page"{% endif %}>
+        <i class="side-dot st-{{ ps.status }}"></i><span class="side-text">{{ ps.short or ps.label }}{% if ps.sems %}<small class="side-sems">{{ ps.sems }}</small>{% endif %}</span></a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    <span class="side-sep"></span>
+    <a class="side-link{{ ' is-on' if ep == 'dept.versions' }}" href="{{ url_for('dept.versions') }}" title="Version History">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4"/></svg><span class="side-text">Version History</span></a>
+    {% if not current_user.acting %}
+    <a class="side-link{{ ' is-on' if ep == 'auth.change_password' }}" href="{{ url_for('auth.change_password') }}" title="Change Password">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg><span class="side-text">Change Password</span></a>
+    {% endif %}
+    <a class="side-link{{ ' is-on' if ep == 'dept.help_page' }}" href="{{ url_for('dept.help_page') }}" title="Help — video and user manual">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span class="side-text">Help</span></a>
+    {{ dev_item() }}
+    <div class="side-foot">
+      <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
+      {% if current_user.acting %}
+      <span class="side-who"><strong>{{ current_user.name }}</strong>
+        <small>Office of Academic Affairs</small></span>
+      <a class="side-out" href="{{ url_for('admin.act_stop') }}" title="Back to admin">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Back to admin</span></a>
+      {% else %}
+      <span class="side-who"><strong>{{ current_user.person.name if current_user.person else current_user.name }}</strong>
+        <small><a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Switch account' if current_user.person else 'Add your name' }}</a></small></span>
+      <a class="side-out" href="{{ url_for('auth.logout') }}" title="Sign out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span class="sr-only">Sign out</span></a>
+      {% endif %}
+    </div>
+  </nav>
+</aside>
+{% elif not hide_chrome %}
 {% macro nav_link(href, label, is_active=false) -%}
   <a href="{{ href }}"{% if is_active %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
 {%- endmacro %}
+{# The masthead is the same bar on every page: the sections on the left, the
+   wordmark in the middle, whoever is signed in — or the way to sign in — on
+   the right. Below the breakpoint both groups fold into one panel under it. #}
 <header class="topbar">
   <div class="wrap">
-    <a class="brand" href="{{ url_for('public.landing') }}">
-      <img class="brand-logo" alt="JAIN (Deemed-to-be University)"
-           src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
-           width="1103" height="319">
-      <span class="brand-text">
-        <strong>BoS Data Repository</strong>
-        <span>Office of Academics</span>
-      </span>
-    </a>
-
     <button class="nav-toggle" type="button" id="nav-toggle"
             aria-expanded="false" aria-controls="topnav">
       <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
       Menu
     </button>
 
-    <nav class="topnav" id="topnav" aria-label="Main">
-      {% if current_user and current_user.role == 'admin' %}
-        {{ nav_link(url_for('admin.dashboard'), 'Dashboard', request.endpoint == 'admin.dashboard') }}
-        {{ nav_link(url_for('admin.departments'), 'Departments', 'department' in (request.endpoint or '')) }}
-        {{ nav_link(url_for('admin.submissions'), 'Submissions', 'submission' in (request.endpoint or '')) }}
-        {{ nav_link(url_for('admin.rules'), 'Credit rules', request.endpoint == 'admin.rules') }}
-        {{ nav_link(url_for('admin.app_settings'), 'Settings', request.endpoint == 'admin.app_settings') }}
-      {% elif current_user and current_user.role == 'department' %}
-        {{ nav_link(url_for('dept.dashboard'), 'My submission', request.endpoint == 'dept.dashboard') }}
-        <a href="{{ url_for('dept.export_excel') }}">Download Excel</a>
-        <a href="{{ url_for('dept.export_word') }}">Download report</a>
-      {% else %}
-        {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
-        {{ nav_link(url_for('auth.login'), 'Sign in', request.endpoint == 'auth.login') }}
-      {% endif %}
+    <a class="brand" href="{{ url_for('public.landing') }}">
+      <img class="brand-logo" alt="JAIN (Deemed-to-be University)"
+           src="{{ url_for('static', filename='img/jain-logo.png') }}"
+           width="1103" height="319">
+      <span class="brand-text">
+        <strong>BoS Academic Portal</strong>
+        <span>Office of Academic Affairs</span>
+      </span>
+    </a>
 
-      {% if current_user %}
-      <div class="who">
-        <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
-        <span class="who-text">
-          <span class="sr-only">Signed in as </span>
-          <strong>{{ current_user.name }}</strong>
-          <span>{{ 'Office of Academics' if current_user.role == 'admin' else current_user.dept_code }}</span>
-        </span>
-        <a href="{{ url_for('auth.logout') }}">Sign out</a>
+    <div class="topnav" id="topnav">
+      <nav class="nav-left" aria-label="Main">
+        {# Home is in the bar for anyone signed in: the wordmark goes there
+           too, but a named link is what people look for. #}
+        {% if current_user and current_user.role == 'department' %}
+          {{ nav_link(url_for('dept.dashboard'), 'Home', request.endpoint == 'dept.dashboard') }}
+        {% elif current_user %}
+          {{ nav_link(url_for('public.landing'), 'Home', request.endpoint == 'public.landing') }}
+        {% endif %}
+        {% if not current_user %}
+          {{ nav_link(url_for('public.about'), 'About', request.endpoint == 'public.about') }}
+        {% endif %}
+      </nav>
+
+      <div class="nav-right">
+        {# the Office's menu is the sidebar; this bar is for departments and visitors #}
+        {% if current_user %}
+        <div class="who">
+          <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
+          <span class="who-text">
+            <span class="sr-only">Signed in as </span>
+            <strong>{{ current_user.name }}</strong>
+            {# the admin's name already is the office; a second line saying so
+               again only takes room off the bar #}
+            {% if current_user.role != 'admin' %}<span>{{ current_user.dept_code }}</span>{% endif %}
+          </span>
+          {% if current_user.role == 'department' %}
+          <details class="who-profile">
+            <summary title="Who is working on this login">
+              <span class="who-person">{{ current_user.person.name if current_user.person else 'Add your name' }}</span>
+            </summary>
+            <div class="who-menu">
+              {% if current_user.person %}
+              <b>{{ current_user.person.name }}</b><span class="small muted">{{ current_user.person.email }}</span>
+              {% endif %}
+              <a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Change name' if current_user.person else 'Add your name and e-mail' }}</a>
+              <a href="{{ url_for('dept.versions') }}">Version History</a>
+              <a href="{{ url_for('auth.change_password') }}">Password</a>
+            </div>
+          </details>
+          {% endif %}
+          <a href="{{ url_for('auth.logout') }}">Sign out</a>
+        </div>
+        {% else %}
+        {# Signing in happens on the home page, so this takes you there. #}
+        <a class="nav-cta" href="{{ '#signin' if request.endpoint == 'public.landing'
+                                   else url_for('public.landing') ~ '#signin' }}">
+          Sign in
+          <span class="nav-cta-arrow" aria-hidden="true">
+            <svg class="arrow" viewBox="0 0 24 24" focusable="false">
+              <path d="M5 12h13M12 6l6 6-6 6" fill="none" stroke="currentColor"
+                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </a>
+        {% endif %}
       </div>
-      {% endif %}
-    </nav>
+    </div>
   </div>
 </header>
 {% endif %}
+
 
 {% if app_settings and app_settings.banner %}
 <div class="site-banner" role="status">
@@ -85,6 +335,36 @@
 </div>
 {% endif %}
 
+{% if side_shell %}
+<div class="erp-bar">
+  <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
+  {% if admin_shell and my_places()|length > 1 %}
+  {# which place every page shows: all, or one city — remembered until changed #}
+  {% set here = current_place() %}
+  {% set back = request.full_path if request.method == 'GET' else url_for('admin.dashboard') %}
+  <nav class="erp-place" aria-label="Show departments in">
+    <a href="{{ url_for('admin.set_place', to='', next=back) }}"{% if not here %} aria-current="true"{% endif %}>All</a>
+    {% for pl in my_places() %}
+    <a href="{{ url_for('admin.set_place', to=pl, next=back) }}"{% if here == pl %} aria-current="true"{% endif %}>{{ pl }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+  {% set bar_year = current_user.year if current_user and current_user.acting and current_user.year else (app_settings.academic_year if app_settings else '') %}
+  <span class="erp-bar-mid">Board of Studies{% if bar_year %} | {{ bar_year|ay }}{% endif %}</span>
+  <span class="erp-bar-end">{{ theme_toggle() }}</span>
+</div>
+{% else %}
+<div class="theme-float">{{ theme_toggle() }}</div>
+{% endif %}
+{% if current_user and current_user.acting %}
+{# the Office, in a department's own pages #}
+<div class="act-bar" role="status">
+  <span>You are editing <strong>{{ acting_dept.dept_name if acting_dept else current_user.dept_code }}</strong>
+    · {{ current_user.year|ay }} as the Office of Academic Affairs. Every change saves under your name;
+    submitted stages stay submitted.</span>
+  <a class="btn btn-sm" href="{{ url_for('admin.act_stop') }}">Back to admin</a>
+</div>
+{% endif %}
 {% block header %}{% endblock %}
 
 {% block body %}
@@ -95,7 +375,7 @@
       <div class="flash-stack" role="alert" aria-live="polite">
         {% for category, message in messages %}
           {% set kind = 'error' if category == 'error' else category %}
-          <div class="alert alert-{{ kind }}">
+          <div class="alert alert-{{ kind }}" data-kind="{{ kind }}">
             <span class="alert-icon" aria-hidden="true">{{ {'error': '!', 'warning': '!', 'success': '✓'}.get(kind, 'i') }}</span>
             <div><span class="sr-only">{{ {'error': 'Error: ', 'warning': 'Warning: ', 'success': 'Success: '}.get(kind, '') }}</span>{{ message }}</div>
           </div>
@@ -108,21 +388,96 @@
 </main>
 {% endblock %}
 
-{% if not hide_chrome %}
+{% if not hide_chrome and not side_shell %}
 <footer class="site">
   <div class="wrap">
     <img class="brand-logo" alt=""
          src="{{ url_for('static', filename='img/jain-logo-light.png') }}"
          width="1103" height="319">
-    <span>JAIN (Deemed-to-be University) · Office of Academics</span>
-    <span class="spacer">Bengaluru &amp; Kochi</span>
-    <span>{{ app_settings.academic_year if app_settings else '' }}</span>
+    <span>JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
+    <span class="spacer">BoS Academic Portal</span>
+    <span>{{ app_settings.academic_year|ay if app_settings else '' }}</span>
   </div>
 </footer>
 {% endif %}
 
 {% if not hide_chrome %}
+{# Shown while the next page loads — the shape of a page, not a spinner. #}
+<div class="page-skeleton" id="page-skeleton" hidden aria-hidden="true">
+  {% if side_shell %}
+  {# beside the menu: a white panel, four tiles across and two blocks below #}
+  <div class="sk-shell">
+    <span class="sk sk-head"></span>
+    <div class="sk-row4"><span class="sk"></span><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>
+    <div class="sk-row2"><span class="sk"></span><span class="sk"></span></div>
+  </div>
+  {% else %}
+  <div class="wrap">
+    <span class="sk sk-line w-30"></span>
+    <span class="sk sk-heading"></span>
+    <span class="sk sk-line w-70"></span>
+    <div class="sk-stats">
+      <span class="sk sk-stat"></span><span class="sk sk-stat"></span>
+      <span class="sk sk-stat"></span><span class="sk sk-stat"></span>
+    </div>
+    <div class="sk-list">
+      {% for i in range(4) %}
+      <div class="sk-card">
+        <span class="sk sk-dot"></span>
+        <div class="sk-grow"><span class="sk sk-line w-50"></span><span class="sk sk-line w-90"></span></div>
+        <span class="sk sk-pill"></span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+</div>
 <script>
+  // Page-to-page skeleton. Only for a click that leaves for another page of
+  // the portal; downloads, new tabs, in-page anchors and anything that takes
+  // under a moment are left alone.
+  (function () {
+    var sk = document.getElementById("page-skeleton");
+    if (!sk) return;
+    var timer = null;
+    var FILE = /(\.xlsx|\.docx|\.pdf|\.zip)(\?|$)|\/file\/|\/export|thumb=|inline=/i;
+    // e: the click or submit; a handler after this one may still keep the
+    // page where it is (a view switched in place), so it is asked again
+    function show(e) {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        if (e && e.defaultPrevented) return;
+        sk.hidden = false;
+        document.body.setAttribute("aria-busy", "true");
+        requestAnimationFrame(function () { sk.classList.add("is-on"); });
+      }, 160);
+    }
+    function hide() {
+      clearTimeout(timer);
+      sk.classList.remove("is-on");
+      sk.hidden = true;
+      document.body.removeAttribute("aria-busy");
+    }
+    document.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest("a[href]");
+      if (!a || a.target === "_blank" || a.hasAttribute("download") || a.dataset.noSkeleton !== undefined) return;
+      var url = new URL(a.href, location.href);
+      if (url.origin !== location.origin || FILE.test(url.pathname + url.search)) return;
+      if (url.pathname === location.pathname && url.search === location.search) return;
+      show(e);
+    });
+    document.addEventListener("submit", function (e) {
+      var f = e.target;
+      if (e.defaultPrevented || f.target === "_blank" || f.dataset.noSkeleton !== undefined) return;
+      if (FILE.test(f.getAttribute("action") || "")) return;
+      show(e);
+    });
+    // back / forward from the browser's cache, or a submit a script stopped
+    window.addEventListener("pageshow", hide);
+    window.addEventListener("pagehide", function () { clearTimeout(timer); });
+  })();
+
   (function () {
     var btn = document.getElementById("nav-toggle");
     var nav = document.getElementById("topnav");
@@ -155,6 +510,131 @@
   });
 </script>
 {% endif %}
+<script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pw-show.js') }}"></script>
+{% if side_shell %}<script src="{{ url_for('static', filename='js/shell.js') }}"></script>
+<script src="{{ url_for('static', filename='js/suggest.js') }}"></script>{% endif %}
+<script>
+  /* The top bar as a resizable navbar (after Aceternity UI): past the top of
+     the page it draws in to a floating, rounded, frosted bar, and a soft
+     pill slides under whichever link the pointer is on. */
+  (function () {
+    var bar = document.querySelector(".topbar");
+    if (!bar) return;
+    var on = false;
+    function tick() {
+      var want = window.scrollY > 70;
+      if (want !== on) { on = want; bar.classList.toggle("is-shrunk", on); }
+    }
+    window.addEventListener("scroll", tick, { passive: true });
+    tick();
+    document.querySelectorAll(".topbar .nav-left, .topbar .nav-right").forEach(function (group) {
+      var pill = document.createElement("span");
+      pill.className = "nav-pill";
+      pill.setAttribute("aria-hidden", "true");
+      group.appendChild(pill);
+      group.querySelectorAll(":scope > a").forEach(function (a) {
+        a.addEventListener("mouseenter", function () {
+          pill.style.width = a.offsetWidth + "px";
+          pill.style.height = a.offsetHeight + "px";
+          pill.style.transform = "translate(" + a.offsetLeft + "px," + a.offsetTop + "px)";
+          pill.classList.add("is-on");
+        });
+      });
+      group.addEventListener("mouseleave", function () { pill.classList.remove("is-on"); });
+    });
+  })();
+</script>
+<script>
+  // the page's messages as alert cards; the plain list stays without JavaScript
+  (function () {
+    var stack = document.querySelector(".flash-stack");
+    if (!stack || !window.Toast) return;
+    var kinds = { error: "error", warning: "warning", success: "success" };
+    stack.querySelectorAll(".alert").forEach(function (a) {
+      var text = (a.querySelector("div") || a).textContent.replace(/^(Error|Warning|Success):\s*/, "").trim();
+      window.Toast.show(kinds[a.dataset.kind] || "info", text);
+    });
+    stack.remove();
+  })();
+</script>
 {% block scripts %}{% endblock %}
+{% if current_user and current_user.role == 'admin' %}
+<dialog class="app-dialog" id="app-dialog" aria-labelledby="app-dialog-h">
+  <form method="dialog">
+    <div class="app-dialog-head">
+      <img src="{{ url_for('static', filename='img/app-192.png') }}" alt="" width="48" height="48">
+      <div><h2 id="app-dialog-h">Install the BoS Portal app</h2>
+        <p>It opens in its own window, like any app, and its icon shows the number of new updates.</p></div>
+    </div>
+    <ol class="app-steps">
+      <li><strong>Computer — Chrome or Edge:</strong> click the install icon <span aria-hidden="true">⊕</span> at the right end of the
+        address bar, or the menu <b>⋮</b> → <em>Cast, save and share</em> → <em>Install page as app</em>
+        (Edge: <b>…</b> → <em>Apps</em> → <em>Install this site as an app</em>).</li>
+      <li><strong>Android — Chrome:</strong> the menu <b>⋮</b> → <em>Add to Home screen</em> → <em>Install</em>.</li>
+      <li><strong>iPhone or iPad — Safari:</strong> the Share button <b>⬆</b> → <em>Add to Home Screen</em> → <em>Add</em>.</li>
+    </ol>
+    <p class="small muted">Sign in once in the app; it stays signed in like the browser.</p>
+    <div class="app-dialog-foot"><button class="btn btn-sm" value="close">Got it</button></div>
+  </form>
+</dialog>
+<script>
+/* Install app: the browser's own install offer when it has one, else the
+   steps for this kind of device. Hidden once the portal runs as the app. */
+(function () {
+  var btn = document.getElementById("app-install");
+  if (!btn) return;
+  var isApp = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+  if (isApp) return;
+  btn.hidden = false;
+  window.addEventListener("appinstalled", function () { btn.hidden = true; window.__installAsk = null; });
+  btn.addEventListener("click", function () {
+    var ask = window.__installAsk;
+    if (ask) {
+      ask.prompt();
+      ask.userChoice.then(function (c) { if (c.outcome === "accepted") btn.hidden = true; });
+      window.__installAsk = null;
+      return;
+    }
+    var d = document.getElementById("app-dialog");
+    if (d && d.showModal) d.showModal();
+  });
+})();
+</script>
+<script>
+/* Updates as they happen: every 20 seconds the bell asks for anything new
+   and shows it as a message card; clicking one opens that department. */
+(function () {
+  var bell = document.querySelector(".nav-bell");
+  if (!bell || !window.fetch) return;
+  var url = bell.getAttribute("data-updates-url"), after = null, count = bell.querySelector(".nav-bell-count");
+  var kinds = { submitted: "success", keyword_miss: "warning", uploaded: "info", saved: "info", programme: "info", password: "info" };
+  var titles = { submitted: "Stage submitted", keyword_miss: "Keyword check failed", uploaded: "File uploaded",
+                 saved: "Data changed", programme: "Programmes changed", password: "Password changed" };
+  function tick() {
+    if (document.hidden) return;
+    fetch(url + (after ? "?after=" + encodeURIComponent(after) : ""), { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j) return;
+        if (after && window.Toast) j.items.forEach(function (n) {
+          window.Toast.show(kinds[n.event] || "info", n.text, { title: titles[n.event] || "Update",
+            timeout: 9000, onClick: function () { location.href = n.link; } });
+        });
+        after = j.now;
+        count.hidden = !j.unread;
+        count.textContent = j.unread > 99 ? "99+" : j.unread;
+        bell.classList.toggle("has-new", !!j.unread);
+        // the installed app's icon carries the same number
+        if (navigator.setAppBadge) (j.unread ? navigator.setAppBadge(j.unread) : navigator.clearAppBadge()).catch(function () {});
+      }).catch(function () {});
+  }
+  tick();
+  setInterval(tick, 20000);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) tick(); });
+})();
+</script>
+{% endif %}
 </body>
 </html>

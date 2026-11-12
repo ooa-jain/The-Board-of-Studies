@@ -1,0 +1,603 @@
+"""The CS & IT Drive pack: the data in it, loading it, what admin and department see."""
+
+import re
+
+from test_workflow import login, make_department
+
+MCA = ("MCAREG", "MCACYS", "MCASCT", "MCAISM", "MCAIML")
+
+
+def _admin(app, client):
+    login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
+
+
+def _load(app):
+    from app.packs import load_pack
+    with app.app_context():
+        return load_pack("csit", app.config["ACADEMIC_YEAR"], "test")
+
+
+def _sub(app, code):
+    from app.db import get_db
+    with app.app_context():
+        return get_db().submissions.find_one({"dept_code": code})
+
+
+# ---------------------------------------------------------------- the pack
+
+def _structure(code):
+    from app.packs import get_pack
+    return get_pack("csit")["programmes"][code]["prog_curriculum"]["semester_structure"]
+
+
+def test_pack_matrices_add_up_to_the_printed_semester_totals():
+    for code in MCA:
+        by_sem = {}
+        for r in _structure(code):
+            by_sem[r["semester"]] = by_sem.get(r["semester"], 0) + r["credits"]
+        assert by_sem == {1: 23, 2: 23, 3: 23, 4: 21}, code
+
+
+def test_every_pack_course_reconciles_l_t_p_e_with_credits():
+    from app.validation import RULES
+    for code in MCA:
+        data = {"semester_structure": _structure(code)}
+        issues = RULES["ltpe_credit_arithmetic"](data, {}, "semester_structure")
+        assert not [i for i in issues if "works out to" in i["message"]], code
+
+
+def test_pack_course_codes_are_unique_and_well_formed():
+    from app.schema import STAGE_BY_KEY
+    from app.validation import RULES
+    sec = next(s for s in STAGE_BY_KEY["prog_curriculum"]["sections"]
+               if s["key"] == "semester_structure")
+    pattern = next(c["pattern"] for c in sec["columns"] if c["name"] == "course_code")
+    for code in MCA:
+        data = {"semester_structure": _structure(code)}
+        assert not RULES["unique_course_codes"](data, {}, "semester_structure"), code
+        for r in data["semester_structure"]:
+            assert re.match(pattern, r["course_code"]), r["course_code"]
+
+
+def test_pack_programmes_are_the_departments_catalogue_programmes():
+    from app import catalogue
+    from app.packs import get_pack
+    pack = get_pack("csit")
+    official = {r["programme_code"] for r in catalogue.load()
+                if catalogue._name(r["department"]) == catalogue._name(pack["department"]["dept_name"])}
+    assert set(pack["programmes"]) <= official
+
+
+# ---------------------------------------------------------------- loading
+
+def test_loading_fills_the_existing_department_rather_than_adding_one(app):
+    make_department(app, "CSI-JYN", "Department of Computer Science and IT",
+                    "School of Computer Science & Information Technology")
+    report = _load(app)
+    assert not report["created"] and report["dept"]["dept_code"] == "CSI-JYN"
+    assert report["password"] is None                 # it already had a login
+    sub = _sub(app, "CSI-JYN")
+    assert set(sub["programmes"]) == set(MCA) | {"BCAGAI"}
+
+
+def test_loading_creates_the_department_and_a_login_when_missing(app):
+    report = _load(app)
+    assert report["created"] and report["password"]
+    sub = _sub(app, report["dept"]["dept_code"])
+    reg = sub["programmes"]["MCAREG"]
+    data = reg["prog_curriculum"]["data"]
+    assert len(data["semester_structure"]) == 36
+    assert data["details"]["degree_level"] == "PG - 2 Year"
+    dsa = next(c for c in reg["prog_syllabus"]["data"]["courses"] if c["course_code"] == "25MCAC101")
+    assert dsa["modules"][0] == {"title": "List ADT", "hours": 10, "revised": dsa["modules"][0]["revised"]}
+    assert len(dsa["outcomes"].splitlines()) == 5
+
+
+def test_loading_validates_like_a_real_submit(app):
+    report = _load(app)
+    curr = _sub(app, report["dept"]["dept_code"])["programmes"]["MCAREG"]["prog_curriculum"]
+    assert curr["status"] == "draft"
+    missing = {i["field"] for i in curr["issues"] if i["level"] == "error"}
+    # not in the Drive folder; everything else comes from the matrix or the standard wording
+    assert {"intake", "eligibility"} <= missing
+
+
+def test_loading_again_keeps_what_is_already_there(app):
+    from app.db import get_db
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    with app.app_context():
+        get_db().submissions.update_one(
+            {"dept_code": code},
+            {"$set": {"programmes.MCAREG.prog_curriculum.data.profile.intake": 60}})
+    again = _load(app)
+    assert again["password"] is None and not again["written"]
+    data = _sub(app, code)["programmes"]["MCAREG"]["prog_curriculum"]["data"]
+    assert data["profile"]["intake"] == 60
+
+
+def test_the_department_can_open_its_filled_curriculum_and_syllabus(app, client):
+    report = _load(app)
+    login(client, report["dept"]["username"], report["password"])
+    for part in ("prog_curriculum", "prog_syllabus"):
+        r = client.get(f"/department/stage/{part}/MCAREG", follow_redirects=True)
+        assert r.status_code == 200
+        assert "25MCAC101" in r.get_data(as_text=True)
+
+
+# ---------------------------------------------------------------- the rules it needed
+
+def test_an_elective_pair_is_two_courses_for_the_syllabus(app):
+    from app.workflow import course_fill_source
+    report = _load(app)
+    courses = course_fill_source(_sub(app, report["dept"]["dept_code"]), "MCAREG")
+    by_code = {c["course_code"]: c["course_title"] for c in courses}
+    assert by_code["25MCAGE2041"] == "Essentials of Cloud Computing"
+    assert by_code["25MCAGE2042"] == "Essentials of Cyber Security"
+
+
+def test_a_code_reused_inside_an_elective_pair_is_caught():
+    from app.validation import RULES
+    data = {"s": [{"course_code": "25MCA101"}, {"course_code": "25MCA102 / 25MCA101"}]}
+    assert any("25MCA101" in i["message"] for i in RULES["unique_course_codes"](data, {}, "s"))
+
+
+def test_experiential_hours_count_one_credit_per_three():
+    from app.validation import RULES
+    project = {"s": [{"course_code": "P1", "l": 2, "t": 0, "p": 4, "e": 15, "credits": 9}]}
+    assert not [i for i in RULES["ltpe_credit_arithmetic"](project, {}, "s")
+                if "works out to" in i["message"]]
+
+
+# ---------------------------------------------------------------- admin
+
+def test_admin_loads_the_pack_from_the_departments_page(app, client):
+    make_department(app, "CSI-JYN", "Department of Computer Science and IT",
+                    "School of Computer Science & Information Technology")
+    _admin(app, client)
+    assert "Load from Drive" in client.get("/admin/departments").get_data(as_text=True)
+    r = client.post("/admin/packs/csit/load")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/admin/submissions/CSI-JYN")
+    assert "Load again" in client.get("/admin/departments").get_data(as_text=True)
+    page = client.get("/admin/submissions/CSI-JYN").get_data(as_text=True)
+    assert "Filled from the department" in page and "TBA-" in page
+
+
+# ---------------------------------------------------------------- add a programme from Curriculum
+
+def _signed_in_department(app, client):
+    report = _load(app)
+    login(client, report["dept"]["username"], report["password"])
+    client.post("/department/who", data={"name": "Test Faculty", "email": "t@example.edu",
+                                         "next": "/department/"})
+    return report["dept"]["dept_code"]
+
+
+def test_curriculum_offers_to_add_a_ug_or_pg_programme(app, client):
+    _signed_in_department(app, client)
+    page = client.get("/department/stage/curriculum").get_data(as_text=True)
+    assert "Add a UG programme" in page and "Add a PG programme" in page
+    assert "/department/programmes/add?level=PG" in page
+
+
+def test_adding_a_programme_reopens_department_information_and_comes_back(app, client):
+    from app.db import get_db
+    code = _signed_in_department(app, client)
+    with app.app_context():                      # as if Department Information were submitted
+        get_db().submissions.update_one({"dept_code": code},
+                                        {"$set": {"stages.dept_info.status": "submitted"}})
+    r = client.get("/department/programmes/add?level=UG")
+    assert r.status_code == 302
+    assert r.headers["Location"].endswith("/department/stage/dept_info?add=UG&back=curriculum")
+    assert _sub(app, code)["stages"]["dept_info"]["status"] == "draft"
+
+    page = client.get(r.headers["Location"]).get_data(as_text=True)
+    assert "Back to Curriculum" in page and "Adding a new" in page
+    assert "back=curriculum" in page             # submitting returns to Curriculum
+
+
+def test_a_sealed_record_cannot_be_reopened_from_curriculum(app, client):
+    from app.db import get_db
+    code = _signed_in_department(app, client)
+    with app.app_context():
+        get_db().submissions.update_one({"dept_code": code}, {"$set": {"status": "sealed"}})
+    r = client.get("/department/programmes/add?level=PG")
+    assert r.headers["Location"].endswith("/department/stage/curriculum")
+
+
+# ---------------------------------------------------------------- the Drive files
+
+def test_loading_attaches_the_drive_files_where_the_department_would_upload_them(app):
+    from pathlib import Path
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    sub = _sub(app, code)
+    assert {"MCAREG": "2026-2028_MCA GEN_Course MAtrix.xlsx"}["MCAREG"] == \
+        sub["programmes"]["MCAREG"]["prog_curriculum"]["data"]["curriculum_file"]["document"]["name"]
+    syl = sub["programmes"]["MCASCT"]["prog_syllabus"]["data"]["syllabus_file"]["document"]
+    assert syl["name"] == "MCA_SCT_SYLLABUS_2026_28.docx"
+    stored = Path(app.config["UPLOAD_ROOT"]) / app.config["ACADEMIC_YEAR"] / code / \
+        "prog_syllabus" / syl["stored"]
+    assert stored.stat().st_size == syl["size"] == 619194
+    # kept with the record: the checklist and the articulation sheets
+    names = [f["name"] for f in sub["imported_from"]["files"]]
+    assert any(n.startswith("Checklist for Document Submission") for n in names)
+    assert "2026-2028_MCA-ISMS-Articulation.xlsx" in names
+
+
+def test_loading_again_does_not_attach_the_files_twice(app):
+    from app.db import get_db
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    with app.app_context():
+        before = get_db().files.count_documents({"dept_code": code})
+    again = _load(app)
+    assert not again["attached"]
+    with app.app_context():
+        assert get_db().files.count_documents({"dept_code": code}) == before
+
+
+def test_attached_files_show_in_the_admins_uploaded_documents(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get(f"/admin/submissions/{report['dept']['dept_code']}").get_data(as_text=True)
+    assert "MCA_ISMS_SYLLABUS_2026_28.docx" in page
+    from app.db import get_db
+    with app.app_context():
+        rec = get_db().files.find_one({"original_name": "MCA_ISMS_SYLLABUS_2026_28.docx"})
+    r = client.get(f"/admin/documents/{rec['dept_code']}/{rec['stored_name']}")
+    assert r.status_code == 200 and len(r.data) == 3582763
+
+
+def test_the_drive_strip_shows_the_departments_login(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get("/admin/departments").get_data(as_text=True)
+    assert report["dept"]["username"] in page
+    assert report["password"] in page and "Load again" in page
+
+
+# ---------------------------------------------------------------- the single-sheet report
+
+def test_department_excel_report_sheet_has_ticks_and_links(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    report = _load(app)
+    code = report["dept"]["dept_code"]
+    _admin(app, client)
+    r = client.get(f"/admin/export/{code}.xlsx")
+    wb = load_workbook(io.BytesIO(r.data))
+    assert wb.sheetnames == ["Report", "Programmes", "Course Revision"]
+    ws = wb["Report"]
+    cells = [c for row in ws.iter_rows() for c in row if c.value is not None]
+    text = " ".join(str(c.value) for c in cells)
+    assert "Department information" in text and "Pre-BoS" in text
+    assert "PG programmes" in text and "✗" in text
+    links = [c.hyperlink.target for c in cells if c.hyperlink]
+    assert any("/share/r/" in u for u in links)                  # programme reports
+    assert any("/share/d/" in u for u in links)                  # the attached Drive files
+
+
+def test_department_word_is_one_report_with_links(app, client):
+    import io
+
+    from docx import Document
+    report = _load(app)
+    _admin(app, client)
+    r = client.get(f"/admin/export/{report['dept']['dept_code']}.docx")
+    doc = Document(io.BytesIO(r.data))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    assert "UG programmes" in text and "PG programmes" in text
+    rels = [rel.target_ref for rel in doc.part.rels.values() if "hyperlink" in rel.reltype]
+    assert any("/share/r/" in u for u in rels)
+
+
+def test_the_programme_report_opens_in_the_browser(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG").get_data(as_text=True)
+    assert "Programme structure" in page and "25MCAC101" in page
+    assert "Data Structures" in page and "Total: 90 credits" in page
+
+
+# ---------------------------------------------------------------- share links (no sign-in)
+
+def _download_links(app, client, code):
+    import io
+
+    from openpyxl import load_workbook
+    _admin(app, client)
+    ws = load_workbook(io.BytesIO(client.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    return {c.value: c.hyperlink.target for row in ws.iter_rows() for c in row if c.hyperlink}
+
+
+def test_a_document_link_opens_without_signing_in(app, client):
+    from urllib.parse import urlparse
+    code = _load(app)["dept"]["dept_code"]
+    links = _download_links(app, client, code)
+    stranger = app.test_client()                         # not signed in
+    docx = urlparse(links["MCA_ISMS_SYLLABUS_2026_28.docx"]).path
+    page = stranger.get(docx)
+    assert page.status_code == 200
+    body = page.get_data(as_text=True)
+    assert "MCA_ISMS_SYLLABUS_2026_28.docx" in body and "DATA STRUCTURES" in body.upper()
+    raw = stranger.get(docx + "/file?download=1")
+    assert raw.status_code == 200 and len(raw.data) == 3582763
+    sheet = stranger.get(urlparse(links["2026-2028_MCA GEN_Course MAtrix.xlsx"]).path)
+    assert "25MCAC101" in sheet.get_data(as_text=True)
+
+
+def test_a_programme_report_link_opens_without_signing_in(app, client):
+    from urllib.parse import urlparse
+    code = _load(app)["dept"]["dept_code"]
+    links = _download_links(app, client, code)
+    report = next(u for name, u in links.items() if name == "Master of Computer Applications")
+    page = app.test_client().get(urlparse(report).path).get_data(as_text=True)
+    assert "Programme structure" in page and "25MCAC101" in page
+    assert "/admin/" not in page                         # its document links are share links too
+
+
+def test_a_changed_share_link_does_not_open(app):
+    c = app.test_client()
+    assert c.get("/share/d/not-a-real-code").status_code == 404
+    assert c.get("/share/r/WyJyIiwiWCJd.tampered").status_code == 404
+
+
+# ---------------------------------------------------------------- Curriculum and Syllabus in the Office's templates
+
+def _generated_links(app, client, code):
+    import io
+
+    from openpyxl import load_workbook
+    _admin(app, client)
+    ws = load_workbook(io.BytesIO(client.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    return [c.hyperlink.target for row in ws.iter_rows() for c in row
+            if c.hyperlink and ("/share/c/" in c.hyperlink.target or "/share/s/" in c.hyperlink.target)]
+
+
+def test_the_excel_offers_each_programmes_curriculum_and_syllabus_without_gold(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    code = _load(app)["dept"]["dept_code"]
+    links = _generated_links(app, client, code)
+    # the five MCAs have a course matrix and all six a syllabus; programmes
+    # not started have nothing to print
+    assert sum("/share/c/" in u for u in links) == 5 and sum("/share/s/" in u for u in links) == 6
+    ws = load_workbook(io.BytesIO(client.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    fills = {c.fill.fgColor.rgb for row in ws.iter_rows() for c in row if c.fill and c.fill.fgColor}
+    assert not any(str(f).endswith("C8A44B") for f in fills)
+
+
+def test_the_curriculum_is_the_template_with_logo_and_every_course(app, client):
+    import io
+    from urllib.parse import urlparse
+
+    from docx import Document
+    code = _load(app)["dept"]["dept_code"]
+    url = next(u for u in _generated_links(app, client, code) if "/share/c/" in u)
+    page = app.test_client().get(urlparse(url).path)               # no sign-in: shown on the page
+    body = page.get_data(as_text=True)
+    assert page.status_code == 200 and "Download Word" in body
+    # an MCA is PG: the PG Course Matrix's layout
+    assert "SUMMARY" in body and "Major (Core)" in body and "25MCAC101" in body
+    r = app.test_client().get(urlparse(url).path + "/file")        # and the Word document
+    assert r.status_code == 200 and r.headers["Content-Disposition"].startswith("attachment")
+    doc = Document(io.BytesIO(r.data))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    assert "Jain (Deemed-to-be University), Bangalore" in text and "Programme Structure" in text
+    cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+    # the summary has the UG classification's columns, and no others
+    for words in ("SUMMARY", "Major", "Minor", "Multi-Disciplinary / OE", "Ability Enhancement / AEC",
+                  "Skill Enhancement / SEC", "Common Value Added / VAC", "Summer Internship / INTERNSHIP",
+                  "Research Project / Dissertation / PROJECT", "Mandatory Non-Credit",
+                  "SEMESTER I", "Category", "25MCAC101", "Objective", "Fee",
+                  "100% Continuous Assessment Credits"):
+        assert words in cells, words
+    assert "Classification of Credits" not in cells and "Generic Core" not in cells
+    sec = doc.sections[0]
+    assert sec.page_width > sec.page_height                         # landscape, as the template
+    assert "Master of Computer Applications" in sec.header.paragraphs[0].text
+    assert any("image" in rel.reltype for rel in sec.header.part.rels.values())   # the logo
+    assert "Prepared and Approved by Office of Academics" in \
+        " ".join(p.text for p in sec.footer.paragraphs)
+
+
+def test_the_syllabus_is_one_template_sheet_per_course(app, client):
+    import io
+    from urllib.parse import urlparse
+
+    from docx import Document
+    code = _load(app)["dept"]["dept_code"]
+    url = next(u for u in _generated_links(app, client, code) if "/share/s/" in u)
+    assert "Module 1:" in app.test_client().get(urlparse(url).path).get_data(as_text=True)
+    doc = Document(io.BytesIO(app.test_client().get(urlparse(url).path + "/file").data))
+    cells = " ".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+    for words in ("Course Title", "L-T-P-E", "Contact Hours", "CA: ESE", "Bloom’s Taxonomy Level",
+                  "PO1", "PSO1", "Articulation"):
+        assert words in cells
+    text = " ".join(p.text for p in doc.paragraphs)
+    for words in ("Course Information:", "Course Objectives:", "Course Outcomes (COs):", "CO-PO-PSO Mapping:",
+                  "Course Content:", "Module 1:", "Text Books:", "Book References:"):
+        assert words in text
+    assert len(doc.tables) > 10                                     # one sheet per course
+    sec = doc.sections[0]
+    assert sec.page_height > sec.page_width                         # portrait
+
+
+def test_the_programme_report_page_offers_the_word_documents(app, client):
+    report = _load(app)
+    _admin(app, client)
+    page = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG").get_data(as_text=True)
+    assert "Curriculum →" in page and "/share/c/" in page
+    r = client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/s.docx")
+    assert r.status_code == 200 and len(r.data) > 10000
+    assert client.get(f"/admin/report/{report['dept']['dept_code']}/MCAREG/x.docx").status_code == 404
+
+
+# ---------------------------------------------------------------- Fill from Drive, submit, download
+
+def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloads(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    code = _signed_in_department(app, client)
+    page = client.get("/department/").get_data(as_text=True)
+    assert "Sync from Drive" in page
+
+    r = client.post("/department/drive/fill", follow_redirects=True)
+    body = r.get_data(as_text=True)
+    assert "Data imported from your Drive folder" in body
+    # once imported, syncing again lives in the Developer Preview item
+    assert 'class="demo-strip drive-strip"' not in body
+    from app.db import get_db
+    with app.app_context():
+        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
+    body = client.get("/department/").get_data(as_text=True)
+    assert "Re-sync from Drive" in body and "side-dev-drive" in body
+    sub = _sub(app, code)
+    assert sub["stages"]["pre_bos"]["data"]["pre_bos_files"]["diac_signed"]["stored"]
+    assert sub["stages"]["bos_documents"]["data"]["meeting"]["bos_date"]
+    assert sub["stages"]["pre_bos"]["status"] == "draft"          # saved, for the department to submit
+
+    j = client.post("/department/api/submit-all").get_json()
+    assert j["ok"], j.get("failed")
+    assert _sub(app, code)["status"] == "sealed"
+
+    # the Office downloads it
+    office = app.test_client()
+    _admin(app, office)
+    ws = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    text = " ".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+    stages = text.split("Stages")[1].split("Department Information —")[0]
+    assert stages.count("✓ Submitted") >= 4                       # every stage in
+    assert "Open →" in text and "Documents (JAIN templates)" in text
+
+
+
+def test_the_excel_has_programmes_with_annexure_and_the_revision_template(app, client):
+    import io
+
+    from openpyxl import load_workbook
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    office = app.test_client()
+    _admin(app, office)
+    wb = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))
+    progs = " ".join(str(c.value) for row in wb["Programmes"].iter_rows() for c in row if c.value)
+    assert "Programme Structure" in progs and "25MCAC101" in progs
+    assert "Minor / Honours — Annexure I" in progs and "No minors entered." not in progs
+    rev = " ".join(str(c.value) for row in wb["Course Revision"].iter_rows() for c in row if c.value)
+    for words in ("Percentage of change in syllabus revision for", "(A)", "(D)",
+                  "course-wise, by semester", "module-wise for all courses",
+                  "Average percentage on revision considering all modules"):
+        assert words in rev
+    page = office.get(f"/admin/export/{code}/preview/xlsx").get_data(as_text=True)
+    assert "Course Revision" in page and "Programmes" in page and "Download" in page
+    assert office.get(f"/admin/export/{code}/preview/docx").status_code == 200
+
+
+def test_the_curriculum_page_has_ug_and_pg_tabs(app, client):
+    _signed_in_department(app, client)
+    page = client.get("/department/stage/curriculum?level=PG").get_data(as_text=True)
+    assert "UG programmes" in page and "PG programmes" in page
+    assert "MCAREG" in page and "BCAGAI" not in page.split('class="prog-list"')[1].split("add-prog-strip")[0]
+    assert "Not started" in page or "In progress" in page
+
+
+def test_the_office_can_delete_all_of_a_departments_data(app, client):
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    office = app.test_client()
+    _admin(app, office)
+    office.post(f"/admin/departments/{code}/wipe", data={"confirm": "nope"})
+    assert _sub(app, code)                                         # not without the code typed
+    r = office.post(f"/admin/departments/{code}/wipe", data={"confirm": code}, follow_redirects=True)
+    assert "data is deleted" in r.get_data(as_text=True)
+    sub = _sub(app, code) or {}                                   # an empty record, ready to start again
+    assert not sub.get("stages") and not sub.get("programmes")
+    from app.db import get_db
+    with app.app_context():
+        assert not get_db().files.count_documents({"dept_code": code})
+        assert get_db().departments.find_one({"dept_code": code})  # the department stays
+
+
+def test_the_excel_links_each_programmes_course_revision_in_the_revision_template(app, client):
+    import io
+    from urllib.parse import urlparse
+
+    from docx import Document
+    from openpyxl import load_workbook
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    office = app.test_client()
+    _admin(app, office)
+    ws = load_workbook(io.BytesIO(office.get(f"/admin/export/{code}.xlsx").data))["Report"]
+    cells = [c for row in ws.iter_rows() for c in row]
+    # one row per programme, each with its Curriculum, Syllabus and Course
+    # Revision documents in their own columns (H, I, J)
+    links = [c.hyperlink.target for c in cells if c.hyperlink and "/share/v/" in c.hyperlink.target]
+    curricula = [c for c in cells if c.hyperlink and "/share/c/" in c.hyperlink.target]
+    assert links and len(links) == len(curricula)
+    assert {c.column for c in cells if c.hyperlink and "/share/v/" in c.hyperlink.target} == {10}
+    assert {c.column for c in curricula} == {8}
+
+    viewer = app.test_client().get(urlparse(links[0]).path)          # no sign-in
+    body = viewer.get_data(as_text=True)
+    assert viewer.status_code == 200 and "Download Word" in body
+    for words in ("Percentage of change in syllabus revision for all Courses", "YEAR OF REVISION",
+                  "COURSE-WISE FOR ALL SEMESTERS", "MODULE-WISE FOR ALL COURSES",
+                  "AVERAGE PERCENTAGE ON REVISION CONSIDERING ALL MODULES"):
+        assert words in body
+    doc = Document(io.BytesIO(app.test_client().get(urlparse(links[0]).path + "/file").data))
+    sec = doc.sections[0]
+    assert sec.page_width > sec.page_height                            # landscape, as the template
+    assert "Percentage of change in syllabus revision" in " ".join(p.text for p in sec.footer.paragraphs)
+
+
+def test_submitting_a_programme_part_goes_to_the_next_step_of_that_programme(app, client):
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    sub = _sub(app, code)
+    data = sub["programmes"]["MCAREG"]["prog_curriculum"]["data"]
+    j = client.post("/department/api/prog_curriculum/MCAREG/submit", json=data).get_json()
+    assert j["ok"], j
+    assert j["redirect"].endswith("/department/stage/prog_syllabus/MCAREG")   # its Syllabus, same programme
+    page = client.get(j["redirect"]).get_data(as_text=True)
+    assert "✓ Submitted" in page                                             # Curriculum turns green
+    syl = _sub(app, code)["programmes"]["MCAREG"]["prog_syllabus"]["data"]
+    j = client.post("/department/api/prog_syllabus/MCAREG/submit", json=syl).get_json()
+    # then Course Revision, and after it the earlier batches
+    assert j["ok"] and j["redirect"].endswith("/department/stage/prog_revision/MCAREG")
+
+
+def test_each_step_says_where_it_goes_and_the_last_reviews_the_programme(app, client):
+    code = _signed_in_department(app, client)
+    client.post("/department/drive/fill")
+    cur = client.get("/department/stage/prog_curriculum/MCAREG").get_data(as_text=True)
+    assert "Submit Curriculum &amp; go to Syllabus" in cur
+    syl = client.get("/department/stage/prog_syllabus/MCAREG").get_data(as_text=True)
+    assert "Submit Syllabus &amp; go to Course Revision" in syl
+    from app.workflow import batches
+    with app.test_request_context():
+        older = [b["key"] for b in batches()["existing"]]
+    rev = client.get("/department/stage/prog_revision/MCAREG").get_data(as_text=True)
+    if older:
+        assert "Submit Course Revision &amp; go to Earlier batch 2024–2025" in rev
+        last_old = client.get(f"/department/stage/{older[-1]}/MCAREG").get_data(as_text=True)
+        # earlier batches are required: no Skip; the last one reviews the programme
+        assert "Skip to Course Revision" not in last_old and "Skip to Earlier batch" not in last_old
+        assert "Review &amp; submit this programme" in last_old
+    else:
+        assert "Review &amp; submit this programme" in rev
+
+    record = client.get("/department/api/record?programme=MCAREG").get_json()
+    assert record["items"] and all(i["programme"] == "MCAREG" for i in record["items"])
+    j = client.post("/department/api/submit-all?programme=MCAREG").get_json()
+    assert j["ok"], j.get("failed")
+    sub = _sub(app, code)
+    assert all(sub["programmes"]["MCAREG"][k]["status"] == "submitted"
+               for k in ("prog_curriculum", "prog_syllabus", "prog_revision"))
+    assert sub["programmes"]["MCAIML"]["prog_curriculum"]["status"] != "submitted"   # only this programme
+    assert "/department/stage/prog_curriculum/" in j["redirect"]                    # on to the next programme

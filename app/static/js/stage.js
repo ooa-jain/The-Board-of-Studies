@@ -14,28 +14,94 @@
   const STAGE = JSON.parse(document.getElementById("stage-def").textContent);
   const CREDIT = JSON.parse(document.getElementById("credit-def").textContent || "{}");
   const CTX = window.STAGE_CTX;
-  const lookupsNode = document.getElementById("lookups");
-  const LOOKUPS = lookupsNode ? JSON.parse(lookupsNode.textContent || "{}") : {};
-  // Run after every change: counts, the credit classification and so on.
-  const refreshers = [];
 
-  // Computed row values. Blank inputs count as nothing entered.
-  const W = { l: 1, t: 1, p: 0.5, e: 0.5 };
-  const CALCS = {
-    credits_from_ltpe(row) {
-      const keys = ["l", "t", "p", "e"];
-      if (keys.every(k => row[k] === undefined || row[k] === null || row[k] === "")) return "";
-      return keys.reduce((sum, k) => sum + (Number(row[k]) || 0) * W[k], 0);
-    },
-    cia_plus_ese(row) {
-      if ([row.cia, row.ese].every(v => v === undefined || v === null || v === "")) return "";
-      return (Number(row.cia) || 0) + (Number(row.ese) || 0);
+  // A new programme's name in proper form, and a code made from it the way
+  // the catalogue's codes are: the degree (MSC, BCA, MBA…) then the initials
+  // of the specialisation (FSD for Full Stack Development), or REG.
+  const ProgName = (() => {
+    const SMALL = new Set(["of", "in", "and", "with", "for", "the", "a", "an", "on", "to", "&"]);
+    // misspellings and short forms at the start of a name
+    const LEAD = [
+      [/^(masters?|mastr|mster|maste)\b/i, "Master"],
+      [/^(bachelors?|bachlors?|bacholors?|bachelor|bachelr|bachalor)\b/i, "Bachelor"],
+      [/^m\.?\s?sc\b/i, "Master of Science"], [/^b\.?\s?sc\b/i, "Bachelor of Science"],
+      [/^m\.?\s?c\.?\s?a\b/i, "Master of Computer Applications"],
+      [/^b\.?\s?c\.?\s?a\b/i, "Bachelor of Computer Applications"],
+      [/^m\.?\s?b\.?\s?a\b/i, "Master of Business Administration"],
+      [/^b\.?\s?b\.?\s?a\b/i, "Bachelor of Business Administration"],
+      [/^m\.?\s?com\b/i, "Master of Commerce"], [/^b\.?\s?com\b/i, "Bachelor of Commerce"],
+      [/^m\.?\s?tech\b/i, "Master of Technology"], [/^b\.?\s?tech\b/i, "Bachelor of Technology"],
+      [/^m\.?\s?a\b/i, "Master of Arts"], [/^b\.?\s?a\b/i, "Bachelor of Arts"],
+    ];
+    const KEEP_UPPER = /^(AI|ML|IT|IOT|AR|VR|UI|UX|HR|CA|ACCA|CMA|CS|ERP|SAP|AWS|BFSI|ESG|II|III|IV)$/i;
+    const DEGREE = [
+      [/^master of science\b/i, "MSC"], [/^bachelor of science\b/i, "BSC"],
+      [/^master of computer applications\b/i, "MCA"], [/^bachelor of computer applications\b/i, "BCA"],
+      [/^master of business administration\b/i, "MBA"], [/^bachelor of business administration\b/i, "BBA"],
+      [/^master of commerce\b/i, "MCM"], [/^bachelor of commerce\b/i, "BCM"],
+      [/^master of technology\b/i, "MTE"], [/^bachelor of technology\b/i, "BTE"],
+      [/^master of arts\b/i, "MA"], [/^bachelor of arts\b/i, "BA"],
+    ];
+    function tidy(raw) {
+      let t = String(raw || "").replace(/\s+/g, " ").trim();
+      if (!t) return t;
+      for (const [re, word] of LEAD) {
+        if (!re.test(t)) continue;
+        t = t.replace(re, word);
+        // a short form (MSc Data Science) gets its "in"
+        if (/ of /.test(word)) {
+          const rest = t.slice(word.length).trim();
+          if (rest && !/^(in|with|\(|honours|hons)\b/i.test(rest)) t = word + " in " + rest;
+        }
+        break;
+      }
+      return t.split(" ").map((w, i) => {
+        const bare = w.replace(/[^A-Za-z&]/g, "");
+        if (KEEP_UPPER.test(bare)) return w.toUpperCase();
+        if (i > 0 && SMALL.has(w.toLowerCase())) return w.toLowerCase();
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      }).join(" ").replace(/\(([a-z])/g, (m, c) => "(" + c.toUpperCase());
     }
-  };
-
-  function lookupRows(def) {
-    return (def.lookup && LOOKUPS[def.lookup]) || [];
-  }
+    function level(name) {
+      if (/^master\b/i.test(name)) return "PG";
+      if (/^bachelor\b/i.test(name)) return "UG";
+      return "";
+    }
+    function code(name, taken) {
+      if (!name) return "";
+      let deg = "";
+      for (const [re, c] of DEGREE) {
+        if (re.test(name)) { deg = c; break; }
+      }
+      if (!deg) {
+        // any other degree: M or B, then the initials of what it is of —
+        // Master of Computer Science -> MCS, Bachelor of Fine Arts -> BFA
+        const m = name.match(/^(master|bachelor)\s+of\s+(.+?)(?:\s+(?:in|with)\s+|\s*\(|$)/i);
+        if (m) deg = (m[1][0] + m[2].split(/\s+/).filter(w => w && !SMALL.has(w.toLowerCase()))
+                                   .map(w => /^[A-Z]{2,4}$/.test(w) ? w : w[0]).join("").slice(0, 3)).toUpperCase();
+      }
+      if (!deg) deg = name.split(" ").filter(w => !SMALL.has(w.toLowerCase())).slice(0, 3)
+                          .map(w => w[0]).join("").toUpperCase();
+      const spec = (name.match(/\b(?:specialisation|specialization)\s+in\s+(.+)$/i) ||
+                    name.match(/\s(?:in|with)\s+(.+)$/i) || [])[1] || "";
+      let tail = spec ? spec.replace(/\(.*?\)/g, " ").split(/\s+/)
+                           .filter(w => w && !SMALL.has(w.toLowerCase()))
+                           .map(w => KEEP_UPPER.test(w) ? w.toUpperCase() : w[0].toUpperCase()).join("").slice(0, 4)
+                      : "REG";
+      let out = (deg + tail).replace(/[^A-Z0-9]/g, "");
+      if (taken && taken.has(out)) {
+        let n = 2;
+        while (taken.has(out + n)) n++;
+        out = out + n;
+      }
+      return out;
+    }
+    return { tidy, code, level };
+  })();
+  // run after every change: counts that follow a table, and the like
+  const refreshers = [];
+  // course groups that carry no credits
+  const NON_CREDIT = ["Mandatory Non-Credit Course", "Mandatory Non-Credit Audit Course"];   // an older draft's
   let state = JSON.parse(document.getElementById("stage-data").textContent || "{}");
 
   const root = document.getElementById("sections");
@@ -49,6 +115,16 @@
     if (text !== undefined) n.textContent = text;
     return n;
   };
+
+  // a note saying something fills itself in carries the yellow highlighter
+  const AUTO_RE = /automatically|worked out from|filled (in|into) .*automatically|populated/i;
+  function autoNote(node) {
+    const t = node.textContent;
+    if (!AUTO_RE.test(t)) return node;
+    node.textContent = "";
+    node.appendChild(el("span", "hl-auto", t));
+    return node;
+  }
 
   // ---------------------------------------------------------------- helpers
 
@@ -156,7 +232,17 @@
         undescribe(input, `${input.id}-error`);
       }
     };
-    input.addEventListener("blur", show);
+    // leaving a field with a wrong entry raises an alert as well as the
+    // note under it
+    const leave = () => {
+      show();
+      const msg = checkField(def, readInput(input, def));
+      if (msg && window.Toast) {
+        window.Toast.warning(msg, { title: def.label || "Check this entry",
+                                    onClick: () => input.focus() });
+      }
+    };
+    input.addEventListener("blur", leave);
     input.addEventListener("input", () => {
       if (input.classList.contains("is-bad")) show();
       touch();
@@ -185,29 +271,531 @@
 
   // ------------------------------------------------------------- widgets
 
+  // ---------------------------------------------- fixed text and module revision
+
+  /** A block the university fixes, shown as the template shows it. */
+  function fixedBlock(def) {
+    const box = el("div", "fixed-block");
+    (def.fixed_table || []).forEach(part => {
+      const row = el("div", "fixed-part");
+      row.appendChild(el("div", "fixed-head", part.head));
+      const body = el("div", "fixed-body");
+      const items = el("div", "fixed-items");
+      (part.items || []).forEach(t => items.appendChild(el("span", "fixed-item", t)));
+      body.appendChild(items);
+      if (part.note) body.appendChild(el("div", "fixed-note", part.note));
+      row.appendChild(body);
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+                 "XI", "XII", "XIII", "XIV", "XV"];
+
+  function averageChange(mods) {
+    const v = (Array.isArray(mods) ? mods : [])
+      .filter(m => m && String(m.revised || "").trim())
+      .map(m => num(m.pct)).filter(x => x !== null);
+    if (!v.length) return null;
+    return Math.round(v.reduce((a, b) => a + b, 0) / v.length * 100) / 100;
+  }
+
+  /** A programme's POs (or PSOs): PO1 open to describe, "+ Add PO2" for the
+      next, × on each to take it away — the ones after it move up (PO2
+      becomes PO1), and every course's CO-PO-PSO Mapping moves with them. */
+  function outcomeList(def, value, onChange) {
+    const prefix = def.prefix || "";
+    const items = (Array.isArray(value) ? value : [])
+      .map(x => String((x && typeof x === "object" ? x.text : x) ?? ""));
+    if (!items.length) items.push("");
+    const box = el("div", "ol-box");
+    const list = el("div", "ol-list");
+    const foot = el("div", "ol-foot");
+    box.appendChild(list);
+    box.appendChild(foot);
+    const emit = () => onChange(items.slice());
+    function draw() {
+      list.textContent = "";
+      foot.textContent = "";
+      items.forEach((t, i) => {
+        const name = prefix + (i + 1);
+        const row = el("div", "ol-item");
+        row.appendChild(el("span", "ol-name", name));
+        const ta = el("textarea");
+        ta.rows = 2;
+        ta.value = t;
+        ta.placeholder = `Describe ${name}`;
+        ta.setAttribute("aria-label", name);
+        ta.disabled = !!CTX.readonly;
+        ta.addEventListener("input", () => { items[i] = ta.value; emit(); });
+        row.appendChild(ta);
+        // any one comes away, the first too; with only one left, × empties it
+        if (!CTX.readonly && (items.length > 1 || t.trim())) {
+          const x = el("button", "ol-x", "×");
+          x.type = "button";
+          x.title = `Remove ${name}`;
+          x.setAttribute("aria-label", `Remove ${name}`);
+          x.addEventListener("click", () => {
+            const later = i < items.length - 1
+              ? ` ${prefix}${i + 2} becomes ${name}, and so on — every course's mapping moves with them.`
+              : " Its column goes from every course's mapping.";
+            if (items[i].trim() && !window.confirm(`Remove ${name}?${later}`)) return;
+            items.splice(i, 1);
+            if (!items.length) items.push("");
+            draw();
+            emit();
+          });
+          row.appendChild(x);
+        }
+        list.appendChild(row);
+      });
+      if (!CTX.readonly && items.length < (def.max_items || 20)) {
+        const add = el("button", "btn btn-ghost btn-sm", `+ Add ${prefix}${items.length + 1}`);
+        add.type = "button";
+        add.addEventListener("click", () => {
+          items.push("");
+          draw();
+          emit();
+          const last = list.querySelector(".ol-item:last-child textarea");
+          if (last) last.focus();
+        });
+        foot.appendChild(add);
+      }
+    }
+    draw();
+    return box;
+  }
+
+  /** Module by module: the previous syllabus beside the revised one, and the
+      % change between them, typed by the department. */
+  function moduleCompare(def, value, onChange) {
+    const mods = (Array.isArray(value) ? value : []).map(m => Object.assign({}, m));
+    if (!mods.length && !CTX.readonly) mods.push({});
+    const box = el("div", "mc-box");
+    const list = el("div", "mc-list");
+    const foot = el("div", "mc-foot");
+    const avg = el("span", "mc-avg");
+    box.appendChild(list);
+    box.appendChild(foot);
+
+    const emit = () => {
+      const a = averageChange(mods);
+      avg.textContent = a === null ? "" : `Average change across modules: ${fmt(a)}%`;
+      onChange(mods.map(m => Object.assign({}, m)));
+    };
+
+    function draw() {
+      list.textContent = "";
+      mods.forEach((m, i) => {
+        const card = el("div", "mc-item");
+        const head = el("div", "mc-head");
+        head.appendChild(el("strong", null, `Module ${ROMAN[i] || i + 1}`));
+        head.appendChild(el("span", "spacer"));
+        const pctWrap = el("label", "mc-pct");
+        pctWrap.appendChild(el("span", null, "% change"));
+        const pct = el("input");
+        pct.type = "text";
+        pct.inputMode = "decimal";
+        // typed by the department, never worked out for it
+        if (!m.pct_manual) m.pct = null;
+        pct.value = m.pct ?? "";
+        pct.placeholder = "Enter";
+        pct.title = "Type the percentage of change in this module";
+        pct.addEventListener("input", () => {
+          const v = pct.value.trim();
+          m.pct = v === "" ? null : Number(v);
+          m.pct_manual = v !== "";
+          emit();
+        });
+        pctWrap.appendChild(pct);
+        pctWrap.appendChild(el("span", null, "%"));
+        head.appendChild(pctWrap);
+        if (!CTX.readonly) {
+          const rm = el("button", "btn btn-ghost btn-sm", "Remove");
+          rm.type = "button";
+          rm.setAttribute("aria-label", `Remove module ${i + 1}`);
+          rm.addEventListener("click", () => { mods.splice(i, 1); draw(); emit(); });
+          head.appendChild(rm);
+        }
+        card.appendChild(head);
+
+        const cols = el("div", "mc-cols");
+        [["previous", "Previous syllabus", "Leave empty for a new module"],
+         ["revised", "Revised syllabus", "Module title (hours) — content"]].forEach(([k, label, ph]) => {
+          const f = el("label", "mc-col");
+          f.appendChild(el("span", "mc-col-label", label));
+          const t = el("textarea");
+          t.rows = 5;
+          t.placeholder = ph;
+          t.value = m[k] || "";
+          if (CTX.readonly) t.disabled = true;
+          t.addEventListener("input", () => {
+            m[k] = t.value;
+            emit();
+          });
+          f.appendChild(t);
+          cols.appendChild(f);
+        });
+        card.appendChild(cols);
+        if (CTX.readonly) pct.disabled = true;
+        list.appendChild(card);
+      });
+    }
+
+
+    if (!CTX.readonly) {
+      const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+      add.type = "button";
+      add.addEventListener("click", () => { mods.push({}); draw(); emit(); });
+      foot.appendChild(add);
+    }
+    foot.appendChild(avg);
+    draw();
+    const a = averageChange(mods);
+    avg.textContent = a === null ? "" : `Average change across modules: ${fmt(a)}%`;
+    return box;
+  }
+
+  /** One course's revision, laid out as the syllabus revision document lays
+      it out: the previous and latest year, title and code side by side, then
+      each module previous-beside-revised with its % change, and the average. */
+  /* One module as the syllabus template sets it out: "Module No. N:" its
+     title, its hours, and the content under them. */
+  function moduleBlock(m, changed, i) {
+    const wrapB = el("div", "mod-block");
+    const top = el("div", "mod-top");
+    top.appendChild(el("span", "mod-no", `Module No. ${i + 1}:`));
+    const title = el("input", "mod-title");
+    title.type = "text";
+    title.placeholder = "Title of the module";
+    title.value = m.title ?? "";
+    const hrs = el("input", "mod-hours");
+    hrs.type = "text";
+    hrs.inputMode = "numeric";
+    hrs.placeholder = "Hrs";
+    hrs.value = m.hours ?? "";
+    hrs.title = "Hours for this module";
+    const content = el("textarea", "mod-content");
+    content.rows = 5;
+    content.placeholder = "Content of the module";
+    content.value = m.revised ?? "";
+    if (CTX.readonly) { title.disabled = hrs.disabled = content.disabled = true; }
+    title.addEventListener("input", () => { m.title = title.value; changed(); });
+    hrs.addEventListener("input", () => {
+      hrs.value = hrs.value.replace(/[^0-9]/g, "");
+      m.hours = hrs.value === "" ? "" : Number(hrs.value);
+      changed();
+      wrapB.dispatchEvent(new CustomEvent("mod:hours", { bubbles: true }));
+    });
+    content.addEventListener("input", () => { m.revised = content.value; changed(); });
+    top.appendChild(title);
+    const hw = el("span", "mod-hours-w");
+    hw.appendChild(el("span", null, "Hours"));
+    hw.appendChild(hrs);
+    top.appendChild(hw);
+    wrapB.appendChild(top);
+    wrapB.appendChild(content);
+    return wrapB;
+  }
+
+  // the modules' hours against the course's total teaching hours
+  function hoursRow(mods, row, span) {
+    const tr = el("tr", "mod-sum");
+    const td = el("td");
+    td.colSpan = span;
+    const paint = () => {
+      const sum = mods.reduce((a, m) => a + (num(m.hours) || 0), 0);
+      const want = num(row.teaching_hours);
+      td.textContent = "";
+      td.appendChild(el("span", null, `Total hours of the modules: ${sum}`));
+      if (want !== null) {
+        const ok = sum === want;
+        td.appendChild(el("span", "mod-sum-note" + (ok ? " is-ok" : " is-off"),
+          ok ? ` — matches the ${want} teaching hours` : ` — the course has ${want} teaching hours`));
+      }
+    };
+    paint();
+    tr.addEventListener("mod:hours", paint);
+    setTimeout(() => tr.closest("table")?.addEventListener("mod:hours", paint), 0);
+    return tr;
+  }
+
+  /** An earlier batch's syllabus: the template's modules, no comparison. */
+  function plainModules(def, row, commit) {
+    if (!Array.isArray(row[def.name])) row[def.name] = [];
+    const mods = row[def.name];
+    if (!mods.length && !CTX.readonly) mods.push({});
+    const wrap = el("div", "rt-wrap rv-wrap mod-wrap");
+    const table = el("table", "rv-table mod-table");
+    const head = el("thead");
+    const hr = el("tr");
+    const th = el("th", null, "Syllabus");
+    th.colSpan = 2;
+    hr.appendChild(th);
+    head.appendChild(hr);
+    table.appendChild(head);
+    const body = el("tbody");
+    table.appendChild(body);
+    wrap.appendChild(table);
+    function draw() {
+      body.textContent = "";
+      mods.forEach((m, i) => {
+        const tr = el("tr", "rv-module");
+        const td = el("td");
+        td.colSpan = 2;
+        td.appendChild(moduleBlock(m, commit, i));
+        if (!CTX.readonly) {
+          const rm = el("button", "rv-remove", "Remove");
+          rm.type = "button";
+          rm.setAttribute("aria-label", `Remove module ${i + 1}`);
+          rm.addEventListener("click", () => { mods.splice(i, 1); draw(); commit(); });
+          td.appendChild(rm);
+        }
+        tr.appendChild(td);
+        body.appendChild(tr);
+      });
+      if (!CTX.readonly) {
+        const tr = el("tr", "rv-add");
+        const td = el("td");
+        td.colSpan = 2;
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+        add.type = "button";
+        add.addEventListener("click", () => { mods.push({}); draw(); commit(); });
+        td.appendChild(add);
+        tr.appendChild(td);
+        body.appendChild(tr);
+      }
+      body.appendChild(hoursRow(mods, row, 2));
+    }
+    draw();
+    return wrap;
+  }
+
+  function revisionTable(def, row, commit) {
+    if (def.compare === false) return plainModules(def, row, commit);
+    if (!Array.isArray(row[def.name])) row[def.name] = [];
+    const mods = row[def.name];
+    if (!mods.length && !CTX.readonly) mods.push({});
+
+    const wrap = el("div", "rt-wrap rv-wrap");
+    const table = el("table", "rv-table");
+    wrap.appendChild(table);
+
+    const avgCell = el("td", "rv-pct rv-avg");
+    function setAvg() {
+      const a = averageChange(mods);
+      row.avg_change = a === null ? "" : a;
+      avgCell.textContent = a === null ? "—" : `${fmt(a)}%`;
+    }
+    const changed = () => { setAvg(); commit(); };
+
+    function box(value, onInput, opts) {
+      const o = opts || {};
+      const t = el(o.multi ? "textarea" : "input");
+      if (o.multi) t.rows = 5; else t.type = "text";
+      t.value = value ?? "";
+      if (o.placeholder) t.placeholder = o.placeholder;
+      if (o.readonly) { t.readOnly = true; t.classList.add("is-auto"); t.tabIndex = -1; }
+      if (CTX.readonly) t.disabled = true;
+      if (!o.readonly) t.addEventListener("input", () => onInput(t.value));
+      return t;
+    }
+    function cell(node, field) {
+      const td = el("td");
+      if (field) td.dataset.field = field;
+      if (node) td.appendChild(node);
+      return td;
+    }
+
+    const head = el("thead");
+    const hr = el("tr");
+    ["", "Year of previous revision in a subject / course",
+     "Year of latest revision of a subject / course", "Percentage of change"]
+      .forEach(x => hr.appendChild(el("th", null, x)));
+    head.appendChild(hr);
+    table.appendChild(head);
+    const body = el("tbody");
+    table.appendChild(body);
+
+    function draw() {
+      body.textContent = "";
+      const line = (label, a, b) => {
+        const tr = el("tr", "rv-meta");
+        tr.appendChild(el("th", null, label));
+        tr.appendChild(a);
+        tr.appendChild(b);
+        tr.appendChild(el("td", "rv-pct"));
+        body.appendChild(tr);
+      };
+      line("Year",
+        cell(box(row.year_previous, v => { row.year_previous = v; commit(); },
+                 { placeholder: "e.g. 2020" }), "year_previous"),
+        cell(box(row.year_latest, v => { row.year_latest = v; commit(); },
+                 { placeholder: "e.g. 2026" }), "year_latest"));
+      line("Subject / course title",
+        cell(box(row.prev_title, v => { row.prev_title = v; commit(); },
+                 { placeholder: "Previous title" }), "prev_title"),
+        cell(box(row.course_title, null, { readonly: true })));
+      line("Subject code",
+        cell(box(row.prev_code, v => { row.prev_code = v; commit(); },
+                 { placeholder: "Previous code" }), "prev_code"),
+        cell(box(row.course_code, null, { readonly: true })));
+
+      mods.forEach((m, i) => {
+        const tr = el("tr", "rv-module");
+        const th = el("th");
+        th.appendChild(el("span", null, `Module ${ROMAN[i] || i + 1}`));
+        if (!CTX.readonly) {
+          const rm = el("button", "rv-remove", "Remove");
+          rm.type = "button";
+          rm.setAttribute("aria-label", `Remove module ${i + 1}`);
+          rm.addEventListener("click", () => { mods.splice(i, 1); draw(); changed(); });
+          th.appendChild(rm);
+        }
+        tr.appendChild(th);
+        const pct = el("input");
+        pct.type = "text";
+        pct.inputMode = "decimal";
+        // typed by the department, never worked out for it
+        if (!m.pct_manual) m.pct = null;
+        pct.value = m.pct ?? "";
+        pct.placeholder = "Enter";
+        pct.title = "Type the percentage of change in this module";
+        if (CTX.readonly) pct.disabled = true;
+        tr.appendChild(cell(box(m.previous, v => { m.previous = v; changed(); },
+                                { multi: true, placeholder: "Leave empty for a new module" })));
+        tr.appendChild(cell(box(m.revised, v => { m.revised = v; changed(); },
+                                { multi: true, placeholder: "Module title (hours) — content" })));
+        pct.addEventListener("input", () => {
+          const v = pct.value.trim();
+          m.pct = v === "" ? null : Number(v);
+          m.pct_manual = v !== "";
+          changed();
+        });
+        const pc = el("td", "rv-pct");
+        const pw = el("span", "rv-pct-in");
+        pw.appendChild(pct);
+        pw.appendChild(el("span", null, "%"));
+        pc.appendChild(pw);
+        tr.appendChild(pc);
+        body.appendChild(tr);
+      });
+
+      if (!CTX.readonly) {
+        const tr = el("tr", "rv-add");
+        const td = el("td");
+        td.colSpan = 4;
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+        add.type = "button";
+        add.addEventListener("click", () => { mods.push({}); draw(); changed(); });
+        td.appendChild(add);
+        tr.appendChild(td);
+        body.appendChild(tr);
+      }
+      body.appendChild(hoursRow(mods, row, 4));
+      const tr = el("tr", "rv-total");
+      tr.appendChild(el("td"));
+      const lab = el("td", null, "Average percentage on revision considering all modules");
+      lab.colSpan = 2;
+      tr.appendChild(lab);
+      tr.appendChild(avgCell);
+      body.appendChild(tr);
+      setAvg();
+    }
+    draw();
+    return wrap;
+  }
+
+  /** Programme-wide: (A)-(D) and the course-wise change for every semester. */
+  function renderRevisionSummary(section, host) {
+    const box = el("div", "cd-box");
+    host.appendChild(box);
+    const T = section.threshold ?? 20;
+    function paint() {
+      box.textContent = "";
+      const courses = rows(section.source || "courses").filter(r => r && r.course_code);
+      if (!courses.length) {
+        box.appendChild(el("p", "pl-empty", "Add courses above and this summary fills itself."));
+        return;
+      }
+      const avgOf = r => num(r.avg_change) ?? averageChange(r.modules);
+      const A = courses.length;
+      const B = courses.filter(r => (avgOf(r) ?? 0) > T).length;
+      const C = A ? Math.round(B / A * 10000) / 100 : 0;
+      const known = courses.map(avgOf).filter(x => x !== null);
+      const D = known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length * 100) / 100 : null;
+      const t = el("table", "cd-table");
+      const tb = el("tbody");
+      [["(A)", "Total number of courses", String(A)],
+       ["(B)", `Number of courses with syllabus revision above ${T}%`, String(B)],
+       ["(C)", "Percentage of courses revised — (B / A) × 100", fmt(C)],
+       ["(D)", "Average percentage of syllabus revised, across all courses",
+        D === null ? "—" : fmt(D) + "%"]].forEach(([k, label, v]) => {
+        const tr = el("tr");
+        tr.appendChild(el("td", null, k));
+        tr.appendChild(el("td", null, label));
+        tr.appendChild(el("td", "num cd-strong", v));
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      const w = el("div", "rt-wrap");
+      w.appendChild(t);
+      box.appendChild(w);
+
+      box.appendChild(el("h4", "cd-head", "Percentage of change in syllabus — course-wise, by semester"));
+      const t2 = el("table", "cd-table");
+      const h = el("tr");
+      ["SL", "Course code", "Course title", "Percentage of change in syllabus"].forEach(
+        (x, n) => h.appendChild(el("th", n === 3 ? "num" : null, x)));
+      const th = el("thead");
+      th.appendChild(h);
+      t2.appendChild(th);
+      const b2 = el("tbody");
+      const sems = Array.from(new Set(courses.map(r => num(r.semester)))).sort((a, b) =>
+        (a ?? 99) - (b ?? 99));
+      sems.forEach(sem => {
+        const band = el("tr", "cd-band");
+        const td = el("td", null, sem === null ? "Semester not given" : `Semester ${ROMAN[sem - 1] || sem}`);
+        td.colSpan = 4;
+        band.appendChild(td);
+        b2.appendChild(band);
+        courses.filter(r => num(r.semester) === sem).forEach((r, i) => {
+          const tr = el("tr");
+          tr.appendChild(el("td", null, String(i + 1)));
+          tr.appendChild(el("td", null, r.course_code || ""));
+          tr.appendChild(el("td", null, r.course_title || ""));
+          const v = avgOf(r);
+          tr.appendChild(el("td", "num", v === null ? "—" : fmt(v) + "%"));
+          b2.appendChild(tr);
+        });
+      });
+      t2.appendChild(b2);
+      const w2 = el("div", "rt-wrap");
+      w2.appendChild(t2);
+      box.appendChild(w2);
+    }
+    refreshers.push(paint);
+    paint();
+  }
+
   function makeInput(def, value, onChange) {
     let input;
+    if (def.type === "fixed") return fixedBlock(def);
+    if (def.type === "module_compare") return moduleCompare(def, value, onChange);
+    if (def.type === "outcome_list") return outcomeList(def, value, onChange);
     if (def.type === "textarea") {
       input = el("textarea");
       input.rows = def.rows || 3;
       input.value = value ?? "";
-    } else if (def.type === "select" && def.lookup && !lookupRows(def).length) {
-      // nothing to pick from yet — let them type it
-      input = el("input");
-      input.type = "text";
-      input.value = value ?? "";
-    } else if (def.type === "select") {
+    } else if (def.type === "select" || def.choices) {
+      // a select, or a number picked from a short list (semester 1–8)
       input = el("select");
-      input.appendChild(new Option(def.required ? "Choose…" : "—", ""));
-      if (def.lookup) {
-        const known = lookupRows(def);
-        known.forEach(r => input.appendChild(
-          new Option(`${r.course_code} — ${r.course_title}`, r.course_code)));
-        if (value && !known.some(r => r.course_code === value))
-          input.appendChild(new Option(value, value));
-      }
-      (def.options || []).forEach(o => input.appendChild(new Option(o, o)));
-      input.value = value ?? "";
+      input.appendChild(new Option(def.choices ? "—" : def.required ? "Choose…" : "—", ""));
+      // a list can name its choices otherwise than it stores them (def.option_labels)
+      (def.options || def.choices || []).forEach(o =>
+        input.appendChild(new Option(String((def.option_labels || {})[o] || o), String(o))));
+      input.value = value == null ? "" : String(value);
     } else if (def.type === "checkbox") {
       input = el("input");
       input.type = "checkbox";
@@ -228,21 +816,6 @@
                      date: "date", phone: "tel" }[def.type] || "text";
       if (def.type === "integer" || def.type === "number") input.inputMode = "numeric";
       input.value = value ?? "";
-      if (def.lookup && lookupRows(def).length) {
-        const listId = `dl-${def.lookup}`;
-        if (!document.getElementById(listId)) {
-          const dl = el("datalist");
-          dl.id = listId;
-          lookupRows(def).forEach(r => {
-            const o = el("option");
-            o.value = r.course_code;
-            o.label = r.course_title;
-            dl.appendChild(o);
-          });
-          document.body.appendChild(dl);
-        }
-        input.setAttribute("list", listId);
-      }
     }
 
     if (def.placeholder) input.placeholder = def.placeholder;
@@ -251,12 +824,278 @@
     constrain(input, def);
 
     if (def.type === "file") {
-      input.addEventListener("change", () => uploadFile(input, def, onChange));
+      input.className = "sr-only";
+      input.addEventListener("change", () => {
+        uploadFile(input, Array.from(input.files || []), def, onChange);
+        input.value = "";   // choosing the same file again still uploads it
+      });
     } else {
       input.addEventListener("input", () => onChange(readInput(input, def)));
       input.addEventListener("change", () => onChange(readInput(input, def)));
     }
     return input;
+  }
+
+  /* ---------------------------------------------------------------- preview
+     A file that has just been uploaded should be visible without leaving the
+     form: the wrong scan is otherwise found weeks later by somebody else.
+
+     A PDF previews for real — browsers render one natively, so a scaled-down
+     frame of the first page is the actual document. So does an image. A Word
+     or Excel file cannot be rendered in a browser without shipping a
+     converter, so it gets a page-shaped card carrying its type, its name and
+     its size, and opens in one click. */
+
+  const IMAGE = /\.(png|jpe?g|webp|gif)$/i;
+
+  function fileKind(name) {
+    const ext = (String(name).match(/\.([a-z0-9]+)$/i) || [, ""])[1].toLowerCase();
+    if (ext === "pdf") return { ext, kind: "pdf", label: "PDF" };
+    if (IMAGE.test("." + ext)) return { ext, kind: "image", label: ext.toUpperCase() };
+    if (ext === "doc" || ext === "docx") return { ext, kind: "doc", label: "WORD" };
+    if (ext === "xls" || ext === "xlsx" || ext === "csv")
+      return { ext, kind: "sheet", label: ext === "csv" ? "CSV" : "EXCEL" };
+    return { ext, kind: "other", label: (ext || "file").toUpperCase() };
+  }
+
+  function sizeLabel(bytes) {
+    if (!bytes && bytes !== 0) return "";
+    return bytes >= 1048576
+      ? (bytes / 1048576).toFixed(1) + " MB"
+      : Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  function canView(info) { return info.kind === "pdf" || info.kind === "image"; }
+  function inlineUrl(val) { return val.url + (val.url.includes("?") ? "&" : "?") + "inline=1"; }
+
+  function filePreview(host, val, onRemove) {
+    const old = host.querySelector(".file-preview");
+    if (old) old.remove();
+    if (!val || !val.name) return;
+
+    const info = fileKind(val.name);
+    const card = el("div", "file-preview kind-" + info.kind);
+
+    const thumb = el(val.url && canView(info) ? "button" : "div", "file-thumb");
+    if (thumb.tagName === "BUTTON") {
+      thumb.type = "button";
+      thumb.title = "View " + val.name;
+      thumb.addEventListener("click", () => openViewer(val));
+    }
+
+    // the card that stands in when the real thing cannot be shown: a page
+    // with its corner turned, carrying the file's type
+    function drawnPage() {
+      const d = el("span", "file-drawn");
+      d.appendChild(el("span", "file-ext", info.label));
+      return d;
+    }
+
+    if (val.thumb || (val.url && info.kind === "image")) {
+      /* A picture of the first page, drawn by the server. If it never
+         arrives — no renderer on the server, an encrypted file — the card
+         takes its place. */
+      const img = document.createElement("img");
+      img.src = val.thumb || inlineUrl(val);
+      img.alt = info.kind === "pdf"
+        ? "First page of " + val.name : "Preview of " + val.name;
+      img.loading = "lazy";
+      img.addEventListener("load", () => thumb.classList.add("is-loaded"));
+      img.addEventListener("error", function () {
+        img.remove();
+        thumb.classList.add("is-drawn");
+        thumb.appendChild(drawnPage());
+      });
+      thumb.appendChild(img);
+    } else {
+      thumb.classList.add("is-drawn");
+      thumb.appendChild(drawnPage());
+    }
+    card.appendChild(thumb);
+
+    const meta = el("div", "file-meta");
+    meta.appendChild(el("strong", "file-name", val.name));
+    const facts = el("span", "file-facts");
+    facts.textContent = [info.label, sizeLabel(val.size)].filter(Boolean).join(" · ");
+    meta.appendChild(facts);
+
+    const acts = el("div", "file-acts");
+    if (val.url && canView(info)) {
+      const view = el("button", "file-act is-view", "View");
+      view.type = "button";
+      view.addEventListener("click", () => openViewer(val));
+      acts.appendChild(view);
+    }
+    if (val.url) {
+      const open = el("a", "file-act", canView(info) ? "New tab" : "Open");
+      open.href = canView(info) ? inlineUrl(val) : val.url;
+      open.target = "_blank";
+      open.rel = "noopener";
+      acts.appendChild(open);
+    }
+    let sumBtn = null;
+    if (val.url && info.kind === "pdf" && CTX.summaries) {
+      sumBtn = el("button", "file-act is-ai", "✦ Summary");
+      sumBtn.type = "button";
+      sumBtn.title = "A short summary of this PDF";
+      acts.appendChild(sumBtn);
+    }
+    if (onRemove && !CTX.readonly) {
+      const rm = el("button", "file-act is-remove", "Remove");
+      rm.type = "button";
+      rm.setAttribute("aria-label", "Remove " + val.name);
+      rm.addEventListener("click", onRemove);
+      acts.appendChild(rm);
+    }
+    meta.appendChild(acts);
+    const tl = templateLine(val);
+    if (tl) meta.appendChild(tl);
+    const kw = matchLine(val);
+    if (kw) meta.appendChild(kw);
+    if (val.url && (info.kind === "doc" || info.kind === "sheet")) {
+      meta.appendChild(el("span", "file-note",
+        "Word and Excel files cannot be shown in a browser — open it to check it."));
+    }
+    card.appendChild(meta);
+    host.appendChild(card);
+    if (sumBtn) {
+      sumBtn.addEventListener("click", () => {
+        const open = host.querySelector(".file-summary");
+        if (open && !open.classList.contains("is-bad")) { open.remove(); host.classList.remove("has-summary"); return; }
+        loadSummary(host, val, false);
+      });
+      // a PDF just uploaded is read straight away
+      if (freshUploads.delete(val.url)) loadSummary(host, val, false);
+    }
+  }
+
+  /* ------------------------------------------------------------- summaries
+     The AI reads the PDF (pictures of its pages, for a scan) and says in a few
+     lines what it is and whether it looks like the right document for the
+     box. Made once per file on the server and kept. */
+  const freshUploads = new Set();
+  function loadSummary(host, val, refresh) {
+    window.PortalSummary.load(host, val.url + "/summary", refresh);
+  }
+
+  /** One preview, or a row of them for a box that takes several files. */
+  function showFiles(host, val, onRemove) {
+    const oldList = host.querySelector(".file-previews");
+    if (oldList) oldList.remove();
+    const old = host.querySelector(":scope > .file-preview");
+    if (old) old.remove();
+    const list = el("div", "file-previews");
+    const vals = (Array.isArray(val) ? val : [val]).filter(v => v && v.name);
+    vals.forEach((v, i) => {
+      const slot = el("div");
+      filePreview(slot, v, onRemove ? () => onRemove(i) : null);
+      list.appendChild(slot);
+    });
+    if (!vals.length) return;
+    // under the box and its note, above the help line
+    const anchor = host.querySelector(":scope > .upload-note") || host.querySelector(":scope > .upload-folder");
+    if (anchor) anchor.after(list); else host.appendChild(list);
+  }
+
+  function fileNames(val) {
+    return (Array.isArray(val) ? val : [val]).filter(v => v && v.name).map(v => v.name);
+  }
+
+  /* ---------------------------------------------------------------- viewer
+     Every PDF and picture uploaded on the page, in one viewer: the whole
+     document, all its pages, without leaving the form. Arrows step through
+     the other uploads. */
+  let viewer = null;
+  function allViewable() {
+    const out = [];
+    document.querySelectorAll("#sections .field[data-field]").forEach(f => {
+      (f._files ? f._files() : []).forEach(v => {
+        if (v && v.url && canView(fileKind(v.name)) && !out.some(o => o.url === v.url)) out.push(v);
+      });
+    });
+    return out;
+  }
+  function buildViewer() {
+    const d = el("div", "file-viewer");
+    d.hidden = true;
+    d.setAttribute("role", "dialog");
+    d.setAttribute("aria-modal", "true");
+    d.setAttribute("aria-label", "Document viewer");
+    d.innerHTML =
+      '<div class="fv-backdrop" data-close></div>' +
+      '<div class="fv-panel">' +
+      '  <div class="fv-head">' +
+      '    <button type="button" class="fv-nav" data-step="-1" aria-label="Previous document">‹</button>' +
+      '    <div class="fv-title"><strong></strong><span></span></div>' +
+      '    <button type="button" class="fv-nav" data-step="1" aria-label="Next document">›</button>' +
+      '    <a class="fv-btn" target="_blank" rel="noopener" data-newtab>New tab</a>' +
+      '    <a class="fv-btn" data-download>Download</a>' +
+      '    <button type="button" class="fv-close" data-close aria-label="Close viewer">×</button>' +
+      '  </div>' +
+      '  <div class="fv-body"><span class="sk fv-sk"></span></div>' +
+      '</div>';
+    document.body.appendChild(d);
+    d.addEventListener("click", e => {
+      if (e.target.closest("[data-close]")) closeViewer();
+      const step = e.target.closest("[data-step]");
+      if (step) stepViewer(+step.dataset.step);
+    });
+    document.addEventListener("keydown", e => {
+      if (d.hidden) return;
+      if (e.key === "Escape") closeViewer();
+      if (e.key === "ArrowRight") stepViewer(1);
+      if (e.key === "ArrowLeft") stepViewer(-1);
+    });
+    return d;
+  }
+  let viewList = [], viewAt = 0, viewFrom = null;
+  function openViewer(val) {
+    viewer = viewer || buildViewer();
+    viewFrom = document.activeElement;
+    viewList = allViewable();
+    viewAt = viewList.findIndex(v => v.url === val.url);
+    // a file outside the upload boxes (a table row's) opens first
+    if (viewAt < 0) { viewList.unshift(val); viewAt = 0; }
+    showInViewer();
+    viewer.hidden = false;
+    document.body.classList.add("fv-open");
+    viewer.querySelector(".fv-close").focus();
+  }
+  function stepViewer(n) {
+    if (viewList.length < 2) return;
+    viewAt = (viewAt + n + viewList.length) % viewList.length;
+    showInViewer();
+  }
+  function showInViewer() {
+    const v = viewList[viewAt];
+    const info = fileKind(v.name);
+    viewer.querySelector(".fv-title strong").textContent = v.name;
+    viewer.querySelector(".fv-title span").textContent =
+      [info.label, sizeLabel(v.size), viewList.length > 1 ? `${viewAt + 1} of ${viewList.length}` : ""]
+        .filter(Boolean).join(" · ");
+    viewer.querySelectorAll(".fv-nav").forEach(b => { b.hidden = viewList.length < 2; });
+    viewer.querySelector("[data-newtab]").href = inlineUrl(v);
+    viewer.querySelector("[data-download]").href = v.url;
+    const body = viewer.querySelector(".fv-body");
+    body.innerHTML = '<span class="sk fv-sk"></span>';
+    const doc = info.kind === "pdf" ? document.createElement("iframe") : document.createElement("img");
+    doc.className = "fv-doc";
+    if (info.kind === "pdf") {
+      doc.title = v.name;
+      doc.src = inlineUrl(v) + "#view=FitH";
+    } else {
+      doc.alt = v.name;
+      doc.src = inlineUrl(v);
+    }
+    doc.addEventListener("load", () => { const sk = body.querySelector(".fv-sk"); if (sk) sk.remove(); });
+    body.appendChild(doc);
+  }
+  function closeViewer() {
+    if (!viewer) return;
+    viewer.hidden = true;
+    viewer.querySelector(".fv-body").innerHTML = "";
+    document.body.classList.remove("fv-open");
+    if (viewFrom && viewFrom.focus) viewFrom.focus();
   }
 
   function uploadOne(file, def) {
@@ -268,54 +1107,219 @@
       .then(r => r.json())
       .then(j => {
         if (!j.ok) throw new Error(j.error || `Upload of ${file.name} failed.`);
-        return { name: j.name, stored: j.stored, size: j.size, url: j.url };
+        // thumb comes along too, or the preview has no picture to show
+        const v = { name: j.name, stored: j.stored, size: j.size,
+                    url: j.url, thumb: j.thumb || null };
+        if (j.match) v.match = j.match;
+        matchToast(v);
+        return v;
       });
   }
 
-  function fileNames(value) {
-    const list = Array.isArray(value) ? value : (value && typeof value === "object" ? [value] : []);
-    return list.map(v => v.name).filter(Boolean);
+  /* --------------------------------------------------------- keyword match
+     The server reads an upload and looks for the words a document for its box
+     always carries; the answer shows as a line on the file and, when nothing
+     matches, as a warning straight away. */
+  const MATCH_WORDS = { match: "Keywords match", weak: "Few keywords match",
+                        miss: "No expected keywords found", unread: "Keywords not checked" };
+  /* A signed composition form: is every category filled in? */
+  function templateLine(val) {
+    const t = val && val.match && val.match.template;
+    if (!t) return null;
+    const bad = (t.blank || []).length || (t.half || []).length || t.placeholders;
+    const line = el("div", "tpl-check " + (bad ? "is-bad" : "is-ok"));
+    line.appendChild(el("span", "kw-icon", bad ? "!" : "✓"));
+    line.appendChild(el("strong", null, bad ? `Blank in the ${t.template} — check it`
+                                            : `${t.template}: every category filled (${t.filled} of ${t.total})`));
+    if (bad) {
+      const ul = el("ul");
+      if ((t.blank || []).length) ul.appendChild(el("li", null, "No name yet: " + t.blank.join(", ")));
+      if ((t.half || []).length) ul.appendChild(el("li", null, "Designation missing: " + t.half.join(", ")));
+      if (t.placeholders) ul.appendChild(el("li", null, `“Words only” still written in ${t.placeholders} place${t.placeholders === 1 ? "" : "s"}`));
+      line.appendChild(ul);
+      line.appendChild(el("span", "kw-sub", "Fill any that apply and upload it again — a category that does not apply can stay empty; it does not stop Submit."));
+    }
+    return line;
   }
 
-  function uploadFile(input, def, onChange) {
-    const files = Array.from(input.files || []);
+  function matchLine(val) {
+    const m = val && val.match;
+    if (!m || !m.status) return null;
+    const line = el("div", "kw-match is-" + m.status);
+    line.appendChild(el("span", "kw-icon", m.status === "match" ? "✓" : m.status === "unread" ? "–" : "!"));
+    line.appendChild(el("strong", null, m.looks_like ? "Wrong document — this looks like " + m.looks_like
+                                                     : (MATCH_WORDS[m.status] || "")));
+    if (m.status === "unread") {
+      line.appendChild(el("span", "kw-sub", m.why === "no_reader"
+        ? "PDF keywords are not checked yet — fine to submit; open it to check"
+        : "this file has no text to read (a scan, image or zip) — fine to submit; open it to check"));
+    } else {
+      const tags = el("span", "kw-tags");
+      (m.expected || []).forEach(w => {
+        const at = (m.found || []).indexOf(w), hit = at >= 0;
+        const shown = hit && m.seen && m.seen[at] ? m.seen[at] : w.split("/")[0].trim();
+        const t = el("span", "kw-tag" + (hit ? " is-hit" : ""), shown);
+        t.title = (hit ? "Found in the file" : "Not found in the file") + (w.includes("/") ? " — any of: " + w : "");
+        tags.appendChild(t);
+      });
+      line.appendChild(tags);
+      if (m.looks_like) line.appendChild(el("span", "kw-sub", `This looks like ${m.looks_like}, not the “${m.label}” — check you chose the right box.`));
+      else if (m.status === "miss") line.appendChild(el("span", "kw-sub", "make sure this is the right file for “" + m.label + "”"));
+    }
+    return line;
+  }
+  function matchToast(v) {
+    const m = v.match;
+    if (!m || !window.Toast) return;
+    if (m.looks_like) {
+      window.Toast.warning(`${v.name} looks like ${m.looks_like}, not the ${m.label}. Check you chose the right box.`,
+                           { title: "Wrong document?", timeout: 12000 });
+      return;
+    }
+    const t = m.template;
+    if (t && ((t.blank || []).length || (t.half || []).length || t.placeholders)) {
+      const what = (t.blank || []).length ? t.blank.join(", ") : (t.half || []).length ? "designation for " + t.half.join(", ") : "the “Words only” places";
+      window.Toast.warning(`${v.name}: blank — ${what}. Fill any that apply; one that does not can stay empty.`,
+                           { title: "Blank in the form", timeout: 12000 });
+      return;
+    }
+    if (t) { window.Toast.success(`${v.name}: every category in the ${t.template} is filled.`, { title: "Form complete" }); return; }
+    if (m.status === "miss") {
+      window.Toast.warning(`None of the words a “${m.label}” carries (${(m.expected || []).slice(0, 4).join(", ")}…) are in ${v.name}. Check it is the right file.`,
+                           { title: "Keywords do not match" });
+    } else if (m.status === "match") {
+      window.Toast.success(`${v.name} carries ${(m.seen || m.found).slice(0, 4).join(", ")}.`, { title: "Keywords match" });
+    }
+  }
+
+  // the types a box takes, from its accept list — a dropped file skips the
+  // browser's own picker, so the check happens here
+  function accepts(def, file) {
+    if (!def.accept) return true;
+    const name = file.name.toLowerCase();
+    return def.accept.split(",").map(a => a.trim().toLowerCase()).some(a =>
+      a.startsWith(".") ? name.endsWith(a) : a.endsWith("/*")
+        ? (file.type || "").startsWith(a.slice(0, -1)) : file.type === a);
+  }
+
+  function uploadFile(input, files, def, onChange) {
+    const wrap = input.closest(".field");
     if (!files.length) return;
-    const note = input.parentElement.querySelector(".upload-note") ||
-                 input.parentElement.appendChild(el("span", "help upload-note"));
+    const note = wrap.querySelector(".upload-note") ||
+                 wrap.querySelector(".upload-folder").insertAdjacentElement("afterend", el("span", "help upload-note"));
     note.className = "help upload-note";
     note.setAttribute("role", "status");
-    note.textContent = files.length > 1 ? `Uploading ${files.length} files…` : "Uploading…";
+    const bad = files.filter(f => !accepts(def, f));
+    files = files.filter(f => accepts(def, f));
+    if (!def.multiple) files = files.slice(0, 1);
+    if (!files.length) {
+      note.textContent = `${bad.map(f => f.name).join(", ")} — this box takes ${def.accept} only.`;
+      note.className = "help upload-note is-bad-text";
+      return;
+    }
+    const zone = wrap.querySelector(".upload-folder");
+    zone.classList.add("is-busy");
+    note.textContent = files.length > 1 ? `Uploading ${files.length} files…` : `Uploading ${files[0].name}…`;
     // one after another, so a slow connection is not flooded
-    files.reduce((chain, f) => chain.then(done => uploadOne(f, def).then(r => done.concat([r]))),
+    files.reduce((chain, f) => chain.then(done => uploadOne(f, def).then(v => done.concat([v]))),
                  Promise.resolve([]))
       .then(done => {
-        const value = def.multiple ? done : done[0];
-        note.textContent = "Uploaded: " + fileNames(value).join(", ");
+        done.forEach(v => { if (CTX.summaries && fileKind(v.name).kind === "pdf") freshUploads.add(v.url); });
+        const had = wrap._files ? wrap._files() : [];
+        const val = def.multiple ? had.concat(done) : done[0];
+        note.textContent = (done.length > 1
+          ? `Uploaded ${done.length} files`
+          : "✓ Uploaded") +
+          (bad.length ? ` · skipped ${bad.map(f => f.name).join(", ")} (not ${def.accept})` : "");
         note.className = "help upload-note is-ok";
-        onChange(value);
+        wrap._set(val);
+        onChange(val);
       })
       .catch(e => {
         note.textContent = (e && e.message) ||
           "Upload failed — check your connection and choose the file again.";
         note.className = "help upload-note is-bad-text";
-      });
+      })
+      .finally(() => zone.classList.remove("is-busy"));
   }
 
-  function fieldBlock(def, value, onChange, idp) {
-    idp = idp || "";
+  /* The upload box: a folder that opens when a file is dragged over it or
+     the pointer rests on it, and takes a click, a keypress or a drop. */
+  function uploadBox(def, input, value, onChange) {
+    const zone = el("div", "upload-folder");
+    const folder = el("div", "folder");
+    folder.setAttribute("aria-hidden", "true");
+    const front = el("div", "front-side");
+    front.appendChild(el("div", "tip"));
+    front.appendChild(el("div", "cover"));
+    folder.appendChild(front);
+    folder.appendChild(el("div", "back-side cover"));
+    zone.appendChild(folder);
+
+    const lab = el("label", "custom-file-upload");
+    lab.setAttribute("for", input.id);
+    lab.appendChild(input);
+    const txt = el("span", "cfu-text");
+    txt.appendChild(el("strong", null, CTX.readonly ? "Uploads are locked"
+      : def.multiple ? "Drag files here to upload" : "Drag a file here to upload"));
+    if (def.accept) txt.appendChild(el("span", "cfu-types",
+      def.accept.replace(/\./g, "").toUpperCase().split(",").join(" · ") + (def.multiple ? " · several at once" : "")));
+    lab.appendChild(txt);
+    if (!CTX.readonly) lab.appendChild(el("span", "cfu-btn", def.multiple ? "Choose files" : "Choose file"));
+    zone.appendChild(lab);
+    if (CTX.readonly) { zone.classList.add("is-locked"); return zone; }
+
+    let depth = 0;
+    zone.addEventListener("dragenter", e => { e.preventDefault(); depth++; zone.classList.add("is-over"); });
+    zone.addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    zone.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; zone.classList.remove("is-over"); } });
+    zone.addEventListener("drop", e => {
+      e.preventDefault();
+      depth = 0;
+      zone.classList.remove("is-over");
+      uploadFile(input, Array.from(e.dataTransfer.files || []), def, onChange);
+    });
+    return zone;
+  }
+
+  /** A small "i" by a label whose box shows grey wording: hover or press it, or
+      click into the box, and the whole wording is read in a card beside it. */
+  // The sample wording stays out of the box until the "i" is clicked; then it
+  // shows faintly as the placeholder, and a second click hides it again.
+  function addHint(wrap, lab, input, def) {
+    const text = (def.placeholder || "").trim();
+    if (!text || def.type === "file" || !input || !("placeholder" in input)) return;
+    const btn = el("button", "hint-i", "i");
+    btn.type = "button";
+    btn.title = "Show sample wording";
+    btn.setAttribute("aria-label", "Show sample wording");
+    btn.setAttribute("aria-pressed", "false");
+    const quiet = "Click ⓘ to see sample wording";
+    input.placeholder = quiet;
+    lab.appendChild(btn);
+    btn.addEventListener("click", e => {
+      e.preventDefault();
+      const on = btn.getAttribute("aria-pressed") !== "true";
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.title = on ? "Hide sample wording" : "Show sample wording";
+      input.placeholder = on ? text : quiet;
+    });
+  }
+
+  function fieldBlock(def, value, onChange) {
     const wrap = el("div", "field" + (def.type === "textarea" || def.wide ? " wide" : ""));
     wrap.dataset.field = def.name;
 
     if (def.type === "checkbox") {
       const lab = el("label", "check");
       const input = makeInput(def, value, onChange);
-      input.id = `f-${idp}${def.name}`;
+      input.id = `f-${def.name}`;
       lab.appendChild(input);
       lab.appendChild(el("span", null, def.label + (def.required ? " *" : "")));
       wrap.appendChild(lab);
       if (def.help) {
-        const help = el("span", "help", def.help);
-        help.id = `f-${idp}${def.name}-help`;
+        const help = autoNote(el("span", "help", def.help));
+        help.id = `f-${def.name}-help`;
         wrap.appendChild(help);
         describe(input, help.id);
       }
@@ -323,7 +1327,7 @@
     }
 
     const lab = el("label", null, def.label);
-    lab.setAttribute("for", `f-${idp}${def.name}`);
+    lab.setAttribute("for", `f-${def.name}`);
     if (def.required) {
       const star = el("span", "req");
       star.setAttribute("aria-hidden", "true");
@@ -334,18 +1338,38 @@
     wrap.appendChild(lab);
 
     const input = makeInput(def, value, onChange);
-    input.id = `f-${idp}${def.name}`;
-    wrap.appendChild(input);
-    wrap._input = input;
-
-    if (def.type === "file" && fileNames(value).length) {
-      const n = el("span", "help upload-note", "Uploaded: " + fileNames(value).join(", "));
-      n.classList.add("is-ok");
-      wrap.appendChild(n);
+    input.id = `f-${def.name}`;
+    if (def.type === "file") {
+      let current = value && typeof value === "object" ? value : (def.multiple ? [] : null);
+      const list = () => (Array.isArray(current) ? current : [current]).filter(v => v && v.name);
+      wrap._files = list;
+      wrap._set = v => {
+        current = v;
+        showFiles(wrap, current, i => {
+          const next = def.multiple ? list().filter((_, j) => j !== i) : null;
+          const note = wrap.querySelector(".upload-note");
+          if (note) { note.textContent = "Removed — upload again if that was a mistake."; note.className = "help upload-note"; }
+          wrap._set(next);
+          onChange(def.multiple ? next : "");
+        });
+      };
+      if (def.template) {
+        const t = el("a", "tpl-link", "⤓ Download the template for reference (Word)");
+        t.href = CTX.urls.static + def.template;
+        t.setAttribute("download", "");
+        wrap.appendChild(t);
+      }
+      wrap.appendChild(uploadBox(def, input, value, onChange));
+      // the file card under the box already names what is uploaded
+      wrap._set(current);
+    } else {
+      wrap.appendChild(input);
     }
+    wrap._input = input;
+    addHint(wrap, lab, input, def);
     if (def.help) {
-      const help = el("span", "help", def.help);
-      help.id = `f-${idp}${def.name}-help`;
+      const help = autoNote(el("span", "help", def.help));
+      help.id = `f-${def.name}-help`;
       wrap.appendChild(help);
       describe(input, help.id);
     }
@@ -353,131 +1377,525 @@
     return wrap;
   }
 
+  // ------------------------------------------------------ hints and sums
+  /* A small card that opens beside a field on hover or focus, saying what
+     the field should hold and offering to fill it. One element serves the
+     whole page. */
+
+  const hintPop = el("div", "hint-pop");
+  hintPop.hidden = true;
+  hintPop.setAttribute("role", "tooltip");
+  document.body.appendChild(hintPop);
+  let hintTimer = null;
+
+  function showHint(anchor, build) {
+    clearTimeout(hintTimer);
+    hintPop.textContent = "";
+    build(hintPop);
+    if (!hintPop.childNodes.length) { hintPop.hidden = true; return; }
+    hintPop.hidden = false;
+    const r = anchor.getBoundingClientRect();
+    const w = hintPop.offsetWidth;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    hintPop.style.left = left + window.scrollX + "px";
+    hintPop.style.top = r.bottom + window.scrollY + 6 + "px";
+  }
+  function hideHint() {
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { hintPop.hidden = true; }, 200);
+  }
+  hintPop.addEventListener("mouseenter", () => clearTimeout(hintTimer));
+  hintPop.addEventListener("mouseleave", hideHint);
+  // the "Use" button must not steal focus and close the card before it is clicked
+  hintPop.addEventListener("mousedown", e => e.preventDefault());
+
+  function hintOn(holder, build) {
+    holder.addEventListener("mouseenter", () => showHint(holder, build));
+    holder.addEventListener("mouseleave", hideHint);
+    holder.addEventListener("focusin", () => showHint(holder, build));
+    holder.addEventListener("focusout", hideHint);
+  }
+
+  function hintCard(pop, title, lines, suggestion, current, apply) {
+    pop.appendChild(el("strong", "hint-title", title));
+    lines.filter(Boolean).forEach(t => pop.appendChild(el("span", "hint-line", t)));
+    if (suggestion === null || suggestion === undefined || CTX.readonly) return;
+    if (String(current ?? "") === String(suggestion)) {
+      pop.appendChild(el("span", "hint-ok", "✓ Matches"));
+      return;
+    }
+    const b = el("button", "hint-use", `Use ${suggestion}`);
+    b.type = "button";
+    b.addEventListener("click", () => { apply(); hintPop.hidden = true; });
+    pop.appendChild(b);
+  }
+
+  const num = v => (v === null || v === undefined || String(v).trim() === "" ||
+                    Number.isNaN(Number(v))) ? null : Number(v);
+  const fmt = n => String(Math.round(n * 100) / 100);
+  // a weight as people write it: ½ and ⅓ rather than 0.5 and 0.3333…
+  const frac = n => ({ 0.5: "½", 0.25: "¼", 0.75: "¾" })[n] ||
+    (Math.abs(n - 1 / 3) < 1e-9 ? "⅓" : Math.abs(n - 2 / 3) < 1e-9 ? "⅔" : fmt(n));
+
+  // Fields a table can work out for itself, from the columns it has.
+  function derivedRules(section) {
+    const has = n => (section.columns || []).some(c => c.name === n);
+    const C = CTX.calc || {};
+    const w = C.weights || {};
+    const out = [];
+    // "UG - 3 Year" → 3 years → 6 semesters
+    const yearsOf = r => {
+      const m = /(\d+)\s*Year/i.exec(String(r.degree_level || ""));
+      return m ? Number(m[1]) : null;
+    };
+    if (has("degree_level") && has("duration_years")) {
+      out.push({
+        field: "duration_years", title: "Duration from the degree",
+        calc: yearsOf,
+        explain: r => [`“${r.degree_level}” runs for ${yearsOf(r)} year${yearsOf(r) === 1 ? "" : "s"}.`],
+        empty: "Choose the degree / duration and this fills itself.",
+      });
+    }
+    if (has("duration_years") && has("semesters")) {
+      out.push({
+        field: "semesters", title: "Semesters from the duration",
+        calc: r => num(r.duration_years) === null ? null : num(r.duration_years) * 2,
+        explain: r => [`${r.duration_years} year${num(r.duration_years) === 1 ? "" : "s"} × 2 semesters a year`],
+        empty: "Enter the duration and the semesters fill themselves.",
+      });
+    }
+    if (has("credits") && ["l", "t", "p", "e"].every(has)) {
+      out.push({
+        field: "credits", title: "Credits from contact hours",
+        calc: r => {
+          if (NON_CREDIT.includes(r.nep_category)) return 0;
+          const [l, t, p, e] = ["l", "t", "p", "e"].map(k => num(r[k]));
+          if ([l, t, p, e].some(x => x === null)) return null;
+          return l * w.lecture + t * w.tutorial + p * w.practical + e * w.experiential;
+        },
+        explain: r => [
+          `L ${r.l ?? "–"} × ${frac(w.lecture)} + T ${r.t ?? "–"} × ${frac(w.tutorial)} + ` +
+          `P ${r.p ?? "–"} × ${frac(w.practical)} + E ${r.e ?? "–"} × ${frac(w.experiential)}`,
+          `A course may carry at most ${C.max_per_course} credits.`,
+        ],
+        empty: "Fill L, T, P and E and the credits fill themselves.",
+      });
+    }
+    if (has("avg_change") && has("modules")) {
+      out.push({
+        field: "avg_change", title: "Average percentage on revision",
+        calc: r => averageChange(r.modules),
+        explain: r => ["The average of the modules' % change."],
+        empty: "Fill in the modules and the average works itself out.",
+      });
+    }
+    const fixedTotal = (section.columns || []).some(c => c.name === "total_marks" && c.fixed_value != null);
+    if (has("total_marks") && has("cia") && has("ese") && !fixedTotal) {
+      out.push({
+        field: "total_marks", title: "Total marks",
+        calc: r => num(r.cia) === null || num(r.ese) === null ? null : num(r.cia) + num(r.ese),
+        explain: r => [`Continuous Assessment ${r.cia ?? "–"} + End Semester Examination ${r.ese ?? "–"}`],
+        empty: "Enter both marks and the total fills itself.",
+      });
+    }
+    if (has("total_credits") && has("degree_level")) {
+      const totals = C.degree_totals || {};
+      out.push({
+        field: "total_credits", title: "Credits from UGC Table 2",
+        calc: r => totals[r.degree_level] ?? null,
+        explain: r => [`UGC Table 2 asks for at least ${totals[r.degree_level]} credits ` +
+                       `for “${r.degree_level}”.`],
+        empty: "Choose a UG degree and the UGC minimum fills in; enter a PG programme's own total.",
+      });
+    }
+    return out;
+  }
+
+  function markManual(row, field, cells) {
+    row._auto = (row._auto || []).filter(f => f !== field);
+    row._manual = Array.from(new Set([...(row._manual || []), field]));
+    if (cells[field]) cells[field].classList.remove("is-auto");
+  }
+
+  // Fill every derived field that is blank or was filled by us before.
+  // A value the department typed itself is never overwritten.
+  function derive(rules, row, cells) {
+    if (CTX.readonly) return false;
+    let changed = false;
+    rules.forEach(rule => {
+      const v = rule.calc(row);
+      if (v === null) return;
+      const blank = num(row[rule.field]) === null;
+      const ours = (row._auto || []).includes(rule.field);
+      const theirs = (row._manual || []).includes(rule.field);
+      if (!(ours || (blank && !theirs))) return;
+      const val = fmt(v);
+      if (String(row[rule.field] ?? "") === val && ours) return;
+      row[rule.field] = Number(val);
+      row._auto = Array.from(new Set([...(row._auto || []), rule.field]));
+      if (cells[rule.field]) {
+        cells[rule.field].value = val;
+        cells[rule.field].classList.add("is-auto");
+      }
+      changed = true;
+    });
+    return changed;
+  }
+
+  function derivedHint(pop, rule, row, cells, rules, after) {
+    const v = rule.calc(row);
+    const auto = (row._auto || []).includes(rule.field);
+    hintCard(pop, rule.title,
+      v === null ? [rule.empty] : [...rule.explain(row), `Suggested: ${fmt(v)}` +
+                                   (auto ? " — filled in for you" : "")],
+      v === null ? null : fmt(v), row[rule.field],
+      () => {
+        row._manual = (row._manual || []).filter(f => f !== rule.field);
+        row._auto = (row._auto || []).filter(f => f !== rule.field);
+        row[rule.field] = "";
+        derive(rules, row, cells);
+        touch();
+        if (after) after();
+      });
+  }
+
+  // Running totals under any table with credit columns.
+  function renderTotals(section, data, box) {
+    const creditCols = (section.columns || []).filter(c => /credits$/.test(c.name));
+    box.textContent = "";
+    if (!creditCols.length || !data.length) return;
+    const sum = name => data.reduce((a, r) => a + (num(r[name]) || 0), 0);
+
+    if (section.key === "semester_structure") {
+      data = data.filter(rowCounts);
+      const bySem = {};
+      data.forEach(r => {
+        const sem = num(r.semester);
+        if (sem === null) return;
+        bySem[sem] = (bySem[sem] || 0) + (num(r.credits) || 0);
+      });
+      const total = sum("credits");
+      const need = (CTX.calc || {}).required_total;
+      const head = el("div", "tot-main");
+      head.appendChild(el("span", "tot-label", "Total credits"));
+      head.appendChild(el("span", "tot-num", fmt(total)));
+      if (need) {
+        const gap = need - total;
+        head.appendChild(el("span", gap > 0 ? "tot-short" : "tot-met",
+          gap > 0 ? `${fmt(gap)} short of ${need}` : gap < 0 ? `${fmt(-gap)} over ${need}` :
+                    `meets the ${need} required`));
+      }
+      box.appendChild(head);
+      const chips = el("div", "tot-chips");
+      Object.keys(bySem).sort((a, b) => a - b).forEach(k => {
+        chips.appendChild(el("span", "tot-chip", `Sem ${k} · ${fmt(bySem[k])}`));
+      });
+      box.appendChild(chips);
+      return;
+    }
+
+    const head = el("div", "tot-main");
+    creditCols.forEach(c => {
+      head.appendChild(el("span", "tot-label", c.label.replace(/^Total /, "")));
+      head.appendChild(el("span", "tot-num", fmt(sum(c.name))));
+    });
+    if (creditCols.length === 2) {
+      const d = sum(creditCols[1].name) - sum(creditCols[0].name);
+      head.appendChild(el("span", d === 0 ? "tot-met" : "tot-short",
+                          d === 0 ? "no change" : `${d > 0 ? "+" : ""}${fmt(d)} credits`));
+    }
+    box.appendChild(head);
+  }
+
   // ---------------------------------------------------------- repeating table
 
-  /** A row value changed: re-run its calculations and lookup fills. */
-  function rowChanged(section, row, inputs, col) {
-    if (col && col.fills) {
-      const rec = lookupRows(col).find(r => r.course_code === row[col.name]);
-      if (rec) {
-        Object.entries(col.fills).forEach(([target, src]) => {
-          row[target] = rec[src] ?? "";
-          if (inputs[target]) inputs[target].value = row[target];
-        });
-      }
-    }
-    section.columns.forEach(c => {
-      if (!c.calc || !CALCS[c.calc]) return;
-      const v = CALCS[c.calc](row);
-      row[c.name] = v;
-      if (inputs[c.name]) inputs[c.name].value = v;
-    });
+  // a number box as wide as its value, never under two digits
+  const FIELD_SIZING = window.CSS && CSS.supports && CSS.supports("field-sizing", "content");
+  function fitNum(input) {
+    if (FIELD_SIZING) return;
+    input.style.width = `calc(${Math.max(2, String(input.value || "").length)}ch + 20px)`;
+  }
+  // derived values (credits, total) are written by code, not typed
+  refreshers.push(() => document.querySelectorAll("input.num-cell").forEach(fitNum));
+
+  /* A file for one row of a table: an Upload button, then the file's name
+     (opening it, or the viewer for a PDF) and × to take it off. */
+  /* A curriculum row's syllabus: found by course code in the current batch's
+     syllabus (then the earlier batches'), and the title compared. The chip
+     says how well they match and opens that syllabus at that course. */
+  const norm = v => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  /* Programme structure: does this course have a syllabus? Yes / No.
+     Yes (the default) shows a link to its syllabus in the current batch —
+     the course is added there if it is not yet; No leaves it out. */
+  /* Syllabus and Revision, on each course row: Yes or No, and with Yes a
+     small → that opens this course there. In the Curriculum, Syllabus opens
+     the current batch's syllabus; on an earlier batch's Curriculum, that
+     batch's own Syllabus page. Revision opens the course in Course Revision.
+     Each link says where it was clicked, so the page it opens leads back. */
+  const IS_BATCH = !!STAGE.existing_batch;
+  // the semesters Settings asks an earlier batch for (none set: all), and the
+  // page of it the address asks for: curriculum, syllabus or revision
+  const BATCH_SEMS = (STAGE.batch_semesters || []).map(Number);
+  const START_VIEW = new URLSearchParams(location.search).get("view") || "";
+  const FROM = "?from=" + encodeURIComponent(CTX.key);
+  const currentSyllabus = () => ((CTX.syllabi || []).find(x => x.current) || {}).url;
+  const COURSE_LINKS = {
+    syllabus_link: { field: "syllabus", word: "Syllabus", all: "All syllabi",
+                     targets: code => IS_BATCH
+                       ? [{ href: "?view=syllabus#course-" + encodeURIComponent(code), here: code }]
+                       : currentSyllabus() ? [{ href: currentSyllabus() + FROM + "#course-" + encodeURIComponent(code) }] : [],
+                     allHref: () => IS_BATCH ? "?view=syllabus" : currentSyllabus(),
+                     off: "The syllabus is not open yet",
+                     title: "Open this course's syllabus",
+                     allTitle: "Open the syllabus — pick a semester, a course category or search",
+                     aria: "Syllabus for this course" },
+    revision_link: { field: "revision", word: "Revision", all: "All revisions",
+                     // an earlier batch revises its own courses, on its own Course Revision page
+                     targets: code => IS_BATCH
+                       ? [{ href: "?view=revision#course-" + encodeURIComponent(code), here: code, view: "revision" }]
+                       : CTX.revision_url ? [{ href: CTX.revision_url + FROM + "#course-" + encodeURIComponent(code) }] : [],
+                     allHref: () => IS_BATCH ? "?view=revision" : CTX.revision_url ? CTX.revision_url + FROM : "",
+                     off: "Course Revision is not open yet",
+                     title: "Open this course in Course Revision (added there if it is not yet)",
+                     allTitle: "Open Course Revision — every revised course",
+                     aria: "Is this course revised in this BoS?" },
+  };
+
+  /* The same course across batches: the same code, the same code without
+     its year (25BCA1C01 and 26BCA1C01), or the same title. */
+  const noYear = c => String(c || "").trim().toUpperCase().replace(/^\d{2}/, "");
+  function sameCourse(list, code, title) {
+    code = String(code || "").trim().toUpperCase();
+    const t = String(title || "").trim().toLowerCase();
+    return list.find(p => String(p.course_code || "").trim().toUpperCase() === code)
+      || list.find(p => noYear(p.course_code) === noYear(code))
+      || (t ? list.find(p => String(p.course_title || "").trim().toLowerCase() === t) : undefined);
   }
 
-  function markAuto(input) {
-    input.readOnly = true;
-    input.tabIndex = -1;
-    input.classList.add("is-auto");
-    input.title = "Worked out for you";
+  /* An earlier batch's own courses, as the syllabus sheets take them: from
+     the course list on the same page, as it stands (saved or not). */
+  /* A course's Course Information, from its line of the Curriculum table —
+     semester, credits, L-T-P-E, contact hours (15 for every credit) and
+     CA : ESE — as the server's course_info works it out. */
+  function courseInfo(r) {
+    const out = {};
+    if (r.semester !== undefined && r.semester !== null && r.semester !== "") out.semester = r.semester;
+    const h = ["l", "t", "p", "e"].map(k => num(r[k]));
+    if (h.every(x => x !== null)) { out.ltpe = h.join("-"); out.hours_per_week = h.reduce((a, b) => a + b, 0); }
+    const cr = num(r.credits);
+    if (cr !== null) { out.credits = cr; out.teaching_hours = Math.round(cr * 15); }
+    const ca = num(r.cia), es = num(r.ese);
+    if (ca !== null && es !== null) out.ca_ese = `${ca}:${es}`;
+    return out;
   }
 
-  function renderCards(section, host) {
-    const list = el("div", "rc-list");
-    host.appendChild(list);
-    const foot = el("div", "rt-foot");
-    const count = el("span", "rt-count");
-    const rowNote = el("span", "rt-note");
-    rowNote.setAttribute("role", "status");
-    const noun = section.key === "courses" ? "course" : "entry";
-    if (!CTX.readonly) {
-      const add = el("button", "btn btn-ghost btn-sm", `+ Add ${noun}`);
-      add.type = "button";
-      add.addEventListener("click", () => { rows(section.key).push({}); draw(); touch(); });
-      foot.appendChild(add);
-    }
-    foot.appendChild(count);
-    foot.appendChild(rowNote);
-    host.appendChild(foot);
-
-    const data = rows(section.key);
-    while (data.length < (section.min_rows || 0)) data.push({});
-
-    function title(row, i) {
-      const code = row.course_code || row.revised_code || row.code_before || "";
-      const name = row.course_title || row.revised_title || row.title_before || "";
-      return `${noun[0].toUpperCase() + noun.slice(1)} ${i + 1}` +
-             (code || name ? ` · ${[code, name].filter(Boolean).join(" — ")}` : "");
-    }
-
-    function draw() {
-      list.textContent = "";
-      data.forEach((row, i) => {
-        const card = el("div", "rc-card");
-        card.dataset.row = i;
-        const head = el("div", "rc-head");
-        const h = el("span", null, title(row, i));
-        head.appendChild(h);
-        head.appendChild(el("span", "spacer"));
-        if (!CTX.readonly) {
-          const b = el("button", "btn btn-ghost btn-sm", "Remove");
-          b.type = "button";
-          b.setAttribute("aria-label", `Remove ${noun} ${i + 1}`);
-          b.addEventListener("click", () => {
-            if (data.length <= (section.min_rows || 0)) {
-              rowNote.textContent = `Keep at least ${section.min_rows} ${noun}.`;
-              return;
-            }
-            data.splice(i, 1);
-            rowNote.textContent = "";
-            draw();
-            touch();
-          });
-          head.appendChild(b);
-        }
-        card.appendChild(head);
-
-        const body = el("div", "rc-body fields-grid");
-        const inputs = {};
-        section.columns.forEach(c => {
-          if (c.auto_index) { row[c.name] = i + 1; return; }
-          const block = fieldBlock(c, row[c.name], (v) => {
-            row[c.name] = v;
-            rowChanged(section, row, inputs, c);
-            h.textContent = title(row, i);
-            touch();
-          }, `${section.key}-${i}-`);
-          if (block._input) {
-            inputs[c.name] = block._input;
-            if (c.calc) markAuto(block._input);
-          }
-          body.appendChild(block);
-        });
-        rowChanged(section, row, inputs, null);
-        card.appendChild(body);
-        list.appendChild(card);
+  function batchCourses() {
+    const out = [];
+    const year = String(STAGE.batch || "").slice(0, 4);
+    (Array.isArray(state.batch_courses) ? state.batch_courses : []).forEach(r => {
+      if (!r) return;
+      const codes = String(r.course_code || "").split("/").map(x => x.trim()).filter(Boolean);
+      let titles = String(r.course_title || "").split(" / ").map(x => x.trim());
+      if (titles.length !== codes.length) titles = codes.map(() => String(r.course_title || "").trim());
+      codes.forEach((code, i) => {
+        const p = Object.assign({ course_code: code, course_title: titles[i] }, courseInfo(r));
+        if (/^\d{4}$/.test(year)) p.year_latest = year;
+        out.push(p);
       });
-      const min = section.min_rows || 0;
-      const plural = noun === "entry" ? "entries" : noun + "s";
-      count.textContent = `${data.length} ${data.length === 1 ? noun : plural}` +
-                          (min ? ` · minimum ${min}` : "");
+    });
+    return out;
+  }
+
+  /* The current batch's semester 1 and 2 courses always have a syllabus and
+     a revision: their Yes cannot be changed. An earlier batch has no Yes / No
+     at all — each of its courses is typed in its Syllabus page. */
+  const MUST_HAVE = [1, 2];
+  const mustHave = row => !IS_BATCH && MUST_HAVE.includes(num(row.semester));
+
+  // a syllabus sheet with its outcomes and a module in: its Course Revision can go on from it
+  const sheetFilled = r => !!(r && String(r.outcomes || "").trim() &&
+    (r.modules || []).some(m => m && String(m.revised || m.title || "").trim()));
+  // this course's syllabus — the batch's own on an earlier batch, else the current batch's
+  function syllabusFilled(code) {
+    code = String(code || "").toUpperCase();
+    if (IS_BATCH) {
+      return sheetFilled((Array.isArray(state.courses) ? state.courses : [])
+        .find(c => c && String(c.course_code || "").trim().toUpperCase() === code));
     }
-    draw();
+    const cur = (CTX.syllabi || []).find(x => x.current) || {};
+    return !!((cur.courses || []).find(x => String(x.code).toUpperCase() === code) || {}).filled;
+  }
+  // where a course's syllabus is filled in: its batch's Syllabus page, at the course
+  function toSyllabus(code) {
+    if (IS_BATCH && window.__batchView) window.__batchView("syllabus", code);
+    else if (currentSyllabus()) window.location.href = currentSyllabus() + FROM + "#course-" + encodeURIComponent(code);
+  }
+
+  function courseLink(type, row) {
+    const K = COURSE_LINKS[type];
+    const wrap = el("span", "syl-yn");
+    if (!IS_BATCH) {
+      const locked = mustHave(row);
+      if (locked) row[K.field] = "Yes";
+      const sel = el("select", "syl-sel");
+      sel.setAttribute("aria-label", K.aria);
+      ["Yes", "No"].forEach(v => { const o = el("option", null, v); o.value = v; sel.appendChild(o); });
+      sel.value = row[K.field] === "No" ? "No" : "Yes";
+      sel.disabled = !!CTX.readonly || locked;
+      if (locked) sel.title = "A semester 1 or 2 course always has a " + K.word.toLowerCase();
+      sel.addEventListener("change", () => {
+        row[K.field] = sel.value;
+        touch();
+        wrap.replaceWith(courseLink(type, row));
+      });
+      wrap.appendChild(sel);
+      if (sel.value === "No") return wrap;
+    }
+    const code = String(row.course_code || "").split("/")[0].trim().toUpperCase();
+    const targets = code ? K.targets(code, row) : [];
+    // a small → beside the Yes (alone on an earlier batch): the column's heading says where it goes
+    if (!targets.length) {
+      const hint = el("span", "syl-go is-off", "→");
+      hint.title = code ? K.off : "Enter the course code first";
+      hint.setAttribute("aria-hidden", "true");
+      wrap.appendChild(hint);
+      return wrap;
+    }
+    const t = targets[0];
+    const go = el("a", "syl-go", "→");
+    go.href = t.href;
+    go.title = K.title;
+    go.setAttribute("aria-label", `${K.word} of ${code}`);
+    if (t.here) go.addEventListener("click", e => {
+      // the batch's Syllabus or Course Revision page: shown in place, at this course
+      if (window.__batchView) { e.preventDefault(); window.__batchView(t.view || "syllabus", t.here); }
+    });
+    wrap.appendChild(go);
+    return wrap;
+  }
+
+
+  function rowFile(def, row, changed) {
+    const box = el("div", "row-file");
+    const input = el("input");
+    input.type = "file";
+    if (def.accept) input.accept = def.accept;
+    input.className = "sr-only";
+    input.tabIndex = -1;
+    function paint(note) {
+      box.textContent = "";
+      const v = row[def.name];
+      if (v && v.name) {
+        const info = fileKind(v.name);
+        const a = el(canView(info) ? "button" : "a", "row-file-name", v.name);
+        a.title = v.name;
+        if (canView(info)) { a.type = "button"; a.addEventListener("click", () => openViewer(v)); }
+        else { a.href = v.url; a.target = "_blank"; a.rel = "noopener"; }
+        box.appendChild(el("span", "row-file-ext", info.label));
+        box.appendChild(a);
+        if (v.match && v.match.status && v.match.status !== "unread") {
+          const ok = v.match.status === "match";
+          const mk = el("span", "row-file-kw " + (ok ? "is-match" : "is-" + v.match.status), ok ? "✓" : "!");
+          mk.title = ok ? "Keywords match: " + v.match.found.join(", ")
+                        : v.match.status === "weak" ? "Few keywords match: " + v.match.found.join(", ")
+                        : "No expected keywords found — check this is the right file";
+          box.appendChild(mk);
+        }
+        if (!CTX.readonly) {
+          const x = el("button", "row-file-x", "×");
+          x.type = "button";
+          x.title = "Remove this file";
+          x.setAttribute("aria-label", `Remove ${v.name}`);
+          x.addEventListener("click", () => { row[def.name] = ""; changed(); paint(); });
+          box.appendChild(x);
+        }
+      } else if (!CTX.readonly) {
+        const b = el("button", "row-file-up");
+        b.type = "button";
+        b.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        b.appendChild(el("span", null, note || "Upload"));
+        b.title = def.help || "Upload a file";
+        b.disabled = note === "Uploading…";
+        b.addEventListener("click", () => input.click());
+        box.appendChild(b);
+      } else {
+        box.appendChild(el("span", "muted", "—"));
+      }
+      box.appendChild(input);
+    }
+    input.addEventListener("change", () => {
+      const f = input.files && input.files[0];
+      input.value = "";
+      if (!f) return;
+      const ok = !def.accept || def.accept.split(",").some(a => f.name.toLowerCase().endsWith(a.trim()));
+      if (!ok) { paint("PDF, Word or Excel"); return; }
+      paint("Uploading…");
+      uploadOne(f, def)
+        .then(v => { row[def.name] = v; changed(); paint(); })
+        .catch(() => paint("Failed — retry"));
+    });
+    paint();
+    return box;
   }
 
   function renderTable(section, host) {
-    if (section.layout === "cards") return renderCards(section, host);
+    // Programme Information takes its rows from Department Information:
+    // no adding or removing here, and code and name are not retyped.
+    const synced = !!(section.synced_from && CTX.synced);
+    const fixed = !!section.fixed_rows || synced;
+    const LOCKED_COLS = ["programme_code", "programme_name"];
+    const RULES = derivedRules(section);
+    const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
+    // a UG programme structure lists semesters 1–6 once, then semesters 7–8
+    // for Honours and again for Honours with Research, each with its own add
+    const GROUPS = (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG)
+      ? [{ track: "All semesters", label: "3-Year UG", sub: "Semesters 1 – 6", sems: [1, 2, 3, 4, 5, 6] },
+         { track: "Honours", label: "4-Year UG (Honours)", sub: "Semesters 7 – 8", sems: [7, 8], optional: true },
+         { track: "Honours with Research", label: "4-Year UG (Honours with Research)",
+           sub: "Semesters 7 – 8", sems: [7, 8], optional: true }]
+      : null;
+    if (GROUPS && splitHonours(rows(section.key)) && !CTX.readonly) touch();
+    if (synced) {
+      const note = el("div", "sync-note");
+      note.appendChild(el("span", null,
+        "These programmes come from Department Information. To change which are offered, "));
+      const a = el("a", null, "change the list there");
+      a.href = CTX.urls.dept_info;
+      note.appendChild(a);
+      note.appendChild(el("span", null, "."));
+      host.appendChild(note);
+    }
     const wrap = el("div", "rt-wrap");
     const table = el("table", "rt");
     const thead = el("thead");
     const htr = el("tr");
     htr.appendChild(el("th", null, "#"));
     section.columns.forEach(c => {
-      const th = el("th", null, c.label + (c.required ? " *" : ""));
-      if (c.width) th.style.width = c.width;
+      // a long label can carry a short heading; the full one is its tooltip
+      const th = el("th", null, (c.short || c.label) + (c.required ? " *" : ""));
+      if (c.short) th.title = c.label;
+      if (COURSE_LINKS[c.type]) {
+        // one way into all the syllabi / the whole Course Revision for the
+        // table; each row says Yes or No, and opens that course
+        const K = COURSE_LINKS[c.type], url = K.allHref();
+        th.textContent = "";
+        th.className = "rt-syl-head";
+        if (url) {
+          const all = el("a", "syl-all", K.all + " →");
+          all.href = url;
+          all.title = K.allTitle;
+          th.appendChild(all);
+        } else th.textContent = c.label;
+        htr.appendChild(th);
+        return;
+      }
+      if (c.type === "integer") th.className = "num-col";
+      else if (c.width) th.style.width = c.width;
       if (c.help) th.title = c.help;
+      else if (c.short) th.title = c.label;
       htr.appendChild(th);
     });
-    if (!section.fixed_rows && !CTX.readonly) {
+    if (!fixed && !CTX.readonly) {
       const actions = el("th");
       actions.appendChild(el("span", "sr-only", "Remove row"));
       htr.appendChild(actions);
@@ -489,21 +1907,58 @@
     table.appendChild(tbody);
     wrap.appendChild(table);
     host.appendChild(wrap);
-
     const foot = el("div", "rt-foot");
     const count = el("span", "rt-count");
     // Row-count problems belong next to the table, not in a modal dialog.
     const rowNote = el("span", "rt-note");
     rowNote.setAttribute("role", "status");
-    if (!section.fixed_rows && !CTX.readonly) {
+    if (!fixed && !CTX.readonly && !GROUPS) {
       const add = el("button", "btn btn-ghost btn-sm", "+ Add row");
       add.type = "button";
-      add.addEventListener("click", () => { rows(section.key).push({}); draw(); touch(); });
+      add.addEventListener("click", () => {
+        const data = rows(section.key);
+        const row = freshRow(section);
+        data.push(row);
+        const tr = drawRow(row, data.length - 1, data.length, null);
+        tbody.appendChild(tr);
+        rowsChanged();
+        touch();
+        const first = tr.querySelector("input, select, textarea");
+        if (first) first.focus();
+      });
       foot.appendChild(add);
     }
     foot.appendChild(count);
     foot.appendChild(rowNote);
     host.appendChild(foot);
+    const totalsBox = el("div", "rt-totals");
+    totalsBox.setAttribute("aria-live", "polite");
+    host.appendChild(totalsBox);
+    // the totals, and the credit tables that follow this one, are worked
+    // out once typing pauses, not on every key
+    let totalsTimer = 0;
+    function showTotals(now) {
+      clearTimeout(totalsTimer);
+      const paint = () => {
+        renderTotals(section, rows(section.key), totalsBox);
+        window.dispatchEvent(new CustomEvent("stage:rows", { detail: section.key }));
+      };
+      if (now === true) paint();
+      else totalsTimer = setTimeout(paint, 150);
+    }
+
+    /* Each row's Syllabus / Revision link is made again only when the row's
+       code, title or Yes / No changes, not on every key pressed anywhere. */
+    let links = [];
+    function paintLink(L) {
+      const key = [L.row.course_code, L.row.course_title, L.row.semester,
+                   L.row[COURSE_LINKS[L.type].field]].join("\u0001");
+      if (key === L.key) return;
+      L.key = key;
+      L.holder.textContent = "";
+      L.holder.appendChild(courseLink(L.type, L.row));
+    }
+    refreshers.push(() => links.forEach(paintLink));
 
     // seed fixed rows
     if (section.fixed_rows) {
@@ -519,77 +1974,907 @@
       while (data.length < (section.min_rows || 0)) data.push({});
     }
 
+    const FIXED = section.columns.filter(c => c.fixed_value != null);
+    const PAIRS = section.columns.filter(c => c.sums_with);
+    const OUT_OF = (FIXED.find(c => c.name === "total_marks") || {}).fixed_value ?? 100;
+    function settle(row) {
+      let changed = false;
+      FIXED.forEach(c => { if (row[c.name] !== c.fixed_value) { row[c.name] = c.fixed_value; changed = true; } });
+      return changed;
+    }
+    /* CA and ESE are both typed; once both are in, they must make 100
+       (0 + 0, 20 + 70 will not do). A pop-up says so, and the box is
+       marked until it is put right. */
+    const pairTouched = new WeakSet();
+    function checkPair(row, cells, from) {
+      const first = PAIRS[0];
+      if (!first) return;
+      const other = first.sums_with;
+      const a = num(row[first.name]), b = num(row[other]);
+      const wrong = a !== null && b !== null && a + b !== OUT_OF;
+      [first.name, other].forEach(n => cells[n] && cells[n].classList.toggle("is-sum-off", wrong));
+      if (!wrong || !from || document.querySelector(".rv-modal.is-sum")) return;
+      const short = c => String(c.short || c.label).replace(/ marks$/i, "");
+      const second = section.columns.find(c => c.name === other) || {};
+      const course = [row.course_code, row.course_title].filter(Boolean).join(" · ");
+      const body = el("div");
+      body.appendChild(el("p", null, `${course ? course + ": " : ""}${short(first)} ${a} + ${short(second)} ${b} = ${a + b}.`));
+      body.appendChild(el("p", null, `${short(first)} + ${short(second)} must total ${OUT_OF} — for example 20 + 80, 40 + 60 or 50 + 50.`));
+      const ok = el("button", "btn", "OK, I'll correct it");
+      ok.type = "button";
+      const show = window.Review && window.Review.modal;
+      if (!show) { window.alert(`${short(first)} + ${short(second)} must total ${OUT_OF}. Now ${a} + ${b} = ${a + b}.`); from.focus(); return; }
+      const m = show({ title: `The total should be ${OUT_OF}`, body, foot: ok, onClose: () => from.focus() });
+      m.el.classList.add("is-sum");
+      m.panel.classList.add("rv-panel-sm");
+      ok.addEventListener("click", m.close);
+      ok.focus();
+    }
+
+    const SPAN = section.columns.length + 1 + (!fixed && !CTX.readonly ? 1 : 0);
+    const groupOf = row => (GROUPS.find(g => g.track === row.track) || GROUPS[0]);
+    let settled = false;
+
+    // after a row is added or taken off: the count and the totals
+    function rowsChanged() {
+      const data = rows(section.key);
+      const min = section.min_rows || 0;
+      count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}`;
+      count.style.color = data.length < min ? "var(--err)" : "";
+      showTotals();
+    }
+
+    // each row's number (counted within its group), and the index the checks
+    // use to find it, follow the list as it now is
+    function renumber() {
+      const data = rows(section.key);
+      let n = 0;
+      tbody.querySelectorAll("tr").forEach(tr => {
+        if (tr.classList.contains("rt-group")) { n = 0; return; }
+        if (!tr._row) return;
+        const i = data.indexOf(tr._row);
+        tr.dataset.row = i;
+        tr.firstChild.textContent = String(++n);
+        tr.querySelectorAll("td[data-auto-index]").forEach(td => {
+          tr._row[td.dataset.autoIndex] = i + 1;
+          td.textContent = String(i + 1);
+        });
+        const del = tr.querySelector(".rt-del button");
+        if (del) del.setAttribute("aria-label", `Remove row ${n}`);
+      });
+    }
+
     function draw() {
       tbody.innerHTML = "";
+      links = [];
       const data = rows(section.key);
-      data.forEach((row, i) => {
-        const tr = el("tr");
-        const inputs = {};
-        tr.dataset.row = i;
-        tr.appendChild(el("td", "rt-idx", String(i + 1)));
-
-        section.columns.forEach(c => {
-          const td = el("td");
-          if (c.auto_index) {
-            row[c.name] = i + 1;
-            td.className = "rt-idx";
-            td.textContent = String(i + 1);
+      settled = false;
+      if (!GROUPS) {
+        data.forEach((row, i) => tbody.appendChild(drawRow(row, i, i + 1, null)));
+      } else {
+        GROUPS.forEach(g => {
+          const head = el("tr", "rt-group");
+          const th = el("td");
+          th.colSpan = SPAN;
+          th.appendChild(el("strong", null, g.label));
+          th.appendChild(el("span", "rt-group-sub", g.sub));
+          if (g.optional) th.appendChild(el("span", "rt-group-opt", "Optional"));
+          head.appendChild(th);
+          tbody.appendChild(head);
+          let n = 0;
+          data.forEach((row, i) => { if (groupOf(row) === g) tbody.appendChild(drawRow(row, i, ++n, g)); });
+          if (!n && CTX.readonly) {
+            const tr = el("tr", "rt-group-empty");
+            const td = el("td", null, "No courses listed.");
+            td.colSpan = SPAN;
             tr.appendChild(td);
-            return;
+            tbody.appendChild(tr);
           }
-          const holder = el("div");
-          holder.dataset.field = c.name;
-          const input = makeInput(c, row[c.name], (v) => {
-            row[c.name] = v;
-            rowChanged(section, row, inputs, c);
-            touch();
-          });
-          inputs[c.name] = input;
-          if (c.calc) markAuto(input);
-          if (c.width) input.style.minWidth = c.width;
-          if (c.type === "readonly") input.readOnly = true;
-          holder.appendChild(input);
-          attachLiveCheck(input, c, holder);
+          if (!CTX.readonly) {
+            const tr = el("tr", "rt-group-add");
+            const td = el("td");
+            td.colSpan = SPAN;
+            const add = el("button", "rt-add", `+ Add a course · ${g.label}`);
+            add.type = "button";
+            add.addEventListener("click", () => {
+              // the new row goes in at the end of its group; nothing else is drawn again
+              const row = Object.assign(freshRow(section), { track: g.track });
+              data.push(row);
+              const tr = drawRow(row, data.length - 1, 0, g);
+              tbody.insertBefore(tr, add.closest("tr"));
+              renumber();
+              rowsChanged();
+              touch();
+              const first = tr.querySelector("select, input");
+              if (first) first.focus();
+            });
+            td.appendChild(add);
+            tr.appendChild(td);
+            tbody.appendChild(tr);
+          }
+        });
+      }
+      if (settled) touch();
+      showTotals(true);
+      rowsChanged();
+    }
+
+    function drawRow(row, i, shown, g) {
+      if (!CTX.readonly && settle(row)) settled = true;
+      const tr = el("tr");
+      tr.dataset.row = i;
+      tr._row = row;
+      const cells = {};
+      tr.appendChild(el("td", "rt-idx", String(shown)));
+
+      section.columns.forEach(c => {
+        // within a group, the semester is one of that group's
+        if (g && c.name === "semester") c = Object.assign({}, c, { choices: g.sems, max: Math.max(...g.sems) });
+        const td = el("td");
+        if (c.auto_index) {
+          row[c.name] = i + 1;
+          td.className = "rt-idx";
+          td.dataset.autoIndex = c.name;
+          td.textContent = String(i + 1);
+          tr.appendChild(td);
+          return;
+        }
+        const holder = el("div");
+        holder.dataset.field = c.name;
+        if (COURSE_LINKS[c.type]) {
+          const L = { type: c.type, row: row, holder: holder, key: null };
+          links.push(L);
+          paintLink(L);
+          td.className = "rt-syl";
           td.appendChild(holder);
           tr.appendChild(td);
-        });
-
-        rowChanged(section, row, inputs, null);
-        if (!section.fixed_rows && !CTX.readonly) {
-          const td = el("td", "rt-del");
-          const b = el("button", null, "×");
-          b.type = "button";
-          b.title = "Remove this row";
-          b.setAttribute("aria-label", `Remove row ${i + 1}`);
-          b.addEventListener("click", () => {
-            if (data.length <= (section.min_rows || 0)) {
-              rowNote.textContent =
-                `This table has to keep at least ${section.min_rows} row` +
-                `${section.min_rows === 1 ? "" : "s"}.`;
-              return;
-            }
-            data.splice(i, 1);
-            rowNote.textContent = "";
-            draw();
-            touch();
-            // The row under the caret is gone — put focus somewhere sensible.
-            const rowsLeft = tbody.querySelectorAll("tr").length;
-            const nextRow = tbody.querySelectorAll("tr")[Math.min(i, rowsLeft - 1)];
-            const target = nextRow && nextRow.querySelector("input, select, textarea");
-            if (target) target.focus();
-            else { const add = foot.querySelector("button"); if (add) add.focus(); }
-          });
-          td.appendChild(b);
-          tr.appendChild(td);
+          return;
         }
-        tbody.appendChild(tr);
+        if (c.type === "file") {
+          holder.appendChild(rowFile(c, row, () => { touch(); }));
+          td.className = "rt-file";
+          td.appendChild(holder);
+          tr.appendChild(td);
+          return;
+        }
+        const input = makeInput(c, row[c.name], (v) => {
+          row[c.name] = v;
+          if (DERIVED[c.name]) markManual(row, c.name, cells);
+          derive(RULES, row, cells);
+          touch();
+          showTotals();
+        });
+        cells[c.name] = input;
+        if (c.sums_with) {
+          // checked once the pair is left: typing CA, then ESE, says nothing in between
+          input.addEventListener("change", () => { pairTouched.add(row); checkPair(row, cells, null); });
+          input.addEventListener("focusout", () => setTimeout(() => {
+            const now = document.activeElement;
+            if (now === cells[c.name] || now === cells[c.sums_with] || !pairTouched.has(row)) return;
+            pairTouched.delete(row);
+            checkPair(row, cells, input);
+          }, 0));
+        }
+        if (DERIVED[c.name]) {
+          if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
+          hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES, showTotals));
+        }
+        if (c.type === "integer" && !c.choices) {
+          // two digits wide, growing with what is typed
+          input.classList.add("num-cell");
+          fitNum(input);
+          input.addEventListener("input", () => fitNum(input));
+        } else if (c.width) input.style.minWidth = c.width;
+        if (c.fixed_value != null) {
+          input.readOnly = true;
+          input.classList.add("is-fixed");
+          input.title = `Every course is out of ${c.fixed_value}`;
+        }
+        if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) {
+          input.readOnly = true;
+        }
+        holder.appendChild(input);
+        attachLiveCheck(input, c, holder);
+        td.appendChild(holder);
+        tr.appendChild(td);
       });
-      const min = section.min_rows || 0;
-      count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}` +
-                          (min ? ` · minimum ${min}` : "");
-      count.style.color = data.length < min ? "var(--err)" : "";
+
+      if (!fixed && !CTX.readonly) {
+        const td = el("td", "rt-del");
+        const b = el("button", null, "×");
+        b.type = "button";
+        b.title = "Remove this row";
+        b.setAttribute("aria-label", `Remove row ${shown}`);
+        b.addEventListener("click", () => {
+          const data = rows(section.key);
+          if (data.length <= (section.min_rows || 0)) {
+            rowNote.textContent =
+              `This table has to keep at least ${section.min_rows} row` +
+              `${section.min_rows === 1 ? "" : "s"}.`;
+            return;
+          }
+          const at = data.indexOf(row);
+          if (at < 0) return;
+          data.splice(at, 1);
+          rowNote.textContent = "";
+          // only this row goes; the rest stay as they are, renumbered
+          const near = [tr.nextElementSibling, tr.previousElementSibling].find(x => x && x._row);
+          const after = tr.nextElementSibling;
+          tr.remove();
+          links = links.filter(L => L.row !== row);
+          renumber();
+          rowsChanged();
+          touch();
+          // The row under the caret is gone — put focus somewhere sensible.
+          const target = (near || after || foot).querySelector("input, select, textarea, button");
+          if (target) target.focus({ preventScroll: true });
+        });
+        td.appendChild(b);
+        tr.appendChild(td);
+      }
+      if (!CTX.readonly && derive(RULES, row, cells)) touch();
+      checkPair(row, cells, null);                  // marked, without the pop-up, as the page opens
+      return tr;
     }
     draw();
+  }
+
+  // Semesters 7–8 courses marked for all semesters are listed under Honours
+  // and again under Honours with Research (a research project only there),
+  // so every total stays as it was. True when anything moved.
+  function splitHonours(data) {
+    const out = [];
+    let moved = false;
+    data.forEach(r => {
+      const t = r && (r.track || "All semesters");
+      if (r && num(r.semester) > 6 && t === "All semesters") {
+        moved = true;
+        if (r.nep_category !== "Research Project / Dissertation") out.push(Object.assign({}, r, { track: "Honours" }));
+        out.push(Object.assign({}, r, { track: "Honours with Research" }));
+      } else out.push(r);
+    });
+    if (moved) data.splice(0, data.length, ...out);
+    return moved;
+  }
+
+  // ------------------------------------------------------------ row cards
+  /* Programme Information, one programme at a time. Every programme sits
+     in a strip of chips at the top — code, name and how complete it is —
+     and the one clicked opens below in a framed card (navy for UG, orange
+     for PG) with two tabs: its details, and its vision, mission and
+     outcomes. Outcomes can be copied from another programme or handed to
+     all of them at once. */
+
+  function renderRowCards(section, host) {
+    const synced = !!(section.synced_from && CTX.synced);
+    const LOCKED_COLS = ["programme_code", "programme_name"];
+    const RULES = derivedRules(section);
+    const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
+    const data = rows(section.key);
+    const cols = section.columns.filter(c => !c.auto_index);
+    // what a card is: a programme by default, or whatever the section says
+    const CARD = Object.assign({ code: "programme_code", name: "programme_name",
+                                 noun: "programme" }, section.card || {});
+    const K = CARD.code, N = CARD.name, NOUN = CARD.noun;
+    const TABS = section.tabs || [{ key: "details", label: "Details" }];
+    const tabOf = c => c.tab || TABS[0].key;
+    const OUT = cols.filter(c => tabOf(c) === "outcomes");
+    const colourOf = r => /^PG/.test(r.degree_level || "") ? "orange" : "navy";
+    const blank = v => v === undefined || v === null || String(v).trim() === "";
+    const isBlankRow = r => cols.every(c => blank(r[c.name]) || c.type === "checkbox");
+    const hasOutcomes = r => OUT.some(c => !blank(r[c.name]));
+    let sel = 0;
+    let tab = (section.tabs || [{ key: "details" }])[0].key;
+
+    // Vision and mission used to be one block for the whole department. A
+    // draft that still has it hands it to every programme that has none.
+    if (state.vision && typeof state.vision === "object" && !CTX.readonly) {
+      data.forEach(r => OUT.forEach(c => {
+        if (blank(r[c.name]) && !blank(state.vision[c.name])) r[c.name] = state.vision[c.name];
+      }));
+    }
+
+    const wrap = el("div", "rc-wrap");
+    host.appendChild(wrap);
+
+    if (synced) {
+      const note = el("div", "sync-note");
+      note.appendChild(el("span", null,
+        "These programmes come from Department Information. To change which are offered, "));
+      const a = el("a", null, "change the list there");
+      a.href = CTX.urls.dept_info;
+      note.appendChild(a);
+      note.appendChild(el("span", null, "."));
+      wrap.appendChild(note);
+    }
+
+    // --- the strip of every programme
+    const strip = el("div", "rc-strip");
+    const stripHead = el("div", "rc-strip-head");
+    const stripCount = el("span", "rc-strip-count");
+    stripHead.appendChild(stripCount);
+    let fillBtn = null;
+    if (!CTX.readonly && !synced && (CTX.fill || []).length) {
+      fillBtn = el("button", "rc-fill");
+      fillBtn.type = "button";
+      fillBtn.addEventListener("click", fillAll);
+      stripHead.appendChild(fillBtn);
+    }
+    strip.appendChild(stripHead);
+    const chips = el("div", "rc-chips");
+    chips.setAttribute("role", "tablist");
+    chips.setAttribute("aria-label", "Programmes");
+    strip.appendChild(chips);
+    wrap.appendChild(strip);
+
+    const note = el("p", "rc-note");
+    note.setAttribute("role", "status");
+    wrap.appendChild(note);
+
+    const stage = el("div", "rc-stage");
+    wrap.appendChild(stage);
+
+    while (data.length < (section.min_rows || 0)) data.push({});
+
+    wrap.showRow = (i, field) => {
+      if (!data[i]) return;
+      sel = i;
+      const c = cols.find(x => x.name === field);
+      if (c) tab = tabOf(c);
+      draw();
+    };
+
+    function say(text) { note.textContent = text; }
+
+    function missing() {
+      const have = new Set(data.map(r => String(r[K] || "").trim().toUpperCase()));
+      return (CTX.fill || []).filter(p => !have.has(String(p[K]).toUpperCase()));
+    }
+
+    function fillAll() {
+      const add = missing();
+      if (!add.length) return;
+      for (let k = data.length - 1; k >= 0; k--) if (isBlankRow(data[k])) data.splice(k, 1);
+      const first = data.length;
+      add.forEach(p => data.push(Object.assign({}, p)));
+      sel = first;
+      tab = TABS[0].key;
+      draw();
+      touch();
+      say(`Added ${add.length} ${NOUN}${add.length === 1 ? "" : "s"}. Click each one to fill it in.`);
+    }
+
+    // The part of a name that tells programmes apart: most share their first
+    // words ("Bachelor of Technology (Computer Science and Engineering) with
+    // specialisation in …"), so a chip shows what follows the last "in".
+    function shortName(n) {
+      let t = String(n || "").replace(/\s+/g, " ").trim();
+      const spec = t.match(/speciali[sz]ation in\s+(.+)$/i);
+      if (spec) return spec[1];
+      // drop the degree ("Bachelor of Technology", "Master of Commerce (Honours …)")
+      t = t.replace(/^(Bachelor|Master|Doctor|Post ?Graduate Diploma|PG Diploma|Diploma)\s+of\s+[A-Za-z ]+?(?=\s*\(|\s+in\s|$)/i, "")
+           .replace(/\(Honours[^)]*\)/i, "")
+           .replace(/^\s*in\s+/i, "")
+           .replace(/[()<>]/g, " ").replace(/\s+/g, " ").trim();
+      return t || String(n || "");
+    }
+
+    function removeAt(i) {
+      const r = data[i];
+      if (data.length <= (section.min_rows || 0)) {
+        say(`Keep at least ${section.min_rows} ${NOUN}${section.min_rows === 1 ? "" : "s"}.`);
+        return;
+      }
+      if (!isBlankRow(r) &&
+          !window.confirm(`Remove ${r[K] || "this " + NOUN} and everything ` +
+                          "filled in for it?")) return;
+      data.splice(i, 1);
+      if (sel > i || sel >= data.length) sel = Math.max(0, sel - 1);
+      draw();
+      touch();
+      say(`${r[K] || "The " + NOUN} removed.`);
+      chips.querySelector(".rc-chip.is-sel .rc-chip-open")?.focus();
+    }
+
+    function completeness(r) {
+      const req = cols.filter(c => c.required);
+      const done = req.filter(c => !blank(r[c.name])).length;
+      return done === req.length ? "full" : done ? "part" : "none";
+    }
+
+    function drawStrip() {
+      chips.textContent = "";
+      data.forEach((r, i) => {
+        const chip = el("span", `rc-chip is-${completeness(r)}` +
+                                (colourOf(r) === "orange" ? " is-pg" : "") +
+                                (i === sel ? " is-sel" : ""));
+        const b = el("button", "rc-chip-open");
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-selected", i === sel ? "true" : "false");
+        b.appendChild(el("span", "rc-chip-dot"));
+        b.appendChild(el("span", "rc-chip-code", r[K] || `#${i + 1}`));
+        b.appendChild(el("span", "rc-chip-name",
+          (NOUN === "programme" ? shortName(r[N]) : r[N]) || `New ${NOUN}`));
+        b.title = `${r[K] || "No code yet"} — ${r[N] || "no name yet"}`;
+        b.addEventListener("click", () => { sel = i; draw(); });
+        chip.appendChild(b);
+        if (!synced && !CTX.readonly) {
+          const x = el("button", "rc-chip-x", "×");
+          x.type = "button";
+          x.title = `Remove ${r[K] || "this " + NOUN}`;
+          x.setAttribute("aria-label", `Remove ${r[K] || NOUN + " " + (i + 1)}`);
+          x.addEventListener("click", () => removeAt(i));
+          chip.appendChild(x);
+        }
+        chips.appendChild(chip);
+      });
+      if (!synced && !CTX.readonly) {
+        const add = el("button", "rc-chip rc-chip-add");
+        add.type = "button";
+        add.innerHTML = ICON.plus;
+        add.appendChild(el("span", null, `Add ${NOUN}`));
+        add.addEventListener("click", () => {
+          data.push(freshRow(section));
+          sel = data.length - 1;
+          tab = TABS[0].key;
+          draw();
+          touch();
+          stage.querySelector("input:not([readonly]), select")?.focus();
+        });
+        chips.appendChild(add);
+      }
+      const full = data.filter(r => completeness(r) === "full").length;
+      stripCount.textContent = `${data.length} ${NOUN}${data.length === 1 ? "" : "s"} · ` +
+                               `${full} complete`;
+      if (fillBtn) {
+        const left = missing().length;
+        fillBtn.disabled = !left;
+        fillBtn.innerHTML = left ? ICON.plus : "";
+        fillBtn.appendChild(el("span", null,
+          left ? `Fill in all ${NOUN}s (${left})` : `All ${(CTX.fill || []).length} ${NOUN}s are in`));
+      }
+    }
+
+    function field(row, c, cells, repaint) {
+      const holder = el("div", "field" +
+        (c.name === N || c.type === "textarea" || c.wide ? " wide" : ""));
+      holder.dataset.field = c.name;
+      if (c.type === "module_compare") {
+        holder.appendChild(revisionTable(c, row, () => { repaint(c.name); touch(); }));
+        if (c.help) holder.appendChild(el("span", "help", c.help));
+        return holder;
+      }
+      const id = `rc-${section.key}-${c.name}`;
+      if (c.type === "checkbox") {
+        const lab = el("label", "check");
+        const input = makeInput(c, row[c.name], v => { row[c.name] = v; touch(); });
+        input.id = id;
+        lab.appendChild(input);
+        lab.appendChild(el("span", null, c.label));
+        holder.appendChild(lab);
+        return holder;
+      }
+      const lab = el("label", null, c.label);
+      lab.setAttribute("for", id);
+      if (c.required) {
+        const star = el("span", "req", "*");
+        star.setAttribute("aria-hidden", "true");
+        lab.appendChild(star);
+      }
+      holder.appendChild(lab);
+      const input = makeInput(c, row[c.name], v => {
+        row[c.name] = v;
+        if (DERIVED[c.name]) markManual(row, c.name, cells);
+        derive(RULES, row, cells);
+        repaint(c.name);
+        touch();
+      });
+      input.id = id;
+      if (c.type === "readonly" || (synced && LOCKED_COLS.includes(c.name))) input.readOnly = true;
+      cells[c.name] = input;
+      holder.appendChild(input);
+      if (c.help) holder.appendChild(el("span", "help", c.help));
+      if (DERIVED[c.name]) {
+        if ((row._auto || []).includes(c.name)) input.classList.add("is-auto");
+        hintOn(holder, pop => derivedHint(pop, DERIVED[c.name], row, cells, RULES,
+                                          () => repaint(c.name)));
+      }
+      attachLiveCheck(input, c, holder);
+      return holder;
+    }
+
+    // outcomes: take them from another programme, or give these to all
+    function outcomeTools(row, i) {
+      if (data.length < 2) return null;
+      const box = el("div", "rc-copy");
+      box.appendChild(el("span", "rc-copy-label", "Same as another programme?"));
+      const pick = el("select", "rc-copy-pick");
+      pick.setAttribute("aria-label", "Programme to copy from");
+      // listed fresh each time, since any programme may have gained some
+      const refill = () => {
+        const keep = pick.value;
+        pick.textContent = "";
+        const others = data.map((r, k) => [r, k]).filter(([r, k]) => k !== i && hasOutcomes(r));
+        if (!others.length) pick.appendChild(new Option("No other programme has any yet", ""));
+        others.forEach(([r, k]) => pick.appendChild(
+          new Option(`${r.programme_code || "#" + (k + 1)} — ${r.programme_name || ""}`, k)));
+        if ([...pick.options].some(o => o.value === keep)) pick.value = keep;
+      };
+      refill();
+      pick.addEventListener("focus", refill);
+      pick.addEventListener("mousedown", refill);
+      const go = el("button", "btn btn-ghost btn-sm", "Copy");
+      go.type = "button";
+      go.addEventListener("click", () => {
+        refill();
+        if (pick.value === "") { say("No other programme has a vision or mission to copy yet."); return; }
+        const src = data[+pick.value];
+        if (hasOutcomes(row) &&
+            !window.confirm("Replace this programme's vision, mission and outcomes?")) return;
+        OUT.forEach(c => { row[c.name] = src[c.name] ?? ""; });
+        draw();
+        touch();
+        say(`Copied from ${src.programme_code || "the other programme"}. Change anything that differs.`);
+      });
+      const all = el("button", "btn btn-ghost btn-sm", "Use for all programmes");
+      all.type = "button";
+      all.title = "Copy these to every programme that has none of its own yet";
+      all.addEventListener("click", () => {
+        if (!hasOutcomes(row)) { say("Fill in this programme's vision and mission first."); return; }
+        let given = 0, kept = 0;
+        data.forEach((r, k) => {
+          if (k === i) return;
+          if (hasOutcomes(r)) { kept++; return; }
+          OUT.forEach(c => { r[c.name] = row[c.name] ?? ""; });
+          given++;
+        });
+        drawStrip();
+        touch();
+        say(`Copied to ${given} programme${given === 1 ? "" : "s"}` +
+            (kept ? `; ${kept} already had their own and were left as they were.` : "."));
+      });
+      box.appendChild(pick);
+      box.appendChild(go);
+      box.appendChild(all);
+      return box;
+    }
+
+    function drawCard() {
+      stage.textContent = "";
+      if (!data.length) {
+        stage.appendChild(el("p", "pl-empty",
+          fillBtn ? `No ${NOUN}s yet. Use “Fill in all ${NOUN}s” or “Add ${NOUN}” above.` : `No ${NOUN}s yet. Use “Add ${NOUN}” above.`));
+        return;
+      }
+      sel = Math.min(sel, data.length - 1);
+      const i = sel;
+      const row = data[i];
+      const card = el("div", `frame frame-${colourOf(row)} rc-card`);
+      card.dataset.row = i;
+      const tabLabel = el("span", "frame-tab");
+      const title = el("div", "rc-title");
+      const repaint = name => {
+        const orange = colourOf(row) === "orange";
+        card.classList.toggle("frame-orange", orange);
+        card.classList.toggle("frame-navy", !orange);
+        tabLabel.textContent = `${String(i + 1).padStart(2, "0")} · ` + (row[K] || `New ${NOUN}`);
+        title.textContent = row[N] || `${NOUN[0].toUpperCase() + NOUN.slice(1)} name not given yet`;
+        title.classList.toggle("is-empty", !row[N]);
+        if (!name || [K, N, "degree_level"].includes(name) ||
+            cols.some(c => c.name === name && c.required)) drawStrip();
+      };
+      card.appendChild(tabLabel);
+
+      const head = el("div", "rc-head");
+      head.appendChild(title);
+      card.appendChild(head);
+
+      const tabs = el("div", "rc-tabs");
+      tabs.setAttribute("role", "tablist");
+      TABS.forEach(t => {
+        const b = el("button", "rc-tab", t.label);
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-selected", t.key === tab ? "true" : "false");
+        b.addEventListener("click", () => { tab = t.key; drawCard(); });
+        tabs.appendChild(b);
+      });
+      // one tab is no choice at all, so it is not shown
+      if (TABS.length > 1) card.appendChild(tabs);
+
+      if (tab === "outcomes" && OUT.length && !CTX.readonly) {
+        const tools = outcomeTools(row, i);
+        if (tools) card.appendChild(tools);
+      }
+
+      const grid = el("div", "fields-grid rc-grid" + (tab === "outcomes" ? " is-outcomes" : ""));
+      const cells = {};
+      // columns drawn inside the revision table are not drawn a second time
+      cols.filter(c => tabOf(c) === tab && !c.in_table)
+        .forEach(c => grid.appendChild(field(row, c, cells, repaint)));
+      section.columns.forEach(c => { if (c.auto_index) row[c.name] = i + 1; });
+      card.appendChild(grid);
+
+      // prev / next, so a long list can be walked without scrolling up
+      const nav = el("div", "rc-nav");
+      if (i > 0) {
+        const prev = el("button", "btn btn-ghost btn-sm", "← Previous");
+        prev.type = "button";
+        prev.addEventListener("click", () => { sel = i - 1; draw(); });
+        nav.appendChild(prev);
+      }
+      const t = TABS.findIndex(x => x.key === tab);
+      if (t < TABS.length - 1) {
+        const on = el("button", "btn btn-sm", `${TABS[t + 1].label} →`);
+        on.type = "button";
+        on.addEventListener("click", () => { tab = TABS[t + 1].key; drawCard(); });
+        nav.appendChild(on);
+      } else if (i < data.length - 1) {
+        const next = el("button", "btn btn-sm", `Next ${NOUN} →`);
+        next.type = "button";
+        next.addEventListener("click", () => { sel = i + 1; tab = TABS[0].key; draw(); });
+        nav.appendChild(next);
+      }
+      card.appendChild(nav);
+
+      stage.appendChild(card);
+      repaint();
+      if (!CTX.readonly && derive(RULES, row, cells)) touch();
+    }
+
+    function draw() {
+      drawStrip();
+      drawCard();
+    }
+    draw();
+  }
+
+  // --------------------------------------------------- credit distribution
+  /* The template's two generated tables, worked out from the programme
+     structure as it is typed: "Classification of Credits" (credits per
+     semester in each group) and "Summary" (100% continuous-assessment
+     credits against term-end credits, and marks). Semesters 7 and 8 of a
+     4-year programme get an Honours block and an Honours with Research
+     block, as in the template. */
+
+  // Does a programme-structure row count for this programme's track?
+  function rowCounts(r) {
+    const t = r.track || "All semesters";
+    const mine = (CTX.calc || {}).track;
+    if (t === "Honours") return mine === "honours";
+    if (t === "Honours with Research") return mine === "research";
+    return true;
+  }
+
+  // a PG programme fills the PG Course Matrix (STAGE.level is "PG")
+  const IS_PG = STAGE.level === "PG";
+  const freshRow = section => (IS_PG && section && section.key === "semester_structure")
+    ? { cia: 60, ese: 40, total_marks: 100 } : {};
+  // the columns of the template's "Classification of Credits" table
+  const DIST_GROUPS = [
+    ["Major (Core)", "Major"],
+    ["Minor Stream", "Minor"],
+    ["Multidisciplinary", "Multi-Disciplinary / OE"],
+    ["Ability Enhancement Courses (AEC)", "Ability Enhancement / AEC"],
+    ["Skill Enhancement Courses (SEC)", "Skill Enhancement / SEC"],
+    ["Value Added Courses (VAC)", "Common Value Added / VAC"],
+    ["Summer Internship", "Summer Internship / INTERNSHIP"],
+    ["Research Project / Dissertation", "Research Project / Dissertation / PROJECT"],
+  ];
+  // a discipline elective sits in the Major column, as UGC Table 2 counts it
+  const inGroup = (r, cat) => r.nep_category === cat ||
+    (cat === "Major (Core)" && r.nep_category === "Discipline Specific Elective (DSE)");
+  const NC_COURSE = "Mandatory Non-Credit Course";
+  const NC_AUDIT = "Mandatory Non-Credit Audit Course";
+
+  /* UG credit totals by programme type: semesters 1–6 are the 3-year
+     degree; 4-year Honours adds its own semesters 7–8, and Honours with
+     Research its own (a semester 7–8 course not marked for either counts in
+     both, a research project only with research). */
+  const DEGREE = () => String((state.details || {}).degree_level || "");
+  const TRACKED = r => r.track === "Honours" || r.track === "Honours with Research";
+  function typeTotals(all) {
+    const upto6 = all.filter(r => num(r.semester) <= 6 && !TRACKED(r));
+    const researchOnly = r => r.track === "Honours with Research" ||
+      (num(r.semester) > 6 && !TRACKED(r) && r.nep_category === "Research Project / Dissertation");
+    const honoursOnly = r => r.track === "Honours";
+    const honLater = all.filter(r => !upto6.includes(r) && !researchOnly(r));
+    const resLater = all.filter(r => !upto6.includes(r) && !honoursOnly(r));
+    return { upto6, honLater, resLater,
+             fourYear: !IS_PG && (honLater.length + resLater.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year")),
+             honours: upto6.concat(honLater), research: upto6.concat(resLater) };
+  }
+
+  function renderCreditDistribution(section, host) {
+    const box = el("div", "cd-box");
+    host.appendChild(box);
+    // the template puts the classification before the programme structure and
+    // the summary after it; one section can show either, or both
+    const SHOW = section.show || "all";
+    const wants = k => SHOW === "all" || SHOW === k;
+
+    function paint() {
+      box.textContent = "";
+      const all = (Array.isArray(state.semester_structure) ? state.semester_structure : [])
+        .filter(r => num(r.semester) !== null);
+      if (!all.length) {
+        // the section's own line already says the table fills itself; no second bar
+        if (SHOW !== "classification") box.appendChild(autoNote(el("p", "pl-empty",
+          "The Credit table will be automatically populated based on the courses added to the programme structure above.")));
+        return;
+      }
+      const sems = rows => Array.from(new Set(rows.map(r => num(r.semester)))).sort((a, b) => a - b);
+
+      const sumBy = (rows, fn) => rows.reduce((a, r) => a + (fn(r) || 0), 0);
+      const nc = rows => rows.filter(r => r.nep_category === NC_COURSE ||
+        (num(r.credits) === 0 && r.nep_category !== NC_AUDIT)).length || "";
+      const audit = rows => rows.filter(r => r.nep_category === NC_AUDIT).length || "";
+
+      // --- classification of credits (a PG programme's too: the same columns, its own semesters)
+      if (wants("classification")) {
+      const t1 = el("table", "cd-table");
+      const h = el("tr");
+      ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total Credits",
+       "No. of Mandatory Non-Credit Course/s", "No. of Mandatory Non-Credit Audit Course"]
+        .forEach(x => h.appendChild(el("th", x === "Semester" ? null : "num", x)));
+      const thead = el("thead");
+      thead.appendChild(h);
+      t1.appendChild(thead);
+      const b1 = el("tbody");
+      const semRow = (sem, from) => {
+        const rows = from.filter(r => num(r.semester) === sem);
+        const tr = el("tr");
+        tr.appendChild(el("td", null, String(sem)));
+        DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
+          fmt(sumBy(rows.filter(r => inGroup(r, cat)), r => num(r.credits))))));
+        tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
+        tr.appendChild(el("td", "num", String(nc(rows))));
+        tr.appendChild(el("td", "num", String(audit(rows))));
+        b1.appendChild(tr);
+      };
+      const totRow = (label, counted, deg) => {
+        const tot = el("tr", "total cd-type" + (deg && deg === DEGREE() ? " is-chosen" : ""));
+        tot.appendChild(el("td", null, label));
+        DIST_GROUPS.forEach(([cat]) => tot.appendChild(el("td", "num",
+          fmt(sumBy(counted.filter(r => inGroup(r, cat)), r => num(r.credits))))));
+        tot.appendChild(el("td", "num", fmt(sumBy(counted, r => num(r.credits)))));
+        tot.appendChild(el("td", "num", String(nc(counted))));
+        tot.appendChild(el("td", "num", String(audit(counted))));
+        b1.appendChild(tot);
+      };
+      const band = (label, cols) => {
+        const tr = el("tr", "cd-band");
+        const td = el("td", null, label);
+        td.colSpan = cols;
+        tr.appendChild(td);
+        return tr;
+      };
+      const T = typeTotals(all);
+      const COLS1 = DIST_GROUPS.length + 4;
+      sems(T.upto6).forEach(sem => semRow(sem, T.upto6));
+      totRow(IS_PG ? "TOTAL" : "3-Year UG", T.upto6, IS_PG ? null : "UG - 3 Year");
+      if (T.fourYear) {
+        b1.appendChild(band("Honours", COLS1));
+        sems(T.honLater).forEach(sem => semRow(sem, T.honLater));
+        totRow("4-Year UG (Honours)", T.honours, "UG - 4 Year (Honours)");
+        b1.appendChild(band("Honours with Research", COLS1));
+        sems(T.resLater).forEach(sem => semRow(sem, T.resLater));
+        totRow("4-Year UG (Honours with Research)", T.research, "UG - 4 Year (Honours with Research)");
+      }
+      t1.appendChild(b1);
+      const w1 = el("div", "rt-wrap");
+      w1.appendChild(t1);
+      box.appendChild(w1);
+      }
+      if (!wants("summary")) return;
+
+      // --- summary
+      const t2 = el("table", "cd-table");
+      const h2 = el("tr");
+      ["Semester", "100% Continuous Assessment credits", "Term End (University) Examination credits",
+       "Total credits", "Total marks"].forEach(x => h2.appendChild(el("th", x === "Semester" ? null : "num", x)));
+      const th2 = el("thead");
+      th2.appendChild(h2);
+      t2.appendChild(th2);
+      const b2 = el("tbody");
+      const caOnly = r => num(r.ese) === 0 && num(r.cia) !== null;
+      const line = (label, rows, cls) => {
+        const tr = el("tr", cls || "");
+        tr.appendChild(el("td", null, label));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows.filter(caOnly), r => num(r.credits)))));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows.filter(r => !caOnly(r)), r => num(r.credits)))));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows, r => num(r.credits)))));
+        tr.appendChild(el("td", "num", fmt(sumBy(rows, r => num(r.total_marks)))));
+        b2.appendChild(tr);
+      };
+      const T2 = typeTotals(all);
+      const chosen = deg => "total cd-type" + (deg === DEGREE() ? " is-chosen" : "");
+      const inSem = (rows, sem) => rows.filter(r => num(r.semester) === sem);
+      sems(T2.upto6).forEach(sem => line(String(sem), inSem(T2.upto6, sem)));
+      line(IS_PG ? "TOTAL" : "3-Year UG", T2.upto6, IS_PG ? "total cd-type" : chosen("UG - 3 Year"));
+      if (T2.fourYear) {
+        const band2 = label => { const tr = el("tr", "cd-band"); const td = el("td", null, label);
+                                 td.colSpan = 5; tr.appendChild(td); b2.appendChild(tr); };
+        band2("Honours");
+        sems(T2.honLater).forEach(sem => line(String(sem), inSem(T2.honLater, sem)));
+        line("4-Year UG (Honours)", T2.honours, chosen("UG - 4 Year (Honours)"));
+        band2("Honours with Research");
+        sems(T2.resLater).forEach(sem => line(String(sem), inSem(T2.resLater, sem)));
+        line("4-Year UG (Honours with Research)", T2.research, chosen("UG - 4 Year (Honours with Research)"));
+      }
+      t2.appendChild(b2);
+      const w2 = el("div", "rt-wrap");
+      w2.appendChild(t2);
+      if (SHOW === "all") box.appendChild(el("h4", "cd-head", "Summary"));
+      box.appendChild(w2);
+      ugcCheck(all);
+    }
+
+    // --- UGC Table 2, from the same courses (only this programme's track)
+    function ugcCheck(all) {
+      if (IS_PG) return;              // UGC Table 2 is for UG programmes
+      const side = document.getElementById("credit-tally");
+      if (!CREDIT || !CREDIT.rows || !CREDIT.rows.length) {
+        box.appendChild(el("p", "small muted",
+          "UGC Table 2 applies to 3-year and 4-year UG programmes only."));
+        return;
+      }
+      const map = (CTX.calc || {}).nep_to_key || {};
+      const by = {};
+      all.filter(rowCounts).forEach(r => {
+        const k = map[r.nep_category];
+        if (k) by[k] = (by[k] || 0) + (num(r.credits) || 0);
+      });
+      const t3 = el("table", "cd-table");
+      const h3 = el("tr");
+      ["Category", `UGC minimum (${CREDIT.track_label})`, "Your credits", ""].forEach(
+        (x, n) => h3.appendChild(el("th", n ? "num" : null, x)));
+      const th3 = el("thead");
+      th3.appendChild(h3);
+      t3.appendChild(th3);
+      const b3 = el("tbody");
+      let total = 0;
+      CREDIT.rows.forEach(r => {
+        if (!r.applicable) return;
+        const got = by[r.key] || 0;
+        total += got;
+        const ok = got >= r.min && (r.max === null || r.max === undefined || got <= r.max);
+        const tr = el("tr");
+        tr.appendChild(el("td", null, r.label));
+        tr.appendChild(el("td", "num", r.max ? `${r.min} – ${r.max}` : String(r.min)));
+        tr.appendChild(el("td", "num cd-strong", fmt(got)));
+        tr.appendChild(el("td", "num " + (ok ? "ok-tick" : "bad-tick"), ok ? "✓" : "✗"));
+        b3.appendChild(tr);
+      });
+      const need = CREDIT.total;
+      const tr = el("tr", "total");
+      tr.appendChild(el("td", null, "Total"));
+      tr.appendChild(el("td", "num", String(need ?? "—")));
+      tr.appendChild(el("td", "num", fmt(total)));
+      tr.appendChild(el("td", "num " + (need && total < need ? "bad-tick" : "ok-tick"),
+                        need && total < need ? "✗" : "✓"));
+      b3.appendChild(tr);
+      t3.appendChild(b3);
+      const w3 = el("div", "rt-wrap");
+      w3.appendChild(t3);
+      box.appendChild(el("h4", "cd-head", "Check against UGC Table 2"));
+      box.appendChild(w3);
+
+      if (side && need) {
+        const short = need - total;
+        side.textContent = "";
+        side.appendChild(el("span", short > 0 ? "tally-short" : "tally-met",
+          short > 0 ? `${fmt(short)} credit${short === 1 ? "" : "s"} short` : "Total requirement met"));
+        side.appendChild(el("div", "muted",
+          short > 0 ? `${fmt(total)} entered of ${need} required` : `${fmt(total)} credits entered`));
+      }
+    }
+
+    window.addEventListener("stage:rows", e => {
+      if (e.detail === "semester_structure") paint();
+    });
+    paint();
   }
 
   // ------------------------------------------------------------ credit matrix
@@ -629,9 +2914,57 @@
 
     const totalRow = el("tr", "total");
     const inputs = {};
-    // Filled from the programme structure when this stage has one.
-    const feeder = (STAGE.sections || []).find(s => s.feeds_credit_matrix);
-    const catKeys = CREDIT.category_keys || {};
+    const fromEls = {};
+
+    // Which values the form filled from Section C, and which were typed.
+    // Kept beside the sections, not in them, so they are never validated.
+    function marks(kind) {
+      state.__auto = state.__auto || {};
+      const k = `${section.key}.${kind}`;
+      return (state.__auto[k] = state.__auto[k] || []);
+    }
+    function mark(key, kind) {
+      const other = kind === "auto" ? "manual" : "auto";
+      const rest = marks(other).filter(x => x !== key);
+      state.__auto[`${section.key}.${other}`] = rest;
+      if (!marks(kind).includes(key)) marks(kind).push(key);
+      if (inputs[key]) inputs[key].classList.toggle("is-auto", kind === "auto");
+    }
+    function courseSums() {
+      const map = (CTX.calc || {}).nep_to_key || {};
+      const out = {};
+      (Array.isArray(state.semester_structure) ? state.semester_structure : []).forEach(r => {
+        if (!rowCounts(r)) return;
+        const key = map[r.nep_category];
+        const c = num(r.credits);
+        if (key && c !== null) out[key] = (out[key] || 0) + c;
+      });
+      return out;
+    }
+    // Section B follows the courses in Section C until the department types
+    // its own figure into a category.
+    function followCourses() {
+      if (CTX.readonly) return;
+      const sums = courseSums();
+      let changed = false;
+      Object.keys(inputs).forEach(key => {
+        const s = sums[key];
+        fromEls[key].textContent = s !== undefined ? `courses: ${fmt(s)}` : "";
+        if (s === undefined) return;
+        const ours = marks("auto").includes(key);
+        const theirs = marks("manual").includes(key);
+        const blank = num(data[key]) === null;
+        if (!(ours || (blank && !theirs)) || num(data[key]) === s) return;
+        data[key] = s;
+        inputs[key].value = fmt(s);
+        mark(key, "auto");
+        changed = true;
+      });
+      if (changed) { tally(); touch(); }
+    }
+    window.addEventListener("stage:rows", e => {
+      if (e.detail === "semester_structure") followCourses();
+    });
 
     (CREDIT.rows || []).forEach(r => {
       const tr = el("tr", r.applicable ? "" : "na");
@@ -654,13 +2987,36 @@
         });
         input.addEventListener("input", () => {
           data[r.key] = input.value === "" ? null : Number(input.value);
+          mark(r.key, "manual");
           tally();
           touch();
         });
         if (CTX.readonly) input.disabled = true;
-        if (feeder) markAuto(input);
+        if ((state.__auto || {})[`${section.key}.auto`]?.includes(r.key)) {
+          input.classList.add("is-auto");
+        }
         inputs[r.key] = input;
         td.appendChild(input);
+        const from = el("span", "cm-from");
+        fromEls[r.key] = from;
+        td.appendChild(from);
+        hintOn(td, pop => {
+          const sums = courseSums();
+          const range = r.max ? `${r.min} to ${r.max}` : `at least ${r.min}`;
+          hintCard(pop, r.label,
+            [`UGC Table 2: ${range} credits.`,
+             sums[r.key] !== undefined
+               ? `Your courses in Section C add up to ${fmt(sums[r.key])}.`
+               : "No course in Section C is in this category yet."],
+            sums[r.key] !== undefined ? fmt(sums[r.key]) : null, data[r.key],
+            () => {
+              data[r.key] = sums[r.key];
+              input.value = fmt(sums[r.key]);
+              mark(r.key, "auto");
+              tally();
+              touch();
+            });
+        });
       } else {
         td.appendChild(el("span", "muted", "Not applicable"));
       }
@@ -699,7 +3055,14 @@
     totalRow.appendChild(el("td", "num tick"));
     tbody.appendChild(totalRow);
 
-    host.appendChild(table);
+    // Five columns will not fit a phone, so the table gets the same scrolling
+    // box as the repeating tables — and a keyboard user can reach the scroll.
+    const wrap = el("div", "rt-wrap");
+    wrap.tabIndex = 0;
+    wrap.setAttribute("role", "region");
+    wrap.setAttribute("aria-label", "UGC Table 2 credit matrix");
+    wrap.appendChild(table);
+    host.appendChild(wrap);
 
     if (CREDIT.needs_in_lieu) {
       const p = el("p", "small muted");
@@ -762,64 +3125,1553 @@
                     : `${sum} credits entered`));
       }
     }
-    if (feeder) {
-      refreshers.push(() => {
-        const sums = {};
-        rows(feeder.key).forEach(r => {
-          const k = catKeys[r.nep_category];
-          const c = Number(r.credits);
-          if (k && !Number.isNaN(c)) sums[k] = (sums[k] || 0) + c;
-        });
-        (CREDIT.rows || []).forEach(r => {
-          if (!r.applicable) return;
-          data[r.key] = sums[r.key] ?? 0;
-          if (inputs[r.key]) inputs[r.key].value = String(data[r.key]);
-        });
-        tally();
-      });
-    }
     tally();
+    // the course table may already have rendered above this one
+    followCourses();
   }
 
+  // --------------------------------------------------------------- cards
+  /* A section the department mostly confirms rather than types: each value
+     is a card, and a pencil opens the ordinary fields to change them. */
+
+  const PENCIL = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">' +
+    '<path d="M4 20h4L19 9l-4-4L4 16v4z" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" ' +
+    'stroke="currentColor" stroke-width="1.8"/></svg>';
+
+  const LOCK = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">' +
+    '<rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
+    '<path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+
+  /* The department's identity as a profile card (after Uiverse.io,
+     Smit-Prajapati). It is the Office's record, so nothing is edited here.
+     At rest a large monogram fills the card with the name on a strip at the
+     foot; as the card scrolls into view the strip rises over it and the
+     monogram shrinks into a round badge — scrolling drives it, no click. */
+  function renderProfileCard(section, block) {
+    const v = state[section.key] || {};
+    const name = String(v.dept_name || CTX.dept_name || "Department").trim();
+    const words = name.replace(/^Department of\s+/i, "").split(/\s+/).filter(w => /^[A-Z]/.test(w) && !/^(and|of|the)$/i.test(w));
+    const mono = (words.slice(0, 2).map(w => w[0]).join("") || name[0] || "D").toUpperCase();
+    const card = el("div", "pcard");
+    card.setAttribute("aria-label", `${name} — department identity`);
+    const pic = el("div", "pcard-pic");
+    pic.setAttribute("aria-hidden", "true");
+    pic.innerHTML =
+      '<svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice">' +
+      '<defs><pattern id="pcard-dots" width="18" height="18" patternUnits="userSpaceOnUse">' +
+      '<circle cx="2" cy="2" r="1.6" fill="#6b7280" opacity=".35"/></pattern></defs>' +
+      '<rect width="400" height="240" fill="#f4f5f7"/><rect width="400" height="240" fill="url(#pcard-dots)"/>' +
+      '<circle cx="330" cy="40" r="70" fill="#d0d5dd" opacity=".7"/>' +
+      '<circle cx="60" cy="210" r="56" fill="#e4e7ec" opacity=".55"/></svg>';
+    pic.appendChild(el("span", "pcard-mono", mono));
+    card.appendChild(pic);
+
+    const lock = el("span", "pcard-lock");
+    lock.innerHTML = LOCK;
+    lock.title = "From the Office of Academic Affairs record";
+    card.appendChild(lock);
+
+    const bottom = el("div", "pcard-bottom");
+    const content = el("div", "pcard-content");
+    content.appendChild(el("span", "pcard-name", name));
+    const facts = el("dl", "pcard-facts");
+    section.fields.filter(f => f.name !== "dept_name").forEach(f => {
+      const val = v[f.name];
+      const d = el("div", "pcard-fact");
+      d.appendChild(el("dt", null, f.label));
+      d.appendChild(el("dd", null, val == null || String(val).trim() === "" ? "—" : String(val)));
+      facts.appendChild(d);
+    });
+    content.appendChild(facts);
+    bottom.appendChild(content);
+    card.appendChild(bottom);
+    block.appendChild(card);
+
+    // open while the card is well in view, close as it leaves
+    const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still || !("IntersectionObserver" in window)) { card.classList.add("is-open"); return; }
+    new IntersectionObserver(entries => entries.forEach(e => {
+      card.classList.toggle("is-open", e.intersectionRatio >= 0.6);
+    }), { threshold: [0, 0.6, 1] }).observe(card);
+  }
+
+  function renderCards(section, block) {
+    if (section.frozen) return renderProfileCard(section, block);
+    state[section.key] = state[section.key] || {};
+    const vals = () => state[section.key];
+
+    const grid = el("div", "bento");
+    const form = el("div", "bento-form");
+    form.hidden = true;
+    const fieldsGrid = el("div", "fields-grid");
+    section.fields.forEach(f => {
+      fieldsGrid.appendChild(fieldBlock(f, vals()[f.name], v => setVal(section.key, f.name, v)));
+    });
+    form.appendChild(fieldsGrid);
+    const done = el("button", "btn btn-ghost btn-sm", "Done");
+    done.type = "button";
+    form.appendChild(done);
+
+    // one box holding every value, with a single pencil for the lot
+    function paint() {
+      grid.textContent = "";
+      const card = el("div", "bento-card bento-single");
+      const list = el("dl", "bento-items");
+      section.fields.forEach((f, i) => {
+        const v = vals()[f.name];
+        const empty = v === undefined || v === null || String(v).trim() === "";
+        const item = el("div", "bento-item" + (i === 0 ? " is-wide" : "") +
+                               (empty && f.required ? " is-missing" : ""));
+        item.appendChild(el("dt", "bento-label", f.label));
+        item.appendChild(el("dd", "bento-value" + (empty ? " is-empty" : ""),
+                            empty ? (f.required ? "Not given yet" : "—") : String(v)));
+        list.appendChild(item);
+      });
+      card.appendChild(list);
+      if (section.frozen) {
+        // the Office's record: shown, never edited here
+      } else if (!CTX.readonly) {
+        const pen = el("button", "bento-edit");
+        pen.type = "button";
+        pen.innerHTML = PENCIL;
+        pen.title = `Edit ${section.title.toLowerCase()}`;
+        pen.setAttribute("aria-label", `Edit ${section.title}`);
+        pen.addEventListener("click", () => openForm());
+        card.appendChild(pen);
+      }
+      grid.appendChild(card);
+      if (window.MagicBento) window.MagicBento.attach(grid);
+    }
+
+    function openForm(fieldName) {
+      grid.hidden = true;
+      form.hidden = false;
+      const target = fieldName && form.querySelector(`[data-field="${fieldName}"] input, ` +
+        `[data-field="${fieldName}"] select, [data-field="${fieldName}"] textarea`);
+      (target || form.querySelector("input:not([readonly]), select"))?.focus();
+    }
+    form.openForm = openForm;
+
+    done.addEventListener("click", () => {
+      form.hidden = true;
+      grid.hidden = false;
+      paint();
+      grid.querySelector(".bento-edit")?.focus();
+    });
+
+    block.appendChild(grid);
+    block.appendChild(form);
+    paint();
+  }
+
+  // ------------------------------------------------------- programme list
+  /* The department's programmes from the Office of Academic Affairs workbook, in a
+     UG tab and a PG tab. Each starts unticked: the department ticks the ones
+     it runs (one is enough), and the plus adds one the workbook does not
+     have. An unticked programme stays in the list, so a slip is one click to
+     undo. */
+
+  const ICON = {
+    plus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    minus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  };
+
+  // an icon and a word: "− Remove", "+ Keep", "+ Add"
+  function labelButton(cls, icon, text, label) {
+    const b = iconButton(cls + " pl-btn", icon, label || text);
+    b.appendChild(el("span", null, text));
+    return b;
+  }
+
+  function iconButton(cls, icon, label) {
+    const b = el("button", cls);
+    b.type = "button";
+    b.innerHTML = ICON[icon];
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    return b;
+  }
+
+  function renderProgrammeList(section, host) {
+    const data = rows(section.key);
+    const tabs = section.tabs || [{ key: "all", label: "Programmes", degrees: null }];
+    const tabOf = row => (tabs.find(t => t.degrees && t.degrees.includes(row.degree)) ||
+                          tabs[0]).key;
+
+    const wrap = el("div", "pl-wrap");
+    host.appendChild(wrap);
+
+    const bar = el("div", "pl-bar");
+    const tally = el("span", "pl-tally");
+    tally.setAttribute("role", "status");
+    const search = el("input", "pl-search");
+    search.type = "search";
+    search.placeholder = "Find a programme";
+    search.setAttribute("aria-label", "Find a programme by name or code");
+    bar.appendChild(tally);
+    bar.appendChild(search);
+    wrap.appendChild(bar);
+
+    // submitted: the list can still change — reopen it to add or remove
+    if (CTX.readonly && CTX.key === "dept_info" && !CTX.sealed && CTX.urls.edit_programmes) {
+      const re = el("div", "pl-reopen");
+      re.appendChild(el("span", null, "Submitted. Need to change the programmes?"));
+      const a = el("a", "btn btn-sm", "Change the programmes");
+      a.href = CTX.urls.edit_programmes;
+      re.appendChild(a);
+      wrap.appendChild(re);
+    }
+
+    // one panel per degree group, side by side
+    const cols = el("div", "pl-cols");
+    wrap.appendChild(cols);
+    const panels = {};
+    tabs.forEach((t, n) => {
+      const panel = el("section", `pl-panel pl-panel-${n % 2 ? "b" : "a"}`);
+      panel.setAttribute("aria-label", t.label);
+      const head = el("div", "pl-panel-head");
+      const title = el("h4", "pl-panel-title");
+      head.appendChild(title);
+      panel.appendChild(head);
+      const list = el("ol", "pl");
+      panel.appendChild(list);
+      if (!CTX.readonly) {
+        const addNew = () => {
+          data.push({ source: "new", decision: "keep", programme_code: "",
+                      programme_name: "", degree: (t.degrees || [""])[0] });
+          draw();
+          touch();
+          list.lastElementChild?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          list.lastElementChild?.querySelector("input")?.focus();
+        };
+        const top = labelButton("pl-head-add", "plus", "Add", `Add a ${t.key === "all" ? "" : t.key + " "}programme`);
+        top.addEventListener("click", addNew);
+        panel.insertBefore(top, list);
+        const add = el("button", "pl-panel-add");
+        add.type = "button";
+        add.innerHTML = ICON.plus;
+        add.appendChild(el("span", null, `Add ${t.key === "all" ? "a" : t.key} programme`));
+        add.addEventListener("click", addNew);
+        panel.appendChild(add);
+      }
+      cols.appendChild(panel);
+      panels[t.key] = { tab: t, title: title, list: list, panel: panel };
+    });
+
+    // every row is on screen now; kept for focusIssue
+    wrap.showRow = () => draw();
+
+    function input(row, name, def) {
+      const holder = el("div", "pl-in pl-in-" + name);
+      holder.dataset.field = name;
+      const i = makeInput(def, row[name], v => {
+        row[name] = v; touch();
+        if (name === "degree") { row._degreeByHand = true; draw(); }
+      });
+      i.setAttribute("aria-label", def.label);
+      holder.appendChild(i);
+      attachLiveCheck(i, def, holder);
+      return holder;
+    }
+
+    function rowItem(row, i, n) {
+      const removed = row.decision === "remove";
+      const li = el("li", "pl-row" + (removed ? " is-off" : "") +
+                          (row.source === "new" ? " is-new" : ""));
+      li.dataset.row = i;
+      li.appendChild(el("span", "pl-num", String(n).padStart(2, "0")));
+
+      if (row.source === "new") {
+        const grid = el("div", "pl-new");
+        // a UG panel offers UG only, a PG panel its PG kinds only
+        const degs = (tabs.find(t => t.key === tabOf(row)) || {}).degrees || section.degrees || [];
+        if (!row.year_introduced) row.year_introduced = String(Math.min(2027, Math.max(2024, new Date().getFullYear())));
+        const codeBox = input(row, "programme_code",
+          { name: "programme_code", label: "Programme code", type: "text", required: true,
+            placeholder: "e.g. MSCDS" });
+        // the code is made from the name (MSCDS) and kept, not shown
+        codeBox.hidden = true;
+        grid.appendChild(codeBox);
+        grid.appendChild(input(row, "degree",
+          { name: "degree", label: "Degree", type: "select", required: true,
+            options: degs }));
+        grid.appendChild(input(row, "year_introduced",
+          { name: "year_introduced", label: "Since (year introduced)", type: "select", required: true,
+            options: ["2024", "2025", "2026", "2027"] }));
+        const nameBox = input(row, "programme_name",
+          { name: "programme_name", label: "Programme name", type: "text", required: true,
+            placeholder: "Full programme name — e.g. Master of Science in Data Science" });
+        grid.appendChild(nameBox);
+        // the name, once typed, is put in proper form ("master of science in
+        // data science" -> "Master of Science in Data Science"), and the code is
+        // made from it the way the others are (MSCDS) unless typed by hand
+        const nameIn = nameBox.querySelector("input");
+        const codeIn = codeBox.querySelector("input");
+        if (codeIn) codeIn.addEventListener("input", () => { row._codeByHand = !!codeIn.value.trim(); });
+        if (nameIn) nameIn.addEventListener("change", () => {
+          const tidy = ProgName.tidy(nameIn.value);
+          if (tidy !== nameIn.value) { nameIn.value = tidy; row.programme_name = tidy; }
+          if (!row._codeByHand && codeIn) {
+            const taken = new Set(data.filter(r => r !== row).map(r => String(r.programme_code || "").toUpperCase()));
+            const code = ProgName.code(tidy, taken);
+            if (code) { codeIn.value = code; row.programme_code = code; }
+          }
+          const lv = ProgName.level(tidy);
+          if (lv && degs.includes(lv) && row.degree !== lv && !row._degreeByHand) {
+            row.degree = lv;
+            const sel = grid.querySelector(".pl-in-degree select");
+            if (sel) sel.value = lv;
+          }
+          touch();
+        });
+        const body = el("div", "pl-body");
+        body.appendChild(el("span", "pl-tag", "New"));
+        body.appendChild(grid);
+        li.appendChild(body);
+        if (!CTX.readonly) {
+          const del = labelButton("pl-minus", "minus", "Remove", "Take this new programme off");
+          del.addEventListener("click", () => { data.splice(i, 1); draw(); touch(); });
+          li.appendChild(del);
+        }
+        return li;
+      }
+
+      const body = el("div", "pl-body");
+      body.appendChild(el("span", "pl-name", row.programme_name || ""));
+      const meta = el("span", "pl-meta");
+      // the code stays in the record; the list shows the name, level and year
+      const rest = [row.degree, row.year_introduced && `since ${row.year_introduced}`,
+                    row.minors].filter(Boolean).join(" · ");
+      if (rest) meta.appendChild(document.createTextNode(" " + rest));
+      body.appendChild(meta);
+      li.appendChild(body);
+
+      // ticked: the department runs this programme; unticked: it does not
+      const pick = el("label", "pl-pick");
+      const box = el("input");
+      box.type = "checkbox";
+      box.checked = !removed;
+      box.disabled = !!CTX.readonly;
+      box.setAttribute("aria-label", `Offer ${row.programme_name || row.programme_code}`);
+      const word = el("span", "pl-pick-word", removed ? "Not offered" : "Offered");
+      box.addEventListener("change", () => {
+        row.decision = box.checked ? "keep" : "remove";
+        li.classList.toggle("is-off", !box.checked);
+        word.textContent = box.checked ? "Offered" : "Not offered";
+        paintCounts();
+        touch();
+      });
+      pick.appendChild(box);
+      pick.appendChild(word);
+      li.appendChild(pick);
+      return li;
+    }
+
+    // the number offered in each panel, and the tally above the lists
+    function paintCounts() {
+      Object.values(panels).forEach(({ tab, title }) => {
+        const live = data.filter(r => tabOf(r) === tab.key && r.decision !== "remove").length;
+        title.textContent = "";
+        title.appendChild(el("span", null, tab.label));
+        title.appendChild(el("span", "pl-panel-n", String(live)));
+      });
+      const offered = data.filter(r => r.decision !== "remove" && r.source !== "new").length;
+      const off = data.filter(r => r.decision === "remove").length;
+      const added = data.filter(r => r.source === "new").length;
+      tally.textContent = `${offered} offered · ${off} not offered` + (added ? ` · ${added} new` : "");
+    }
+
+    function draw() {
+      Object.values(panels).forEach(({ tab, list }) => {
+        const mine = data.map((r, i) => [r, i]).filter(([r]) => tabOf(r) === tab.key);
+        list.textContent = "";
+        if (!mine.length) {
+          list.appendChild(el("li", "pl-empty",
+            `No ${tab.key === "all" ? "" : tab.key + " "}programmes on record. ` +
+            "Use Add to put in each one you run this year."));
+        }
+        mine.forEach(([row, i], n) => list.appendChild(rowItem(row, i, n + 1)));
+      });
+
+      paintCounts();
+      filter();
+    }
+
+    function filter() {
+      const q = search.value.trim().toLowerCase();
+      wrap.querySelectorAll(".pl-row").forEach(li => {
+        const row = data[+li.dataset.row] || {};
+        const hay = `${row.programme_code} ${row.programme_name}`.toLowerCase();
+        li.hidden = !!q && row.source !== "new" && !hay.includes(q);
+      });
+    }
+    search.addEventListener("input", filter);
+
+    draw();
+
+    // arriving from Curriculum's "add a new UG / PG programme": start the row
+    if (CTX.add_level && !CTX.readonly) {
+      const want = tabs.find(t => t.key === CTX.add_level) ||
+                   tabs.find(t => t.degrees && t.degrees.includes(CTX.add_level));
+      const target = want && panels[want.key];
+      if (target && !data.some(r => r.source === "new" && !r.programme_code && !r.programme_name)) {
+        target.panel.querySelector(".pl-panel-add")?.click();
+      }
+    }
+  }
+
+  // ------------------------------------------------------------- template sheets
+  /* A syllabus, laid out as the syllabus template is: one bordered sheet
+     per course, with nothing on it but the template's own headings —
+     Name of the Program, Course Code, Name of the Course, credits and
+     hours, Pedagogy, Course Outcomes, the modules with their hours, Skill
+     Development Activities and Books for reference. */
+  function renderSheets(section, host) {
+    const data = rows(section.key);
+    if (!data.length && !CTX.readonly && section.min_rows !== 0) data.push({});
+    // where a course's code, title, credits and hours come from: the
+    // programme structure — or, on an earlier batch, that batch's own list
+    const sourceAll = () => IS_BATCH ? batchCourses() : (CTX.fill || []);
+    const sourceOne = code => (IS_BATCH ? sameCourse(batchCourses(), code) : undefined)
+      || (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === code);
+    const hashCode = location.hash.startsWith("#course-") && !(IS_BATCH && START_VIEW === "revision")
+      ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
+    // the course the link meant, as this page names it
+    const arrived = hashCode ? String((sourceOne(hashCode) || {}).course_code || hashCode).toUpperCase() : "";
+    const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
+    // (objectives as the programme's Objective put them in are not the course's own yet)
+    const blank = r => Object.keys(r).filter(k => !k.startsWith("_"))
+      .every(k => r[k] === "" || r[k] == null || (k === "objectives" && r[k] === CTX.programme_objectives)
+        || (Array.isArray(r[k]) && !r[k].some(m => m && (m.title || m.revised || m.hours || m.text))));
+
+    const top = el("div", "sheet-bar");
+    const note = el("span", "sheet-note");
+    note.setAttribute("role", "status");
+    host.appendChild(top);
+    const list = el("div", "sheets");
+    host.appendChild(list);
+
+    // arriving from the programme structure for a course not here yet: add it
+    if (!CTX.readonly && arrived) {
+      const want = arrived;
+      const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+      const src = sourceOne(hashCode);
+      if (want && src && !have.has(want)) {
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(Object.assign({}, src));
+        setTimeout(() => { touch(); note.textContent = `Added ${src.course_code} — fill in its syllabus below.`; }, 0);
+      }
+    }
+
+    if (!CTX.readonly && (IS_BATCH || (CTX.fill || []).length)) {
+      const fb = el("button", "btn btn-ghost btn-sm",
+        IS_BATCH ? "Fill in all courses from this batch's Curriculum" : "Fill in all courses from the Curriculum");
+      fb.type = "button";
+      fb.addEventListener("click", () => {
+        const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+        const add = sourceAll().filter(p => !have.has(String(p.course_code).toUpperCase()));
+        if (!add.length) {
+          note.textContent = IS_BATCH && !batchCourses().length ? "List this batch's courses in its Curriculum first."
+            : IS_BATCH ? "Every course of the list is already here." : "Every course of the Curriculum is already here.";
+          return;
+        }
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        add.forEach(p => data.push(Object.assign({}, p)));
+        draw(); touch();
+        note.textContent = `Added ${add.length} course${add.length === 1 ? "" : "s"} — code, name, credits and hours are in.`;
+      });
+      top.appendChild(fb);
+    }
+    top.appendChild(note);
+
+    function field(row, i, name, extra) {
+      const c = Object.assign({}, C[name], extra || {});
+      const holder = el("div", "sh-in");
+      holder.dataset.field = name;
+      holder.dataset.row = i;
+      const input = makeInput(c, row[name], v => { row[name] = v; touch(); });
+      input.setAttribute("aria-label", c.label);
+      if (c.placeholder) input.placeholder = c.placeholder;
+      holder.appendChild(input);
+      attachLiveCheck(input, c, holder);
+      return holder;
+    }
+    const cell = (tag, cls, kids, span) => {
+      const t = el(tag, cls);
+      if (span) t.colSpan = span;
+      (kids || []).forEach(k => t.appendChild(typeof k === "string" ? el("span", null, k) : k));
+      return t;
+    };
+    const label = (txt, node) => {
+      const d = el("div", "sh-line");
+      d.appendChild(el("strong", "sh-lab", txt));
+      d.appendChild(node);
+      return d;
+    };
+
+    /* The course outcomes a module serves: any of CO1–CO6, chosen from a
+       drop-down of ticks; the chosen ones show on top. */
+    function coPick(m) {
+      if (!Array.isArray(m.cos)) m.cos = [];
+      const box = el("details", "co-pick");
+      const sum = el("summary", "co-sum");
+      const paint = () => {
+        sum.textContent = "";
+        const chosen = ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"].filter(c => m.cos.includes(c));
+        if (!chosen.length) sum.appendChild(el("span", "co-none", CTX.readonly ? "—" : "Choose"));
+        chosen.forEach(c => sum.appendChild(el("span", "co-chip", c)));
+      };
+      paint();
+      box.appendChild(sum);
+      const menu = el("div", "co-menu");
+      ["CO1", "CO2", "CO3", "CO4", "CO5", "CO6"].forEach(c => {
+        const lab = el("label", "co-opt");
+        const cb = el("input");
+        cb.type = "checkbox";
+        cb.checked = m.cos.includes(c);
+        cb.disabled = !!CTX.readonly;
+        cb.addEventListener("change", () => {
+          m.cos = cb.checked ? [...new Set([...m.cos, c])] : m.cos.filter(x => x !== c);
+          paint(); touch();
+        });
+        lab.appendChild(cb);
+        lab.appendChild(el("span", null, c));
+        menu.appendChild(lab);
+      });
+      box.appendChild(menu);
+      if (CTX.readonly) box.addEventListener("toggle", () => { box.open = false; });
+      return box;
+    }
+
+    /* The level of Bloom's Taxonomy a module reaches: one of BTA 1 – BTA 6. */
+    const BTA = ["BTA 1 (Remembering)", "BTA 2 (Understanding)", "BTA 3 (Applying)",
+                 "BTA 4 (Analyzing)", "BTA 5 (Evaluating)", "BTA 6 (Creating)"];
+    function btaPick(m) {
+      const sel = el("select", "bta-sel");
+      sel.setAttribute("aria-label", "Bloom's Taxonomy level");
+      sel.appendChild(new Option(CTX.readonly ? "—" : "Choose", ""));
+      BTA.forEach(b => sel.appendChild(new Option(b, b)));
+      sel.value = BTA.includes(m.bta) ? m.bta : "";
+      sel.disabled = !!CTX.readonly;
+      sel.classList.toggle("is-empty", !sel.value);
+      sel.addEventListener("change", () => { m.bta = sel.value; sel.classList.toggle("is-empty", !sel.value); touch(); });
+      return sel;
+    }
+
+    function modulesRows(row, i, tbody) {
+      if (!Array.isArray(row.modules)) row.modules = [];
+      const mods = row.modules;
+      if (!mods.length && !CTX.readonly) mods.push({});
+      const head = el("tr", "sh-syl-head");
+      head.appendChild(cell("th", "sh-left", ["Course Content:"]));
+      head.appendChild(cell("th", "sh-cos", ["CO's"]));
+      head.appendChild(cell("th", "sh-bta", ["BTA"]));
+      head.appendChild(cell("th", "sh-hours", ["Hours"]));
+      tbody.appendChild(head);
+      const sum = el("span");
+      const paintSum = () => {
+        const total = mods.reduce((a, m) => a + (num(m.hours) || 0), 0);
+        const want = num(row.teaching_hours);
+        sum.textContent = `Total ${total} hours` + (want === null ? "" :
+          total === want ? ` — matches the ${want} contact hours` : ` — the course has ${want} contact hours`);
+        sum.className = want === null ? "" : total === want ? "is-ok" : "is-off";
+      };
+      mods.forEach((m, k) => {
+        const tr = el("tr", "sh-mod");
+        const t = el("input", "sh-mod-title");
+        t.type = "text"; t.value = m.title ?? ""; t.placeholder = "Title of the module";
+        t.addEventListener("input", () => { m.title = t.value; touch(); });
+        const lab = el("div", "sh-mod-line");
+        lab.appendChild(el("strong", null, `Module ${k + 1}:`));
+        lab.appendChild(t);
+        if (!CTX.readonly && mods.length > 1) {
+          const rm = el("button", "sh-x", "×");
+          rm.type = "button"; rm.title = `Remove module ${k + 1}`;
+          rm.addEventListener("click", () => { mods.splice(k, 1); draw(); touch(); });
+          lab.appendChild(rm);
+        }
+        tr.appendChild(cell("td", "sh-left", [lab]));
+        tr.appendChild(cell("td", "sh-cos", [coPick(m)]));
+        tr.appendChild(cell("td", "sh-bta", [btaPick(m)]));
+        const h = el("input", "sh-mod-hours");
+        h.type = "text"; h.inputMode = "numeric"; h.value = m.hours ?? ""; h.placeholder = "—";
+        h.addEventListener("input", () => {
+          h.value = h.value.replace(/[^0-9]/g, "");
+          m.hours = h.value === "" ? "" : Number(h.value);
+          paintSum(); touch();
+        });
+        tr.appendChild(cell("td", "sh-hours", [h]));
+        tbody.appendChild(tr);
+        const tr2 = el("tr", "sh-mod-body");
+        const ta = el("textarea", "sh-mod-content");
+        ta.rows = 4; ta.value = m.revised ?? ""; ta.placeholder = "Content of the module";
+        ta.addEventListener("input", () => { m.revised = ta.value; touch(); });
+        if (CTX.readonly) t.disabled = h.disabled = ta.disabled = true;
+        tr2.appendChild(cell("td", null, [ta], 4));
+        tbody.appendChild(tr2);
+      });
+      const foot = el("tr", "sh-mod-foot");
+      const td = cell("td", null, [], 4);
+      if (!CTX.readonly) {
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add module");
+        add.type = "button";
+        add.addEventListener("click", () => { mods.push({}); draw(); touch(); });
+        td.appendChild(add);
+      }
+      td.appendChild(sum);
+      foot.appendChild(td);
+      tbody.appendChild(foot);
+      paintSum();
+    }
+
+    const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    // a fixed-layout table takes its column widths from its first row: name them
+    const colWidths = (t, widths) => {
+      const cg = el("colgroup");
+      widths.forEach(w => { const c = el("col"); if (w) c.style.width = w; cg.appendChild(c); });
+      t.insertBefore(cg, t.firstChild);
+    };
+    const INFO = ["semester", "credits", "ltpe", "hours_per_week", "teaching_hours", "ca_ese"];
+    // the course's line of the Curriculum table — this batch's own on an earlier batch
+    const infoSource = code => IS_BATCH ? sameCourse(batchCourses(), code)
+      : (CTX.fill || []).find(p => String(p.course_code).toUpperCase() === code);
+    // its Course Information kept in step with that line; false when there is none
+    function syncInfo(row) {
+      const code = String(row.course_code || "").trim().toUpperCase();
+      const src = code ? infoSource(code) : null;
+      if (!src) return false;
+      if (CTX.readonly) return true;
+      let changed = false;
+      INFO.forEach(k => {
+        if (src[k] !== undefined && String(row[k] ?? "") !== String(src[k])) { row[k] = src[k]; changed = true; }
+      });
+      if (changed) setTimeout(touch, 0);
+      return true;
+    }
+
+    /* Course Outcomes: CO 1, CO 2 … each with what the learner will be able to
+       do and the level of Bloom's Taxonomy it reaches (1–6) — suggested from
+       its opening verb until one is chosen. "outcomes" keeps the same, one
+       per line, for the checks and the documents. */
+    const BLOOM = ["Remembering", "Understanding", "Applying", "Analyzing", "Evaluating", "Creating"];
+    const suggestLevel = text => {
+      const w = String(text || "").trim().split(/\s+/)[0] || "";
+      const n = (CTX.bloom_verbs || {})[w.toLowerCase().replace(/[.,:;]+$/, "")];
+      return n ? String(n) : "";
+    };
+    function coRows(row) {
+      if (!Array.isArray(row.co_table)) {
+        row.co_table = String(row.outcomes || "").split("\n")
+          .map(x => x.replace(/^\s*(CO\s*\d+|[a-z]\)|\d+[.)])\s*[:.\-–]?\s*/i, "").trim()).filter(Boolean)
+          .map(text => ({ text: text, bloom: suggestLevel(text), auto: true }));
+      }
+      return row.co_table;
+    }
+    const syncOutcomes = row => {
+      row.outcomes = row.co_table.map(c => String((c && c.text) || "").trim()).filter(Boolean).join("\n");
+    };
+    function coBlock(row, i, part) {
+      const cos = coRows(row);
+      if (!cos.length && !CTX.readonly) for (let k = 0; k < 3; k++) cos.push({ text: "", bloom: "" });
+      if (!Array.isArray(row.co_po)) row.co_po = [];
+      const trs = [];
+      const h = el("tr", "sh-cot-head");
+      ["Course Outcome", "Description", "Bloom’s Taxonomy Level"].forEach(x => h.appendChild(cell("th", null, [x])));
+      trs.push(h);
+      cos.forEach((c, k) => {
+        const tr = el("tr");
+        tr.appendChild(cell("td", "sh-con", [`CO ${k + 1}`]));
+        const ta = el("textarea", "sh-co-text");
+        ta.rows = 2;
+        ta.value = c.text || "";
+        ta.placeholder = k ? "Analyse … / Evaluate … / Design …" : "Apply … — begin with what the learner will do";
+        ta.disabled = !!CTX.readonly;
+        const sel = el("select", "sh-co-level");
+        sel.setAttribute("aria-label", `Bloom's Taxonomy level of CO ${k + 1}`);
+        sel.appendChild(new Option(CTX.readonly ? "—" : "Choose", ""));
+        BLOOM.forEach((b, n) => sel.appendChild(new Option(`${n + 1} – ${b}`, String(n + 1))));
+        sel.value = c.bloom || "";
+        sel.disabled = !!CTX.readonly;
+        sel.classList.toggle("is-auto", !!c.auto && !!c.bloom);
+        sel.title = c.auto && c.bloom ? "Suggested from the opening verb — change it if needed" : "";
+        ta.addEventListener("input", () => {
+          c.text = ta.value;
+          if (!c.bloom || c.auto) {
+            const n = suggestLevel(ta.value);
+            if (n) { c.bloom = n; c.auto = true; sel.value = n; sel.classList.add("is-auto"); }
+          }
+          syncOutcomes(row);
+          touch();
+        });
+        sel.addEventListener("change", () => {
+          c.bloom = sel.value;
+          delete c.auto;
+          sel.classList.remove("is-auto");
+          sel.title = "";
+          touch();
+        });
+        const tdText = cell("td", "sh-co-desc", [ta]);
+        const tdLevel = cell("td", "sh-co-lv", [sel]);
+        if (!CTX.readonly && cos.length > 1) {
+          const rm = el("button", "sh-x", "×");
+          rm.type = "button";
+          rm.title = `Remove CO ${k + 1}`;
+          rm.addEventListener("click", () => {
+            cos.splice(k, 1);
+            row.co_po.splice(k, 1);
+            syncOutcomes(row);
+            draw(); touch();
+          });
+          tdLevel.appendChild(rm);
+        }
+        tr.appendChild(tdText);
+        tr.appendChild(tdLevel);
+        trs.push(tr);
+      });
+      if (!CTX.readonly) {
+        const tr = el("tr", "sh-mod-foot");
+        const td = cell("td", null, [], 3);
+        const add = el("button", "btn btn-ghost btn-sm", "+ Add a course outcome");
+        add.type = "button";
+        add.addEventListener("click", () => { cos.push({ text: "", bloom: "" }); row.co_po.push({}); draw(); touch(); });
+        td.appendChild(add);
+        tr.appendChild(td);
+        trs.push(tr);
+      }
+      const tb = part("Course Outcomes (COs):", [], "sh-cot");
+      const lead = el("tr");
+      lead.appendChild(cell("td", "sh-lead", ["At the end of the course, the learner will be able to:"], 3));
+      tb.appendChild(lead);
+      trs.forEach(tr => tb.appendChild(tr));
+      tb.closest("table").dataset.field = "outcomes";
+      tb.closest("table").dataset.row = i;
+      colWidths(tb.closest("table"), ["92px", "", "240px"]);
+    }
+
+    /* CO-PO-PSO Mapping: each CO against the programme's POs and PSOs — the
+       ones its Curriculum describes — chosen as 1, 2 or 3 (– for none), and
+       the Articulation row, which the department types in itself. */
+    function mapBlock(row, i, part) {
+      // the Curriculum's POs and PSOs, one column for each box it has: [["PO1", "its description"], …]
+      const defs = (CTX.outcome_cols || []).length ? CTX.outcome_cols : [["PO1", ""], ["PSO1", ""]];
+      const pos = defs.filter(([c]) => c.startsWith("PO")).map(([c]) => c);
+      const psos = defs.filter(([c]) => c.startsWith("PSO")).map(([c]) => c);
+      const about = Object.fromEntries(defs);
+      const cols = [...pos, ...psos];
+      const cos = row.co_table || [];
+      if (!Array.isArray(row.co_po)) row.co_po = [];
+      while (row.co_po.length < cos.length) row.co_po.push({});
+      const edit = !CTX.readonly;
+      const trs = [];
+      const h = el("tr");
+      h.appendChild(cell("th", "sh-map-co", ["CO"]));
+      cols.forEach(c => {
+        const th = cell("th", "sh-map-h", [c]);
+        if (about[c]) th.title = `${c}: ${about[c]}`;      // its description, on hover
+        h.appendChild(th);
+      });
+      trs.push(h);
+      const fill = (tr, make) => cols.forEach(c => tr.appendChild(make(c)));
+      cos.forEach((_, k) => {
+        const m = row.co_po[k] && typeof row.co_po[k] === "object" ? row.co_po[k] : (row.co_po[k] = {});
+        const tr = el("tr");
+        tr.appendChild(cell("td", "sh-map-co", [`CO${k + 1}`]));
+        fill(tr, c => {
+          // 1 Low, 2 Medium, 3 High, or – for none
+          const sel = el("select", "sh-map-sel");
+          sel.setAttribute("aria-label", `CO${k + 1} to ${c}`);
+          [["1", "1"], ["2", "2"], ["3", "3"], ["", "–"]].forEach(([v, t]) => sel.appendChild(new Option(t, v)));
+          const was = String(m[c] ?? "").trim();
+          // a value typed in before the list (2.5, 4 …) stays shown until it is changed
+          if (was && !["1", "2", "3", "-", "–"].includes(was)) sel.appendChild(new Option(was, was));
+          sel.value = ["-", "–"].includes(was) ? "" : was;
+          sel.disabled = !edit;
+          sel.addEventListener("change", () => { m[c] = sel.value || "-"; touch(); });
+          return cell("td", "sh-map-v", [sel]);
+        });
+        trs.push(tr);
+      });
+      // the Articulation of each column, as the department works it out
+      if (!row.articulation || typeof row.articulation !== "object" || Array.isArray(row.articulation)) row.articulation = {};
+      const at = el("tr", "sh-map-avg");
+      at.appendChild(cell("th", "sh-map-co", ["Articulation"]));
+      fill(at, c => {
+        const box = el("input", "sh-map-in");
+        box.type = "text";
+        box.inputMode = "decimal";
+        box.placeholder = "–";
+        box.setAttribute("aria-label", `Articulation of ${c}`);
+        box.value = String(row.articulation[c] ?? "");
+        box.disabled = !edit;
+        box.addEventListener("input", () => {
+          const clean = box.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+          if (clean !== box.value) box.value = clean;
+          if (clean === "" || clean === ".") delete row.articulation[c]; else row.articulation[c] = clean;
+          touch();
+        });
+        return cell("td", "sh-map-v", [box]);
+      });
+      trs.push(at);
+      const legend = el("tr");
+      legend.appendChild(cell("td", "sh-legend", ["3-High, 2-Medium, 1-Low"], cols.length + 1));
+      trs.push(legend);
+      if (edit && CTX.outcomes_url) {
+        // the columns are the Curriculum's: more (or fewer) are added there
+        const described = defs.some(([, t]) => String(t || "").trim());
+        const tr = el("tr");
+        const td = cell("td", described ? "sh-map-from" : "sh-missing", [], cols.length + 1);
+        td.appendChild(el("span", null, described
+          ? "The columns are the POs and PSOs of the Curriculum (1.A and 1.B). To add or remove one, do it there. "
+          : "Describe the POs and PSOs in the Curriculum (1.A and 1.B) — this mapping has a column for each. "));
+        const a = el("a", "btn btn-ghost btn-sm", "POs and PSOs in the Curriculum →");
+        a.href = CTX.outcomes_url;
+        td.appendChild(a);
+        tr.appendChild(td);
+        trs.push(tr);
+      }
+      const tb = part("CO-PO-PSO Mapping:", trs, "sh-map");
+      tb.closest("table").dataset.field = "outcomes";
+    }
+
+    function sheet(row, i) {
+      const wrap = el("section", "sheet-wrap");
+      wrap.dataset.row = i;
+      if (row.course_code) wrap.id = "course-" + String(row.course_code).trim().toUpperCase();
+      const cap = el("div", "sheet-cap");
+      cap.appendChild(el("span", null, `Course ${i + 1}${row.course_code ? " · " + row.course_code : ""}`));
+      if (!CTX.readonly && data.length > 1) {
+        const rm = el("button", "btn btn-ghost btn-sm", "Remove");
+        rm.type = "button";
+        rm.addEventListener("click", () => {
+          if (!blank(row) && !window.confirm(`Remove ${row.course_code || "this course"} and its syllabus?`)) return;
+          data.splice(i, 1); draw(); touch();
+        });
+        cap.appendChild(rm);
+      }
+      wrap.appendChild(cap);
+
+      const stack = el("div", "sh-stack");
+      wrap.appendChild(stack);
+      // a heading, then its own bordered box
+      const part = (title, kids, cls) => {
+        if (title) stack.appendChild(el("p", "sh-part", title));
+        const t = el("table", "sheet" + (cls ? " " + cls : ""));
+        const tb = el("tbody");
+        t.appendChild(tb);
+        (kids || []).forEach(k => tb.appendChild(k));
+        stack.appendChild(t);
+        return tb;
+      };
+      const block = (lab, name, opt) => {
+        const tr = el("tr");
+        const td = cell("td", "sh-block", []);
+        const head = el("strong", "sh-lab", lab);
+        if (opt) head.appendChild(el("span", "sh-opt", " (optional)"));
+        td.appendChild(head);
+        td.appendChild(field(row, i, name));
+        tr.appendChild(td);
+        return tr;
+      };
+
+      // Course Information: from the course's line of the Curriculum table
+      const found = syncInfo(row);
+      const auto = (name, text) => {
+        const d = el("div", "sh-auto");
+        d.dataset.field = name;
+        d.dataset.row = i;
+        d.textContent = text === undefined || text === null || text === "" ? "—" : String(text);
+        d.title = "From the Curriculum table — change it there";
+        return d;
+      };
+      const kv = (...pairs) => {
+        const tr = el("tr");
+        pairs.forEach(([k, v, span]) => { tr.appendChild(cell("th", "sh-k", [k])); tr.appendChild(cell("td", "sh-v", [v], span)); });
+        return tr;
+      };
+      const codeBox = field(row, i, "course_code");
+      const codeIn = codeBox.querySelector("input");
+      if (codeIn) codeIn.addEventListener("change", () => draw());       // another course: its information follows
+      const rowsInfo = [
+        kv(["Course Title", field(row, i, "course_title"), 3]),
+        kv(["Course Code", codeBox], ["L-T-P-E", auto("ltpe", row.ltpe)]),
+        kv(["Semester", auto("semester", ROMAN[num(row.semester) - 1] || row.semester)],
+           ["Contact Hours", auto("teaching_hours", row.teaching_hours)]),
+        kv(["Credits", auto("credits", row.credits)], ["CA : ESE", auto("ca_ese", row.ca_ese)]),
+      ];
+      if (!found && !CTX.readonly) {
+        const tr = el("tr");
+        const td = cell("td", "sh-missing", [], 4);
+        td.appendChild(el("span", null, "Not in the Curriculum table yet — add this course there, and its semester, credits, " +
+                                        "L-T-P-E, contact hours and CA : ESE come in by themselves. "));
+        td.appendChild(backToTable());
+        tr.appendChild(td);
+        rowsInfo.push(tr);
+      }
+      colWidths(part("Course Information:", rowsInfo, "sh-info").closest("table"), ["18%", "32%", "18%", "32%"]);
+      // Course Objectives are the programme's Objective (and follow it) until the course writes its own
+      const goals = CTX.programme_objectives;
+      if (goals && !CTX.readonly && row.objectives !== goals &&
+          (row.objectives == null || String(row.objectives).trim() === "" || row.objectives === row._objectives_auto)) {
+        row.objectives = row._objectives_auto = goals;
+        setTimeout(touch, 0);
+      }
+      part("", [block("Course Objectives:", "objectives")]);
+      coBlock(row, i, part);
+      mapBlock(row, i, part);
+      // the modules sit in a table of their own
+      const mt = el("table", "sheet sh-syl");
+      const mtb = el("tbody");
+      mt.appendChild(mtb);
+      modulesRows(row, i, mtb);
+      stack.appendChild(mt);
+      part("", [block("Text Books:", "text_books"), block("Book References:", "books"),
+                block("Web References:", "web_references", true)]);
+      part("", [block("Pedagogy:", "pedagogy", true), block("Skill Development Activities:", "skill_activities", true)]);
+      if (focus && String(row.course_code || "").trim().toUpperCase() === focus) wrap.appendChild(nextBar(row));
+      return wrap;
+    }
+
+    /* Opened from a course of the Curriculum table: when its syllabus is in,
+       on to that course's Course Revision — or back to the table. */
+    function nextBar(row) {
+      const code = String(row.course_code || "").trim().toUpperCase();
+      const bar = el("div", "sheet-next");
+      bar.appendChild(backToTable());
+      if (!CTX.readonly && (IS_BATCH || CTX.revision_url)) {
+        // named by the course's title (its code when it has none yet)
+        const name = String(row.course_title || "").trim() || code;
+        const on = el("a", "btn btn-gold btn-sm", `Course Revision of ${name} →`);
+        on.title = `Course Revision of ${code}`;
+        on.href = IS_BATCH ? "?view=revision#course-" + encodeURIComponent(code)
+          : CTX.revision_url + FROM + "#course-" + encodeURIComponent(code);
+        on.addEventListener("click", e => {
+          if (IS_BATCH && window.__batchView) { e.preventDefault(); window.__batchView("revision", code); }
+        });
+        bar.appendChild(on);
+      }
+      return bar;
+    }
+
+    /* Semester → course group → course: pick one and only its sheet shows. */
+    const MAP = CTX.course_map || {};
+    const USE_NAV = String(CTX.key).startsWith("prog_syllabus");
+    // an earlier batch's course list, as it stands, says each course's semester and group
+    const liveMap = () => {
+      const m = {};
+      if (IS_BATCH) (state.batch_courses || []).forEach(r => {
+        String((r && r.course_code) || "").split("/").map(x => x.trim().toUpperCase()).filter(Boolean)
+          .forEach(code => { if (!m[code]) m[code] = { semester: r.semester, group: r.nep_category || "" }; });
+      });
+      return m;
+    };
+    const nav = el("div", "syl-nav");
+    host.insertBefore(nav, list);
+    const info = r => {
+      const k = String(r.course_code || "").trim().toUpperCase();
+      const m = liveMap()[k] || MAP[k] || {};
+      return { sem: String(r.semester || m.semester || ""), group: m.group || "Other courses" };
+    };
+    const isFilled = r => !!(String(r.outcomes || "").trim() && (r.modules || []).some(m => m && String(m.revised || m.title || "").trim()));
+    // an earlier batch shows only the semesters Settings asks it for
+    const inBatch = r => !IS_BATCH || !BATCH_SEMS.length || BATCH_SEMS.includes(+info(r).sem);
+    let pick = { sem: "", group: "", idx: -1 };
+    const wanted = arrived;
+    const hit = wanted ? data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === wanted) : -1;
+    const first = data.findIndex(inBatch);
+    if (hit >= 0) pick = { sem: info(data[hit]).sem, group: info(data[hit]).group, idx: hit };
+    else if (first >= 0) pick = { sem: info(data[first]).sem, group: "", idx: first };
+
+    let query = "";
+    // the course opened from the Curriculum table, if one was
+    let focus = arrived;
+    const inPick = (r) => inBatch(r) && (!pick.sem || info(r).sem === pick.sem) && (!pick.group || info(r).group === pick.group) &&
+      (!query || `${r.course_code || ""} ${r.course_title || ""}`.toLowerCase().includes(query));
+    function paintNav() {
+      nav.textContent = "";
+      if (!USE_NAV || data.length < 2) { nav.hidden = true; return; }
+      nav.hidden = false;
+      const row1 = el("div", "syl-nav-row");
+      const sems = IS_BATCH && BATCH_SEMS.length ? BATCH_SEMS.map(String)
+        : [...new Set(data.map(r => info(r).sem).filter(Boolean))].sort((a, b) => +a - +b);
+      const semSel = el("select");
+      semSel.setAttribute("aria-label", "Semester");
+      semSel.appendChild(new Option("All semesters", ""));
+      sems.forEach(x => semSel.appendChild(new Option("Semester " + x, x)));
+      semSel.value = pick.sem;
+      const groups = [...new Set(data.filter(r => inBatch(r) && (!pick.sem || info(r).sem === pick.sem)).map(r => info(r).group))];
+      const grpSel = el("select");
+      grpSel.setAttribute("aria-label", "Course category");
+      grpSel.appendChild(new Option("All course categories", ""));
+      const CAT_LABEL = Object.fromEntries(DIST_GROUPS);
+      groups.forEach(g => grpSel.appendChild(new Option(CAT_LABEL[g] || g, g)));
+      grpSel.value = groups.includes(pick.group) ? pick.group : "";
+      const lab = (t, sel) => { const w = el("label", "syl-nav-field"); w.appendChild(el("span", null, t)); w.appendChild(sel); return w; };
+      row1.appendChild(lab("Semester", semSel));
+      row1.appendChild(lab("Course category", grpSel));
+      const find = el("input", "syl-nav-search");
+      find.type = "search";
+      find.placeholder = "Search code or title";
+      find.value = query;
+      find.setAttribute("aria-label", "Search courses by code or title");
+      row1.appendChild(lab("Search", find));
+      const shown = data.filter(inBatch);
+      row1.appendChild(el("span", "syl-nav-count", `${shown.filter(isFilled).length} of ${shown.length} courses filled`));
+      const structure = document.querySelector(".back-link");
+      if (IS_BATCH) {
+        const go = el("a", "btn btn-ghost btn-sm", "Check / add in this batch's Curriculum →");
+        go.href = "?view=curriculum#sec-batch_courses";
+        row1.appendChild(go);
+      } else if (structure) {
+        const go = el("a", "btn btn-ghost btn-sm", "Check / add in the Programme structure →");
+        go.href = structure.href;
+        row1.appendChild(go);
+      }
+      nav.appendChild(row1);
+      const choose = () => {
+        const first = data.findIndex(inPick);
+        pick.idx = first;
+        draw();
+      };
+      semSel.addEventListener("change", () => { pick.sem = semSel.value; pick.group = ""; choose(); });
+      find.addEventListener("input", () => {
+        query = find.value.trim().toLowerCase();
+        if (query) { pick.sem = ""; pick.group = ""; }
+        const first = data.findIndex(inPick);
+        pick.idx = first;
+        draw();
+        const again = nav.querySelector(".syl-nav-search");
+        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      });
+      grpSel.addEventListener("change", () => { pick.group = grpSel.value; choose(); });
+
+      const chips = el("div", "syl-courses");
+      data.forEach((r, i) => {
+        if (!inPick(r)) return;
+        const b = el("button", "syl-course" + (i === pick.idx ? " is-on" : "") + (isFilled(r) ? " is-filled" : ""));
+        b.type = "button";
+        b.appendChild(el("span", "syl-course-dot", isFilled(r) ? "✓" : String(i + 1)));
+        const t = el("span", "syl-course-text");
+        t.appendChild(el("strong", null, r.course_title || "Untitled course"));
+        t.appendChild(el("span", null, (r.course_code || "no code") + " · " + info(r).group));
+        b.appendChild(t);
+        b.addEventListener("click", () => { pick.idx = i; draw(); list.scrollIntoView({ behavior: "smooth", block: "start" }); });
+        chips.appendChild(b);
+      });
+      if (!chips.childElementCount) chips.appendChild(el("p", "small muted", "No courses here."));
+      nav.appendChild(chips);
+    }
+
+    function draw() {
+      list.textContent = "";
+      paintNav();
+      data.forEach((row, i) => {
+        // with the picker, only the chosen course's sheet shows
+        if (USE_NAV && data.length >= 2 && i !== pick.idx) return;
+        list.appendChild(sheet(row, i));
+      });
+      if (!CTX.readonly) {
+        const add = el("button", "btn btn-ghost sheet-add", "+ Add another course");
+        add.type = "button";
+        add.addEventListener("click", () => {
+          data.push({});
+          pick = { sem: "", group: "", idx: data.length - 1 };
+          draw(); touch();
+          list.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        list.appendChild(add);
+      }
+    }
+    host.showRow = () => draw();
+    if (arrived) host.dataset.arrived = arrived;
+    // open one course here — from a course list's Syllabus → on this page:
+    // added from the list if it is not here yet, chosen, and scrolled to
+    window.__openSheet = code => {
+      code = String(code || "").toUpperCase();
+      focus = code;
+      let i = data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === code);
+      if (i < 0) {
+        const src = sourceOne(code);
+        if (!src || CTX.readonly) return;
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(Object.assign({}, src));
+        i = data.length - 1;
+        touch();
+        note.textContent = `Added ${src.course_code} — fill in its syllabus below.`;
+      }
+      pick = { sem: info(data[i]).sem, group: info(data[i]).group, idx: i };
+      query = "";
+      draw();
+      const target = document.getElementById("course-" + code) || list;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+      target.classList.add("is-flash");
+      setTimeout(() => target.classList.remove("is-flash"), 1900);
+    };
+    draw();
+  }
+
+  // -------------------------------------------------------- revision tables
+  /* Course Revision as the syllabus revision document has it: one
+     module-wise table per course — year, title and code before and after,
+     each module's previous and revised text with its % change, and the
+     average. "Fill in all courses" brings every course of the current batch
+     syllabus with its modules, and the previous ones from the latest earlier
+     batch, so the percentages work themselves out. */
+  // back to the Curriculum table a course was opened from
+  function backToTable() {
+    const a = el("a", "btn btn-ghost btn-sm", "← Back to the Curriculum table");
+    a.href = IS_BATCH ? "?view=curriculum#sec-batch_courses"
+      : (document.querySelector(".back-link") || {}).href || CTX.urls.dept_info || "#";
+    return a;
+  }
+
+  // a syllabus module as the revision table shows it: "Title (12 Hrs) — content"
+  const moduleText = m => {
+    const head = String(m.title || "").trim(), hrs = String(m.hours ?? "").trim();
+    const first = head + (hrs ? ` (${hrs} Hrs)` : "");
+    return [first, String(m.revised || "").trim()].filter(Boolean).join(" — ");
+  };
+  /* An earlier batch's courses for its own Course Revision: each course of
+     its Syllabus (then any of its Curriculum not there yet), in its
+     semesters, with the modules as the batch studied them on both sides to
+     start — the department changes the revised side. */
+  function batchRevisionRows() {
+    const year = String(STAGE.batch || "").slice(0, 4);
+    const semOf = code => ((batchCourses().find(p => String(p.course_code).toUpperCase() === code) || {}).semester);
+    const out = [], seen = new Set();
+    const add = (c, mods) => {
+      const code = String(c.course_code || "").trim().toUpperCase();
+      if (!code || seen.has(code)) return;
+      const sem = c.semester || semOf(code);
+      if (BATCH_SEMS.length && sem && !BATCH_SEMS.includes(num(sem))) return;
+      seen.add(code);
+      const row = { course_code: c.course_code, course_title: c.course_title || "",
+                    prev_code: c.course_code, prev_title: c.course_title || "" };
+      if (sem) row.semester = sem;
+      if (/^\d{4}$/.test(year)) row.year_previous = year;
+      if (CTX.revision_year) row.year_latest = CTX.revision_year;
+      const texts = (mods || []).filter(Boolean).map(moduleText).filter(Boolean);
+      if (texts.length) row.modules = texts.map(t => ({ previous: t, revised: t }));
+      out.push(row);
+    };
+    (Array.isArray(state.courses) ? state.courses : []).forEach(c => c && add(c, c.modules));
+    batchCourses().forEach(c => add(c, []));
+    return out;
+  }
+
+  function renderRevisionCourses(section, host) {
+    const data = rows(section.key);
+    if (!data.length && !CTX.readonly && !IS_BATCH) data.push({});
+    // where its courses come from: the syllabi — or, on an earlier batch, that batch's own
+    const fillRows = () => IS_BATCH ? batchRevisionRows() : (CTX.fill || []);
+    const C = Object.fromEntries(section.columns.map(c => [c.name, c]));
+    const blank = r => !String(r.course_code || "").trim() && !String(r.course_title || "").trim()
+      && !(r.modules || []).some(m => m && (m.previous || m.revised));
+    const top = el("div", "sheet-bar");
+    const note = el("span", "sheet-note");
+    note.setAttribute("role", "status");
+    host.appendChild(top);
+    const list = el("div", "rv-list");
+    host.appendChild(list);
+
+    // arriving from a course row's "Revision →": add that course if it is not here yet
+    // (an earlier batch opens it in place, below)
+    // the course opened from the Curriculum table (or its syllabus), if one was
+    let focus = !IS_BATCH && location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)).toUpperCase() : "";
+    const srcFor = want => {
+      const m = (CTX.course_map || {})[want];
+      return fillRows().find(p => String(p.course_code).toUpperCase() === want)
+        || (m ? { course_code: want, course_title: m.title || "", semester: m.semester || "" } : null);
+    };
+    if (!CTX.readonly && !IS_BATCH && location.hash.startsWith("#course-")) {
+      const want = decodeURIComponent(location.hash.slice(8)).toUpperCase();
+      const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+      const src = srcFor(want);
+      if (want && src && !have.has(want)) {
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(JSON.parse(JSON.stringify(src)));
+        setTimeout(() => { touch(); note.textContent = `Added ${src.course_code} — enter the % change for each module.`; }, 0);
+      }
+    }
+    if (!CTX.readonly && (IS_BATCH || (CTX.fill || []).length)) {
+      const fb = el("button", "btn btn-ghost btn-sm",
+        IS_BATCH ? "Fill in all courses from this batch's Syllabus" : "Fill in all courses from the syllabi");
+      fb.type = "button";
+      fb.title = IS_BATCH ? "Every course of this batch, its modules as the batch studied them — then change the revised side"
+        : "Revised modules from the current batch syllabus, previous ones from the latest earlier batch";
+      fb.addEventListener("click", () => {
+        const have = new Set(data.map(r => String(r.course_code || "").trim().toUpperCase()));
+        const add = fillRows().filter(p => !have.has(String(p.course_code).toUpperCase()));
+        if (!add.length) {
+          note.textContent = IS_BATCH && !fillRows().length ? "List this batch's courses in its Curriculum first."
+            : "Every course is already here.";
+          return;
+        }
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        add.forEach(p => data.push(JSON.parse(JSON.stringify(p))));
+        draw(); touch();
+        note.textContent = `Added ${add.length} course${add.length === 1 ? "" : "s"} — enter the % change for each module.`;
+      });
+      top.appendChild(fb);
+    }
+    top.appendChild(note);
+
+    function input(row, name) {
+      const c = C[name];
+      const holder = el("label", "rv-in");
+      holder.dataset.field = name;
+      holder.appendChild(el("span", null, c.label));
+      const i = makeInput(c, row[name], v => { row[name] = v; touch(); });
+      holder.appendChild(i);
+      attachLiveCheck(i, c, holder);
+      return [holder, i];
+    }
+
+    function course(row, i) {
+      const wrap = el("section", "rv-course");
+      wrap.dataset.row = i;
+      // an earlier batch's page holds its syllabus sheets too: their ids stay theirs
+      if (row.course_code) wrap.id = (IS_BATCH ? "revision-" : "course-") + String(row.course_code).trim().toUpperCase();
+      const head = el("div", "rv-course-head");
+      head.appendChild(el("span", "rv-course-no", String(i + 1).padStart(2, "0")));
+      const [hc, ic] = input(row, "course_code");
+      const [ht, it] = input(row, "course_title");
+      const [hs] = input(row, "semester");
+      head.appendChild(hc); head.appendChild(ht); head.appendChild(hs);
+      if (!CTX.readonly && data.length > 1) {
+        const rm = el("button", "btn btn-ghost btn-sm", "Remove");
+        rm.type = "button";
+        rm.addEventListener("click", () => {
+          if (!blank(row) && !window.confirm(`Remove ${row.course_code || "this course"} from the revision?`)) return;
+          data.splice(i, 1); draw(); touch();
+        });
+        head.appendChild(rm);
+      }
+      wrap.appendChild(head);
+      let table = revisionTable(C.modules, row, () => touch());
+      wrap.appendChild(table);
+      // the revised side of the table shows the course's code and title
+      const redraw = () => {
+        const t = revisionTable(C.modules, row, () => touch());
+        table.replaceWith(t); table = t;
+      };
+      ic.addEventListener("change", redraw);
+      it.addEventListener("change", redraw);
+      if (focus && String(row.course_code || "").trim().toUpperCase() === focus) {
+        if (!CTX.readonly && !syllabusFilled(focus)) {
+          // it can be revised now, but its syllabus is still to add
+          const warn = el("div", "rv-nosyl");
+          warn.setAttribute("role", "status");
+          warn.appendChild(el("span", null, "Syllabus not added yet. Add the syllabus and proceed with the revision."));
+          const go = el("a", null, "Add its syllabus →");
+          go.href = IS_BATCH ? "?view=syllabus#course-" + encodeURIComponent(focus)
+            : (currentSyllabus() || "#") + "?from=" + encodeURIComponent(CTX.key) + "#course-" + encodeURIComponent(focus);
+          go.addEventListener("click", e => { if (IS_BATCH) { e.preventDefault(); toSyllabus(focus); } });
+          warn.appendChild(go);
+          wrap.insertBefore(warn, head.nextSibling);
+        }
+        const bar = el("div", "sheet-next");
+        bar.appendChild(backToTable());
+        wrap.appendChild(bar);
+      }
+      return wrap;
+    }
+
+    function draw() {
+      list.textContent = "";
+      data.forEach((row, i) => list.appendChild(course(row, i)));
+      if (!CTX.readonly) {
+        const add = el("button", "btn btn-ghost sheet-add", "+ Add another course");
+        add.type = "button";
+        add.addEventListener("click", () => { data.push({}); draw(); touch(); });
+        list.appendChild(add);
+      }
+      refresh();
+    }
+    host.showRow = () => draw();
+    // arriving for a course whose syllabus is not added yet: an alert at the top
+    const tellNoSyllabus = code => {
+      if (CTX.readonly || !code || syllabusFilled(code) || !window.Toast) return;
+      const row = data.find(r => String(r.course_code || "").trim().toUpperCase() === code) || {};
+      window.Toast.warning(`${row.course_title || code}: add the syllabus and proceed with the revision.`,
+                           { title: "Syllabus not added yet", timeout: 10000, onClick: () => toSyllabus(code) });
+    };
+    if (focus) setTimeout(() => tellNoSyllabus(focus), 500);
+    // open one course here — from a course list's Revision → on an earlier
+    // batch: added from its Syllabus if it is not here yet, and scrolled to
+    window.__openRevision = code => {
+      code = String(code || "").toUpperCase();
+      focus = code;
+      let i = data.findIndex(r => String(r.course_code || "").trim().toUpperCase() === code);
+      if (i < 0) {
+        const src = srcFor(code);
+        if (!src || CTX.readonly) return;
+        for (let k = data.length - 1; k >= 0; k--) if (blank(data[k])) data.splice(k, 1);
+        data.push(JSON.parse(JSON.stringify(src)));
+        touch();
+        note.textContent = `Added ${src.course_code} — change its revised modules below.`;
+      }
+      draw();
+      const target = document.getElementById("revision-" + code) || document.getElementById("course-" + code) || list;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+      tellNoSyllabus(code);
+      target.classList.add("is-flash");
+      setTimeout(() => target.classList.remove("is-flash"), 1900);
+    };
+    draw();
+  }
+
+  // ------------------------------------------------------------------ expand
+  /* A wide table is easier to fill in on the whole screen. Expand lifts the
+     section itself into a large pop-up — the same inputs, still saving as
+     you type — and Close (or Esc) puts it back where it was. */
+  const WIDE_SECTIONS = ["table", "credit_distribution", "credit_matrix", "revision_summary"];
+  let expanded = null;
+
+  function expandable(block, heading, title) {
+    heading.classList.add("has-expand");
+    const btn = el("button", "btn btn-ghost btn-sm sec-expand");
+    btn.type = "button";
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    btn.appendChild(el("span", null, "Expand"));
+    btn.setAttribute("aria-label", `Expand ${title}`);
+    btn.addEventListener("click", () => (expanded ? collapse() : expand(block, title, btn)));
+    heading.appendChild(btn);
+  }
+
+  function expand(block, title, btn) {
+    const holder = el("div", "sec-holder");
+    block.replaceWith(holder);
+    const pop = el("div", "sec-pop");
+    pop.setAttribute("role", "dialog");
+    pop.setAttribute("aria-modal", "true");
+    pop.setAttribute("aria-label", title);
+    const panel = el("div", "sec-pop-panel");
+    const head = el("div", "sec-pop-head");
+    head.appendChild(el("strong", null, title));
+    head.appendChild(el("span", "sec-pop-hint", "Changes save as you type · Esc to close"));
+    const close = el("button", "btn btn-gold btn-sm", "Close");
+    close.type = "button";
+    close.addEventListener("click", collapse);
+    head.appendChild(close);
+    const body = el("div", "sec-pop-body");
+    body.appendChild(block);
+    panel.appendChild(head);
+    panel.appendChild(body);
+    pop.appendChild(el("div", "sec-pop-backdrop"));
+    pop.appendChild(panel);
+    document.body.appendChild(pop);
+    document.body.classList.add("fv-open");
+    btn.querySelector("span").textContent = "Collapse";
+    expanded = { block, holder, pop, btn };
+    close.focus();
+  }
+
+  function collapse() {
+    if (!expanded) return;
+    const { block, holder, pop, btn } = expanded;
+    holder.replaceWith(block);
+    pop.remove();
+    document.body.classList.remove("fv-open");
+    btn.querySelector("span").textContent = "Expand";
+    expanded = null;
+    btn.focus();
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && expanded && !document.querySelector(".file-viewer:not([hidden])")) collapse();
+  });
+
   // ------------------------------------------------------------------ render
+
+  /* One row per document, in order, each opened with a click to upload.
+     Closed, a row still says where it stands: not uploaded, uploaded (how
+     many), the keyword check, a form with blanks. The first required one
+     still missing is opened for you. */
+  function docStatus(f, v) {
+    const vals = (Array.isArray(v) ? v : [v]).filter(x => x && x.name);
+    if (!vals.length) return f.required ? ["is-todo", "Not uploaded"] : ["is-opt", "Optional"];
+    const bad = vals.find(x => x.match && x.match.template &&
+      ((x.match.template.blank || []).length || (x.match.template.half || []).length || x.match.template.placeholders));
+    if (bad) return ["is-warn", "Uploaded · some categories blank"];
+    const wrong = vals.find(x => x.match && x.match.looks_like);
+    if (wrong) return ["is-bad", "Looks like " + wrong.match.looks_like];
+    const miss = vals.find(x => x.match && x.match.status === "miss");
+    if (miss) return ["is-warn", "Keywords do not match"];
+    const weak = vals.find(x => x.match && x.match.status === "weak");
+    const n = vals.length > 1 ? ` (${vals.length} files)` : "";
+    if (weak) return ["is-warn", "Uploaded" + n + " · few keywords"];
+    return ["is-ok", "Uploaded" + n + " ✓"];
+  }
+
+  function accordion(section, grid, made) {
+    grid.classList.add("acc");
+    let opened = false;
+    made.forEach(([f, b], i) => {
+      const d = el("details", "acc-item");
+      const sum = el("summary", "acc-head");
+      sum.appendChild(el("span", "acc-n", String(i + 1)));
+      const t = el("span", "acc-title", f.label);
+      if (f.required) t.appendChild(el("span", "req", " *"));
+      sum.appendChild(t);
+      if (f.template) {
+        // the reference template, right on the row, without opening it
+        const tpl = el("a", "acc-tpl", "⤓ Template");
+        tpl.href = CTX.urls.static + f.template;
+        tpl.setAttribute("download", "");
+        tpl.title = "Download the template for reference (Word)";
+        tpl.addEventListener("click", e => e.stopPropagation());
+        sum.appendChild(tpl);
+      }
+      const chip = el("span", "acc-chip");
+      sum.appendChild(chip);
+      sum.appendChild(el("span", "acc-caret", "›"));
+      d.appendChild(sum);
+      const body = el("div", "acc-body");
+      // the row's own "Template" button is enough: no second link inside
+      if (f.template) b.querySelectorAll(".tpl-link").forEach(x => x.remove());
+      b.replaceWith(d);
+      body.appendChild(b);
+      d.appendChild(body);
+      const paint = () => {
+        const [cls, words] = docStatus(f, (state[section.key] || {})[f.name]);
+        chip.className = "acc-chip " + cls;
+        chip.textContent = words;
+        d.classList.toggle("is-done", cls === "is-ok");
+      };
+      paint();
+      refreshers.push(paint);
+      if (!opened && !CTX.readonly && f.required && chip.classList.contains("is-todo")) { d.open = true; opened = true; }
+    });
+  }
 
   function render() {
     root.textContent = "";
     if (!STAGE.sections || !STAGE.sections.length) {
       const note = el("div", "alert alert-warning");
       note.appendChild(el("div", null,
-        "This stage has no fields to fill in. Tell the Office of Academics if that looks wrong."));
+        "This stage has no fields to fill in. Tell the Office of Academic Affairs if that looks wrong."));
       root.appendChild(note);
       return;
     }
     STAGE.sections.forEach(section => {
+      if (section.hidden) return;        // filled from elsewhere on the page
       const block = el("div", "section-block");
       block.id = `sec-${section.key}`;
       const h = el("h3", null, section.title);
-      block.appendChild(h);
-      if (section.help) block.appendChild(el("div", "section-help", section.help));
+      if (section.title) block.appendChild(h);
+      if (WIDE_SECTIONS.includes(section.type) && !["cards", "sheet"].includes(section.display) && section.title) expandable(block, h, section.title);
+      if (section.help) {
+        const help = autoNote(el("div", "section-help", section.help));
+        // Pre-BoS and BoS Documents: the folder mascot above the uploads
+        if (["pre_bos", "bos_documents"].includes(CTX.key) && (section.fields || []).some(f => f.type === "file")
+            && !document.querySelector(".upload-mascot")) {
+          help.classList.add("has-mascot");
+          const img = el("img", "upload-mascot");
+          img.src = CTX.urls.static + "img/folder-mascot.png";
+          img.alt = "";
+          img.width = 110; img.height = 92;
+          help.appendChild(img);
+        }
+        block.appendChild(help);
+      }
+      (section.links || []).forEach(l => {
+        const a = el("a", "section-link", `${l.label} →`);
+        a.href = CTX.urls.stage.replace("__stage__", l.stage);
+        block.appendChild(a);
+      });
 
-      if (section.type === "table") {
+      if (section.type === "table" && section.display === "sheet") {
+        renderSheets(section, block);
+      } else if (section.type === "table" && section.display === "revision") {
+        renderRevisionCourses(section, block);
+      } else if (section.type === "table" && section.display === "cards") {
+        renderRowCards(section, block);
+      } else if (section.type === "table") {
         renderTable(section, block);
       } else if (section.type === "credit_matrix") {
         renderCreditMatrix(section, block);
+      } else if (section.type === "revision_summary") {
+        renderRevisionSummary(section, block);
+      } else if (section.type === "credit_distribution") {
+        renderCreditDistribution(section, block);
+      } else if (section.type === "programme_list") {
+        renderProgrammeList(section, block);
+      } else if (section.display === "cards") {
+        renderCards(section, block);
       } else {
         const grid = el("div", "fields-grid");
+        const made = [];
         state[section.key] = state[section.key] || {};
         section.fields.forEach(f => {
-          const b = fieldBlock(f, state[section.key][f.name],
-                               v => setVal(section.key, f.name, v));
+          if (f.hidden) return;              // kept in the record, not shown
+          // a UG programme's degree is not asked: unless it has one, its structure
+          // says — courses in semesters 7–8 make it 4-year, else 3-year
+          if (f.name === "degree_level" && CTX.key === "prog_curriculum" && !IS_PG) {
+            const d = state[section.key];
+            const sems = (state.semester_structure || []).filter(r => r && num(r.semester) !== null);
+            if (!CTX.readonly && sems.length && (!d.degree_level || d._degree_auto)) {
+              const want = sems.some(r => num(r.semester) > 6) ? "UG - 4 Year (Honours with Research)" : "UG - 3 Year";
+              if (d.degree_level !== want || !d._degree_auto) {
+                d._degree_auto = true;
+                setVal(section.key, "degree_level", want);
+              }
+            }
+            return;
+          }
+          // standard wording is the placeholder: an empty box means "use it".
+          // A draft that still holds the wording word for word shows it the
+          // same way, so the department sees grey text it can type over.
+          if (f.prefill_text && f.type !== "fixed") {
+            // never "required" on the page: empty is a valid answer here
+            f = Object.assign({}, f, { placeholder: f.prefill_text, required: false });
+            if (!CTX.readonly && String(state[section.key][f.name] || "").trim() === f.prefill_text.trim()) {
+              state[section.key][f.name] = "";
+            }
+          }
+          if (f.derive_from) f = Object.assign({}, f, { required: false });
+          const b = fieldBlock(f, state[section.key][f.name], v => {
+            setVal(section.key, f.name, v);
+            // the credit check follows the degree: save, then reopen with it
+            if (f.reload_on_change) { reloadAfterSave = true; clearTimeout(saveTimer); save(); }
+          });
+          if (f.derive_from && b._input) {
+            // filled from other fields on the page (item 9 from the programme
+            // name and specialisation) until the department types its own
+            const TAGS = { "UG - 3 Year": "3 Years", "UG - 4 Year (Honours)": "Honours",
+                           "UG - 4 Year (Honours with Research)": "Honours with Research" };
+            const read = ref => {
+              const [sec, name] = ref.split(".");
+              const v = String(((state[sec] || {})[name]) || "").trim();
+              const tag = TAGS[(state.details || {}).degree_level];
+              // the programme carries the degree chosen after semester 6
+              return name === "programme_name" && tag
+                ? v.replace(/\s*\((?:[^()]*hon(?:ou)?r?s[^()]*|\s*\d\s*years?\s*)\)\s*$/i, "") + ` (${tag})` : v;
+            };
+            const make = () => f.derive_from.map(read).filter(Boolean).join(" — ");
+            const example = f.placeholder || "";
+            // worked out from the programme, shown as the placeholder; a value
+            // that is just the worked-out text is cleared back to placeholder
+            const cur0 = String(state[section.key][f.name] || "").trim();
+            if (!CTX.readonly && cur0 && cur0 === make()) { state[section.key][f.name] = ""; b._input.value = ""; }
+            refreshers.push(() => {
+              b._input.placeholder = make() || example;
+            });
+          }
           if (f.count && b._input) {
+            // "No. of courses with major revisions" and the like count themselves
             const c = f.count;
             refreshers.push(() => {
-              const n = rows(c.section).filter(r => r[c.field] === c.value).length;
+              const n = rows(c.section).filter(r => r && r[c.field] === c.value).length;
               state[section.key][f.name] = n;
               b._input.value = String(n);
             });
           }
           grid.appendChild(b);
+          made.push([f, b]);
         });
         block.appendChild(grid);
+        if (section.display === "accordion") accordion(section, grid, made);
       }
       root.appendChild(block);
     });
@@ -829,6 +4681,23 @@
 
   let saveTimer = null;
   let dirty = false;
+  let reloadAfterSave = false;
+  // every change counts up; a save that comes back clears "unsaved" only if
+  // nothing changed while it was on its way
+  let edits = 0;
+  let saving = null;
+  let leftWith = -1;
+
+  /* What is not saved yet is also kept in this tab as the page goes: a quick
+     reload (or Back) can open the page before that save is in, and then
+     takes it from here and saves it again. */
+  const COPY = "bos-unsaved:" + ((CTX.urls || {}).save || location.pathname);
+  function keepCopy() {
+    try { sessionStorage.setItem(COPY, JSON.stringify({ at: Date.now(), state: state })); } catch (_) { /* full or blocked */ }
+  }
+  function dropCopy() {
+    try { sessionStorage.removeItem(COPY); } catch (_) { /* fine */ }
+  }
 
   function refresh() {
     refreshers.forEach(fn => { try { fn(); } catch (_) { /* never block typing */ } });
@@ -837,35 +4706,66 @@
   function touch() {
     refresh();
     dirty = true;
+    edits++;
     saveNote.textContent = "Unsaved changes";
     saveNote.className = "save-note";
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 1400);
+    saveTimer = setTimeout(save, 800);
   }
 
-  function save() {
-    if (CTX.readonly || !dirty) return;
+  /* Saved on its own, a moment after each change. One save at a time: what
+     changes while one is on its way goes with the next. Leaving the page,
+     the save is sent so that it still arrives as the page closes. Resolves
+     true once everything is saved. */
+  function save(leaving) {
+    if (CTX.readonly) return Promise.resolve(true);
+    if (saving && leaving !== true) return saving.then(() => save());
+    if (!dirty) return Promise.resolve(true);
+    if (leaving === true && leftWith === edits) return saving || Promise.resolve(true);   // sent already
+    if (leaving === true) { leftWith = edits; keepCopy(); }
+    clearTimeout(saveTimer);
+    const sent = edits;
+    const body = JSON.stringify(state);
+    const keepalive = leaving === true && new Blob([body]).size < 60000;
     saveNote.textContent = "Saving…";
     saveNote.className = "save-note saving";
-    fetch(CTX.urls.save, {
+    const p = fetch(CTX.urls.save, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state)
+      body: body,
+      keepalive: keepalive
     }).then(r => r.json()).then(j => {
       if (j.ok) {
-        dirty = false;
-        saveNote.textContent = "Saved " + new Date().toLocaleTimeString();
-        saveNote.className = "save-note saved";
-      } else {
-        saveNote.textContent = j.error || "Could not save";
-        saveNote.className = "save-note";
+        if (edits === sent) {
+          dirty = false;
+          // the copy left on the way out stays: the page may already be
+          // opening again with what was there before this save was in
+          if (leftWith !== sent) dropCopy();
+          saveNote.textContent = "All changes saved · " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          saveNote.className = "save-note saved";
+        }
+        if (reloadAfterSave) { reloadAfterSave = false; window.location.reload(); }
+        return true;
       }
+      saveNote.textContent = j.error || "Could not save";
+      saveNote.className = "save-note";
+      return false;
     }).catch(() => {
       saveNote.textContent = "Could not reach the server — your work is still in this tab";
-    });
+      saveNote.className = "save-note";
+      return false;
+    }).finally(() => { if (saving === p) saving = null; });
+    saving = p;
+    return p;
   }
 
+  const checksCard = document.getElementById("checks-card");
+  const checksClose = document.getElementById("checks-close");
+  function showChecks() { if (checksCard) checksCard.hidden = false; }
+  if (checksClose) checksClose.addEventListener("click", () => { checksCard.hidden = true; });
+
   function paintIssues(issues, summary) {
+    showChecks();
     issuesBox.textContent = "";
     document.querySelectorAll(".is-bad").forEach(n => {
       n.classList.remove("is-bad");
@@ -932,14 +4832,51 @@
   function focusIssue(iss) {
     const target = locate(iss);
     if (!target) return;
+    const blk = target.closest ? target.closest(".section-block") : null;
+    if (blk && blk.hidden && window.__showSection) window.__showSection(blk.id);
+    // a field behind the cards has to be brought out before it can be fixed
+    const behind = target.closest ? target.closest(".bento-form") : null;
+    if (behind && behind.hidden && behind.openForm) behind.openForm(iss.field);
+    // a programme that is not the one on screen (or a row in the other panel)
+    const plWrap = document.querySelector(`#sec-${iss.section} .pl-wrap, ` +
+                                          `#sec-${iss.section} .rc-wrap`);
+    if (plWrap && !iss._shown && iss.row !== null && iss.row !== undefined) {
+      const want = `[data-row="${iss.row}"]` + (iss.field ? ` [data-field="${iss.field}"]` : "");
+      if (!plWrap.querySelector(want)) {
+        plWrap.showRow(iss.row, iss.field);
+        return focusIssue(Object.assign({}, iss, { _shown: true }));
+      }
+    }
     target.scrollIntoView({ behavior: "smooth", block: "center" });
     const input = target.querySelector("input, select, textarea");
     if (input) { input.focus(); input.classList.add("is-bad"); }
   }
 
+  /** Placeholder issue lines while the checks run. */
+  function checksLoading() {
+    showChecks();
+    issuesBox.textContent = "";
+    const wrap = el("div");
+    wrap.setAttribute("aria-busy", "true");
+    ["w-90", "w-70", "w-90", "w-50"].forEach(w => {
+      const row = el("div", "sk-row");
+      row.style.margin = "10px 0";
+      row.appendChild(el("span", "sk sk-dot"));
+      row.lastChild.style.cssText = "width:10px;height:10px;border-radius:50%";
+      const g = el("div", "sk-grow");
+      g.appendChild(el("span", "sk sk-line " + w));
+      row.appendChild(g);
+      wrap.appendChild(row);
+    });
+    issuesBox.appendChild(wrap);
+  }
+
   function check(cb) {
+    // a submitted (read-only) stage has nothing to check
+    if (CTX.readonly) return;
     const btn = document.getElementById("btn-check");
     if (btn) { btn.disabled = true; btn.textContent = "Checking…"; }
+    checksLoading();
     const done = () => {
       if (btn) { btn.disabled = false; btn.textContent = "Check now"; }
     };
@@ -962,15 +4899,317 @@
 
   /** A message in the Checks panel, for when we have no issue list to show. */
   function showPanelMessage(text) {
+    showChecks();
     issuesBox.textContent = "";
     issuesBox.appendChild(el("p", "small issue-note", text));
     countsBox.textContent = "";
   }
 
+  /* Submitting is two steps. First the checks run; if anything must be
+     fixed, it is listed as before. If all is well, the review opens:
+     everything entered, files as links (open, or remove), a Change link per
+     section, and a confirmation to tick — once submitted the stage is
+     locked until the Office sends it back. After it goes through, the same
+     review can be downloaded as a copy. */
+  const SUBMIT_LABEL = (document.getElementById("btn-submit") || {}).textContent || "Submit";
+  function submitLabel(btn, text) {
+    btn.disabled = false;
+    btn.textContent = text || SUBMIT_LABEL.trim();
+  }
+
   function submit() {
     const btn = document.getElementById("btn-submit");
     btn.disabled = true;
-    btn.textContent = "Checking…";
+    btn.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Checking…';
+    save();
+    fetch(CTX.urls.validate, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state)
+    }).then(r => r.json()).then(j => {
+      const errs = (j.issues || []).filter(i => i.level === "error");
+      // a programme's last step: every step of it is checked before its review
+      if (j.ok && CTX.programme_review) { paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 }); programmeCheck(btn, errs); return; }
+      if (!j.ok || errs.length) { notSubmitted(btn, j); return; }
+      paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
+      // the step that completes the record opens the review of everything
+      if (CTX.final) { submitLabel(btn); openAll(); }
+      else if (CTX.programme_review) { submitLabel(btn); openProgramme(); }
+      else submitAndGo(btn);
+    }).catch(() => unreachable(btn));
+  }
+
+  /* An intermediate stage: submitted as soon as the checks pass, then on
+     to the next one. */
+  function openAll() {
+    window.SubmitAll.open({ record: CTX.urls.record, submit: CTX.urls.submit_all, beforeOpen: () => save() });
+  }
+
+  /* The programme's last step: its own review — Curriculum, Current Batch,
+     the earlier batches begun, Course Revision — submitted together, then on
+     to the next programme. */
+  function openProgramme() {
+    const q = "?programme=" + encodeURIComponent(CTX.programme);
+    window.SubmitAll.open({ record: CTX.urls.record + q, submit: CTX.urls.submit_all + q,
+                            title: "Review & submit this programme", beforeOpen: () => save() });
+  }
+
+  function submitAndGo(btn) {
+    btn.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Submitting…';
+    fetch(CTX.urls.submit, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state)
+    }).then(r => r.json()).then(j => {
+      if (!j.ok) { notSubmitted(btn, j); return; }
+      dirty = false;
+      btn.textContent = "Submitted ✓";
+      window.location = j.redirect || CTX.urls.dashboard;
+    }).catch(() => unreachable(btn));
+  }
+
+  function recordBlock() {
+    const box = el("section", "rv-sec rv-record");
+    const h = el("div", "rv-sec-head");
+    h.appendChild(el("h4", null, "Your whole record"));
+    box.appendChild(h);
+    const ul = el("ul", "rv-record-list");
+    (CTX.record || []).forEach(r => {
+      const li = el("li", "is-" + r.status);
+      li.appendChild(el("span", "rv-rec-dot", r.status === "submitted" ? "✓" : r.status === "now" ? "→" : "!"));
+      li.appendChild(el("span", "rv-rec-title", r.title));
+      li.appendChild(el("span", "rv-rec-at", r.status === "now" ? "this one — below" : r.status === "submitted" ? (r.at ? "submitted " + r.at : "submitted") : r.status));
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+    return box;
+  }
+
+  function notSubmitted(btn, j) {
+    paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
+    submitLabel(btn);
+    saveNote.textContent = "Not submitted — there are answers still to fix";
+    saveNote.className = "save-note save-note-bad";
+    const errs = (j.issues || []).filter(i => i.level === "error");
+    if (errs.length && window.Review) { missingDialog(errs); return; }
+    alertIssues(j.issues || [], j.summary || {}, j.error);
+    const first = errs[0];
+    if (first) focusIssue(first);
+    else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /* The programme's last step: what is still blank in each of its steps.
+     All filled: its review opens. Otherwise the list, each step a link, and
+     no going on to the next programme until it is done. */
+  function programmeCheck(btn, hereErrs) {
+    const toHere = () => { if (hereErrs && hereErrs[0]) focusIssue(hereErrs[0]); else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" }); };
+    save().then(() => fetch(CTX.urls.programme_check + "?programme=" + encodeURIComponent(CTX.programme), { method: "POST" }))
+      .then(r => r.json()).then(j => {
+        submitLabel(btn);
+        if (!j.ok) { unreachable(btn); return; }
+        if (!(j.parts || []).length) { openProgramme(); return; }
+        saveNote.textContent = "Not submitted — some steps of this programme are still to fill";
+        saveNote.className = "save-note save-note-bad";
+        const n = j.parts.reduce((a, p) => a + p.missing.length + (p.more || 0), 0);
+        const body = el("div", "miss");
+        body.appendChild(el("p", "miss-lede",
+          "This programme is not submitted yet. Please fill in the following in each step, then submit again:"));
+        let ctl = null;
+        j.parts.forEach(p => {
+          const here = p.url === location.pathname;
+          const head = el("div", "miss-part");
+          head.appendChild(el("strong", null, p.title));
+          const go = el("a", "miss-part-go", here ? "This page" : "Go to this step →");
+          go.href = p.url;
+          if (here) go.addEventListener("click", e => {
+            e.preventDefault(); ctl.close(); toHere();
+          });
+          head.appendChild(go);
+          body.appendChild(head);
+          const ul = el("ul", "miss-list");
+          p.missing.forEach(m => {
+            const li = el("li");
+            const a = el("a", "miss-go", m);
+            a.href = p.url;
+            if (here) a.addEventListener("click", e => { e.preventDefault(); go.click(); });
+            li.appendChild(a);
+            ul.appendChild(li);
+          });
+          body.appendChild(ul);
+          if (p.more) body.appendChild(el("p", "miss-more", `…and ${p.more} more on that step.`));
+        });
+        const foot = el("div", "rv-actions");
+        const draft = el("button", "btn btn-ghost", "Save draft");
+        draft.type = "button";
+        draft.addEventListener("click", () => {
+          dirty = true;
+          save().then(() => {
+            ctl.close();
+            if (window.Toast) window.Toast.success("Your draft is saved. Fill the steps listed, then submit.", { title: "Draft saved" });
+          });
+        });
+        const fill = el("button", "btn btn-gold", "Fill them now");
+        fill.type = "button";
+        foot.appendChild(el("span", "spacer"));
+        foot.appendChild(draft);
+        foot.appendChild(fill);
+        ctl = Review.modal({ title: `${n} thing${n === 1 ? "" : "s"} still to fill`, sub: reviewTitle(), body, foot });
+        fill.addEventListener("click", () => {
+          const first = j.parts[0];
+          if (first.url === location.pathname) { ctl.close(); toHere(); } else window.location = first.url;
+        });
+      }).catch(() => unreachable(btn));
+  }
+
+  /* Submit found gaps: list them, each a link to its box. The department
+     fills them now, or keeps this stage as a draft and goes on to the next —
+     it is listed as still to submit there, with a link back. */
+  function missingDialog(errs) {
+    const body = el("div", "miss");
+    body.appendChild(el("p", "miss-lede",
+      "This stage is not submitted yet. Please fill in the following, then submit again:"));
+    const ul = el("ul", "miss-list");
+    let ctl = null;
+    errs.slice(0, 12).forEach(i => {
+      const li = el("li");
+      const a = el("button", "miss-go", i.message);
+      a.type = "button";
+      a.addEventListener("click", () => { ctl.close(); focusIssue(i); });
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+    if (errs.length > 12) body.appendChild(el("p", "miss-more", `…and ${errs.length - 12} more in the Checks panel.`));
+    const foot = el("div", "rv-actions");
+    const fill = el("button", "btn btn-gold", "Fill them now");
+    fill.type = "button";
+    foot.appendChild(el("span", "spacer"));
+    if (CTX.skip_to && CTX.skip_to.url && !CTX.programme_review) {
+      const skip = el("button", "btn btn-ghost", `Save draft & go to ${CTX.skip_to.label || "the next stage"} →`);
+      skip.type = "button";
+      skip.addEventListener("click", () => {
+        skip.disabled = true;
+        dirty = true;
+        // remembered for this browser tab: the reminder on the next pages
+        try {
+          const list = JSON.parse(sessionStorage.getItem("bos-skipped") || "[]").filter(u => u !== location.pathname);
+          list.push(location.pathname);
+          sessionStorage.setItem("bos-skipped", JSON.stringify(list));
+        } catch (_) { /* no storage: no reminder */ }
+        save().then(() => { dirty = false; window.location = CTX.skip_to.url; });
+      });
+      foot.appendChild(skip);
+    }
+    foot.appendChild(fill);
+    ctl = Review.modal({
+      title: `${errs.length} thing${errs.length === 1 ? "" : "s"} still to fill`,
+      sub: reviewTitle(),
+      body, foot
+    });
+    fill.addEventListener("click", () => { ctl.close(); focusIssue(errs[0]); });
+  }
+
+  function unreachable(btn) {
+    submitLabel(btn);
+    saveNote.textContent = "Could not reach the server — nothing was submitted. Try again in a moment.";
+    saveNote.className = "save-note save-note-bad";
+    if (window.Toast) window.Toast.error("Could not reach the server — nothing was submitted. Try again in a moment.",
+                                         { title: "Not submitted" });
+  }
+
+  function reviewTitle() {
+    return (CTX.programme_name ? CTX.programme_name + " · " : "") + (CTX.title || STAGE.title || "This stage");
+  }
+
+  function removeAt(path) {
+    // path: [section, field] or [section, field, i] or [section, row, column] …
+    let node = state;
+    for (let i = 0; i < path.length - 1; i++) {
+      if (node == null) return;
+      node = node[path[i]];
+    }
+    const last = path[path.length - 1];
+    if (Array.isArray(node) && typeof last === "number") node.splice(last, 1);
+    else if (node) node[last] = "";
+    render();
+    refresh();
+    dirty = true;
+    save();
+  }
+
+  function statsBar(st, warnings) {
+    const bar = el("div", "rv-stats");
+    const ring = el("div", "rv-ring");
+    ring.style.setProperty("--p", st.percent);
+    ring.appendChild(el("strong", null, st.percent + "%"));
+    bar.appendChild(ring);
+    const words = el("div", "rv-stats-words");
+    words.appendChild(el("strong", null, `${st.filled} of ${st.total} filled`));
+    words.appendChild(el("span", null, st.missing.length
+      ? "Empty: " + st.missing.slice(0, 4).join(", ") + (st.missing.length > 4 ? "…" : "")
+      : "Everything asked for is filled in."));
+    if (warnings) words.appendChild(el("span", "rv-warn", `${warnings} thing${warnings === 1 ? "" : "s"} to double-check — see the Checks panel.`));
+    bar.appendChild(words);
+    return bar;
+  }
+
+  function openReview(issues) {
+    const warnings = (issues || []).filter(i => i.level !== "error").length;
+    let ctl = null;
+    const draw = () => { const wrap = el("div"); if (CTX.final && (CTX.record || []).length) wrap.appendChild(recordBlock());
+      wrap.appendChild(Review.build(STAGE, state, {
+      viewFile: v => openViewer(v),
+      removeFile: path => {
+        if (!window.confirm("Remove this file? You will need to upload it again to submit.")) return;
+        removeAt(path);
+        ctl.body.textContent = "";
+        ctl.body.appendChild(draw());
+        ctl.panel.querySelector(".rv-stats").replaceWith(statsBar(Review.stats(STAGE, state), warnings));
+      },
+      edit: key => {
+        ctl.close();
+        if (window.__showSection) window.__showSection("sec-" + key);
+        const sec = document.getElementById("sec-" + key);
+        if (sec) { sec.scrollIntoView({ behavior: "smooth", block: "start" }); sec.classList.add("is-flash"); setTimeout(() => sec.classList.remove("is-flash"), 1600); }
+      }
+    })); return wrap; };
+
+    const foot = el("div", "rv-foot-in");
+    const terms = el("label", "rv-terms");
+    const tick = el("input");
+    tick.type = "checkbox";
+    terms.appendChild(tick);
+    terms.appendChild(el("span", null,
+      "I have checked everything above. I understand that once submitted, the whole Board of Studies " +
+      "record goes to the Office of Academic Affairs and is locked — only the Office can send a part back for correction."));
+    foot.appendChild(terms);
+    const row = el("div", "rv-actions");
+    const backBtn = el("button", "btn btn-ghost", "Back to editing");
+    backBtn.type = "button";
+    const go = el("button", "btn btn-gold", "Submit now");
+    go.type = "button";
+    go.disabled = true;
+    row.appendChild(el("span", "spacer"));
+    row.appendChild(backBtn);
+    row.appendChild(go);
+    foot.appendChild(row);
+    tick.addEventListener("change", () => { go.disabled = !tick.checked; });
+
+    ctl = Review.modal({
+      title: "Final submission — review everything",
+      sub: reviewTitle() + " — " + CTX.dept_name,
+      top: statsBar(Review.stats(STAGE, state), warnings),
+      body: draw(),
+      foot
+    });
+    backBtn.addEventListener("click", () => ctl.close());
+    go.addEventListener("click", () => reallySubmit(ctl, go));
+  }
+
+  function reallySubmit(ctl, go) {
+    const btn = document.getElementById("btn-submit");
+    go.disabled = true;
+    go.innerHTML = '<span class="loader-one is-light" aria-hidden="true"><i></i><i></i><i></i></span>Submitting…';
     save();
     fetch(CTX.urls.submit, {
       method: "POST",
@@ -978,42 +5217,241 @@
       body: JSON.stringify(state)
     }).then(r => r.json()).then(j => {
       if (j.ok) {
-        // The dashboard flashes the confirmation, so keep the button busy
-        // through the navigation rather than flicking it back to "Submit".
-        btn.textContent = "Submitted";
         dirty = false;
-        window.location = j.redirect || CTX.urls.dashboard;
+        btn.disabled = true;
+        btn.textContent = "Submitted";
+        // the review becomes the receipt: the copy to keep, then onward
+        ctl.panel.querySelector(".rv-head h3").textContent = "Submitted";
+        ctl.panel.querySelector(".rv-sub").textContent = reviewTitle() + " — " + CTX.dept_name + " · " + new Date().toLocaleString();
+        ctl.panel.querySelectorAll(".rv-edit, .rv-file-rm").forEach(b => b.remove());
+        ctl.panel.querySelectorAll(".rv-record-list li.is-now").forEach(li => {
+          li.className = "is-submitted";
+          li.querySelector(".rv-rec-dot").textContent = "✓";
+          li.querySelector(".rv-rec-at").textContent = "submitted now";
+        });
+        const done = el("div", "rv-done");
+        done.appendChild(el("span", "rv-done-tick", "✓"));
+        const w = el("div");
+        w.appendChild(el("strong", null, "Submitted to the Office of Academic Affairs."));
+        w.appendChild(el("span", null, (j.next ? `Next: ${j.next.title}. ` : "") +
+          "See what you sent any time under Reports — view only; for a copy, contact the Office of Academic Affairs."));
+        done.appendChild(w);
+        ctl.panel.querySelector(".rv-stats").replaceWith(done);
+        const foot = ctl.panel.querySelector(".rv-foot");
+        foot.textContent = "";
+        const row = el("div", "rv-actions");
+        // what was sent, as the Office's template lays it out — to see
+        if (CTX.submission_url) {
+          const see = el("a", "btn btn-ghost", "See your submission");
+          see.href = CTX.submission_url;
+          row.appendChild(see);
+        }
+        const on = el("a", "btn btn-gold", j.next ? "Continue to " + j.next.title : "Done");
+        on.href = j.redirect || CTX.urls.dashboard;
+        row.appendChild(el("span", "spacer"));
+        row.appendChild(on);
+        foot.appendChild(row);
         return;
       }
-      paintIssues(j.issues || [], j.summary || { errors: 0, warnings: 0 });
-      btn.disabled = false;
-      btn.textContent = "Submit this stage";
-      saveNote.textContent = "Not submitted — there are answers still to fix";
-      saveNote.className = "save-note save-note-bad";
-      const first = (j.issues || []).find(i => i.level === "error");
-      if (first) focusIssue(first);
-      else issuesBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }).catch(() => {
-      btn.disabled = false;
-      btn.textContent = "Submit this stage";
-      saveNote.textContent = "Could not reach the server — nothing was submitted. Try again in a moment.";
-      saveNote.className = "save-note save-note-bad";
-    });
+      ctl.close();
+      notSubmitted(btn, j);
+    }).catch(() => { ctl.close(); unreachable(btn); });
+  }
+
+  /* A submission that did not go through: one alert saying so, then one per
+     problem (the first few), each taking you to its field when clicked. */
+  function alertIssues(issues, summary, error) {
+    if (!window.Toast) return;
+    const errs = issues.filter(i => i.level === "error");
+    const warns = issues.filter(i => i.level !== "error");
+    if (!errs.length && error) { window.Toast.error(error, { title: "Not submitted" }); return; }
+    window.Toast.error(
+      `${errs.length} thing${errs.length === 1 ? "" : "s"} to fix` +
+      (warns.length ? ` and ${warns.length} to check` : "") + " — the list is in the Checks panel.",
+      { title: "Not submitted" });
+    errs.slice(0, 3).forEach(i => window.Toast.error(i.message, { onClick: () => focusIssue(i), timeout: 11000 }));
+    if (errs.length > 3) window.Toast.info(`…and ${errs.length - 3} more in the Checks panel.`);
   }
 
   // ------------------------------------------------------------------- boot
 
+  // a copy left by a quick reload, from before its save was in: taken up again
+  let fromCopy = false;
+  if (!CTX.readonly) {
+    let kept = null;
+    try { kept = JSON.parse(sessionStorage.getItem(COPY) || "null"); } catch (_) { kept = null; }
+    const nav = (performance.getEntriesByType && performance.getEntriesByType("navigation")[0]) || {};
+    if (kept && kept.state && Date.now() - kept.at < 120000 && (nav.type === "reload" || nav.type === "back_forward")) {
+      Object.keys(state).forEach(k => delete state[k]);
+      Object.assign(state, kept.state);
+      fromCopy = true;
+    } else dropCopy();
+  }
   render();
   refresh();
+  if (fromCopy) { dirty = true; edits++; save(); }
+  /* An earlier batch is three pages of one part, as the current batch is:
+     its Curriculum (the courses it studied), its Syllabus and its Course
+     Revision. Moving between them happens in place — the address follows
+     (?view=…), the steps at the top follow, and nothing typed is lost. */
+  if (IS_BATCH) {
+    const VIEW_OF = { batch_courses: "curriculum", courses: "syllabus", revision_courses: "revision" };
+    const setView = (v, push) => {
+      v = ["syllabus", "revision"].includes(v) ? v : "curriculum";
+      document.querySelectorAll(".section-block").forEach(b => {
+        const key = (b.id || "").replace(/^sec-/, "");
+        if (VIEW_OF[key]) b.hidden = VIEW_OF[key] !== v;
+      });
+      document.querySelectorAll(".pflow-simple .pmap-node").forEach(li => {
+        const on = li.dataset.view === v;
+        li.classList.toggle("is-here", on);
+        const a = li.querySelector("a");
+        if (a) { if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
+      });
+      // the way back to the batch's Curriculum shows on its Syllabus and Course Revision pages
+      document.querySelectorAll(".back-bar").forEach(b => { b.hidden = v === "curriculum"; });
+      if (push) {
+        const url = new URL(location.href);
+        url.searchParams.set("view", v);
+        url.searchParams.delete("from");
+        history.pushState({ view: v }, "", url.pathname + url.search);
+      }
+      window.scrollTo({ top: 0 });
+    };
+    window.__batchView = (v, code) => {
+      setView(v, true);
+      const open = v === "revision" ? window.__openRevision : window.__openSheet;
+      if (code && open) open(code);
+    };
+    // a section the page needs to show (a check's "fix it", the review's "edit")
+    window.__showSection = id => {
+      const key = String(id || "").replace(/^sec-/, "");
+      if (VIEW_OF[key]) setView(VIEW_OF[key], true);
+    };
+    const arrival = location.hash.startsWith("#course-") ? decodeURIComponent(location.hash.slice(8)) : "";
+    setView(START_VIEW === "revision" ? "revision"
+      : START_VIEW === "syllabus" || arrival ? "syllabus" : "curriculum", false);
+    if (START_VIEW === "revision" && arrival && window.__openRevision) {
+      // after the browser's own jump to the address's #course-…, which is not this page's
+      const go = () => setTimeout(() => window.__openRevision(arrival), 150);
+      if (document.readyState === "complete") go(); else window.addEventListener("load", go, { once: true });
+    }
+    window.addEventListener("popstate", () => setView(new URLSearchParams(location.search).get("view"), false));
+    // links to the other page of this batch: in place, too
+    document.addEventListener("click", e => {
+      const a = e.target.closest && e.target.closest("a[href]");
+      if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey) return;
+      const url = new URL(a.getAttribute("href"), location.href);
+      if (url.pathname !== location.pathname || !url.searchParams.get("view")) return;
+      e.preventDefault();
+      setView(url.searchParams.get("view"), true);
+      const target = url.hash && document.getElementById(url.hash.slice(1));
+      if (target) setTimeout(() => window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" }), 50);
+    });
+  }
+
+  // going to another page from here: what was typed is saved first (after
+  // the handlers above, so a link that switches the view in place is theirs)
+  if (!CTX.readonly) document.addEventListener("click", e => {
+    if (!dirty && !saving) return;
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((a.target && a.target !== "_self") || a.hasAttribute("download")) return;
+    const url = new URL(a.href, location.href);
+    if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+    if (url.pathname === location.pathname && url.search === location.search) return;   // a place on this page
+    e.preventDefault();
+    save().then(ok => {
+      if (ok) window.location.href = a.href;
+      else if (window.Toast) window.Toast.error("Your last changes are not saved yet. Check the connection, then try again.",
+                                                { title: "Not saved" });
+    });
+  });
+
+  // opened from a curriculum row: that course is already chosen — start at
+  // the semester / course group / search bar above it, where the department
+  // can move on to any other course
+  if (location.hash.startsWith("#course-") && !(IS_BATCH && START_VIEW === "revision")) {
+    setTimeout(() => {
+      const named = document.querySelector("[data-arrived]");
+      const target = (named && document.getElementById("course-" + named.dataset.arrived))
+        || document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      const nav = document.querySelector(".syl-nav:not([hidden])");
+      if (nav) window.scrollTo({ top: nav.getBoundingClientRect().top + window.scrollY - 110 });
+      else if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 90, behavior: "smooth" });
+      if (target) target.classList.add("is-flash");
+    }, 400);
+  }
+  // stages left as a draft with "Save draft & go": a reminder on the pages
+  // after, each a link back, until it is submitted
+  if (!CTX.readonly && window.Toast) {
+    let skipped = [];
+    try { skipped = JSON.parse(sessionStorage.getItem("bos-skipped") || "[]"); } catch (_) { skipped = []; }
+    const rec = CTX.record || [];
+    const left = rec.filter(r => r.url && skipped.includes(r.url) && r.status !== "submitted" && r.status !== "now");
+    try {
+      sessionStorage.setItem("bos-skipped", JSON.stringify(skipped.filter(u =>
+        !rec.some(r => r.url === u && r.status === "submitted"))));
+    } catch (_) { /* fine */ }
+    if (left.length) {
+      window.Toast.warning(`Please fill and submit ${left.length === 1 ? "this stage" : "these stages"} — click to go there.`,
+                           { title: "Still to submit", timeout: 12000 });
+      left.slice(0, 4).forEach(r => window.Toast.warning(`${r.title} — click here to go`,
+        { onClick: () => { window.location = r.url; }, timeout: 12000 }));
+    }
+  }
+  // a CO drop-down closes when the click is elsewhere
+  document.addEventListener("click", e => {
+    document.querySelectorAll("details.co-pick[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; });
+  });
+  // programme steps: Syllabus opens into its current and earlier batches
+  document.querySelectorAll(".pmap-syl > button").forEach(b => b.addEventListener("click", () => {
+    const li = b.parentElement;
+    const open = !li.classList.contains("is-open");
+    li.classList.toggle("is-open", open);
+    b.setAttribute("aria-expanded", open ? "true" : "false");
+  }));
+  const allBtn = document.getElementById("btn-all");
+  if (allBtn) allBtn.addEventListener("click", () => openAll());
 
   if (!CTX.readonly) {
-    document.getElementById("btn-check").addEventListener("click", () => check());
     document.getElementById("btn-submit").addEventListener("click", submit);
-    window.addEventListener("beforeunload", (e) => {
-      if (dirty) { e.preventDefault(); e.returnValue = ""; }
+    const sampleBtn = document.getElementById("btn-sample");
+    if (sampleBtn) sampleBtn.addEventListener("click", () => {
+      sampleBtn.disabled = true;
+      fetch(CTX.urls.sample, { method: "POST" }).then(r => r.json()).then(j => {
+        sampleBtn.disabled = false;
+        if (!j.ok) return;
+        Object.keys(state).forEach(k => delete state[k]);
+        Object.assign(state, j.data);
+        render();
+        refresh();
+        dirty = true;
+        save();
+        if (window.Toast) window.Toast.success("Every box is filled with sample data. Press Submit to review it.", { title: "Filled" });
+      }).catch(() => { sampleBtn.disabled = false; });
     });
-    setInterval(() => { if (dirty) save(); }, 25000);
+    // closing the tab, reloading, or the phone putting the page away: what is
+    // not saved yet is sent on the way out. Only a page too big to be sure of
+    // that way (a long syllabus) has the browser ask first.
+    window.addEventListener("beforeunload", (e) => {
+      if (!dirty) return;
+      save(true);
+      if (new Blob([JSON.stringify(state)]).size >= 60000) { e.preventDefault(); e.returnValue = ""; }
+    });
+    window.addEventListener("pagehide", () => { if (dirty) save(true); });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden" && dirty) save(true);
+    });
+    setInterval(() => { if (dirty) save(); }, 20000);
   } else {
     check();
+    const show = () => Review.build(STAGE, state, { viewFile: v => openViewer(v) });
+    const rv = document.getElementById("btn-review");
+    if (rv) rv.addEventListener("click", () => {
+      Review.modal({ title: "What was submitted", sub: reviewTitle() + " — " + CTX.dept_name +
+                     (CTX.submitted_at ? " · submitted " + CTX.submitted_at : ""),
+                     top: statsBar(Review.stats(STAGE, state), 0), body: show() });
+    });
   }
 })();

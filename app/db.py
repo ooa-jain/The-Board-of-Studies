@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import secrets
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import bcrypt
 from pymongo import ASCENDING, MongoClient
@@ -36,6 +37,23 @@ def get_db():
 
 def now():
     return datetime.now(timezone.utc)
+
+
+# Times are stored in UTC and shown in Indian Standard Time (UTC+5:30).
+IST = timezone(timedelta(hours=5, minutes=30), "IST")
+
+
+def to_ist(dt):
+    """A stored time as Indian time (a time with no zone is taken as UTC)."""
+    if not isinstance(dt, datetime):
+        return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(IST)
+
+
+def now_ist():
+    return datetime.now(IST)
 
 
 def _ensure_indexes():
@@ -83,20 +101,61 @@ def slugify_username(dept_code: str, dept_name: str = "") -> str:
     return base.strip(".")[:40]
 
 
+_GRAMMAR = {"of", "and", "the", "for", "in"}
+
+
+def _initials(text: str, keep: int = 4, drop=frozenset()) -> str:
+    """Initials of a name, ignoring the grammar between the words.
+
+    A single-word name has no initials worth the name, so the first few
+    letters stand in: "Commerce" gives "comm", not "c".
+    """
+    words = [w for w in "".join(ch if ch.isalpha() else " " for ch in text).split()
+             if w.lower() not in _GRAMMAR and w.lower() not in drop]
+    if not words:
+        return "dept"
+    if len(words) == 1:
+        return words[0][:keep].lower()
+    return "".join(w[0] for w in words)[:keep].lower()
+
+
+def department_username(db, dept) -> str:
+    """department + school + a number, e.g. ``cse.scse.4713``.
+
+    The department and the school say whose login it is at a glance; the
+    number keeps the same department at a second campus from colliding with
+    the first. Nothing about a person appears in it. The number is drawn
+    again if it is already taken.
+    """
+    # "Department" is dropped from the first half because every department
+    # carries it; "School" is kept in the second, where it tells the two
+    # halves apart — cse.scse, not cse.cse.
+    stem = (f"{_initials(dept.get('dept_name', ''), drop={'department'})}"
+            f".{_initials(dept.get('school', ''))}")
+    for _ in range(40):
+        candidate = f"{stem}.{secrets.randbelow(9000) + 1000}"
+        clash = db.users.find_one({"username": candidate})
+        if not clash or clash.get("dept_code") == dept.get("dept_code"):
+            return candidate
+    # 40 collisions on a 4-digit number means something is very wrong; fall
+    # back to the code, which is unique by construction.
+    return slugify_username(dept["dept_code"])
+
+
 def issue_department_login(db, dept, actor="system", reset=False):
     """Create or reset one department's login and return (username, password).
 
-    Both halves come from the department itself: the username from its code,
-    the password freshly generated. Single, bulk and import all call this, so
-    a login issued one way is identical to one issued another.
+    Both halves are generated: the username from the department and its
+    school plus a number, the password freshly drawn. Single, bulk, seed and
+    import all call this, so a login issued one way is identical to one
+    issued another, and nobody has to key one in by hand.
+
+    A department that already has a username keeps it — reissuing is about
+    the password, and changing someone's username along with it would lock
+    them out of a name they have already been told.
     """
     dept_code = dept["dept_code"]
-    username = dept.get("username") or slugify_username(dept_code, dept.get("dept_name", ""))
-
-    # Only a *different* department holding this name forces a suffix.
-    clash = db.users.find_one({"username": username})
-    if clash and clash.get("dept_code") != dept_code:
-        username = f"{username}.{dept_code.lower()}"
+    username = dept.get("username") or department_username(db, dept)
 
     password = generate_password()
     db.users.update_one(
@@ -129,7 +188,8 @@ def issue_department_login(db, dept, actor="system", reset=False):
 
 def _bootstrap(app):
     d = _db
-    if not d.users.find_one({"role": "admin"}):
+    # the first admin — not a team member the Office added later
+    if not d.users.find_one({"role": "admin", "team": {"$ne": True}}):
         d.users.insert_one({
             "username": app.config["ADMIN_USERNAME"],
             "password": hash_password(app.config["ADMIN_PASSWORD"]),
@@ -140,6 +200,9 @@ def _bootstrap(app):
             "created_at": now(),
         })
         app.logger.info("Bootstrap admin created: %s", app.config["ADMIN_USERNAME"])
+    # the Office was renamed: an admin still carrying the old default name follows
+    d.users.update_many({"role": "admin", "name": "Office of Academics"},
+                        {"$set": {"name": app.config["ADMIN_NAME"]}})
 
     if not d.rules.find_one({"_id": "ugc"}):
         d.rules.insert_one({
@@ -166,12 +229,33 @@ def _bootstrap(app):
 # convenience accessors
 # ---------------------------------------------------------------------------
 
+def _once_per_request(key, load):
+    """A small document a page asks for many times (the settings, nineteen
+    times for one programme page), read from the database once per request
+    and handed out as a copy, so no caller changes it for the next."""
+    from flask import has_request_context, request
+    if not has_request_context():
+        return load()
+    env = request.environ
+    if key not in env:
+        env[key] = load()
+    return copy.deepcopy(env[key])
+
+
+def forget_cached():
+    """After writing the settings or the rules: read them afresh."""
+    from flask import has_request_context, request
+    if has_request_context():
+        request.environ.pop("bos.settings", None)
+        request.environ.pop("bos.rules", None)
+
+
 def settings():
-    return get_db().settings.find_one({"_id": "app"}) or {}
+    return _once_per_request("bos.settings", lambda: get_db().settings.find_one({"_id": "app"}) or {})
 
 
 def rules_doc():
-    return get_db().rules.find_one({"_id": "ugc"}) or {}
+    return _once_per_request("bos.rules", lambda: get_db().rules.find_one({"_id": "ugc"}) or {})
 
 
 def audit(actor: str, action: str, target: str = "", detail=None):

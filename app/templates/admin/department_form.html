@@ -17,14 +17,35 @@
           <span class="help">Becomes the login username. Letters, numbers, hyphen or slash.</span>
         </div>
         <div class="field">
-          <label>School / Faculty<span class="req">*</span></label>
-          <input type="text" name="school" required value="{{ dept.school if dept else '' }}">
+          <label>Faculty</label>
+          <input type="text" name="faculty" value="{{ dept.faculty if dept else '' }}"
+                 list="faculty-list">
+          <datalist id="faculty-list">
+            {% for f in faculties %}<option value="{{ f }}">{% endfor %}
+          </datalist>
+        </div>
+        <div class="field">
+          <label>School<span class="req">*</span></label>
+          <input type="text" name="school" required value="{{ dept.school if dept else '' }}"
+                 list="school-list">
+          <datalist id="school-list">
+            {% for s in schools %}<option value="{{ s }}">{% endfor %}
+          </datalist>
         </div>
         <div class="field">
           <label>Campus<span class="req">*</span></label>
           <select name="campus" required>
             {% for c in campuses %}
             <option value="{{ c }}" {{ 'selected' if dept and dept.campus == c }}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          {# The city, not the campus: several campuses share one. #}
+          <label>Place<span class="req">*</span></label>
+          <select name="place" required>
+            {% for pl in places %}
+            <option value="{{ pl }}" {{ 'selected' if dept and dept.place == pl }}>{{ pl }}</option>
             {% endfor %}
           </select>
         </div>

@@ -5,41 +5,124 @@
 <div class="page-head">
   <div class="wrap">
     <div>
-      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a> <span>›</span> Departments</div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Departments</div>
       <h1>Department master</h1>
-      <p>Click a department to generate its login. The username is the department code; the password
-         is generated here and shown once until the department signs in.</p>
+      <p>Logins are issued in one go, not one department at a time. The username is the
+         department, its school and a number; the password is generated alongside it and
+         shown once, until that department signs in.</p>
     </div>
+    {% if can('departments', 'edit') %}
     <div class="spacer flex flex-wrap">
       <a class="btn btn-ghost" href="{{ url_for('admin.credential_sheet') }}">Credential sheet</a>
       <form method="post" action="{{ url_for('admin.bulk_credentials') }}" style="display:inline">
-        <button class="btn btn-ghost" type="submit">Generate all missing logins</button>
+        <button class="btn btn-gold" type="submit">Issue every missing login</button>
       </form>
       <a class="btn btn-ghost" href="{{ url_for('admin.import_departments') }}">Import from Excel</a>
       <a class="btn" href="{{ url_for('admin.department_form') }}">Add department</a>
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-{# Campus is the filter people reach for first, so it gets the pill row
-   rather than a dropdown; search and school stay in the form beneath. #}
+{% set may_edit = can('departments', 'edit') %}
+{% if may_edit %}
+<div class="demo-strip">
+  <span class="demo-badge" aria-hidden="true">DEMO</span>
+  <div>
+    <strong>Demo department</strong>
+    {% if demo %}
+    <span class="demo-login">Login — username <code class="mono">{{ demo.username }}</code>
+      {% if demo.initial_password %}· password <code class="mono">{{ demo.initial_password }}</code>{% endif %}</span>
+    <span class="small muted">Sign in with it in a private window, press <strong>Fill everything with sample
+      data</strong>, then open each stage, press Submit, review and confirm. Everything it does shows up
+      here — under the bell, in Keywords and in its Review.</span>
+    {% else %}
+    <span class="small muted">“Department of Demonstration Studies” — a practice login with sample documents
+      uploaded. Sign in as it, press one button to fill every stage, then submit them one by one.</span>
+    {% endif %}
+  </div>
+  <div class="spacer flex">
+    {% if demo %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code='DEMO') }}">Open it</a>{% endif %}
+    <form method="post" action="{{ url_for('admin.demo_department') }}"
+          {% if demo %}onsubmit="return confirm('Start the demo department again from scratch?')"{% endif %}>
+      <button class="btn btn-sm">{{ 'Make it again' if demo else 'Make the demo department' }}</button></form>
+    {% if demo and can('departments', 'delete') %}
+    <form method="post" action="{{ url_for('admin.demo_department_remove') }}" onsubmit="return confirm('Remove the demo department and everything in it?')">
+      <button class="btn btn-ghost btn-sm is-danger">Remove</button></form>
+    {% endif %}
+  </div>
+</div>
+
+{% for p in packs %}
+<div class="demo-strip pack-strip">
+  <span class="demo-badge" aria-hidden="true">DRIVE</span>
+  <div>
+    <strong>{{ p.department.dept_name }}</strong>
+    <span class="small muted">
+      {% if p.loaded %}Filled from its <a href="{{ p.source.folder }}" target="_blank" rel="noopener">Drive
+        folder</a>, with the folder's files attached. Loading again fills only what is still empty.
+      {% else %}Its <a href="{{ p.source.folder }}" target="_blank" rel="noopener">Drive folder</a> is ready:
+        {{ p.programmes }} programmes with their course matrices and syllabi. Loading fills them in as
+        drafts{{ '' if p.exists else ', adds the department' }} and issues a login if it has none.{% endif %}
+    </span>
+  </div>
+  {# the department's login, right here: shown until it signs in for the first time #}
+  {% if p.exists %}
+  <div class="pack-login">
+    {% if p.department.username %}
+      <span class="pack-login-row"><span class="small muted">Username</span>
+        <code class="mono">{{ p.department.username }}</code></span>
+      {% if p.department.initial_password %}
+      <span class="pack-login-row"><span class="small muted">Password</span>
+        <code class="mono">{{ p.department.initial_password }}</code>
+        <button class="copy-btn" type="button"
+                data-copy="{{ p.department.username }}&#9;{{ p.department.initial_password }}"
+                data-copy-label="Copied">Copy</button></span>
+      {% else %}
+      <span class="pack-login-row small muted">Password in use —
+        <form method="post" style="display:inline"
+              action="{{ url_for('admin.generate_credentials', dept_code=p.department.dept_code) }}">
+          <button class="linklike" type="submit">issue a new one</button></form></span>
+      {% endif %}
+    {% else %}
+      <form method="post" action="{{ url_for('admin.generate_credentials', dept_code=p.department.dept_code) }}">
+        <button class="btn btn-gold btn-sm" type="submit">Issue its login</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+  <div class="spacer flex">
+    {% if p.exists %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=p.department.dept_code) }}">Open it</a>{% endif %}
+    <form method="post" action="{{ url_for('admin.pack_load', key=p.key) }}">
+      <button class="btn btn-sm">{{ 'Load again' if p.loaded else 'Load from Drive' }}</button></form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{# the city is chosen in the top bar; the campus narrows within it #}
+<div class="filter-bar">
+  <span class="small muted">
+    {{ departments|length }} shown{% if departments|length != total %} of {{ total }}{% endif %}
+  </span>
+</div>
+
 <div class="filter-bar">
   <nav class="pill-tabs" aria-label="Filter by campus">
-    <a href="{{ url_for('admin.departments', q=filters.q or None, school=filters.school or None) }}"
-       {% if not filters.campus %}aria-current="true"{% endif %}>All</a>
+    <a href="{{ url_for('admin.departments', place=filters.place or None, q=filters.q or None, school=filters.school or None) }}"
+       {% if not filters.campus %}aria-current="true"{% endif %}>All campuses</a>
     {% for c in campuses %}
-    <a href="{{ url_for('admin.departments', campus=c, q=filters.q or None, school=filters.school or None) }}"
+    <a href="{{ url_for('admin.departments', place=filters.place or None, campus=c, q=filters.q or None, school=filters.school or None) }}"
        {% if filters.campus == c %}aria-current="true"{% endif %}>{{ c }}</a>
     {% endfor %}
   </nav>
-  <span class="spacer small muted">{{ departments|length }} shown</span>
 </div>
 
 <div class="card mb-2">
   <div class="card-body tight">
     <form class="flex flex-wrap" method="get">
+      <input type="hidden" name="place" value="{{ filters.place }}">
       <input type="hidden" name="campus" value="{{ filters.campus }}">
       <label class="sr-only" for="dept-q">Search departments</label>
       <input id="dept-q" type="search" name="q" value="{{ filters.q }}"
@@ -71,19 +154,30 @@
           {% for d in departments %}
           <tr {{ 'style=opacity:.5' if not d.active }}>
             <td>
-              <strong>{{ d.dept_name }}</strong>
+              {% if can('overview') %}
+              <a class="dept-open" href="{{ url_for('admin.department_page', dept_code=d.dept_code) }}"
+                 title="Its details, programmes and stages — every year"><strong>{{ d.dept_name }}</strong></a>
+              {% else %}<strong>{{ d.dept_name }}</strong>{% endif %}
               <div class="small muted mono">{{ d.dept_code }}</div>
             </td>
-            <td class="small">{{ d.school }}</td>
-            <td><span class="pill">{{ d.campus }}</span></td>
+            <td class="small">
+              {% if d.faculty %}<div class="muted" style="font-size:.78rem">{{ d.faculty }}</div>{% endif %}
+              {{ d.school }}
+            </td>
+            <td>
+              <span class="pill">{{ d.campus }}</span>
+              {% if d.place %}<div class="small muted">{{ d.place }}</div>{% endif %}
+            </td>
             <td class="mono small">{{ d.username or '—' }}</td>
             <td>
-              {% if d.initial_password %}
+              {% if d.initial_password and may_edit %}
                 <span class="mono small">{{ d.initial_password }}</span>
                 <button class="copy-btn" type="button"
                         data-copy="{{ d.username }}&#9;{{ d.initial_password }}"
                         data-copy-label="Copied"
                         aria-label="Copy the login for {{ d.dept_name }}">Copy</button>
+              {% elif d.initial_password %}
+                <span class="muted small">Issued, not used yet</span>
               {% elif d.username %}
                 <span class="pill pill-ok">Signed in</span>
               {% else %}
@@ -91,6 +185,7 @@
               {% endif %}
             </td>
             <td class="right nowrap">
+              {% if may_edit %}
               <form method="post" style="display:inline"
                     action="{{ url_for('admin.generate_credentials', dept_code=d.dept_code) }}">
                 <button class="btn btn-ghost btn-sm" type="submit">
@@ -98,7 +193,10 @@
                 </button>
               </form>
               <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.department_form', dept_code=d.dept_code) }}">Edit</a>
+              {% endif %}
+              {% if can('overview') %}
               <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=d.dept_code) }}">Record</a>
+              {% endif %}
             </td>
           </tr>
           {% else %}
@@ -111,4 +209,33 @@
     </div>
   </div>
 </div>
+
+{# Emptying the master is the one thing on this page that cannot be undone by
+   clicking again, so it asks for the words rather than for a click, and it
+   sits at the foot rather than beside the everyday buttons. #}
+{% if is_full_admin() %}
+<details class="danger-zone">
+  <summary>Remove every department</summary>
+  <div class="danger-body">
+    <p class="small">
+      This removes all <strong>{{ total }}</strong> department records, every department
+      login, and every submission filed against them. The Office of Academic Affairs keeps no
+      other copy inside the portal.
+    </p>
+    <p class="small muted">
+      It is recoverable: <span class="mono">python seed.py --logins</span> rebuilds the
+      whole master from the Office of Academic Affairs workbook and issues fresh logins. What
+      does not come back is the submitted work.
+    </p>
+    <form method="post" action="{{ url_for('admin.departments_clear') }}" class="flex flex-wrap">
+      <label class="sr-only" for="confirm-clear">Type REMOVE ALL to confirm</label>
+      <input id="confirm-clear" type="text" name="confirm" autocomplete="off"
+             spellcheck="false" placeholder="Type REMOVE ALL" style="max-width:220px">
+      <button class="btn btn-danger btn-sm" type="submit">Remove every department</button>
+    </form>
+  </div>
+</details>
+{% endif %}
 {% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/copy.js') }}"></script>{% endblock %}

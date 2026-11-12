@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime
 
 from . import ugc_rules as U
-from .schema import STAGE_BY_KEY
+from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, mapping_value, programme_columns
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
@@ -106,7 +106,40 @@ def validate_field(fdef, value, section_key=None, row=None):
     ftype = fdef.get("type", "text")
     where = {"section": section_key, "row": row, "field": name}
 
-    if ftype in ("readonly",):
+    if ftype in ("readonly", "fixed"):
+        return out
+
+    if ftype == "module_compare":
+        # [{previous, revised, pct}, ...] — one entry per module
+        mods = [m for m in (value or []) if isinstance(m, dict)] if isinstance(value, list) else []
+        filled = [m for m in mods if str(m.get("revised") or "").strip()]
+        if fdef.get("required") and not filled:
+            out.append(err(f"{label} needs at least one module with its content.", **where))
+        for k, m in enumerate(mods, start=1):
+            if not str(m.get("revised") or "").strip() and str(m.get("previous") or "").strip():
+                out.append(err(f"Module {k}: enter the module's content (or remove the module).",
+                               **where))
+            hrs = _num(m.get("hours"))
+            if m.get("hours") not in (None, "") and (hrs is None or hrs < 0 or hrs > 200):
+                out.append(err(f"Module {k}: hours must be a number of hours.", **where))
+            pct = _num(m.get("pct"))
+            if m.get("pct") not in (None, "") and (pct is None or pct < 0 or pct > 100):
+                out.append(err(f"Module {k}: the % change must be between 0 and 100.", **where))
+        return out
+
+    if ftype == "outcome_list":
+        # a programme's POs (or PSOs): each one described, PO1 at least
+        prefix = fdef.get("prefix") or ""
+        items = value if isinstance(value, list) else []
+        texts = [str((x.get("text") if isinstance(x, dict) else x) or "").strip() for x in items]
+        if fdef.get("required") and not any(texts):
+            out.append(err(f"{label}: describe {prefix}1.", **where))
+        elif len(texts) > 1:
+            for n, t in enumerate(texts, start=1):
+                if not t:
+                    out.append(err(f"{label}: describe {prefix}{n}, or remove it.", **where))
+        if fdef.get("max_items") and len(texts) > fdef["max_items"]:
+            out.append(err(f"{label}: at most {fdef['max_items']}.", **where))
         return out
 
     if _is_blank(value):
@@ -217,6 +250,7 @@ def r_experts_unique_emails(data, ctx, sk):
 def r_programme_duration_semesters(data, ctx, sk):
     out = []
     for i, r in enumerate(_rows(data, sk)):
+        # semesters are no longer asked for; an older row may still carry them
         yrs, sems = _int(r.get("duration_years")), _int(r.get("semesters"))
         if yrs and sems and sems != yrs * 2:
             out.append(err(f"A {yrs}-year programme has {yrs * 2} semesters, not {sems}.",
@@ -245,11 +279,68 @@ def r_programme_unique_codes(data, ctx, sk):
     return out
 
 
+def r_programmes_offered_valid(data, ctx, sk):
+    """Department Information → Programmes offered.
+
+    The department ticks the programmes it runs — one is enough, and the rest
+    need no reason. A row the department added needs a code, a name and a
+    degree, and no code may appear twice. At least one programme has to be
+    ticked, because every later stage is filed per programme.
+    """
+    rows = _rows(data, sk)
+    out, seen = [], {}
+    for i, r in enumerate(rows):
+        if r.get("source") == "new":
+            if _is_blank(r.get("programme_name")):
+                out.append(err(f"Programme {i + 1}: the new programme needs a name.",
+                               section=sk, row=i, field="programme_name"))
+            code = str(r.get("programme_code") or "").strip()
+            if not code:
+                out.append(err(f"Programme {i + 1}: the new programme needs a code.",
+                               section=sk, row=i, field="programme_code"))
+            elif not re.fullmatch(r"[A-Za-z0-9\-]{2,20}", code):
+                out.append(err(f"Programme code “{code}” may use only letters, numbers and "
+                               f"hyphens (2–20 characters).",
+                               section=sk, row=i, field="programme_code"))
+            if _is_blank(r.get("degree")):
+                out.append(err(f"Programme {i + 1}: choose UG, PG or another degree level.",
+                               section=sk, row=i, field="degree"))
+        c = str(r.get("programme_code") or "").strip().upper()
+        if c:
+            if c in seen:
+                out.append(err(f"Programme code “{c}” is listed twice.",
+                               section=sk, row=i, field="programme_code"))
+            seen.setdefault(c, i)
+    if not any(r.get("decision") != "remove" for r in rows):
+        out.append(err("Tick at least one programme — every later stage is filed "
+                       "per programme.", section=sk))
+    return out
+
+
 # ---- credit engine --------------------------------------------------------
 
+def _category_credits(data, ctx):
+    """Credits per UGC Table 2 category, added up from the programme
+    structure — only the courses on this programme's track count. An older
+    draft that still holds a typed-in matrix is read as it was."""
+    typed = _vals(data, "credit_summary")
+    if typed and not _rows(data, "semester_structure"):
+        return typed
+    track = U.honours_track(ctx.get("degree_level"))
+    out = {}
+    for r in _rows(data, "semester_structure"):
+        if not U.row_counts_for(r, track):
+            continue
+        key = U.NEP_CATEGORY_TO_KEY.get(r.get("nep_category"))
+        cr = _num(r.get("credits"))
+        if key and cr is not None:
+            out[key] = out.get(key, 0) + cr
+    return out
+
+
 def r_ugc_table2_minimums(data, ctx, sk):
-    """Check the entered credit matrix against UGC Table 2."""
-    matrix = _vals(data, sk)
+    """Check the credits in each category against UGC Table 2."""
+    matrix = _category_credits(data, ctx)
     track = ctx.get("track")
     degree = ctx.get("degree_level")
     table = ctx.get("table2") or U.DEFAULT_TABLE_2
@@ -273,9 +364,7 @@ def r_ugc_table2_minimums(data, ctx, sk):
             continue
 
         if entered is None:
-            out.append(err(f"{label}: enter the credits your programme awards. "
-                           f"The UGC minimum is {spec['min']}.", section=sk, field=key))
-            continue
+            entered = 0
 
         lo, hi = spec.get("min"), spec.get("max")
         if lo is not None and entered < lo:
@@ -288,7 +377,7 @@ def r_ugc_table2_minimums(data, ctx, sk):
 
 
 def r_ugc_total_credits(data, ctx, sk):
-    matrix = _vals(data, sk)
+    matrix = _category_credits(data, ctx)
     track = ctx.get("track")
     if not track:
         return []
@@ -328,23 +417,36 @@ def r_ugc_research_or_lieu(data, ctx, sk):
     return out
 
 
+LONG_COURSES = ("Research Project / Dissertation", "Summer Internship")
+
+
 def r_ltpe_credit_arithmetic(data, ctx, sk):
     cfg = U.DEFAULT_OTHER_RULES
     w = cfg["credit_from_hours"]
     tol = cfg["credit_arithmetic_tolerance"]
     out = []
     for i, r in enumerate(_rows(data, sk)):
+        if r.get("nep_category") in NON_CREDIT_GROUPS:
+            # a non-credit course has contact hours but carries no credits
+            if (_num(r.get("credits")) or 0) != 0:
+                out.append(err(f"Course {r.get('course_code') or f'in row {i + 1}'} is a "
+                               f"non-credit course, so its credits must be 0.",
+                               section=sk, row=i, field="credits"))
+            continue
         l, t, p, e = (_num(r.get(k)) for k in ("l", "t", "p", "e"))
         cr = _num(r.get("credits"))
         if None in (l, t, p, e) or cr is None:
             continue
+        if cr == 0:
+            continue        # no credits: a non-credit course, whose contact hours carry none
         expected = l * w["lecture"] + t * w["tutorial"] + p * w["practical"] + e * w["experiential"]
         if abs(expected - cr) > tol:
             out.append(err(
                 f"Course {r.get('course_code') or f'in row {i + 1}'}: L-T-P-E of "
                 f"{int(l)}-{int(t)}-{int(p)}-{int(e)} works out to {expected:g} credits, "
                 f"but you entered {cr:g}.", section=sk, row=i, field="credits"))
-        if cr > cfg["max_credits_per_course"]:
+        # a project, dissertation or internship is one course worth more than a taught course
+        if cr > cfg["max_credits_per_course"] and r.get("nep_category") not in LONG_COURSES:
             out.append(err(f"Course {r.get('course_code') or f'in row {i + 1}'}: "
                            f"{cr:g} credits exceeds the {cfg['max_credits_per_course']}-credit "
                            f"ceiling for a single course.", section=sk, row=i, field="credits"))
@@ -352,17 +454,19 @@ def r_ltpe_credit_arithmetic(data, ctx, sk):
 
 
 def r_credit_marks_ratio(data, ctx, sk):
+    """1 credit = 25 marks is the guideline, not a hard rule: the university's
+    own curriculum sample gives 3-credit courses 100 marks. So it warns."""
     per = U.DEFAULT_OTHER_RULES["marks_per_credit"]
     out = []
     for i, r in enumerate(_rows(data, sk)):
         cr, tot = _num(r.get("credits")), _num(r.get("total_marks"))
-        if cr is None or tot is None:
+        if not cr or tot is None:
             continue
         expected = cr * per
         if abs(expected - tot) > 0.01:
-            out.append(err(
-                f"Course {r.get('course_code') or f'in row {i + 1}'}: {cr:g} credits carries "
-                f"{expected:g} marks at 1 credit = {per} marks, but total marks is {tot:g}.",
+            out.append(warn(
+                f"Course {r.get('course_code') or f'in row {i + 1}'}: {cr:g} credits would "
+                f"usually carry {expected:g} marks (1 credit = {per} marks); this has {tot:g}.",
                 section=sk, row=i, field="total_marks"))
     return out
 
@@ -375,8 +479,8 @@ def r_marks_add_up(data, ctx, sk):
             continue
         if abs((cia + ese) - tot) > 0.01:
             out.append(err(
-                f"Course {r.get('course_code') or f'in row {i + 1}'}: CIA {cia:g} + ESE {ese:g} "
-                f"= {cia + ese:g}, which does not match the total of {tot:g}.",
+                f"Course {r.get('course_code') or f'in row {i + 1}'}: CA {cia:g} + ESE {ese:g} "
+                f"= {cia + ese:g} — CA and ESE must total {tot:g}.",
                 section=sk, row=i, field="total_marks"))
     return out
 
@@ -388,23 +492,62 @@ def r_semester_within_duration(data, ctx, sk):
     out = []
     for i, r in enumerate(_rows(data, sk)):
         s = _int(r.get("semester"))
+        # semesters 7-8 listed for Honours or Honours with Research are the
+        # 4-year options of a UG programme
+        if r.get("track") in ("Honours", "Honours with Research") and s and s <= 8:
+            continue
         if s and s > sems:
             out.append(err(f"Semester {s} is outside this programme, which has {sems} semesters.",
                            section=sk, row=i, field="semester"))
     return out
 
 
+def r_first_year_has_syllabus_and_revision(data, ctx, sk):
+    """A semester 1 or 2 course always has a syllabus and a revision: neither
+    can be marked No."""
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        if _int(r.get("semester")) not in (1, 2):
+            continue
+        for field, word in (("syllabus", "a syllabus"), ("revision", "a revision")):
+            if r.get(field) == "No":
+                out.append(err(f"{r.get('course_code') or f'Row {i + 1}'}: a semester 1 or 2 course "
+                               f"always has {word} — set it to Yes.", section=sk, row=i, field=field))
+    return out
+
+
+def r_semester_within_batch(data, ctx, sk):
+    """An earlier batch lists only the semesters Settings asks it for."""
+    from .workflow import batches, semester_words
+    b = next((x for x in batches()["existing"] if x["key"] == ctx.get("stage_key")), None)
+    sems = (b or {}).get("semesters") or []
+    if not sems:
+        return []
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        s = _int(r.get("semester"))
+        if s is not None and s not in sems:
+            out.append(err(f"{r.get('course_code') or f'Row {i + 1}'}: semester {s} is not one of this "
+                           f"batch's — it covers {semester_words(sems)}.", section=sk, row=i, field="semester"))
+    return out
+
+
 def r_unique_course_codes(data, ctx, sk):
+    """A code may appear once per track: semester 7 of Honours and of
+    Honours with Research often share courses."""
     seen, out = {}, []
     for i, r in enumerate(_rows(data, sk)):
-        c = str(r.get("course_code", "")).strip().upper()
-        if not c:
-            continue
-        if c in seen:
-            out.append(err(f"Course code “{c}” is used twice, in rows {seen[c] + 1} and {i + 1}.",
-                           section=sk, row=i, field="course_code"))
-        else:
-            seen[c] = i
+        # an elective pair "A1 / A2" is two courses; each code counts
+        for c in str(r.get("course_code") or "").upper().split("/"):
+            c = c.strip()
+            if not c:
+                continue
+            key = (c, str(r.get("track") or "All semesters"))
+            if key in seen:
+                out.append(err(f"Course code “{c}” is used twice, in rows {seen[key] + 1} and "
+                               f"{i + 1}.", section=sk, row=i, field="course_code"))
+            else:
+                seen[key] = i
     return out
 
 
@@ -414,7 +557,10 @@ def r_category_totals_match_summary(data, ctx, sk):
     if not matrix:
         return []
     tally = {}
+    track = U.honours_track(ctx.get("degree_level"))
     for r in _rows(data, sk):
+        if not U.row_counts_for(r, track):
+            continue
         key = U.NEP_CATEGORY_TO_KEY.get(r.get("nep_category"))
         cr = _num(r.get("credits"))
         if key and cr is not None:
@@ -430,8 +576,8 @@ def r_category_totals_match_summary(data, ctx, sk):
         if abs(got - d) > 0.01:
             label = next((r["label"] for r in U.DEFAULT_TABLE_2 if r["key"] == key), key)
             out.append(err(
-                f"{label}: the classification of credits shows {d:g} credits but the courses "
-                f"in the programme structure add up to {got:g}.", section=sk, field=key))
+                f"{label}: Section B declares {d:g} credits but the courses you listed in "
+                f"Section C add up to {got:g}.", section=sk, field=key))
     return out
 
 
@@ -443,8 +589,8 @@ def r_course_codes_known(data, ctx, sk):
     for i, r in enumerate(_rows(data, sk)):
         c = str(r.get("course_code", "")).strip().upper()
         if c and c not in known:
-            out.append(err(f"Course code “{c}” is not in this programme's structure. "
-                           f"Add it under Curriculum first.",
+            out.append(err(f"Course code “{c}” does not appear in the programme structure you "
+                           f"saved in this programme's Curriculum.",
                            section=sk, row=i, field="course_code"))
     return out
 
@@ -459,6 +605,74 @@ def r_bloom_verbs_present(data, ctx, sk):
                     f"Course {r.get('course_code') or f'row {i + 1}'}, outcome {j + 1} starts with "
                     f"“{first}”, which is not a Bloom's taxonomy action verb.",
                     section=sk, row=i, field="outcomes"))
+    return out
+
+
+def _course_name(r, i):
+    return r.get("course_code") or r.get("course_title") or f"row {i + 1}"
+
+
+def r_outcomes_have_bloom_levels(data, ctx, sk):
+    """Every course outcome names the level of Bloom's Taxonomy it reaches (1-6)."""
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        cos = r.get("co_table")
+        if not isinstance(cos, list):
+            if _lines(r.get("outcomes")):        # an older sheet: the levels are still to choose
+                out.append(err(f"Course {_course_name(r, i)}: choose each course outcome's Bloom's "
+                               f"Taxonomy level.", section=sk, row=i, field="outcomes"))
+            continue
+        for n, c in enumerate(cos, 1):
+            if not isinstance(c, dict) or not str(c.get("text") or "").strip():
+                continue
+            if str(c.get("bloom") or "") not in {"1", "2", "3", "4", "5", "6"}:
+                out.append(err(f"Course {_course_name(r, i)}, CO {n}: choose its Bloom's Taxonomy level (1–6).",
+                               section=sk, row=i, field="outcomes"))
+    return out
+
+
+def r_co_po_mapping_valid(data, ctx, sk):
+    """The CO-PO-PSO Mapping holds 1, 2, 3 or – in each cell, every course
+    outcome is mapped to at least one PO or PSO, and each mapped column has
+    its Articulation, a number the department enters."""
+    out = []
+    for i, r in enumerate(_rows(data, sk)):
+        cos = [c for c in (r.get("co_table") or []) if isinstance(c, dict) and str(c.get("text") or "").strip()] \
+            if isinstance(r.get("co_table"), list) else []
+        if not cos:
+            continue
+        rows = r.get("co_po") if isinstance(r.get("co_po"), list) else []
+        # the programme's POs and PSOs, as its Curriculum has them
+        cols = ctx.get("outcome_cols") or [n for n, _ in programme_columns({})]
+        mapped = 0
+        for n in range(1, len(cos) + 1):
+            m = rows[n - 1] if n - 1 < len(rows) and isinstance(rows[n - 1], dict) else {}
+            m = {k: m.get(k, "") for k in cols}
+            bad = [k for k, v in m.items() if str(v).strip() not in ("", "-", "–", "1", "2", "3")]
+            if bad:
+                out.append(err(f"Course {_course_name(r, i)}, CO{n}: the mapping to {', '.join(bad)} must be "
+                               f"1, 2, 3 or –.", section=sk, row=i, field="outcomes"))
+            if any(str(v).strip() in ("1", "2", "3") for v in m.values()):
+                mapped += 1
+            else:
+                out.append(warn(f"Course {_course_name(r, i)}, CO{n} is not mapped to any PO or PSO.",
+                                section=sk, row=i, field="outcomes"))
+        if not mapped:
+            out.append(err(f"Course {_course_name(r, i)}: fill in its CO-PO-PSO Mapping.",
+                           section=sk, row=i, field="outcomes"))
+            continue
+        # the Articulation row: a number for each column something is mapped to
+        art = r.get("articulation") if isinstance(r.get("articulation"), dict) else {}
+        used = [k for k in cols if any(isinstance(m, dict) and str(m.get(k) or "").strip() in ("1", "2", "3")
+                                       for m in rows[:len(cos)])]
+        missing = [k for k in used if not str(art.get(k) or "").strip()]
+        if missing:
+            out.append(err(f"Course {_course_name(r, i)}: enter the Articulation of {', '.join(missing)}.",
+                           section=sk, row=i, field="outcomes"))
+        wrong = [k for k in cols if str(art.get(k) or "").strip() and mapping_value(art.get(k)) is None]
+        if wrong:
+            out.append(err(f"Course {_course_name(r, i)}: the Articulation of {', '.join(wrong)} must be a number.",
+                           section=sk, row=i, field="outcomes"))
     return out
 
 
@@ -585,6 +799,13 @@ def r_plan_applicable_needs_detail(data, ctx, sk):
     return out
 
 
+def r_batch_has_courses(data, ctx, sk):
+    """An earlier batch lists at least one of its courses."""
+    if not _rows(data, sk):
+        return [err("List this batch's courses — at least one row.", section=sk)]
+    return []
+
+
 RULES = {name[2:]: fn for name, fn in list(globals().items())
          if name.startswith("r_") and callable(fn)}
 
@@ -595,17 +816,32 @@ RULES = {name[2:]: fn for name, fn in list(globals().items())
 
 def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     """Validate one stage payload. Returns (issues, summary)."""
-    ctx = ctx or {}
+    ctx = {**(ctx or {}), "stage_key": stage_key}
     stage = STAGE_BY_KEY.get(stage_key)
     if not stage:
         return [err(f"Unknown stage “{stage_key}”.")], {"errors": 1, "warnings": 0}
 
     issues = []
     data = data or {}
+    # a PG programme's Curriculum is the PG Course Matrix: its own course groups
+    from .schema import for_level, category_groups
+    deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
+        or ctx.get("degree_level")
+    stage = for_level(stage, deg)
+    # an upload box the Office has made not mandatory
+    from .keyword_match import relax
+    stage = relax(stage)
+    if stage_key == "prog_curriculum":
+        data = category_groups(data, deg)
+    elif stage.get("existing_batch"):
+        data = category_groups(data, deg, "batch_courses")
 
     for section in stage.get("sections", []):
         sk = section["key"]
         stype = section.get("type", "fields")
+        if section.get("frozen"):
+            # the Office's own record, not the department's to correct
+            continue
 
         if stype == "table":
             rows = _rows(data, sk)
@@ -620,6 +856,9 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
 
         elif stype == "credit_matrix":
             pass  # handled entirely by the named UGC rules below
+
+        elif stype == "programme_list":
+            pass  # rows are checked by the section's rule
 
         else:
             vals = _vals(data, sk)
@@ -653,15 +892,20 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
         deg = programme.get("degree_level")
         ctx["degree_level"] = deg
         ctx["track"] = U.get_track(deg)
-        ctx["semesters"] = _int(programme.get("semesters"))
+        yrs = _int(programme.get("duration_years"))
+        ctx["semesters"] = _int(programme.get("semesters")) or (yrs * 2 if yrs else None)
         ctx["programme_code"] = programme.get("programme_code")
 
         curric = ((submission.get("programmes") or {})
                   .get(programme.get("programme_code"), {})
                   .get("prog_curriculum", {}).get("data", {}))
+        # an elective pair "A1 / A2" in the structure is two courses
+        # the CO-PO-PSO Mapping's columns: the programme's POs and PSOs
+        ctx["outcome_cols"] = [n for n, _ in programme_columns(curric.get("profile") or {})]
         ctx["known_course_codes"] = {
-            str(r.get("course_code", "")).strip().upper()
-            for r in (curric.get("structure") or [])
-            if r.get("course_code")
+            code.strip().upper()
+            for r in (curric.get("semester_structure") or [])
+            for code in str(r.get("course_code") or "").split("/")
+            if code.strip()
         }
     return ctx

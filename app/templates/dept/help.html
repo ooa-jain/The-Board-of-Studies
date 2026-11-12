@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> Help</div>
+      <h1>How the portal works</h1>
+      <p>Watch the walkthrough section by section — click a section to jump to it — or read the user manual.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if files['walkthrough.mp4'] %}
+<section class="help-watch">
+  <div class="help-video">
+    <video id="help-video" controls preload="metadata" playsinline
+           {% if files['poster.jpg'] %}poster="{{ url_for('static', filename='help/poster.jpg', v=files['poster.jpg']) }}"{% endif %}>
+      <source src="{{ url_for('static', filename='help/walkthrough.mp4', v=files['walkthrough.mp4']) }}" type="video/mp4">
+      Your browser cannot play this video.
+    </video>
+  </div>
+  {% if chapters %}
+  <nav class="help-chapters" aria-label="Sections of the video">
+    <h2>Sections</h2>
+    <ol>
+      {% for c in chapters %}
+      <li><button type="button" class="help-ch" data-start="{{ c.start }}" data-end="{{ c.end }}">
+        <span class="help-ch-n">{{ loop.index }}</span>
+        <span class="help-ch-t"><strong>{{ c.title }}</strong>{% if c.sub %}<small>{{ c.sub }}</small>{% endif %}</span>
+        <span class="help-ch-time">{{ '%d:%02d'|format((c.start // 60)|int, (c.start % 60)|int) }}</span>
+      </button></li>
+      {% endfor %}
+    </ol>
+  </nav>
+  {% endif %}
+</section>
+{% else %}
+<div class="card mb-2"><div class="card-body"><p class="muted">The walkthrough video is being prepared.</p></div></div>
+{% endif %}
+
+<section class="card mb-2 help-manual">
+  <div class="card-body help-manual-body">
+    <div>
+      <h3>User manual</h3>
+      <p class="small muted">Every stage, step by step, with pictures of each page — Department Information, Pre-BoS,
+        BoS Documents, each programme's Curriculum, Syllabus and Course Revision, the earlier batches, submitting and Reports.</p>
+    </div>
+    {% if files['manual.pdf'] %}
+    <div class="help-manual-acts">
+      <a class="btn btn-ghost" href="{{ url_for('static', filename='help/manual.pdf', v=files['manual.pdf']) }}" target="_blank" rel="noopener">Open the manual</a>
+      <a class="btn btn-gold" href="{{ url_for('static', filename='help/manual.pdf', v=files['manual.pdf']) }}" download="BoS-Portal-User-Manual.pdf">Download (PDF)</a>
+    </div>
+    {% else %}<p class="small muted">The manual is being prepared.</p>{% endif %}
+  </div>
+</section>
+
+<p class="small muted">Still stuck? Write to the Office of Academic Affairs — they can see your record and help.</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  // a section: jump to its start and play; the section playing now is marked
+  var v = document.getElementById("help-video");
+  var chs = Array.prototype.slice.call(document.querySelectorAll(".help-ch"));
+  if (!v || !chs.length) return;
+  chs.forEach(function (b) {
+    b.addEventListener("click", function () {
+      v.currentTime = parseFloat(b.dataset.start) + 0.05;
+      v.play();
+      v.focus();
+    });
+  });
+  var mark = function () {
+    var t = v.currentTime;
+    chs.forEach(function (b) {
+      var on = t >= parseFloat(b.dataset.start) && t < parseFloat(b.dataset.end);
+      b.classList.toggle("is-on", on);
+      if (on) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+    });
+  };
+  v.addEventListener("timeupdate", mark);
+  v.addEventListener("seeked", mark);
+  // a link to a section: /department/help#3 opens the video at section 3
+  var n = parseInt((location.hash || "").replace("#", ""), 10);
+  if (n && chs[n - 1]) v.addEventListener("loadedmetadata", function () { v.currentTime = parseFloat(chs[n - 1].dataset.start); mark(); });
+})();
+</script>
+{% endblock %}

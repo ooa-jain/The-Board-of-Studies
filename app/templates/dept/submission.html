@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Your submission · {{ programme.programme_code }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">
+        <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a>
+        <span>›</span> <a href="{{ url_for('dept.reports') }}">Reports</a>
+        <span>›</span> {{ programme.programme_code }}
+      </div>
+      <h1>Your submission — {{ programme.display_name or programme.programme_name }}</h1>
+      <p>{{ programme.programme_code }}{% if programme.degree_level %} · {{ programme.degree_level }}{% endif %} · {{ year|ay }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{# each submitted document of the programme, as the Office's Word template lays it out — to read only #}
+<nav class="subm-docs" aria-label="Documents">
+  {% for g in groups %}
+  <div class="subm-row">
+    <span class="subm-batch">{{ g.label }}</span>
+    {% for d in g.docs %}
+      {% if d.submitted %}
+      <a class="subm-doc{{ ' is-on' if pick and pick.batch == d.batch and pick.doc == d.doc }}" href="{{ d.url }}"
+         {% if pick and pick.batch == d.batch and pick.doc == d.doc %}aria-current="page"{% endif %}>{{ d.title }}</a>
+      {% else %}
+      <span class="subm-doc is-off" title="Not submitted yet">{{ d.title }} <small>· not submitted</small></span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</nav>
+
+<p class="subm-note">View only. For a copy of these documents, contact the Office of Academic Affairs.</p>
+
+{% if view %}
+<div class="subm-doc-wrap">
+  {% include "share/_gen_doc.html" %}
+</div>
+<p class="subm-noprint">This submission is view only. For a copy, contact the Office of Academic Affairs.</p>
+{% elif pick %}
+<p class="small muted">This document could not be shown just now. Please try again, or contact the Office of Academic Affairs.</p>
+{% else %}
+<div class="card"><div class="card-body">
+  <p class="muted">Nothing of {{ programme.programme_code }} is submitted yet. Its Curriculum, Syllabus and Course Revision show here once they are submitted.</p>
+</div></div>
+{% endif %}
+{% endblock %}

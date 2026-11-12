@@ -2,36 +2,50 @@
 {% block title %}{{ dept.dept_name }}{% endblock %}
 
 {% block header %}
-<div class="page-head">
+<div class="page-head home-head">
   <div class="wrap">
     <div>
-      <div class="crumbs">{{ dept.campus }} <span>›</span> {{ dept.school }}</div>
-      <h1>{{ dept.dept_name }}</h1>
-      <p>Board of Studies submission for {{ year }}. Stages open in order — finish one to unlock the next.</p>
-    </div>
-    <div class="spacer head-aside">
-      <div class="flex head-aside-row">
-        <div class="bar" role="progressbar" aria-valuenow="{{ progress.done }}" aria-valuemin="0"
-             aria-valuemax="{{ progress.total }}" aria-label="Stages submitted"
-             style="width:170px"><i style="width:{{ progress.percent }}%"></i></div>
-        <span class="bar-label">{{ progress.done }} / {{ progress.total }} stages</span>
-      </div>
-      <div class="flex mt-1 head-aside-row">
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_excel') }}">Excel</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.export_word') }}">Word report</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.change_password') }}">Password</a>
-      </div>
+      <h1>Welcome back{% if person and person.name %}, <span class="hl hl-green">{{ person.name }}</span>{% endif %}</h1>
+      <p>{{ dept.dept_name }} · Board of Studies | {{ year|ay }}</p>
     </div>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+{% if dept.demo %}
+<div class="demo-strip">
+  <span class="demo-badge" aria-hidden="true">DEMO</span>
+  <div>
+    <strong>This is the practice department.</strong>
+    <span class="small muted">One press fills every stage and every programme part with sample answers and
+      documents. Then open each stage in turn, press Submit, review and confirm.</span>
+  </div>
+  <form method="post" action="{{ url_for('dept.demo_fill_all') }}" class="spacer">
+    <button class="btn btn-gold">Fill everything with sample data</button>
+  </form>
+</div>
+{% endif %}
+{% if drive and not drive.done and submission.status != 'sealed' %}
+{# the first import; after that, syncing again lives in the Developer
+   Preview item in the menu #}
+<div class="demo-strip drive-strip">
+  <span class="demo-badge" aria-hidden="true">DRIVE</span>
+  <div>
+    <strong>Import your data from the Drive folder</strong>
+    <span class="small muted">Course matrices, syllabi and supporting documents{% if drive.folder %} (<a href="{{ drive.folder }}" target="_blank" rel="noopener">Drive folder</a>){% endif %}
+      are imported into every stage and programme. Any missing information can be added manually during the relevant stage.</span>
+  </div>
+  <form method="post" action="{{ url_for('dept.drive_fill') }}" class="spacer">
+    <button class="btn btn-gold">Sync from Drive</button>
+  </form>
+</div>
+{% endif %}
 {% if submission.status == 'sealed' %}
 <div class="alert alert-success">
   <div>
     <strong>This submission is complete and sealed.</strong>
-    The Office of Academics has the full record for {{ year }}. Contact them if anything needs reopening.
+    The Office of Academic Affairs has the full record for {{ year|ay }}. Contact them if anything needs reopening.
   </div>
 </div>
 {% endif %}
@@ -46,65 +60,89 @@
 </div>
 {% endif %}
 
-<div class="grid grid-4 mb-2">
-  <div class="stat">
-    <div class="n">{{ progress.done }}</div><div class="l">Stages submitted</div>
-    <div class="sub">of {{ progress.total }}</div>
+{% set words = {'submitted': 'Completed', 'draft': 'In progress', 'returned': 'Returned',
+                'open': 'Not started', 'locked': 'Locked', 'optional': 'Optional'} %}
+{% if resume %}
+{# where you left off, in one big button #}
+<a class="resume-card" href="{{ resume.url }}">
+  <span class="resume-kicker">{{ 'Continue ' ~ resume.where if resume.where != 'next to do' else 'Next step' }}</span>
+  <span class="resume-title">{{ resume.title }}</span>
+  {% if resume.at %}<span class="resume-meta">Last opened {{ (resume.at|ist).strftime('%d %b, %H:%M') }}{% if resume.name %} by {{ resume.name }}{% endif %}</span>{% endif %}
+  <span class="resume-go">Continue <span aria-hidden="true">→</span></span>
+</a>
+{% endif %}
+
+<div class="home-next">
+  <div class="home-prog">
+    <div class="bar" role="progressbar" aria-valuenow="{{ progress.done }}" aria-valuemin="0"
+         aria-valuemax="{{ progress.total }}" aria-label="Stages completed"><i style="width:{{ progress.percent }}%"></i></div>
+    <span>{{ progress.done }} of {{ progress.total }} stages completed</span>
   </div>
-  <div class="stat">
-    <div class="n">{{ board|selectattr('can_open')|list|length }}</div><div class="l">Open now</div>
-    <div class="sub">ready to fill</div>
-  </div>
-  <div class="stat">
-    <div class="n">{{ programmes|length }}</div><div class="l">Programmes</div>
-    <div class="sub">{{ 'entered' if programmes else 'not yet entered' }}</div>
-  </div>
-  <div class="stat">
-    <div class="n">{{ board|sum(attribute='errors') }}</div><div class="l">Open errors</div>
-    <div class="sub">across all stages</div>
-  </div>
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.progress_page') }}">See all stages &amp; progress →</a>
 </div>
 
-{% set ns = namespace(group=None) %}
-<div class="stage-list">
-  {% for s in board %}
-    {% if s.group != ns.group %}
-      {% set ns.group = s.group %}
-      <div class="group-label">{{ s.group }}</div>
-    {% endif %}
-    <div class="stage-row {{ s.status }}">
-      <span class="stage-num">{{ loop.index }}</span>
-      <div class="stage-info">
-        <strong>{{ s.title }}</strong>
-        <span>{{ s.blurb }}</span>
-        {% if s.source_templates %}
-        <span class="small note-gold">
-          Replaces {{ s.source_templates|length }} template{{ 's' if s.source_templates|length > 1 }}
-        </span>
-        {% endif %}
-      </div>
-      <div class="stage-actions">
-        {% if s.errors %}<span class="pill pill-err">{{ s.errors }} to fix</span>{% endif %}
-        {% if s.warnings and not s.errors %}<span class="pill pill-warn">{{ s.warnings }} to check</span>{% endif %}
 
-        {% if s.status == 'submitted' %}
-          <span class="pill pill-ok">Submitted</span>
-          <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">View</a>
-        {% elif s.status == 'locked' %}
-          {# "Locked" on its own reads like a fault — name what opens it. #}
-          <span class="pill pill-lock">Locked</span>
-          <span class="small muted stage-why">Opens once the stage above is submitted</span>
-        {% elif s.status == 'returned' %}
-          <span class="pill pill-err">Returned</span>
-          <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Correct</a>
-        {% elif s.status == 'draft' %}
-          <span class="pill pill-warn">In progress</span>
-          <a class="btn btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Continue</a>
-        {% else %}
-          <a class="btn btn-gold btn-sm" href="{{ url_for('dept.stage', stage_key=s.key) }}">Start</a>
-        {% endif %}
-      </div>
-    </div>
-  {% endfor %}
+{% if prog_rows %}
+{# each programme's submission, to see — a copy comes from the Office #}
+<section class="card mb-2 subs-card">
+  <div class="card-head"><h3>Submissions</h3>
+    <span class="spacer small muted">{{ prog_rows|selectattr('done')|list|length }} of {{ prog_rows|length }} programmes submitted</span></div>
+  <div class="card-body tight">
+    <table class="data subs-table">
+      <tbody>
+      {% for p in prog_rows %}
+        <tr>
+          <td><span class="mono small">{{ p.code }}</span> <strong>{{ p.name }}</strong></td>
+          <td class="small">{% if p.done %}<span class="pill pill-ok">✓ Submitted</span>
+            {% else %}<span class="muted">{{ p.submitted }} of {{ p.parts }} parts submitted</span>{% endif %}</td>
+          <td class="subs-go">{% if p.submitted %}<a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report', programme_code=p.code) }}">See your submission →</a>
+            {% else %}<span class="small muted">Nothing submitted yet</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="small muted subs-foot">View only — for a copy, contact the Office of Academic Affairs.</p>
+  </div>
+</section>
+{% endif %}
+
+{% if open_comments %}
+<div class="office-comment">
+  <div class="oc-head"><span class="oc-icon">💬</span><strong>{{ open_comments|length }} comment{{ 's' if open_comments|length != 1 }} from the Office of Academic Affairs</strong></div>
+  <ul class="oc-list">
+    {% for c in open_comments %}<li><a href="{{ c.url }}">{{ c.where }}</a> — {{ c.text }}</li>{% endfor %}
+  </ul>
 </div>
+{% endif %}
+{% if all_revisions_done %}
+<div class="dash-all">
+  <button class="btn btn-all" type="button" id="btn-all">Review &amp; submit all stages</button>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/submit-all.js') }}"></script>
+<script>
+  (function () {
+    // Review & submit all: the button here, or arriving with ?review=1 (the
+    // Developer preview item in the menu)
+    var open = function () { window.SubmitAll.open({
+      record: {{ url_for('dept.api_record')|tojson }}, submit: {{ url_for('dept.api_submit_all')|tojson }} }); };
+    var b = document.getElementById("btn-all");
+    if (b) b.addEventListener("click", open);
+    if (/[?&]review=1/.test(location.search)) open();
+    // UG / PG: show one level's programmes
+    document.querySelectorAll(".lv-tab").forEach(function (t) {
+      t.addEventListener("click", function () {
+        document.querySelectorAll(".lv-tab").forEach(function (x) { x.setAttribute("aria-selected", x === t ? "true" : "false"); });
+        var lv = t.dataset.lv;
+        document.querySelectorAll(".erp-dots tbody tr").forEach(function (r) {
+          r.hidden = !!lv && r.dataset.lv !== lv;
+        });
+      });
+    });
+  })();
+</script>
 {% endblock %}

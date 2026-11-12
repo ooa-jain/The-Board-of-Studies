@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from pathlib import Path
 
@@ -10,31 +11,247 @@ from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
 from werkzeug.utils import secure_filename
 
 from . import ugc_rules as U
-from .auth import department_required
-from .db import audit, get_db, now, rules_doc, settings
-from .exporter import department_excel, submission_word
-from .schema import STAGE_BY_KEY, STAGE_KEYS
+from .auth import acting, department_required, page_user
+from .db import audit, get_db, now, rules_doc, settings, to_ist
+from .db import settings as app_settings_doc
+from .schema import BLOOM_VERB_LEVEL, STAGE_BY_KEY, STAGE_KEYS, course_category
+from . import people
+from .notify import describe_changes
+from .notify import record as notify_record
 from .workflow import (OPENABLE, compute_status, get_or_create_submission,
-                       part_status, prefill_for, programme_courses,
-                       programme_stage_state, programmes_of, progress, save_draft,
-                       stage_board, stage_state, submit_stage, validate_only)
+                       grouped_board, next_action,
+                       course_fill_source, course_options, form_data, part_status, prefill_for,
+                       programme_fill_source, programme_stage_state, programmes_of,
+                       progress, save_draft, stage_board, stage_state,
+                       submit_stage, validate_only, batches, parts_for, revision_fill_source,
+                       apply_defaults, revision_year, semester_short)
 
 bp = Blueprint("dept", __name__)
 
 
 def _me():
-    return session["user"]
+    # the department — or, while the Office edits it here, the department with the Office's name
+    return page_user()
 
 
 def _year():
+    a = acting()
+    if a and a.get("year"):
+        return a["year"]
     return settings().get("academic_year") or current_app.config["ACADEMIC_YEAR"]
 
 
 def _dept():
     d = get_db().departments.find_one({"dept_code": _me()["dept_code"]})
-    if not d or not d.get("active", True):
+    if not d or (not d.get("active", True) and not acting()):
         abort(403)
     return d
+
+
+# ---------------------------------------------------------------------------
+# who is working on the shared login
+# ---------------------------------------------------------------------------
+
+_NO_ASK = {"dept.who", "dept.versions", "dept.version_restore"}
+PERSON_COOKIE = "bos_person"
+
+
+def _person_signer():
+    from itsdangerous import URLSafeTimedSerializer
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="bos-person-v1")
+
+
+def _remembered_person(dept_code):
+    """The person this browser said it was, for this department, if it
+    said so recently enough."""
+    raw = request.cookies.get(PERSON_COOKIE)
+    if not raw:
+        return None
+    try:
+        days = current_app.config.get("PERSON_COOKIE_DAYS", 180)
+        v = _person_signer().loads(raw, max_age=days * 86400)
+    except Exception:
+        return None
+    if v.get("d") != dept_code or not v.get("n") or not v.get("e"):
+        return None
+    return {"name": v["n"], "email": v["e"]}
+
+
+def _remember_person(resp, dept_code, person):
+    days = current_app.config.get("PERSON_COOKIE_DAYS", 180)
+    resp.set_cookie(PERSON_COOKIE, _person_signer().dumps({"d": dept_code, "n": person["name"],
+                                                            "e": person["email"]}),
+                    max_age=days * 86400, httponly=True, samesite="Lax",
+                    secure=current_app.config.get("SESSION_COOKIE_SECURE", False))
+    return resp
+
+
+def _batch_semesters(stage):
+    """An earlier batch's page, naming the semesters Settings asks for — and
+    offering only those."""
+    import copy
+    from .workflow import semester_words
+    b = next((x for x in batches()["existing"] if x["key"] == stage["key"]), None)
+    words = semester_words((b or {}).get("semesters"))
+    if not words:
+        return stage
+    s = copy.deepcopy(stage)
+    s["batch_semesters"] = list(b["semesters"])
+    named = f" · {words[0].upper()}{words[1:]}"
+    for sec in s["sections"]:
+        if sec["key"] in ("courses", "batch_courses", "revision_courses"):
+            sec["title"] += named
+        if sec["key"] == "batch_courses":
+            sec["help"] = (f"The courses the Batch of {b['label']} studied in {words}, one per row, as in the "
+                           "programme structure. Syllabus → opens the course on this batch's Syllabus page; "
+                           "Revision → opens it on its Course Revision page.")
+        if sec["key"] in ("batch_courses", "revision_courses"):
+            # only the semesters Settings asks this batch for
+            for c in sec["columns"]:
+                if c["name"] == "semester":
+                    c["choices"], c["min"], c["max"] = list(b["semesters"]), min(b["semesters"]), max(b["semesters"])
+    return s
+
+
+@bp.before_request
+def _ask_who():
+    """A department's login is shared, so each person says who they are once
+    a session; their saves are kept under their name."""
+    u = session.get("user") or {}
+    if u.get("role") != "department":
+        return None
+    p = u.get("person")
+    if not p:
+        # this browser has said who it is before: no need to ask again
+        p = _remembered_person(u.get("dept_code"))
+        if p:
+            u["person"] = p
+            session["user"] = u
+            session.modified = True
+    if p:
+        people.seen(u["dept_code"], p)
+        return None
+    if (not current_app.config.get("ASK_PERSON", True) or request.endpoint in _NO_ASK
+            or request.method != "GET" or "/api/" in request.path):
+        return None
+    return redirect(url_for("dept.who", next=request.full_path.rstrip("?")))
+
+
+@bp.route("/who", methods=["GET", "POST"])
+@department_required
+def who():
+    if acting():                                     # the Office's name is on its saves already
+        return redirect(url_for("dept.dashboard"))
+    dept = _dept()
+    me = _me()
+    nxt = request.values.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("dept.dashboard")
+    error = None
+    if request.method == "POST":
+        name = " ".join((request.form.get("name") or "").split())[:80]
+        email = (request.form.get("email") or "").strip().lower()[:120]
+        if len(name) < 2:
+            error = "Please give your name."
+        elif "@" not in email or "." not in email.split("@")[-1] or " " in email:
+            error = "Please give a working e-mail address."
+        else:
+            person = {"name": name, "email": email}
+            me["person"] = person
+            session["user"] = me
+            session.modified = True
+            people.seen(dept["dept_code"], person)
+            audit(me["username"], "person.set", f"{name} <{email}>")
+            return _remember_person(redirect(nxt), dept["dept_code"], person)
+    return render_template("dept/who.html", dept=dept, nxt=nxt, error=error,
+                           person=me.get("person"),
+                           others=people.others_active(dept["dept_code"], me.get("person")),
+                           known=people.known(dept["dept_code"]))
+
+
+@bp.route("/help")
+@department_required
+def help_page():
+    """How the portal works: the walkthrough video, section by section, and
+    the user manual (made by tools/help_media.py into static/help/)."""
+    import json
+    folder = Path(current_app.static_folder) / "help"
+    try:
+        chapters = json.loads((folder / "chapters.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        chapters = []
+    # each file with its date as a version: a new video or manual is not served from a stale cache
+    files = {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
+             for n in ("walkthrough.mp4", "manual.pdf", "poster.jpg")}
+    return render_template("dept/help.html", dept=_dept(), chapters=chapters, files=files)
+
+
+@bp.route("/versions")
+@department_required
+def versions():
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    rows = people.history(dept["dept_code"], _year())
+    # what each version changed, against the one before it on the same stage
+    by_part = {}
+    for v in reversed(rows):
+        k = (v["stage"], v["programme_code"])
+        v["changes"] = describe_changes(v["stage"], by_part.get(k), v.get("data"))
+        by_part[k] = v.get("data")
+        v["title"] = STAGE_BY_KEY.get(v["stage"], {}).get("title", v["stage"])
+        v["url"] = (url_for("dept.stage", stage_key=v["stage"], programme_code=v["programme_code"])
+                    if v["programme_code"] else url_for("dept.stage", stage_key=v["stage"]))
+        st = _part(sub, v["stage"], v["programme_code"]).get("status")
+        v["locked"] = st in ("submitted", "approved")
+        v["latest"] = False
+    for k in by_part:
+        newest = next(v for v in rows if (v["stage"], v["programme_code"]) == k)
+        newest["latest"] = True
+    return render_template("dept/versions.html", dept=dept, rows=rows, keep_days=people.KEEP_DAYS,
+                           person=_person(), stage=request.args.get("stage"))
+
+
+@bp.post("/versions/<vid>/restore")
+@department_required
+def version_restore(vid):
+    from bson import ObjectId
+    from bson.errors import InvalidId
+    dept = _dept()
+    try:
+        v = get_db().versions.find_one({"_id": ObjectId(vid), "dept_code": dept["dept_code"],
+                                        "academic_year": _year()})
+    except InvalidId:
+        v = None
+    if not v:
+        abort(404)
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    code = v["programme_code"] or None
+    was = _part(sub, v["stage"], code).get("status")
+    locked = was in ("submitted", "approved")
+    if locked and not acting():                      # the Office may restore one, and it stays as it was
+        flash("That stage is submitted, so it cannot be changed. Ask the Office of Academic Affairs "
+              "to send it back first.", "error")
+        return redirect(url_for("dept.versions"))
+    programme = None
+    if code:
+        programme = next((p for p in programmes_of(sub, dept) if p.get("programme_code") == code), None)
+    before = _stored_data(sub, v["stage"], code)
+    save_draft(dept["dept_code"], _year(), v["stage"], v.get("data") or {}, code,
+               status=was if locked else "draft")
+    who_was = v.get("name") or "someone"
+    people.keep(dept["dept_code"], _year(), v["stage"], code, v.get("data") or {}, _person(), kind="restore")
+    _tell(dept, "saved", v["stage"], programme,
+          changes=describe_changes(v["stage"], before, v.get("data") or {}))
+    audit(_me()["username"], "version.restore", f"{v['stage']} {code or ''} from {v['at']}")
+    flash(f"Restored the version {who_was} saved on {to_ist(v['at']).strftime('%d %b, %H:%M')}.", "success")
+    return redirect(url_for("dept.stage", stage_key=v["stage"], programme_code=code) if code
+                    else url_for("dept.stage", stage_key=v["stage"]))
+
+
+def _part(sub, stage_key, programme_code=None):
+    if programme_code:
+        return ((sub.get("programmes") or {}).get(programme_code) or {}).get(stage_key) or {}
+    return (sub.get("stages") or {}).get(stage_key) or {}
 
 
 # ---------------------------------------------------------------------------
@@ -44,11 +261,52 @@ def _dept():
 @bp.route("/")
 @department_required
 def dashboard():
+    return render_template("dept/dashboard.html", **_dashboard_ctx())
+
+
+@bp.route("/progress")
+@department_required
+def progress_page():
+    """Every stage and programme, with what is done and what is left."""
+    return render_template("dept/progress.html", **_dashboard_ctx())
+
+
+def _dashboard_ctx():
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
-    return render_template("dept/dashboard.html", dept=dept, submission=sub,
+    open_comments = list(get_db().comments.find({"dept_code": dept["dept_code"], "academic_year": _year(),
+                                                 "status": "open"}).sort("at", -1))
+    for c in open_comments:
+        c["url"] = (url_for("dept.stage", stage_key=c["stage"], programme_code=c["programme_code"])
+                    if c.get("programme_code") else url_for("dept.stage", stage_key=c["stage"]))
+        c["where"] = STAGE_BY_KEY.get(c["stage"], {}).get("title", c["stage"]) + \
+            (f" · {c['programme_code']}" if c.get("programme_code") else "")
+    from .autofill import pack_for
+    drive = pack_for(get_db(), dept)
+    # each programme's steps as a row of dots
+    prog_rows, prog_heads = [], []
+    for p in programmes_of(sub, dept):
+        steps = _programme_steps(sub, p["programme_code"])
+        prog_heads = prog_heads or [st["label"] + (" · current" if st["key"] == "prog_syllabus" else "")
+                                    for st in steps]
+        # an earlier batch not begun is optional, not overdue
+        shown = [{**st, "status": "optional" if st["optional"] and st["status"] == "open" else st["status"]}
+                 for st in steps]
+        needed = [st for st in steps if not st["optional"]]
+        prog_rows.append({"code": p["programme_code"], "name": p["programme_name"], "level": p.get("level") or "",
+                          "steps": shown, "url": steps[0]["url"] if steps else "#",
+                          "done": all(st["status"] == "submitted" for st in needed),
+                          "submitted": sum(st["status"] == "submitted" for st in needed), "parts": len(needed)})
+    return dict(dept=dept, submission=sub, open_comments=open_comments, person=_person(),
+                           prog_rows=prog_rows, prog_heads=prog_heads,
+                           drive=drive and {"title": drive["title"],
+                                            "folder": (drive.get("source") or {}).get("folder"),
+                                            "done": bool(sub.get("autofilled"))},
                            board=stage_board(sub), progress=progress(sub),
-                           programmes=programmes_of(sub), year=_year())
+                           programmes=programmes_of(sub, dept), year=_year(),
+                           next_step=next_action(sub), resume=_resume(sub, dept),
+                           all_revisions_done=_all_revisions_done(sub, dept),
+                           level_counts=_level_counts(prog_rows))
 
 
 # ---------------------------------------------------------------------------
@@ -62,23 +320,25 @@ def stage(stage_key, programme_code=None):
     stage_def = STAGE_BY_KEY.get(stage_key) or abort(404)
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
-    top_key = stage_def.get("parent") or stage_key
 
+    top_key = stage_def.get("parent") or stage_key
     status = compute_status(sub, stage_key)
+    if status == "locked" and acting():
+        status = "open"
     if status == "locked":
         prev = STAGE_BY_KEY[STAGE_KEYS[STAGE_KEYS.index(top_key) - 1]]["title"]
-        flash(f"“{STAGE_BY_KEY[top_key]['title']}” opens once you have submitted “{prev}”.", "info")
+        flash(f"“{STAGE_BY_KEY[top_key]['title']}” opens once you have submitted “{prev}”.",
+              "info")
         return redirect(url_for("dept.dashboard"))
 
     programme = None
     if stage_def.get("per_programme"):
-        programmes = programmes_of(sub)
+        programmes = programmes_of(sub, dept)
         if not programmes:
-            flash("List your programmes in Department Information first.", "info")
+            flash("Keep at least one programme in Department Information first.", "info")
             return redirect(url_for("dept.dashboard"))
         if stage_def.get("parts") or not programme_code:
-            return _programme_hub(STAGE_BY_KEY[top_key], programmes, sub, dept,
-                                  selected=programme_code)
+            return _programme_hub(STAGE_BY_KEY[top_key], programmes, sub, dept)
         programme = next((p for p in programmes
                           if p.get("programme_code") == programme_code), None) or abort(404)
         state = programme_stage_state(sub, programme_code, stage_key)
@@ -86,17 +346,24 @@ def stage(stage_key, programme_code=None):
     else:
         state = stage_state(sub, stage_key)
 
-    data = state.get("data") or {}
-    if not data:
-        data = prefill_for(stage_key, dept, _year(), sub, programme)
+    synced = False
+    if programme:
+        data = dict(state.get("data") or {})
+        if status in OPENABLE:
+            # a section the draft has never held opens with its prefill
+            for key, value in prefill_for(stage_key, dept, _year(), programme, sub).items():
+                data.setdefault(key, value)
+        # read-only values follow the record they are copied from
+        for key, vals in prefill_for(stage_key, dept, _year(), programme, sub,
+                                     readonly_only=True).items():
+            if isinstance(data.get(key), dict):
+                data[key] = {**data[key], **vals}
     else:
-        # read-only values follow the record they come from
-        for sk, vals in prefill_for(stage_key, dept, _year(), sub, programme,
-                                    readonly_only=True).items():
-            data.setdefault(sk, {}).update(vals)
+        data, synced = form_data(stage_key, sub, dept, _year(), status in OPENABLE)
 
     credit_matrix = None
-    if any(s.get("type") == "credit_matrix" for s in stage_def["sections"]):
+    if any(s.get("type") in ("credit_matrix", "credit_distribution")
+           for s in stage_def["sections"]):
         doc = rules_doc()
         track = U.get_track((programme or {}).get("degree_level"))
         credit_matrix = {
@@ -108,49 +375,278 @@ def stage(stage_key, programme_code=None):
             "total": (doc.get("totals") or U.DEFAULT_TOTALS).get(track or "ug3"),
             "in_lieu": U.IN_LIEU_RULE,
             "needs_in_lieu": (programme or {}).get("degree_level") == U.HONOURS_NO_RESEARCH,
-            "category_keys": U.NEP_CATEGORY_TO_KEY,
         }
 
-    lookups = {}
-    if programme:
-        lookups["courses"] = programme_courses(sub, programme["programme_code"])
+    # the arithmetic the form fills in by itself — the same figures the
+    # server checks against
+    other = U.DEFAULT_OTHER_RULES
+    calc = {
+        "weights": other["credit_from_hours"],
+        "marks_per_credit": other["marks_per_credit"],
+        "max_per_course": other["max_credits_per_course"],
+        "nep_to_key": U.NEP_CATEGORY_TO_KEY,
+        "required_total": (credit_matrix or {}).get("total"),
+        # which semester 7-8 courses count: "honours", "research" or None
+        "track": U.honours_track((programme or {}).get("degree_level")),
+        # the UGC total for each degree, for Programme Information's credits
+        "degree_totals": {d: (rules_doc().get("totals") or U.DEFAULT_TOTALS).get(t)
+                          for d, t in U.DEGREE_TO_TRACK.items() if t},
+    }
 
-    return render_template("dept/stage.html", stage=stage_def, dept=dept, submission=sub,
+    fill = []
+    if status in OPENABLE:
+        if stage_key.startswith("prog_syllabus") and programme:
+            fill = course_fill_source(sub, programme["programme_code"])
+        elif stage_key == "prog_revision" and programme:
+            fill = revision_fill_source(sub, programme["programme_code"])
+
+    linked = stage_key == "prog_curriculum" or bool(stage_def.get("existing_batch"))
+    # (Course Revision too: it says when a course's syllabus is not added yet)
+    syllabi = _syllabus_index(sub, stage_key, programme) if linked or stage_key == "prog_revision" else []
+    # where each course's Revision link goes
+    revision_url = (url_for("dept.stage", stage_key="prog_revision", programme_code=programme["programme_code"])
+                    if (linked or stage_key == "prog_syllabus") and programme else "")
+    course_map, back, back_label, structure_courses = {}, None, "", {}
+    if programme and (stage_key.startswith("prog_syllabus") or stage_key == "prog_revision"):
+        # each course's semester and course group: an earlier batch's own
+        # course list first, then the programme structure
+        cur = programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {}
+        own = (data.get("batch_courses") or []) if stage_def.get("existing_batch") and isinstance(data, dict) else []
+        # the programme structure's own courses, code → title, to match an
+        # earlier batch's course to the current one of the same name
+        for r in cur.get("semester_structure") or []:
+            for code, title in course_options((r or {}).get("course_code"), (r or {}).get("course_title")):
+                structure_courses.setdefault(code.upper(), title)
+        for r in list(own) + list(cur.get("semester_structure") or []):
+            r = r or {}
+            for code, title in course_options(r.get("course_code"), r.get("course_title")):
+                if code.upper() not in course_map:
+                    course_map[code.upper()] = {"semester": r.get("semester"),
+                                                "group": course_category(r.get("nep_category")),
+                                                "title": title}
+        # back to where the course link was clicked: the programme structure,
+        # or an earlier batch's curriculum (its course list)
+        came = request.args.get("from") or ""
+        came_def = STAGE_BY_KEY.get(came) or {}
+        if stage_def.get("existing_batch"):
+            # shown on the batch's Syllabus page (the page script hides it on its Curriculum)
+            back = url_for("dept.stage", stage_key=stage_key, programme_code=programme["programme_code"],
+                           view="curriculum") + "#sec-batch_courses"
+            back_label = f"Curriculum · Batch of {stage_def.get('batch', '')}"
+        elif came_def.get("existing_batch"):
+            back = url_for("dept.stage", stage_key=came, programme_code=programme["programme_code"],
+                           view="curriculum") + "#sec-batch_courses"
+            back_label = f"Curriculum · Batch of {came_def.get('batch', '')}"
+        else:
+            back = url_for("dept.stage", stage_key="prog_curriculum",
+                           programme_code=programme["programme_code"]) + "#sec-semester_structure"
+            back_label = "Programme structure — semester scheme"
+    # a syllabus: the programme's Objective, which each course's Course Objectives starts from
+    # and its POs and PSOs, the columns of every course's CO-PO-PSO Mapping
+    programme_objectives, outcome_cols, outcomes_url = "", [], ""
+    if programme and stage_key.startswith("prog_syllabus"):
+        from .schema import objective_lines, programme_columns
+        profile = ((programme_stage_state(sub, programme["programme_code"], "prog_curriculum").get("data") or {})
+                   .get("profile") or {})
+        programme_objectives = "\n".join(objective_lines(profile.get("objective")))
+        outcome_cols = programme_columns(profile)
+        outcomes_url = url_for("dept.stage", stage_key="prog_curriculum",
+                               programme_code=programme["programme_code"]) + "#f-programme_outcomes"
+    comments = list(get_db().comments.find({
+        "dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
+        "programme_code": (programme or {}).get("programme_code", ""),
+        "status": {"$in": ["open", "done"]}}).sort("at", -1))
+    board = stage_board(sub)
+    final, record = _final_step(sub, dept, stage_key, (programme or {}).get("programme_code"))
+    step = next_step = None
+    steps = []
+    last_step = False
+    if programme and stage_def.get("parent"):
+        steps = _programme_steps(sub, programme["programme_code"])
+        keys = [st["key"] for st in steps]
+        if stage_key in keys:
+            i = keys.index(stage_key)
+            step = steps[i]
+            next_step = steps[i + 1] if i + 1 < len(steps) else None
+            last_step = next_step is None
+            if last_step:
+                np_ = _next_programme(sub, dept, programme["programme_code"])
+                next_step = np_ and {**np_, "label": "the next programme"}
+    _note_place(dept, stage_key, (programme or {}).get("programme_code"))
+    # every part of the programme submitted: its report, as the Office sees it, under the page
+    # every part of the programme submitted: its submission, to see
+    programme_done = bool(steps) and all(st["status"] == "submitted" for st in steps if not st["optional"])
+    # this page's own document in "Your submission"
+    my_doc = None
+    if programme and stage_def.get("parent"):
+        if stage_def.get("existing_batch"):
+            my_doc = {"batch": stage_key, "doc": {"syllabus": "s", "revision": "v"}.get(request.args.get("view"), "c")}
+        elif stage_key in ("prog_curriculum", "prog_syllabus", "prog_revision"):
+            my_doc = {"batch": "current", "doc": {v: k for k, v in CURRENT_PART.items()}[stage_key]}
+    # a PG programme fills the PG Course Matrix: its own course groups and wording
+    from .schema import for_level, category_groups
+    deg = ((data.get("details") or {}) if isinstance(data, dict) and isinstance(data.get("details"), dict)
+           else {}).get("degree_level") or (programme or {}).get("degree_level")
+    # a degree worked out from the structure does not narrow the form: semesters 7–8 stay open to add
+    worked_out = isinstance(data, dict) and isinstance(data.get("details"), dict) \
+        and data["details"].get("_degree_auto")
+    page_stage = for_level(stage_def, None if worked_out else deg)
+    # an upload box the Office has made not mandatory
+    from .keyword_match import relax
+    page_stage = relax(page_stage)
+    if stage_def.get("existing_batch"):
+        page_stage = _batch_semesters(page_stage)
+    if stage_key == "prog_curriculum":
+        data = category_groups(data, deg)
+    elif stage_def.get("existing_batch"):
+        data = category_groups(data, deg, "batch_courses")
+    # where "go to the next stage" leads when this one is left as a draft
+    if next_step and next_step.get("url"):
+        skip_to = {"url": next_step["url"], "label": next_step.get("label") or next_step.get("title") or ""}
+    elif not stage_def.get("parent"):
+        later = [k for k in STAGE_KEYS[STAGE_KEYS.index(stage_key) + 1:]
+                 if not STAGE_BY_KEY[k].get("parent")] if stage_key in STAGE_KEYS else []
+        skip_to = ({"url": url_for("dept.stage", stage_key=later[0]), "label": STAGE_BY_KEY[later[0]]["title"]}
+                   if later else None)
+    else:
+        skip_to = None
+    return render_template("dept/stage.html", calc=calc, fill=fill, stage=page_stage, dept=dept, submission=sub,
+                           skip_to=skip_to,
+                           final=final, record=record, syllabi=syllabi, revision_url=revision_url, comments=comments,
+                           step=step, next_step=next_step, last_step=last_step, prog_steps=steps,
+                           course_map=course_map, back_to_structure=back, back_label=back_label,
+                           structure_courses=structure_courses, revision_year=revision_year(sub),
+                           programme_objectives=programme_objectives, outcome_cols=outcome_cols,
+                           outcomes_url=outcomes_url,
+                           programme_done=programme_done, my_doc=my_doc,
+                           bloom_verbs=BLOOM_VERB_LEVEL,
+                           add_level=(request.args.get("add") if request.args.get("add") in ("UG", "PG")
+                                      and stage_key == "dept_info" else ""),
+                           back_to=(url_for("dept.stage", stage_key="curriculum")
+                                    if request.args.get("back") == "curriculum"
+                                    and stage_key == "dept_info" else ""),
                            state=state, data=data, status=status, programme=programme,
-                           credit_matrix=credit_matrix, year=_year(), lookups=lookups,
-                           readonly=(status == "submitted"),
+                           credit_matrix=credit_matrix, year=_year(),
+                           readonly=(status == "submitted" and not acting()), synced=synced,
+                           batch_tag=(batches()["current"] if stage_def.get("batch") == "current"
+                                      else stage_def.get("batch") or ""),
                            parts=_parts_nav(sub, stage_def, programme),
-                           board=stage_board(sub))
+                           prog_tree=_programme_tree(sub, dept, programme),
+                           all_revisions_done=_all_revisions_done(sub, dept),
+                           suggest_phrases=_suggest_phrases(sub, dept),
+                           board=board, groups=grouped_board(board))
+
+
+@bp.route("/programmes/add")
+@department_required
+def add_programme():
+    """From Curriculum: "add a new UG / PG programme". Department Information
+    holds the programme list, so go there — reopened if it was already
+    submitted — with a new row started, and come back to Curriculum after."""
+    # no level: reopened only to change the list (tick or add), from the
+    # submitted Department Information page itself
+    level = {"PG": "PG", "UG": "UG"}.get(request.args.get("level"), "")
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    if sub.get("status") == "sealed":
+        flash("This record is complete and sealed. Ask the Office of Academic Affairs to reopen "
+              "Department Information before adding a programme.", "error")
+        return redirect(url_for("dept.stage", stage_key="curriculum" if level else "dept_info"))
+    if stage_state(sub, "dept_info").get("status") == "submitted":
+        get_db().submissions.update_one(
+            {"dept_code": dept["dept_code"], "academic_year": _year()},
+            {"$set": {"stages.dept_info.status": "draft", "updated_at": now()},
+             "$unset": {"stages.dept_info.returned_note": ""}})
+        audit(_me()["username"], "stage.reopened", f"{dept['dept_code']}/dept_info",
+              {"why": f"add a new {level} programme" if level else "change the programmes"})
+    if not level:
+        flash("Department Information is open again: change the programmes, then submit it again.", "info")
+        return redirect(url_for("dept.stage", stage_key="dept_info"))
+    return redirect(url_for("dept.stage", stage_key="dept_info", add=level, back="curriculum"))
+
+
+def _part_item(sub, code, k, s=None):
+    """One part of a programme as the menus show it, with its batch tag."""
+    d = STAGE_BY_KEY[k]
+    tag = ""
+    if d.get("batch") == "current":
+        tag = batches(s)["current"]
+    elif d.get("existing_batch"):
+        tag = d["batch"]
+    sems = ""
+    if d.get("existing_batch"):
+        b = next((x for x in batches(s)["existing"] if x["key"] == k), None)
+        sems = semester_short((b or {}).get("semesters"))
+    return {"key": k, "title": d["title"], "tag": tag, "sems": sems,
+            "existing": bool(d.get("existing_batch")), "optional": bool(d.get("optional")),
+            "status": part_status(sub, code, k)}
+
+
+def _programme_tree(sub, dept, current=None):
+    """The side menu's Curriculum branch: UG / PG, each programme, its parts."""
+    stage_def = next((s for s in STAGE_BY_KEY.values() if s.get("parts")), None)
+    if not stage_def:
+        return []
+    here = (current or {}).get("programme_code")
+    cfg = app_settings_doc()
+    keys = parts_for(stage_def, cfg)
+    levels = {"UG": [], "PG": []}
+    for p in programmes_of(sub, dept):
+        levels["PG" if p["level"] in ("PG", "PGD") else "UG"].append({
+            "code": p["programme_code"], "name": p["programme_name"],
+            "here": p["programme_code"] == here,
+            "parts": [_part_item(sub, p["programme_code"], k, cfg) for k in keys],
+        })
+    tree = []
+    for name, progs in levels.items():
+        if progs:
+            tree.append({"name": name, "programmes": progs,
+                         "here": any(x["here"] for x in progs),
+                         "done": sum(1 for x in progs
+                                     if all(pt["status"] == "submitted" for pt in x["parts"]
+                                            if not pt["optional"]))})
+    return tree
 
 
 def _parts_nav(sub, stage_def, programme):
-    """Curriculum · Syllabus · Course Revision tabs for one programme."""
+    """Curriculum · Syllabus · Course Revision, as tabs across one programme."""
     if not programme or not stage_def.get("parent"):
         return []
     parent = STAGE_BY_KEY[stage_def["parent"]]
-    return [{"key": k, "title": STAGE_BY_KEY[k]["title"],
-             "status": part_status(sub, programme["programme_code"], k),
-             "here": k == stage_def["key"]} for k in parent["parts"]]
+    cfg = app_settings_doc()
+    return [dict(_part_item(sub, programme["programme_code"], k, cfg), here=k == stage_def["key"])
+            for k in parts_for(parent, cfg)]
 
 
-def _programme_hub(stage_def, programmes, sub, dept, selected=None):
-    """The Curriculum stage: programmes grouped UG / PG, three parts each."""
+def _programme_hub(stage_def, programmes, sub, dept):
+    """The Curriculum stage: the mapped programmes, UG and PG, three parts each."""
     groups = {}
     for p in programmes:
-        if selected and p["programme_code"] != selected:
-            continue
         p = dict(p)
-        p["parts"] = [{"key": k, "title": STAGE_BY_KEY[k]["title"],
-                       "blurb": STAGE_BY_KEY[k]["blurb"],
-                       "status": part_status(sub, p["programme_code"], k),
-                       "errors": ((programme_stage_state(sub, p["programme_code"], k)
-                                   .get("summary") or {}).get("errors", 0)),
-                       "note": programme_stage_state(sub, p["programme_code"], k)
-                       .get("returned_note")}
-                      for k in stage_def["parts"]]
+        p["parts"] = []
+        cfg = app_settings_doc()
+        for k in parts_for(stage_def, cfg):
+            st = programme_stage_state(sub, p["programme_code"], k)
+            p["parts"].append(dict(_part_item(sub, p["programme_code"], k, cfg),
+                                   errors=(st.get("summary") or {}).get("errors", 0),
+                                   note=st.get("returned_note")))
+        # the parts that count: the current batch (earlier batches are optional records)
+        counted = [x for x in p["parts"] if not x["optional"]]
+        p["done"] = sum(1 for x in counted if x["status"] == "submitted")
+        p["total"] = len(counted)
+        p["state"] = ("done" if p["done"] == p["total"] else
+                      "returned" if any(x["status"] == "returned" for x in counted) else
+                      "progress" if any(x["status"] in ("draft", "submitted") for x in counted) else "new")
+        p["filled"] = sum(1 for x in counted if x["status"] in ("draft", "submitted"))
+        p["url"] = url_for("dept.stage", stage_key=counted[0]["key"], programme_code=p["programme_code"])
         groups.setdefault("PG" if p["level"] in ("PG", "PGD") else "UG", []).append(p)
-    return render_template("dept/choose_programme.html", stage=stage_def, groups=groups,
-                           submission=sub, dept=dept,
+    board = stage_board(sub)
+    level = request.args.get("level", "").upper()
+    if level not in groups:
+        level = "UG" if "UG" in groups else "PG"
+    return render_template("dept/choose_programme.html", stage=stage_def, groups=groups, level=level,
+                           submission=sub, dept=dept, board=board,
+                           groups_board=grouped_board(board),
                            status=compute_status(sub, stage_def["key"]))
 
 
@@ -158,24 +654,33 @@ def _programme_hub(stage_def, programmes, sub, dept, selected=None):
 # JSON endpoints used by the form renderer
 # ---------------------------------------------------------------------------
 
-def _guard(stage_key, programme_code=None):
+def _guard(stage_key, programme_code=None, light=False):
+    """light: what a save needs of the record — every stage, and only this
+    programme of all of them (each programme's answers can run long; an
+    autosave every few seconds should not fetch them all)."""
     dept = _dept()
-    sub = get_or_create_submission(dept["dept_code"], _year())
+    sub = None
+    if light and (not programme_code or re.fullmatch(r"[A-Za-z0-9_-]+", programme_code)):
+        fields = {"dept_code": 1, "academic_year": 1, "status": 1, "stages": 1}
+        if programme_code:
+            fields[f"programmes.{programme_code}"] = 1
+        sub = get_db().submissions.find_one({"dept_code": dept["dept_code"], "academic_year": _year()}, fields)
+    sub = sub or get_or_create_submission(dept["dept_code"], _year())
     stage_def = STAGE_BY_KEY.get(stage_key)
     closed = (jsonify({"ok": False, "error": "This stage is not open for editing."}), 409)
     if not stage_def or stage_def.get("parts"):
         return None, None, None, closed
-    if stage_def.get("parent"):
-        if not programme_code:
-            return None, None, None, closed
-        if (compute_status(sub, stage_key) == "locked"
+    if acting():
+        pass                                         # the Office edits any stage, submitted or not
+    elif stage_def.get("parent"):
+        if (not programme_code or compute_status(sub, stage_key) == "locked"
                 or part_status(sub, programme_code, stage_key) == "submitted"):
             return None, None, None, closed
     elif compute_status(sub, stage_key) not in OPENABLE:
         return None, None, None, closed
     programme = None
     if programme_code:
-        programme = next((p for p in programmes_of(sub)
+        programme = next((p for p in programmes_of(sub, dept)
                           if p.get("programme_code") == programme_code), None)
         if not programme:
             return None, None, None, (jsonify({"ok": False,
@@ -183,16 +688,247 @@ def _guard(stage_key, programme_code=None):
     return dept, sub, programme, None
 
 
+def _sheet_filled(r):
+    """A course's syllabus sheet has its outcomes and at least one module."""
+    return bool(str(r.get("outcomes") or "").strip()
+                and any(isinstance(m, dict) and str(m.get("revised") or m.get("title") or "").strip()
+                        for m in r.get("modules") or []))
+
+
+def _syllabus_index(sub, stage_key, programme):
+    """For a programme's Curriculum: every syllabus it has — the current
+    batch's and each earlier batch's — with its courses' codes and titles,
+    so each course row can say whether its syllabus is there and open it."""
+    from .workflow import programme_stage_state
+    if not programme:
+        return []
+    code = programme["programme_code"]
+    out = []
+    keys = [k for k in parts_for(STAGE_BY_KEY["curriculum"]) if k.startswith("prog_syllabus")]
+    for k in keys:
+        sd = STAGE_BY_KEY[k]
+        data = programme_stage_state(sub, code, k).get("data") or {}
+        courses = [{"code": str(r.get("course_code") or "").strip(),
+                    "title": str(r.get("course_title") or "").strip(),
+                    # its outcomes and a module are in: Course Revision can go on from it
+                    "filled": _sheet_filled(r)}
+                   for r in (data.get("courses") or []) if isinstance(r, dict) and r.get("course_code")]
+        out.append({"key": k, "current": k == "prog_syllabus",
+                    "label": "Batch of " + batches()["current"] + " (current)" if k == "prog_syllabus"
+                             else "Batch of " + (sd.get("batch") or ""),
+                    "url": url_for("dept.stage", stage_key=k, programme_code=code),
+                    "courses": courses})
+    return out
+
+
+def _final_step(sub, dept, stage_key, programme_code=None):
+    """Whether submitting this stage completes the whole record — the one
+    submit that opens the review — and the record, stage by stage and part
+    by part, for that review."""
+    from .workflow import programme_stage_state
+    record, final = [], True
+    progs = programmes_of(sub, dept)
+    for k in STAGE_KEYS:
+        sd = STAGE_BY_KEY[k]
+        if sd.get("parts"):
+            for p in progs:
+                for part in sd["parts"]:
+                    st = programme_stage_state(sub, p["programme_code"], part)
+                    here = part == stage_key and p["programme_code"] == programme_code
+                    record.append({"title": f"{p.get('programme_name') or p['programme_code']} · "
+                                            f"{STAGE_BY_KEY[part]['title']}",
+                                   "status": "now" if here else (st.get("status") or "open"),
+                                   "url": url_for("dept.stage", stage_key=part,
+                                                  programme_code=p["programme_code"]),
+                                   "at": to_ist(st["submitted_at"]).strftime("%d %b %Y") if st.get("submitted_at") else ""})
+                    if not here and st.get("status") != "submitted":
+                        final = False
+            if not progs:
+                final = False
+            continue
+        st = (sub.get("stages") or {}).get(k) or {}
+        here = k == stage_key
+        status = compute_status(sub, k)
+        record.append({"title": sd["title"], "status": "now" if here else status,
+                       "url": url_for("dept.stage", stage_key=k),
+                       "at": to_ist(st["submitted_at"]).strftime("%d %b %Y") if st.get("submitted_at") else ""})
+        if not here and status != "submitted":
+            final = False
+    # an optional part (an earlier batch's syllabus) is never the final step
+    if (STAGE_BY_KEY.get(stage_key) or {}).get("optional"):
+        final = False
+    return final, record
+
+
+def _pin_frozen(stage_key, data, dept, sub, programme):
+    """A frozen section is whatever the Office's record says, whatever the
+    page sent."""
+    stage_def = STAGE_BY_KEY.get(stage_key) or {}
+    frozen = [s["key"] for s in stage_def.get("sections", []) if s.get("frozen")]
+    if frozen:
+        pinned = prefill_for(stage_key, dept, _year(), programme, sub, readonly_only=True)
+        for key in frozen:
+            data[key] = pinned.get(key, {})
+    return data
+
+
 @bp.post("/api/<stage_key>/save")
 @bp.post("/api/<stage_key>/<programme_code>/save")
 @department_required
 def api_save(stage_key, programme_code=None):
+    dept, sub, programme, bad = _guard(stage_key, programme_code, light=True)
+    if bad:
+        return bad
+    data = _pin_frozen(stage_key, request.get_json(silent=True) or {}, dept, sub, programme)
+    before = _stored_data(sub, stage_key, programme_code)
+    # the Office correcting a submitted stage leaves it submitted
+    keep = acting() and _stored_status(sub, stage_key, programme_code) == "submitted"
+    save_draft(dept["dept_code"], _year(), stage_key, data, programme_code,
+               status="submitted" if keep else "draft")
+    people.keep(dept["dept_code"], _year(), stage_key, programme_code, data, _person())
+    _tell(dept, "saved", stage_key, programme, changes=describe_changes(stage_key, before, data))
+    return jsonify({"ok": True, "saved_at": now().isoformat()})
+
+
+def _stored_status(sub, stage_key, programme_code=None):
+    if programme_code:
+        return (((sub.get("programmes") or {}).get(programme_code) or {}).get(stage_key) or {}).get("status")
+    return ((sub.get("stages") or {}).get(stage_key) or {}).get("status")
+
+
+def _stored_data(sub, stage_key, programme_code=None):
+    if programme_code:
+        return (((sub.get("programmes") or {}).get(programme_code) or {}).get(stage_key) or {}).get("data") or {}
+    return ((sub.get("stages") or {}).get(stage_key) or {}).get("data") or {}
+
+
+def _person():
+    return (_me() or {}).get("person")
+
+
+def _tell(dept, event, stage_key=None, programme=None, **kw):
+    """An update for the Office; never in the way of the department's work.
+    (None for the Office's own edits.)"""
+    if acting():
+        return
+    p = _person()
+    try:
+        notify_record(dept, event, stage_key=stage_key, programme=programme,
+                      actor=_me()["username"], person=(p or {}).get("name", ""), **kw)
+    except Exception:
+        current_app.logger.exception("Could not record an update")
+
+
+@bp.post("/api/<stage_key>/sample")
+@bp.post("/api/<stage_key>/<programme_code>/sample")
+@department_required
+def api_sample(stage_key, programme_code=None):
+    """The demo department only: the sample answers for this stage."""
+    from . import demo_dept
     dept, sub, programme, bad = _guard(stage_key, programme_code)
     if bad:
         return bad
-    data = request.get_json(silent=True) or {}
-    save_draft(dept["dept_code"], _year(), stage_key, data, programme_code)
-    return jsonify({"ok": True, "saved_at": now().isoformat()})
+    if not dept.get("demo"):
+        abort(404)
+    demo_dept.upload_samples(_year())          # anything removed comes back
+    files = demo_dept._files_for(get_db(), _year())
+    data = demo_dept.sample(stage_key, programme, files, _year())
+    return jsonify({"ok": True, "data": _pin_frozen(stage_key, data, dept, sub, programme)})
+
+
+@bp.post("/comments/<cid>/done")
+@department_required
+def comment_done(cid):
+    """The department marks a comment from the Office as done, with a reply."""
+    from bson import ObjectId
+    dept = _dept()
+    try:
+        c = get_db().comments.find_one({"_id": ObjectId(cid), "dept_code": dept["dept_code"]})
+    except Exception:
+        c = None
+    if not c:
+        abort(404)
+    reply = (request.form.get("reply") or "").strip()[:1000]
+    get_db().comments.update_one({"_id": c["_id"]}, {"$set": {"status": "done", "reply": reply, "done_at": now()}})
+    _tell(dept, "saved", c["stage"], None, changes=[{"section": "Comment from the Office", "field": c["text"][:60],
+                                                     "before": "open", "after": "done" + (f": {reply[:60]}" if reply else "")}])
+    flash("Thank you — the Office of Academic Affairs sees it is done.", "success")
+    return redirect(request.referrer or url_for("dept.dashboard"))
+
+
+@bp.post("/drive/fill")
+@department_required
+def drive_fill():
+    """A department with a Drive data pack: fill every stage from it, and
+    whatever the Drive folder did not cover with entries that suit."""
+    from .autofill import fill_from_drive, pack_for
+    dept = _dept()
+    if not pack_for(get_db(), dept):
+        abort(404)
+    done = fill_from_drive(dept, _year(), (_person() or {}).get("name") or dept["dept_code"])
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for key, part in (sub.get("stages") or {}).items():
+        if part.get("data"):
+            people.keep(dept["dept_code"], _year(), key, None, part["data"], _person())
+    # the Office sees it as an update, one per stage (the programmes under Curriculum)
+    name = (_person() or {}).get("name", "")
+    for key in STAGE_KEYS:
+        parts = [d for d in done if d.startswith(STAGE_BY_KEY[key]["title"])] if key != "curriculum" \
+            else [d for d in done if " · " in d]
+        if parts:
+            notify_record(dept, "saved", stage_key=key, person=name, actor=_me()["username"],
+                          changes=[{"section": "Drive folder", "field": "Imported",
+                                    "before": "", "after": f"{len(parts)} part{'s' if len(parts) != 1 else ''} filled from the Drive folder"}])
+    flash(f"Data imported from your Drive folder into {len(done)} stages and programme parts. "
+          "Anything the folder did not have is marked “to be confirmed” — add it manually during "
+          "the relevant stage.", "success")
+    return redirect(url_for("dept.dashboard"))
+
+
+@bp.post("/demo/fill-all")
+@department_required
+def demo_fill_all():
+    """The demo department only: every stage filled with sample answers."""
+    from . import demo_dept
+    dept = _dept()
+    if not dept.get("demo"):
+        abort(404)
+    n = demo_dept.fill_all(_year())
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for key, part in (sub.get("stages") or {}).items():
+        if part.get("data"):
+            people.keep(dept["dept_code"], _year(), key, None, part["data"], _person())
+    for code, parts in (sub.get("programmes") or {}).items():
+        for key, part in (parts or {}).items():
+            if isinstance(part, dict) and part.get("data"):
+                people.keep(dept["dept_code"], _year(), key, code, part["data"], _person())
+    flash(f"Filled {n} stage{'s' if n != 1 else ''} and programme parts with sample data. "
+          "Open each in turn, press Submit, review and confirm.", "success")
+    return redirect(url_for("dept.dashboard"))
+
+
+def _template_issues(dept, stage_key, data):
+    """A signed composition form with categories left blank: one reminder
+    per form, naming what is blank. Not every category applies to every
+    department, and a scanned copy cannot be read row by row — so it is a
+    warning, never a block."""
+    from .template_check import TEMPLATES, problems
+    stage = STAGE_BY_KEY.get(stage_key) or {}
+    out = []
+    for sec in stage.get("sections", []):
+        for f in sec.get("fields", []):
+            if f.get("name") not in TEMPLATES:
+                continue
+            v = ((data or {}).get(sec["key"]) or {}).get(f["name"])
+            if not isinstance(v, dict) or not v.get("stored"):
+                continue
+            rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": v["stored"]})
+            tpl = ((rec or {}).get("keyword_match") or {}).get("template")
+            for msg in problems(tpl):
+                out.append({"level": "warning", "section": sec["key"], "field": f["name"],
+                            "message": f"{f.get('label', f['name'])}: {msg} — check it; a category "
+                                       "that does not apply can stay empty."})
+    return out
 
 
 @bp.post("/api/<stage_key>/validate")
@@ -204,6 +940,10 @@ def api_validate(stage_key, programme_code=None):
         return bad
     data = request.get_json(silent=True) or {}
     issues, summary = validate_only(sub, stage_key, data, programme)
+    extra = _template_issues(dept, stage_key, data)
+    if extra:
+        issues = extra + issues
+        summary = {**summary, "warnings": summary.get("warnings", 0) + len(extra)}
     return jsonify({"ok": True, "issues": issues, "summary": summary})
 
 
@@ -215,35 +955,312 @@ def api_submit(stage_key, programme_code=None):
     if bad:
         return bad
     data = request.get_json(silent=True) or {}
+    res = _submit_one(dept, sub, stage_key, programme, data)
+    if not res["ok"]:
+        return jsonify(res)
+    if programme:
+        nxt = _next_part(dept, stage_key, programme_code)
+        flash(f"{programme['programme_name']}: “{STAGE_BY_KEY[stage_key]['title']}” is submitted."
+              + (f" Next: {nxt['title']}." if nxt else ""), "success")
+        return jsonify({**res, "next": nxt,
+                        "redirect": nxt["url"] if nxt else
+                        url_for("dept.stage", stage_key=STAGE_BY_KEY[stage_key]["parent"])})
+    stage_title = STAGE_BY_KEY[stage_key]["title"]
+    if stage_key == "dept_info" and request.args.get("back") == "curriculum":
+        flash(f"“{stage_title}” is submitted. The programme list is updated — "
+              "your new programme is in Curriculum.", "success")
+        return jsonify({**res, "next": None, "redirect": url_for("dept.stage", stage_key="curriculum")})
+    nxt = next_action(get_or_create_submission(dept["dept_code"], _year()))
+    if nxt:
+        flash(f"“{stage_title}” is submitted. Next: “{nxt['title']}”.", "success")
+        target = url_for("dept.stage", stage_key=nxt["key"])
+    else:
+        flash(f"“{stage_title}” is submitted. Your Board of Studies record is complete.", "success")
+        target = url_for("dept.dashboard")
+    return jsonify({**res, "next": {"key": nxt["key"], "title": nxt["title"]} if nxt else None,
+                    "redirect": target})
+
+
+def _submit_one(dept, sub, stage_key, programme, data):
+    """Submit one stage or programme part: the form checks first, then
+    submitted, told to the Office, logged. (A signed form's blanks are only
+    a reminder in the checks: they do not hold the submission up.)"""
+    programme_code = (programme or {}).get("programme_code")
+    data = _pin_frozen(stage_key, data or {}, dept, sub, programme)
+    before = _stored_data(sub, stage_key, programme_code)
     issues, summary, status = submit_stage(dept["dept_code"], _year(), stage_key, data,
                                            programme, _me()["username"])
-    if status == "submitted" and programme:
-        audit(_me()["username"], "stage.submitted",
-              f"{dept['dept_code']}/{programme['programme_code']}/{stage_key}")
-        flash(f"{programme['programme_name']}: “{STAGE_BY_KEY[stage_key]['title']}” is submitted.",
-              "success")
-        return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
-                        "next": None,
-                        "redirect": url_for("dept.stage", stage_key=STAGE_BY_KEY[stage_key]["parent"])})
-    if status == "submitted":
-        audit(_me()["username"], "stage.submitted", f"{dept['dept_code']}/{stage_key}")
-        nxt_key = None
-        i = STAGE_KEYS.index(stage_key)
-        if i + 1 < len(STAGE_KEYS):
-            nxt_key = STAGE_KEYS[i + 1]
-        # Confirm on the page we send them to, rather than in a browser dialog.
-        stage_title = STAGE_BY_KEY[stage_key]["title"]
-        if nxt_key:
-            flash(f"“{stage_title}” is submitted. "
-                  f"“{STAGE_BY_KEY[nxt_key]['title']}” is now open.", "success")
-        else:
-            flash(f"“{stage_title}” is submitted. Your Board of Studies record is complete.",
-                  "success")
-        return jsonify({"ok": True, "status": status, "issues": issues, "summary": summary,
-                        "next": {"key": nxt_key,
-                                 "title": STAGE_BY_KEY[nxt_key]["title"]} if nxt_key else None,
-                        "redirect": url_for("dept.dashboard")})
-    return jsonify({"ok": False, "status": status, "issues": issues, "summary": summary})
+    if status != "submitted":
+        return {"ok": False, "status": status, "issues": issues, "summary": summary}
+    _tell(dept, "submitted", stage_key, programme,
+          changes=describe_changes(stage_key, before, apply_defaults(stage_key, data)))
+    people.keep(dept["dept_code"], _year(), stage_key, programme_code, apply_defaults(stage_key, data),
+                _person(), kind="submit")
+    audit(_me()["username"], "stage.submitted",
+          f"{dept['dept_code']}/{programme_code + '/' if programme_code else ''}{stage_key}")
+    return {"ok": True, "status": status, "issues": issues, "summary": summary}
+
+
+def _level_counts(rows):
+    """UG and PG: how many programmes, how many complete."""
+    out = []
+    for lv in ("UG", "PG"):
+        mine = [r for r in rows if (r["level"] or "").upper().startswith(lv)]
+        if mine:
+            out.append({"level": lv, "total": len(mine), "done": sum(1 for r in mine if r["done"])})
+    return out
+
+
+def _suggest_phrases(sub, dept):
+    """Whole titles to offer while typing: every programme in the university's
+    catalogue, and the course titles this department has already used."""
+    from . import catalogue
+    from .workflow import programme_stage_state
+    out = [r.get("programme_name") for r in catalogue.load()]
+    for p in programmes_of(sub, dept):
+        code = p["programme_code"]
+        out.append(p.get("programme_name"))
+        cur = programme_stage_state(sub, code, "prog_curriculum").get("data") or {}
+        out += [(r or {}).get("course_title") for r in cur.get("semester_structure") or [] if isinstance(r, dict)]
+        syl = programme_stage_state(sub, code, "prog_syllabus").get("data") or {}
+        out += [(r or {}).get("course_title") for r in syl.get("courses") or [] if isinstance(r, dict)]
+    seen, phrases = set(), []
+    for t in out:
+        t = " ".join(str(t or "").split())
+        # a cell may hold several titles: "Python / Python Lab"
+        for one in [x.strip() for x in t.split(" / ")] if " / " in t else [t]:
+            if 3 < len(one) < 200 and one.lower() not in seen:
+                seen.add(one.lower())
+                phrases.append(one)
+    return phrases[:3000]
+
+
+def _note_place(dept, stage_key, programme_code=None):
+    """Where the department was last working, so its home can take it back
+    there."""
+    get_db().departments.update_one({"dept_code": dept["dept_code"]}, {"$set": {"last_place": {
+        "year": _year(), "stage": stage_key, "programme_code": programme_code or "",
+        "at": now(), "name": (_person() or {}).get("name", "")}}})
+
+
+def _resume(sub, dept):
+    """The place to continue from: where the department last was, or, if
+    that is submitted, the next thing after it; with nowhere recorded, the
+    next stage that needs work."""
+    place = dept.get("last_place") or {}
+    if place.get("year") == _year() and place.get("stage") in STAGE_BY_KEY:
+        key, code = place["stage"], place.get("programme_code") or ""
+        d = STAGE_BY_KEY[key]
+        if code and d.get("parent"):
+            label = f"{STAGE_BY_KEY[d['parent']]['title']} · {code} · {_step_label(key)}"
+            if part_status(sub, code, key) == "submitted":
+                nxt = _next_part(dept, key, code)
+                if nxt:
+                    return {"url": nxt["url"], "title": nxt["title"], "where": "next after " + label, "stage": d["parent"],
+                            "at": place.get("at"), "name": place.get("name")}
+            else:
+                return {"url": url_for("dept.stage", stage_key=key, programme_code=code),
+                        "title": label, "where": "where you left off", "stage": d["parent"],
+                        "at": place.get("at"), "name": place.get("name")}
+        elif not code and compute_status(sub, key) != "submitted":
+            return {"url": url_for("dept.stage", stage_key=key), "title": d["title"], "stage": key,
+                    "where": "where you left off", "at": place.get("at"), "name": place.get("name")}
+    nxt = next_action(sub)
+    if nxt:
+        return {"url": url_for("dept.stage", stage_key=nxt["key"]), "title": nxt["title"], "stage": nxt["key"],
+                "where": "next to do", "at": None, "name": ""}
+    return None
+
+
+def _all_revisions_done(sub, dept):
+    """Every programme's Course Revision submitted — the point at which the
+    whole record can be reviewed and submitted."""
+    progs = programmes_of(sub, dept)
+    return bool(progs) and all(part_status(sub, p["programme_code"], "prog_revision") == "submitted"
+                               for p in progs)
+
+
+def _step_label(key, cfg=None):
+    """A programme step as the buttons name it."""
+    d = STAGE_BY_KEY[key]
+    if key == "prog_curriculum":
+        return "Curriculum"
+    if key == "prog_syllabus":
+        return "Syllabus"
+    if d.get("existing_batch"):
+        return f"Earlier batch {d.get('batch', '')}".strip()
+    if key == "prog_revision":
+        return "Course Revision"
+    return d["title"]
+
+
+def _programme_steps(sub, code):
+    """One programme's steps, in order: Curriculum, Current Batch, each
+    earlier batch, Course Revision — with where each stands."""
+    stage_def = next(s for s in STAGE_BY_KEY.values() if s.get("parts"))
+    cfg = app_settings_doc()
+    return [{"key": k, "label": _step_label(k, cfg), "status": part_status(sub, code, k),
+             "optional": bool(STAGE_BY_KEY[k].get("optional")),
+             # the earlier batches are listed apart, by their years
+             "earlier": bool(STAGE_BY_KEY[k].get("existing_batch")),
+             "short": STAGE_BY_KEY[k].get("batch", "") if STAGE_BY_KEY[k].get("existing_batch") else "",
+             "sems": _part_item(sub, code, k, cfg)["sems"],
+             # the current batch's year, for the heading over its steps
+             "batch": "" if STAGE_BY_KEY[k].get("existing_batch") else batches(cfg)["current"],
+             "url": url_for("dept.stage", stage_key=k, programme_code=code)}
+            for k in parts_for(stage_def, cfg)]
+
+
+def _next_programme(sub, dept, code):
+    """The programme after this one that still has something to submit."""
+    progs = [p["programme_code"] for p in programmes_of(sub, dept)]
+    here = progs.index(code) if code in progs else -1
+    for c in progs[here + 1:] + progs[:max(here, 0)]:
+        for st in _programme_steps(sub, c):
+            if st["status"] != "submitted" and not st["optional"]:
+                return st
+    return None
+
+
+def _next_part(dept, stage_key, programme_code):
+    """After a programme part: the next step of the same programme not yet
+    submitted (Curriculum → Current Batch → an earlier batch it has begun →
+    Revision), then the programmes after it, then any left before it."""
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    steps = _programme_steps(sub, programme_code)
+    keys = [st["key"] for st in steps]
+    here = keys.index(stage_key) if stage_key in keys else -1
+    for st in steps[here + 1:]:
+        if st["status"] != "submitted":
+            return {"key": st["key"], "title": st["label"], "url": st["url"]}
+    nxt = _next_programme(sub, dept, programme_code)
+    if nxt:
+        return {"key": nxt["key"], "title": nxt["label"], "url": nxt["url"]}
+    return None
+
+
+def _record_items(sub, dept):
+    """Every stage and programme part, in the order they are filled, with
+    what is in it — for the review of the whole record."""
+    from .workflow import programme_stage_state
+    items = []
+    for k in STAGE_KEYS:
+        sd = STAGE_BY_KEY[k]
+        if sd.get("parts"):
+            for p in programmes_of(sub, dept):
+                code = p["programme_code"]
+                for part in parts_for(sd):
+                    pd = STAGE_BY_KEY[part]
+                    st = programme_stage_state(sub, code, part)
+                    optional = bool(pd.get("optional"))
+                    if optional and not st.get("data"):
+                        continue
+                    title = pd["title"]
+                    items.append({"key": part, "programme": code,
+                                  "title": f"{p.get('programme_name') or code} · {title}",
+                                  "group": sd.get("group", ""), "optional": optional,
+                                  "status": st.get("status") or "open",
+                                  "url": url_for("dept.stage", stage_key=part, programme_code=code),
+                                  "stage": {"title": pd["title"], "sections": pd.get("sections", [])},
+                                  "data": st.get("data") or {}})
+            continue
+        st = (sub.get("stages") or {}).get(k) or {}
+        items.append({"key": k, "programme": "", "title": sd["title"], "group": sd.get("group", ""),
+                      "optional": False, "status": compute_status(sub, k),
+                      "url": url_for("dept.stage", stage_key=k),
+                      "stage": {"title": sd["title"], "sections": sd.get("sections", [])},
+                      "data": st.get("data") or {}})
+    return items
+
+
+@bp.route("/api/record")
+@department_required
+def api_record():
+    """The whole record, for “Review & submit all”."""
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    items = _record_items(sub, dept)
+    only = request.args.get("programme")
+    name = dept.get("dept_name", "")
+    if only:
+        # one programme's own review: its parts, earlier batches it has begun included
+        items = [{**i, "title": _step_label(i["key"])} for i in items if i["programme"] == only]
+        name = next((p.get("programme_name") for p in programmes_of(sub, dept)
+                     if p["programme_code"] == only), only)
+        return jsonify({"ok": True, "dept_name": name, "items": items})
+    return jsonify({"ok": True, "dept_name": name, "items": items})
+
+
+@bp.post("/api/programme-check")
+@department_required
+def api_programme_check():
+    """One programme's steps not yet submitted, each with what is still to
+    fill — for the last step's Submit, before its review opens."""
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    code = request.args.get("programme") or ""
+    programme = next((p for p in programmes_of(sub, dept) if p.get("programme_code") == code), None)
+    if not programme:
+        return jsonify({"ok": False, "error": "Unknown programme."}), 404
+    parts = []
+    for item in _record_items(sub, dept):
+        if item["programme"] != code or item["status"] == "submitted":
+            continue
+        issues, _ = validate_only(sub, item["key"], item["data"], programme)
+        errs = [i["message"] for i in issues if i.get("level") == "error"]
+        if not item["data"]:
+            errs = errs or ["Nothing has been filled in here yet."]
+        if errs:
+            parts.append({"title": _step_label(item["key"]), "url": item["url"], "missing": errs[:8],
+                          "more": max(0, len(errs) - 8)})
+    return jsonify({"ok": True, "parts": parts})
+
+
+@bp.post("/api/submit-all")
+@department_required
+def api_submit_all():
+    """Submit every stage and programme part not yet submitted, in order,
+    as saved. Stops at the first that cannot go, and says which and why."""
+    dept = _dept()
+    done = []
+    only = request.args.get("programme")
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    for item in _record_items(sub, dept):
+        if only and item["programme"] != only:
+            continue
+        if item["status"] == "submitted":
+            continue
+        sub = get_or_create_submission(dept["dept_code"], _year())
+        programme = None
+        if item["programme"]:
+            programme = next((p for p in programmes_of(sub, dept)
+                              if p.get("programme_code") == item["programme"]), None)
+        if not item["data"]:
+            return jsonify({"ok": False, "done": done,
+                            "failed": {"title": item["title"], "url": item["url"],
+                                       "issues": [{"level": "error", "message": "Nothing has been filled in here yet."}]}})
+        if compute_status(sub, item["key"] if not item["programme"] else STAGE_BY_KEY[item["key"]]["parent"]) == "locked":
+            return jsonify({"ok": False, "done": done,
+                            "failed": {"title": item["title"], "url": item["url"],
+                                       "issues": [{"level": "error", "message": "This stage is still locked."}]}})
+        res = _submit_one(dept, sub, item["key"], programme, item["data"])
+        if not res["ok"]:
+            return jsonify({"ok": False, "done": done,
+                            "failed": {"title": item["title"], "url": item["url"],
+                                       "issues": [i for i in res.get("issues", []) if i.get("level") == "error"][:8]}})
+        done.append(item["title"])
+    if only:
+        sub = get_or_create_submission(dept["dept_code"], _year())
+        nxt = _next_programme(sub, dept, only)
+        if done:
+            flash(f"This programme is submitted — {len(done)} part{'s' if len(done) != 1 else ''}."
+                  + (" On to the next programme." if nxt else ""), "success")
+        return jsonify({"ok": True, "done": done,
+                        "redirect": nxt["url"] if nxt else url_for("dept.stage", stage_key="curriculum")})
+    if done:
+        flash(f"Submitted {len(done)} stage{'s' if len(done) != 1 else ''} and parts. "
+              "Your Board of Studies record is with the Office of Academic Affairs.", "success")
+    return jsonify({"ok": True, "done": done, "redirect": url_for("dept.dashboard")})
 
 
 @bp.post("/api/upload")
@@ -270,13 +1287,73 @@ def api_upload():
     f.save(folder / stored)
     size = (folder / stored).stat().st_size
 
+    # does it carry the words a document for this box always has?
+    from .keyword_match import check as keyword_check
+    from .summarise import field_label
+    match = keyword_check(folder / stored, field, field_label(stage_key, field))
+
     rec = {"dept_code": dept["dept_code"], "academic_year": _year(), "stage": stage_key,
            "field": field, "original_name": f.filename, "stored_name": stored,
-           "size": size, "uploaded_by": _me()["username"], "uploaded_at": now()}
-    get_db().files.insert_one(rec)
+           "size": size, "uploaded_by": _me()["username"], "uploaded_at": now(),
+           "keyword_match": match}
+    from .drive_store import push_later
+    push_later(get_db().files.insert_one(rec).inserted_id)
+    words = {"match": "keywords match", "weak": "few keywords match",
+             "miss": "no expected keywords found", "unread": "no text to check"}[match["status"]]
+    _tell(dept, "keyword_miss" if match["status"] == "miss" else "uploaded", stage_key,
+          text=f"“{f.filename}” for {match['label']} — {words}"
+               + (f" ({', '.join(match.get('seen') or match['found'])})" if match["found"] else ""))
 
-    return jsonify({"ok": True, "name": f.filename, "stored": stored, "size": size,
-                    "url": url_for("dept.download", stage_key=stage_key, stored=stored)})
+    url = url_for("dept.download", stage_key=stage_key, stored=stored)
+    return jsonify({
+        "ok": True, "name": f.filename, "stored": stored, "size": size, "url": url,
+        # drawn on the first request for it, then kept; the page falls back to
+        # a card if it never arrives
+        "thumb": url + "?thumb=1" if ext == ".pdf" else None,
+        "match": match,
+    })
+
+
+# The browser renders a PDF or an image itself, but only if it is handed one
+# inline; as an attachment it downloads instead. Anything else stays an
+# attachment, because a browser asked to display a .docx offers to download
+# it anyway — with a worse filename.
+INLINE_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"}
+THUMB_MAX = (420, 560)
+
+
+def _thumbnail(source: Path) -> Path | None:
+    """Draw the first page of a PDF, once, and keep it beside the file.
+
+    Returns the image's path, or None if it cannot be drawn — an encrypted
+    PDF, a damaged one, or a deployment without the renderer installed. The
+    caller falls back to the drawn card, so a failure here costs a picture
+    and nothing else.
+    """
+    thumb = source.with_suffix(source.suffix + ".thumb.png")
+    if thumb.exists():
+        return thumb
+    try:
+        import pypdfium2 as pdfium
+    except ImportError:          # renderer not installed on this deployment
+        current_app.logger.info("No PDF renderer; previews fall back to a card.")
+        return None
+    from .pdflock import PDF_LOCK
+    try:
+        with PDF_LOCK:
+            if thumb.exists():           # drawn by another request meanwhile
+                return thumb
+            doc = pdfium.PdfDocument(source)
+            try:
+                image = doc[0].render(scale=1.4).to_pil()
+            finally:
+                doc.close()
+            image.thumbnail(THUMB_MAX)
+            image.save(thumb, "PNG", optimize=True)
+        return thumb
+    except Exception:
+        current_app.logger.warning("Could not draw a preview of %s", source.name)
+        return None
 
 
 @bp.route("/file/<stage_key>/<stored>")
@@ -286,32 +1363,117 @@ def download(stage_key, stored):
     rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})
     if not rec:
         abort(404)
-    path = current_app.config["UPLOAD_ROOT"] / _year() / dept["dept_code"] / stage_key / stored
+    from .drive_store import ensure_local
+    path = ensure_local(rec)
     if not path.exists():
         abort(404)
-    return send_file(path, as_attachment=True, download_name=rec["original_name"])
+    suffix = Path(rec["original_name"]).suffix.lower()
+
+    if request.args.get("thumb") == "1":
+        if suffix != ".pdf":
+            abort(404)
+        drawn = _thumbnail(path)
+        if not drawn:
+            abort(404)
+        return send_file(drawn, mimetype="image/png", max_age=86400)
+
+    inline = request.args.get("inline") == "1" and suffix in INLINE_EXT
+    return send_file(path, as_attachment=not inline,
+                     download_name=rec["original_name"])
+
+
+@bp.post("/file/<stage_key>/<stored>/summary")
+@department_required
+def file_summary(stage_key, stored):
+    """A short AI summary of an uploaded PDF, made once and kept."""
+    from .summarise import SummaryError, summarise
+    dept = _dept()
+    rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": stored})
+    if not rec:
+        return jsonify({"ok": False, "error": "That file was not found."}), 404
+    from .drive_store import ensure_local
+    path = ensure_local(rec)
+    try:
+        out = summarise(rec, path, refresh=request.args.get("refresh") == "1")
+    except SummaryError as e:
+        return jsonify({"ok": False, "error": str(e)})
+    return jsonify({"ok": True, **out})
 
 
 # ---------------------------------------------------------------------------
 # department's own exports
 # ---------------------------------------------------------------------------
 
-@bp.route("/export.xlsx")
-@department_required
-def export_excel():
-    dept = _dept()
-    buf = department_excel(dept["dept_code"], _year())
-    return send_file(buf, as_attachment=True,
-                     download_name=f"BoS-{dept['dept_code']}-{_year()}.xlsx",
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+DOCS = (("c", "Curriculum"), ("s", "Syllabus"), ("v", "Course Revision"))
+# which part a current-batch document is submitted with
+CURRENT_PART = {"c": "prog_curriculum", "s": "prog_syllabus", "v": "prog_revision"}
 
 
-@bp.route("/export.docx")
+def _submission_docs(sub, code):
+    """A programme's documents, batch by batch — the current batch's
+    Curriculum, Syllabus and Course Revision, then each earlier batch's —
+    each marked with whether it is submitted."""
+    b = batches()
+    url = lambda batch, doc: url_for("dept.programme_report", programme_code=code, batch=batch, doc=doc)
+    groups = [{"label": f"Current batch · {b['current']}", "batch": "current",
+               "docs": [{"doc": d, "title": t, "batch": "current", "url": url("current", d),
+                         "submitted": part_status(sub, code, CURRENT_PART[d]) == "submitted"} for d, t in DOCS]}]
+    for e in b["existing"]:
+        done = part_status(sub, code, e["key"]) == "submitted"
+        sems = semester_short(e["semesters"])
+        groups.append({"label": f"Earlier batch · {e['label']}" + (f" · {sems}" if sems else ""), "batch": e["key"],
+                       "docs": [{"doc": d, "title": t, "batch": e["key"], "url": url(e["key"], d),
+                                 "submitted": done} for d, t in DOCS]})
+    return groups
+
+
+def _submission_view(dept, code, pick):
+    """The picked document as its Word template lays it out (None if it cannot be made)."""
+    from .docgen import batch_curriculum_docx, curriculum_docx, revision_docx, syllabus_docx, to_view
+    db, year, part = get_db(), _year(), pick["batch"]
+    if part == "current":
+        make = {"c": curriculum_docx, "s": syllabus_docx, "v": revision_docx}[pick["doc"]]
+        kw = {}
+    else:
+        make = {"c": batch_curriculum_docx, "s": syllabus_docx, "v": revision_docx}[pick["doc"]]
+        kw = {"part": part}
+    try:
+        buf = make(db, dept["dept_code"], year, code, **kw)
+        return to_view(buf) if buf is not None else None
+    except Exception:
+        current_app.logger.exception("could not show %s %s %s", code, part, pick["doc"])
+        return None
+
+
+@bp.route("/reports")
 @department_required
-def export_word():
+def reports():
+    """Every programme's submission, to see — not to download."""
     dept = _dept()
-    buf = submission_word(dept["dept_code"], _year())
-    return send_file(buf, as_attachment=True,
-                     download_name=f"BoS-Report-{dept['dept_code']}-{_year()}.docx",
-                     mimetype="application/vnd.openxmlformats-officedocument."
-                              "wordprocessingml.document")
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    rows = []
+    for p in programmes_of(sub, dept):
+        docs = [d for g in _submission_docs(sub, p["programme_code"]) for d in g["docs"]]
+        rows.append({"code": p["programme_code"], "name": p["programme_name"],
+                     "submitted": sum(d["submitted"] for d in docs), "total": len(docs),
+                     "url": url_for("dept.programme_report", programme_code=p["programme_code"])})
+    return render_template("dept/reports.html", dept=dept, rows=rows, year=_year())
+
+
+@bp.route("/programme/<programme_code>/report")
+@department_required
+def programme_report(programme_code):
+    """Your submission: one programme's submitted documents, each as the
+    Office's Word template lays it out — to read; a copy comes from the
+    Office of Academic Affairs."""
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    programme = next((p for p in programmes_of(sub, dept) if p["programme_code"] == programme_code), None) \
+        or abort(404)
+    groups = _submission_docs(sub, programme_code)
+    docs = [d for g in groups for d in g["docs"] if d["submitted"]]
+    want = (request.args.get("batch") or "current", request.args.get("doc") or "")
+    pick = next((d for d in docs if (d["batch"], d["doc"]) == want), None) or (docs[0] if docs else None)
+    view = _submission_view(dept, programme_code, pick) if pick else None
+    return render_template("dept/submission.html", dept=dept, programme=programme, groups=groups,
+                           pick=pick, view=view, year=_year())

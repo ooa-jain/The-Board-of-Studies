@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}{{ stage.title }}{% endblock %}
+{% import "_art.html" as art %}
+{% block title %}{% if stage.existing_batch %}Earlier batch · {{ batch_tag }}{% elif batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}{% endblock %}
 
 {% block header %}
 <div class="page-head">
@@ -12,70 +13,101 @@
         {% else %}{{ stage.group }}{% endif %}
         {% if programme %}<span>›</span> {{ programme.programme_code }}{% endif %}
       </div>
-      <h1>{% if programme %}{{ programme.programme_name }} — {% endif %}{{ stage.title }}</h1>
-      <p>{{ stage.blurb }}</p>
-      {% if stage.source_templates %}
-      <p class="small note-gold">
-        Replaces: {{ stage.source_templates|join(' · ') }}
+      <h1>{% if programme %}{{ programme.display_name or programme.programme_name }} — {% endif %}{% if stage.existing_batch %}Earlier batch · {{ batch_tag }}{% elif batch_tag %}Syllabus — Batch of {{ batch_tag }}{% else %}{{ stage.title }}{% endif %}</h1>
+      {% if batch_tag %}
+      <span class="batch-tag{{ ' is-current' if stage.batch == 'current' }}">
+        Batch of {{ batch_tag }}{{ ' · current batch' if stage.batch == 'current' else ' · earlier batch' }}
+      </span>
+      {% endif %}
+      {% if stage.blurb and stage.key != 'pre_bos' %}<p>{{ stage.blurb }}</p>{% endif %}
+      {% if stage.samples %}
+      <p class="small sample-links">
+        {% for d in stage.samples %}
+        <a href="{{ url_for('static', filename=d.file) }}" download>{{ d.label }}</a>
+        {% endfor %}
       </p>
       {% endif %}
     </div>
     <div class="spacer head-aside">
       {% if status == 'submitted' %}<span class="pill pill-ok">Submitted — read only</span>
       {% elif status == 'returned' %}<span class="pill pill-err">Returned for correction</span>
-      {% elif status == 'draft' %}<span class="pill pill-warn">In progress</span>
+      {% elif status == 'draft' %}<span class="pill pill-warn pill-progress">In progress</span>
       {% else %}<span class="pill pill-gold">Open</span>{% endif %}
       {% if programme %}
-      <div class="small muted mt-1">{{ programme.programme_name }}<br>{{ programme.degree_level }}</div>
+      {% if programme.degree_level %}<div class="small muted mt-1">{{ programme.degree_level }}</div>{% endif %}
       {% endif %}
+      <div class="small mt-1"><a class="ver-link" href="{{ url_for('dept.versions', stage=stage.key) }}">Version History</a></div>
     </div>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-{% if parts %}
-<nav class="part-tabs" aria-label="Parts of this programme">
-  {% for part in parts %}
-  <a href="{{ url_for('dept.stage', stage_key=part.key, programme_code=programme.programme_code) }}"
-     class="part-tab{{ ' is-here' if part.here }}"{% if part.here %} aria-current="page"{% endif %}>
-    <span class="mini-dot mini-{{ part.status }}" aria-hidden="true"></span>{{ part.title }}
-  </a>
-  {% endfor %}
-</nav>
+{% if back_to %}
+<div class="back-bar add-prog-bar">
+  <a class="back-link" href="{{ back_to }}">← Back to Curriculum</a>
+  <span class="back-prog">
+    {% if add_level %}Adding a new <strong>{{ add_level }}</strong> programme — fill in its code, degree and name below,
+    then <strong>Submit this stage</strong> and you go straight back to Curriculum.
+    {% else %}Add the new programme below, then <strong>Submit this stage</strong> and you go back to Curriculum.{% endif %}
+  </span>
+</div>
 {% endif %}
+{% if parts %}
+{% from "dept/_part_flow.html" import part_flow %}
+{% if back_to_structure %}
+<div class="back-bar">
+  <a class="back-link" href="{{ back_to_structure }}">← {{ back_label or 'Programme structure — semester scheme' }}</a>
+  <span class="back-prog"><strong>{{ programme.display_name or programme.programme_name }}</strong> <span class="mono">{{ programme.programme_code }}</span>
+    {% if course_map %}· {{ course_map|length }} courses{% endif %}</span>
+</div>
+{% endif %}
+<div class="pflow-row">
+<nav class="pflow-nav" aria-label="Parts of this programme">
+  {{ part_flow(parts, programme.programme_code, stage.key) }}
+</nav>
+<img class="pflow-art" src="{{ url_for('static', filename='img/pencil-paper.png') }}" alt="" width="84" height="85">
+</div>
+{% endif %}
+{% for c in comments %}
+<div class="office-comment {{ 'is-done' if c.status == 'done' else '' }}">
+  <div class="oc-head"><span class="oc-icon">💬</span><strong>Comment from the Office of Academic Affairs</strong>
+    <span class="small muted">{{ (c.at|ist).strftime('%d %b %Y') }}</span>
+    {% if c.status == 'done' %}<span class="sh-pill is-submitted">Marked done</span>{% endif %}</div>
+  <p class="oc-text">{{ c.text }}</p>
+  {% if c.status == 'open' %}
+  <form method="post" action="{{ url_for('dept.comment_done', cid=c._id) }}" class="oc-form">
+    <input name="reply" placeholder="Optional: what you changed" maxlength="1000">
+    <button class="btn btn-sm">Mark as done</button>
+  </form>
+  {% elif c.reply %}<p class="small muted">Your reply: {{ c.reply }}</p>{% endif %}
+</div>
+{% endfor %}
 {% if state.returned_note %}
 <div class="alert alert-warning">
-  <div><strong>Sent back by the Office of Academics:</strong> {{ state.returned_note }}</div>
+  <div><strong>Sent back by the Office of Academic Affairs:</strong> {{ state.returned_note }}</div>
 </div>
 {% endif %}
 
 <div class="stage-layout">
   <div>
-    <noscript>
-      <div class="alert alert-error">
-        <span class="alert-icon" aria-hidden="true">!</span>
-        <div>
-          <strong>This form needs JavaScript.</strong>
-          The stage fields, the live checks and the credit tally are all built in the browser.
-          Turn JavaScript on for this site, or write to the Office of Academics and they will
-          take your submission another way.
-        </div>
-      </div>
-    </noscript>
+    {% if credit_matrix and credit_matrix.track %}
+    {# UGC Table 2, as a slim strip above the form #}
+    <div class="ugc-strip">
+      <span class="ugc-strip-title">UGC Table 2</span>
+      <span class="ugc-strip-rule">{{ credit_matrix.track_label }} column · <strong>{{ credit_matrix.total }}</strong> credits required</span>
+      <span id="credit-tally" class="ugc-strip-tally small"></span>
+    </div>
+    {% endif %}
 
-    <form id="stage-form" autocomplete="off">
-      <div id="sections">
-        <p class="muted small" id="sections-placeholder">Loading the form…</p>
-      </div>
-    </form>
-  </div>
-
-  <aside class="stage-side">
-    <div class="card">
+    {# shown once Submit has run the checks: a panel that floats above the
+       save bar, so the form keeps the whole width #}
+    <div class="card checks-float" id="checks-card" hidden>
       <div class="card-head">
         <h3 class="card-title-sm">Checks</h3>
         <span class="spacer issue-counts" id="issue-counts"></span>
+        <button type="button" class="checks-close" id="checks-close"
+                aria-label="Hide the checks">×</button>
       </div>
       <div class="card-body tight">
         <div id="issues" class="issues" role="status" aria-live="polite" aria-atomic="true">
@@ -83,77 +115,157 @@
         </div>
       </div>
     </div>
+    <noscript>
+      <div class="alert alert-error">
+        <span class="alert-icon" aria-hidden="true">!</span>
+        <div>
+          <strong>This form needs JavaScript.</strong>
+          The stage fields, the live checks and the credit tally are all built in the browser.
+          Turn JavaScript on for this site, or write to the Office of Academic Affairs and they will
+          take your submission another way.
+        </div>
+      </div>
+    </noscript>
 
-    {% if credit_matrix and credit_matrix.track %}
-    <div class="card">
-      <div class="card-head"><h3 class="card-title-sm">UGC Table 2</h3></div>
-      <div class="card-body tight">
-        <p class="small muted mb-half">
-          Applying the <strong>{{ credit_matrix.track_label }}</strong> column.
-          Total required: <strong>{{ credit_matrix.total }}</strong> credits.
-        </p>
-        <div id="credit-tally" class="small"></div>
+    <form id="stage-form" autocomplete="off">
+      <div id="sections">
+        {# the form's shape while the fields are built #}
+        <div id="sections-placeholder" aria-busy="true" aria-label="Loading the form">
+          {% for block in range(2) %}
+          <div class="section-block">
+            <span class="sk sk-title"></span>
+            <div class="sk-grid">
+              {% for f in range(4) %}
+              <div class="sk-field{{ ' wide' if f == 3 }}">
+                <span class="sk sk-label"></span>
+                <span class="sk {{ 'sk-area' if f == 3 else 'sk-input' }}"></span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </form>
+
+    {# Submit and the other actions: at the end of the form, where the page is read to — not fixed on the screen #}
+    {% if not readonly %}
+    <div class="savebar savebar-end">
+      <div class="wrap">
+        <span class="save-note" id="save-note" role="status" aria-live="polite">Changes save automatically</span>
+        <span class="spacer"></span>
+        {% if dept.demo %}<button class="btn btn-ghost demo-fill" type="button" id="btn-sample" title="Demo department only">Fill with sample data</button>{% endif %}
+        <button class="btn btn-gold" type="button" id="btn-submit">{% if back_to %}Submit &amp; back to Curriculum →{% elif step and last_step %}Review &amp; submit this programme →{% elif step and next_step %}Submit {{ step.label }} &amp; go to {{ next_step.label }} →{% else %}Submit this stage &amp; go to next →{% endif %}</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="savebar savebar-end">
+      <div class="wrap">
+        <span class="save-note">Submitted on
+          {{ (state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" type="button" id="btn-review">Review</button>
+        {% if my_doc %}<a class="btn btn-ghost" href="{{ url_for('dept.programme_report', programme_code=programme.programme_code, batch=my_doc.batch, doc=my_doc.doc) }}"
+           title="This document as the Office's template lays it out — view only">See your submission</a>{% endif %}
+        <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
+        {% if step and next_step %}<a class="btn btn-gold" href="{{ next_step.url }}">Go to {{ next_step.label }} →</a>{% endif %}
       </div>
     </div>
     {% endif %}
 
-    <div class="card">
-      <div class="card-head"><h3 class="card-title-sm">Stages</h3></div>
-      <div class="card-body tight scroll-300">
-        <ol class="mini-board">
-          {% for s in board %}
-          <li class="flex small{{ ' is-locked' if s.status == 'locked' }}{{ ' is-here' if s.key == stage.key }}">
-            <span class="mini-dot mini-{{ s.status }}" aria-hidden="true"></span>
-            <span>{{ s.title }}</span>
-            <span class="sr-only">— {{ s.status }}{{ ', this stage' if s.key == stage.key }}</span>
-          </li>
-          {% endfor %}
-        </ol>
+    {% if all_revisions_done %}
+    {# every programme's Course Revision is in: the whole record can go #}
+    <section class="panel submit-all-panel">
+      <div class="submit-all-body">
+        <div>
+          <strong>Every Course Revision is submitted.</strong>
+          <p class="small muted">Review every stage and programme part in one place, then submit the whole record.</p>
+        </div>
+        <button class="btn btn-gold" type="button" id="btn-all">Review &amp; submit all stages →</button>
       </div>
-    </div>
-  </aside>
+    </section>
+    {% endif %}
+
+    {% if programme_done %}
+    {# every part of the programme is submitted: its documents, to see #}
+    <section class="panel submit-all-panel subm-done" id="programme-done">
+      <div class="submit-all-body">
+        <div>
+          <strong>Every part of {{ programme.programme_code }} is submitted.</strong>
+          <p class="small muted">See its Curriculum, Syllabus and Course Revision — every batch — as the Office's templates lay them out.
+            View only; for a copy, contact the Office of Academic Affairs.</p>
+        </div>
+        <a class="btn btn-gold" href="{{ url_for('dept.programme_report', programme_code=programme.programme_code) }}">See your submission →</a>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
 </div>
 
-{% if not readonly %}
-<div class="savebar">
-  <div class="wrap">
-    <span class="save-note" id="save-note" role="status" aria-live="polite">Not saved yet</span>
-    <span class="spacer"></span>
-    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
-    <button class="btn btn-ghost" type="button" id="btn-check">Check now</button>
-    <button class="btn btn-gold" type="button" id="btn-submit">Submit this stage</button>
-  </div>
-</div>
-{% else %}
-<div class="savebar">
-  <div class="wrap">
-    <span class="save-note">Submitted on
-      {{ state.submitted_at.strftime('%d %b %Y, %H:%M') if state.submitted_at else '—' }}</span>
-    <span class="spacer"></span>
-    <a class="btn btn-ghost" href="{{ url_for('dept.stage', stage_key=stage.parent) if stage.parent else url_for('dept.dashboard') }}">Back</a>
-  </div>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{# titles to offer while typing: the university's programmes, this department's courses #}
+<script>window.SUGGEST_PHRASES = {{ (suggest_phrases or [])|tojson }};</script>
 <script id="stage-def" type="application/json">{{ stage|tojson }}</script>
 <script id="stage-data" type="application/json">{{ data|tojson }}</script>
 <script id="credit-def" type="application/json">{{ (credit_matrix or {})|tojson }}</script>
-<script id="lookups" type="application/json">{{ (lookups or {})|tojson }}</script>
 <script>
   window.STAGE_CTX = {
     key: {{ stage.key|tojson }},
     programme: {{ (programme.programme_code if programme else None)|tojson }},
+    programme_name: {{ (programme.programme_name if programme else '')|tojson }},
+    dept_name: {{ dept.dept_name|tojson }},
+    title: {{ stage.title|tojson }},
+    final: {{ final|tojson }},
+    // the last step of a programme: review and submit the whole programme
+    programme_review: {{ (step is not none and last_step)|tojson }},
+    syllabi: {{ syllabi|tojson }},
+    revision_url: {{ (revision_url or '')|tojson }},
+    revision_year: {{ (revision_year or '')|tojson }},
+    // a syllabus: the programme's POs and PSOs (its mapping's columns, each with its
+    // description) and where they are added, its Objective (each course's Course
+    // Objectives starts from it) and the verbs that suggest a CO's Bloom's level
+    outcome_cols: {{ (outcome_cols or [])|tojson }},
+    // this page's document in "Your submission" (view only)
+    submission_url: {{ (url_for('dept.programme_report', programme_code=programme.programme_code, batch=my_doc.batch, doc=my_doc.doc) if my_doc else '')|tojson }},
+    outcomes_url: {{ (outcomes_url or '')|tojson }},
+    programme_objectives: {{ (programme_objectives or '')|tojson }},
+    bloom_verbs: {{ (bloom_verbs or {})|tojson }},
+    course_map: {{ course_map|tojson }},
+    structure_courses: {{ structure_courses|tojson }},
+    record: {{ record|tojson }},
+    submitted_at: {{ ((state.submitted_at|ist).strftime('%d %b %Y, %H:%M') if state.submitted_at else '')|tojson }},
     readonly: {{ readonly|tojson }},
+    synced: {{ synced|tojson }},
+    calc: {{ calc|tojson }},
+    fill: {{ fill|tojson }},
+    summaries: true,
+    add_level: {{ add_level|tojson }},
+    skip_to: {{ (skip_to or None)|tojson }},
+    sealed: {{ (submission.status == 'sealed')|tojson }},
+    back_to: {{ back_to|tojson }},
     urls: {
       save:     {{ (url_for('dept.api_save', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_save', stage_key=stage.key))|tojson }},
       validate: {{ (url_for('dept.api_validate', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_validate', stage_key=stage.key))|tojson }},
-      submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key))|tojson }},
+      submit:   {{ (url_for('dept.api_submit', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_submit', stage_key=stage.key, back=('curriculum' if back_to else None)))|tojson }},
       upload:   {{ url_for('dept.api_upload')|tojson }},
-      dashboard:{{ url_for('dept.dashboard')|tojson }}
+      static:   {{ url_for('static', filename='')|tojson }},
+      record:   {{ url_for('dept.api_record')|tojson }},
+      submit_all: {{ url_for('dept.api_submit_all')|tojson }},
+      sample:   {{ (url_for('dept.api_sample', stage_key=stage.key, programme_code=programme.programme_code) if programme else url_for('dept.api_sample', stage_key=stage.key))|tojson }},
+      dashboard:{{ url_for('dept.dashboard')|tojson }},
+      dept_info:{{ url_for('dept.stage', stage_key='dept_info')|tojson }},
+      edit_programmes:{{ url_for('dept.add_programme')|tojson }},
+      programme_check:{{ url_for('dept.api_programme_check')|tojson }},
+      stage:    {{ url_for('dept.stage', stage_key='__stage__')|tojson }}
     }
   };
 </script>
+<script src="{{ url_for('static', filename='js/magic-bento.js') }}"></script>
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/submit-all.js') }}"></script>
 <script src="{{ url_for('static', filename='js/stage.js') }}"></script>
 {% endblock %}

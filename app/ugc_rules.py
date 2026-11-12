@@ -103,6 +103,8 @@ IN_LIEU_RULE = {
 # UGC Table 2 category keys.
 NEP_CATEGORY_TO_KEY = {
     "Major (Core)": "major_core",
+    # a discipline elective is part of the major in the UGC tally
+    "Discipline Specific Elective (DSE)": "major_core",
     "Minor Stream": "minor_stream",
     "Multidisciplinary": "multidisciplinary",
     "Ability Enhancement Courses (AEC)": "aec",
@@ -113,15 +115,17 @@ NEP_CATEGORY_TO_KEY = {
 }
 
 # ---------------------------------------------------------------------------
-# Other rules the Office of Academics enforces alongside Table 2
+# Other rules the Office of Academic Affairs enforces alongside Table 2
 # ---------------------------------------------------------------------------
 
 DEFAULT_OTHER_RULES = {
     # 1 credit carries 25 marks of assessment weight.
     "marks_per_credit": 25,
-    # Credit arithmetic from contact hours: 1 credit per lecture or tutorial hour,
-    # 1 credit per 2 practical or experiential hours.
-    "credit_from_hours": {"lecture": 1.0, "tutorial": 1.0, "practical": 0.5, "experiential": 0.5},
+    # Credit arithmetic from contact hours, as the course matrix template prints
+    # it ("multiples of L, T, P, E are 1, 1, 2, 3"): 1 credit per lecture or
+    # tutorial hour, per 2 practical hours, per 3 experiential hours.
+    "credit_from_hours": {"lecture": 1.0, "tutorial": 1.0, "practical": 1 / 2,
+                          "experiential": 1 / 3},
     "credit_arithmetic_tolerance": 0.5,
     # A course may not exceed this many credits.
     "max_credits_per_course": 8,
@@ -173,3 +177,49 @@ def blank_credit_matrix(table, track, degree_level=None):
             "credits": None,
         })
     return rows
+
+
+def honours_track(degree_level):
+    """Which of a 4-year programme's semester 7-8 tracks it follows."""
+    d = str(degree_level or "")
+    if "Research" in d:
+        return "research"
+    if "Honours" in d:
+        return "honours"
+    return None
+
+
+def row_counts_for(row, track):
+    """Does a programme-structure row count towards a programme on `track`?
+    Rows for all semesters always do; a row marked for one 4-year track only
+    counts for that track."""
+    t = str(row.get("track") or "All semesters")
+    if t == "Honours":
+        return track == "honours"
+    if t == "Honours with Research":
+        return track == "research"
+    return True
+
+
+def split_honours(rows):
+    """A UG structure as the form lists it: semesters 1-6 for every degree,
+    and semesters 7-8 once for Honours and once for Honours with Research.
+    A semester 7-8 course marked for all semesters is listed under both (a
+    research project only under Honours with Research), so every total
+    stays as it was."""
+    out = []
+    for r in rows or []:
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        try:
+            sem = int(r.get("semester") or 0)
+        except (TypeError, ValueError):
+            sem = 0
+        if sem > 6 and str(r.get("track") or "All semesters") == "All semesters":
+            if r.get("nep_category") != "Research Project / Dissertation":
+                out.append({**r, "track": "Honours"})
+            out.append({**r, "track": "Honours with Research"})
+        else:
+            out.append(r)
+    return out

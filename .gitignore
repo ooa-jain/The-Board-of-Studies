@@ -9,3 +9,6 @@ tests/_uploads/
 .DS_Store
 .idea/
 .vscode/
+
+# made on the server to bring the voice back (tools/help_media.py --voice-clips)
+app/static/help/voice-clips.zip

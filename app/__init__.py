@@ -1,4 +1,4 @@
-"""Application factory for the JAIN OoA BoS Data Repository Portal."""
+"""Application factory for the JAIN Office of Academic Affairs Data Portal."""
 
 from __future__ import annotations
 
@@ -15,6 +15,10 @@ from . import db as database
 def create_app(config_object=Config):
     app = Flask(__name__, static_folder="static", template_folder="templates")
     app.config.from_object(config_object)
+    # nginx passes the scheme and host on; links written into downloads
+    # (Excel, Word) must be the site's https address, not 127.0.0.1
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
     logging.basicConfig(
         level=logging.DEBUG if app.config["DEBUG"] else logging.INFO,
@@ -27,6 +31,7 @@ def create_app(config_object=Config):
 
     from .auth import bp as auth_bp
     from .admin import bp as admin_bp
+    from . import team  # noqa: F401  (Settings › Team & access, on the admin blueprint)
     from .dept import bp as dept_bp
     from .public import bp as public_bp
 
@@ -34,6 +39,8 @@ def create_app(config_object=Config):
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(dept_bp, url_prefix="/department")
+    from .share import bp as share_bp
+    app.register_blueprint(share_bp, url_prefix="/share")
 
     # Static files are cached for 30 days (deploy/nginx.conf). Stamp every
     # static URL with the file's mtime so a deploy changes the URL and
@@ -54,38 +61,113 @@ def create_app(config_object=Config):
     def _load_user():
         g.user = session.get("user")
 
+    @app.template_filter("ist")
+    def _ist(value):
+        """A stored time as Indian time: {{ x.at|ist }}.strftime(...) — see db.to_ist."""
+        return database.to_ist(value)
+
+    @app.template_filter("ay")
+    def _academic_year(value):
+        """An academic year as it is printed: 2027–28, with an en dash."""
+        return str(value or "").replace("-", "\u2013")
+
     @app.context_processor
     def _inject():
-        from .schema import GROUP_ORDER, STAGES
+        from .schema import GROUP_ORDER, STAGE_BY_KEY, STAGES
+        from .auth import page_user
+        # in the department's pages while the Office edits it: that department
+        user = page_user() or {}
+        unread, batch_info = 0, None
+        if user.get("role") == "admin":
+            try:
+                from .access import scope_q
+                unread = database.get_db().notifications.count_documents({"read": False, **scope_q()})
+                from .workflow import batches
+                batch_info = batches()
+            except Exception:
+                unread = 0
+        dept_nav = dept_drive = None
+        if user.get("role") == "department" and user.get("dept_code"):
+            # the department's menu: its stages, each with where it stands
+            try:
+                from .workflow import get_or_create_submission, stage_board
+                sub = get_or_create_submission(user["dept_code"], user.get("year")
+                                               or database.settings().get("academic_year")
+                                               or app.config["ACADEMIC_YEAR"])
+                dept_nav = [{"key": s["key"], "title": s["title"], "status": s["status"]}
+                            for s in stage_board(sub)]
+                # the Drive import, offered in the Developer Preview item
+                if database.settings().get("dev_mode"):
+                    from .autofill import pack_for
+                    d = database.get_db().departments.find_one({"dept_code": user["dept_code"]})
+                    pack = d and pack_for(database.get_db(), d)
+                    if pack:
+                        dept_drive = {"done": bool(sub.get("autofilled")),
+                                      "folder": (pack.get("source") or {}).get("folder")}
+            except Exception:
+                dept_nav = None
+        acting_dept = None
+        if user.get("acting"):
+            acting_dept = database.get_db().departments.find_one({"dept_code": user["dept_code"]},
+                                                                {"dept_name": 1, "dept_code": 1})
+        from .access import template_helpers
         return {
-            "current_user": session.get("user"),
+            **template_helpers(),
+            "acting_dept": acting_dept,
+            "dept_nav": dept_nav,
+            "dept_drive": dept_drive,
+            "updates_unread": unread,
+            "batch_info": batch_info,
+            "current_user": user or None,
             "app_settings": database.settings(),
             "STAGES": STAGES,
+            "STAGE_BY_KEY": STAGE_BY_KEY,
             "GROUP_ORDER": GROUP_ORDER,
             "CAMPUSES": app.config["CAMPUSES"],
+            "PLACES": app.config["PLACES"],
         }
 
+    # Each of these says what happened in words rather than in a number, and
+    # every one of them offers a way onward.
     @app.errorhandler(403)
     def _403(e):
-        return render_template("error.html", code=403,
-                               message="You do not have access to that page."), 403
+        if (session.get("user") or {}).get("role") == "admin":
+            detail = ("You are signed in, but your access does not include this page or this "
+                      "department. A Full admin can widen it in Settings › Team & access.")
+        else:
+            detail = ("You are signed in, but this page belongs to a different "
+                      "account. A department can only reach its own submission.")
+        return render_template("error.html", code=403, title="That page is not yours to open",
+                               detail=detail), 403
 
     @app.errorhandler(404)
     def _404(e):
-        return render_template("error.html", code=404,
-                               message="That page does not exist."), 404
+        return render_template(
+            "error.html", code=404, title="There is no page here",
+            detail="The address may have been mistyped, or the page may have "
+                   "moved since the link to it was made."), 404
 
     @app.errorhandler(413)
     def _413(e):
         mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
-        return render_template("error.html", code=413,
-                               message=f"That file is too large. The limit is {mb} MB."), 413
+        return render_template(
+            "error.html", code=413, title="That file is too large",
+            detail=f"The limit is {mb} MB per upload. Try a smaller scan, or "
+                   f"split the document and upload it in parts."), 413
 
     @app.errorhandler(500)
     def _500(e):
         app.logger.exception("Unhandled error")
-        return render_template("error.html", code=500,
-                               message="Something went wrong at our end. "
-                                       "The Office of Academics has been notified."), 500
+        # the Office sees what actually broke, so it can be reported and fixed;
+        # a department never does
+        why = ""
+        if (session.get("user") or {}).get("role") == "admin":
+            orig = getattr(e, "original_exception", None) or e
+            why = f"{orig.__class__.__name__}: {orig}"[:600]
+        return render_template(
+            "error.html", code=500, title="Something went wrong at our end",
+            detail="Nothing you had saved is lost — drafts are kept as you "
+                   "type. Try again, and tell the Office of Academic Affairs if it "
+                   "keeps happening.", why=why), 500
 
     return app

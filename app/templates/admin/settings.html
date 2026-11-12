@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Settings <span>›</span> Portal settings</div>
+      <h1>Portal settings</h1>
+      <p>The academic year, the syllabus batches, the banner, and whether departments can submit.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
 {% block content %}
-<div class="card" style="max-width:620px;margin:24px auto">
-  <div class="card-head"><h3>Portal settings</h3></div>
+{% include "admin/_tabs.html" %}
+<div class="card" style="max-width:720px">
+  <div class="card-head"><h3>Academic cycle</h3></div>
   <div class="card-body">
     <form method="post">
       <div class="field">
@@ -11,6 +24,58 @@
         <span class="help">New submissions are filed against this year. Changing it starts a fresh
           cycle — existing records stay under their own year.</span>
       </div>
+      <fieldset class="batch-box">
+        <legend>Syllabus batches</legend>
+        <div class="field">
+          <label for="current_batch">Current batch</label>
+          <input type="text" id="current_batch" name="current_batch" required
+                 value="{{ batches.current|replace('–', '-') }}" placeholder="2026-2027">
+          <span class="help">Departments fill the syllabus for the <strong>current batch</strong> (“Batch of …”) for this
+            batch; it is shown as a tag beside the syllabus everywhere.</span>
+        </div>
+        <div class="field">
+          <label for="existing_batches">Existing batches</label>
+          <textarea id="existing_batches" name="existing_batches" rows="3"
+                    placeholder="2024-2025&#10;2025-2026">{% for b in batches.existing %}{{ b.label|replace('–', '-') }}
+{% endfor %}</textarea>
+          <span class="help">One per line. Each gets its own syllabus, in the same template, under
+            <strong>Existing batches</strong> for every programme. They are a record and do not hold
+            up the Curriculum stage. Removing a year hides it; what was filled in is kept.</span>
+        </div>
+        {% if batches.existing %}
+        <div class="field">
+          <label>Semesters each earlier batch covers</label>
+          <div class="batch-sems">
+            {% for b in batches.existing %}
+            <div class="batch-sems-row">
+              <span class="batch-tag">Batch of {{ b.label }}</span>
+              <input type="hidden" name="sems_{{ b.start }}_shown" value="1">
+              {% for n in range(1, 9) %}
+              <label class="batch-sem"><input type="checkbox" name="sems_{{ b.start }}" value="{{ n }}"
+                     {% if n in b.semesters %}checked{% endif %}><span>{{ n }}</span></label>
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+          <span class="help">Tick the semesters whose courses and syllabus a batch fills in — 5 and 6 for one, 3 and 4
+            for another. Departments see them on that batch's page. None ticked: every semester.</span>
+        </div>
+        {% endif %}
+        <p class="batch-now small">
+          Now: <span class="batch-tag is-current">Current: Batch of {{ batches.current }}</span>
+          {% for b in batches.existing %}<span class="batch-tag">Batch of {{ b.label }}</span>{% endfor %}
+        </p>
+      </fieldset>
+      {% set cur_start = (batches.current[:4]|int) if batches.current else 0 %}
+      {% if cur_start and can('settings', 'edit') %}
+      <div class="batch-next">
+        <div><strong>Start the next batch</strong>
+          <p class="small muted">Batch of {{ batches.current }} becomes an earlier batch — each programme's syllabus moves
+            there as it is — and <strong>Batch of {{ cur_start + 1 }}–{{ cur_start + 2 }}</strong> becomes the current batch,
+            starting empty. Do it whenever the new batch begins.</p></div>
+        <button class="btn btn-sm" type="submit" form="next-batch-form">Make {{ cur_start + 1 }}–{{ cur_start + 2 }} the current batch</button>
+      </div>
+      {% endif %}
       <div class="field">
         <label>Banner message</label>
         <textarea name="banner" rows="2"
@@ -20,9 +85,44 @@
         <input type="checkbox" name="submissions_open" {{ 'checked' if settings.submissions_open }}>
         <span>Submissions are open</span>
       </label>
+
+      {# Developer mode. It lifts the sequential lock for every department at
+         once, so it is set apart from the ordinary settings and says plainly
+         what it does and what it does not do. #}
+      <div class="dev-box {{ 'is-on' if settings.dev_mode }}">
+        <label class="check">
+          <input type="checkbox" name="dev_mode" {{ 'checked' if settings.dev_mode }}>
+          <span><strong>Developer mode</strong> — unlock every stage</span>
+        </label>
+        <p class="help">
+          Normally a department opens one stage at a time: each unlocks when the
+          one before it has been submitted. With this on, all
+          {{ stage_count }} stages are open to every department straight away,
+          in any order.
+        </p>
+        <p class="help">
+          It changes what can be opened and nothing else. Validation still runs,
+          submissions are still recorded, and everything filed while it is on
+          stays filed when it goes off — switching it back simply returns the
+          untouched stages to waiting their turn.
+        </p>
+        {% if settings.dev_mode %}
+        <p class="dev-live" role="status">
+          It is on now. Every department sees every stage unlocked, and a
+          notice saying so appears at the top of every page.
+        </p>
+        {% endif %}
+      </div>
+
       <button class="btn" type="submit">Save settings</button>
       <a class="btn btn-ghost" href="{{ url_for('auth.change_password') }}">Change my password</a>
     </form>
   </div>
 </div>
+{% if batches.current and can('settings', 'edit') %}
+<form id="next-batch-form" method="post" action="{{ url_for('admin.next_batch') }}"
+      onsubmit="return confirm('Start Batch of {{ (batches.current[:4]|int) + 1 }}–{{ (batches.current[:4]|int) + 2 }}? Batch of {{ batches.current }} becomes an earlier batch, with every programme\'s syllabus moved to it as it is.')">
+  <input type="hidden" name="from" value="{{ batches.current }}">
+</form>
+{% endif %}
 {% endblock %}

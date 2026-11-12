@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ programme.programme_code }} — report{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">
+        {% if back_url %}<a href="{{ back_url }}">{{ dept.dept_name }}</a>
+        {% elif shared %}{{ dept.dept_name }}
+        {% else %}<a href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code) }}">{{ dept.dept_name }}</a>{% endif %}
+        <span>›</span> {{ programme.programme_code }}
+      </div>
+      <h1>{{ programme.programme_name }}</h1>
+      <p>{{ programme.programme_code }}{% if programme.degree_level %} · {{ programme.degree_level }}{% endif %}
+         {% if programme.specialisation %} · {{ programme.specialisation }}{% endif %} · {{ year|ay }}</p>
+    </div>
+    <div class="spacer head-aside no-print">
+      {% if curriculum_doc %}<a class="btn btn-ghost btn-sm" href="{{ curriculum_doc }}" target="_blank" rel="noopener">Curriculum →</a>{% endif %}
+      {% if syllabus_doc %}<a class="btn btn-ghost btn-sm" href="{{ syllabus_doc }}" target="_blank" rel="noopener">Syllabus →</a>{% endif %}
+      {% if revision_doc %}<a class="btn btn-ghost btn-sm" href="{{ revision_doc }}" target="_blank" rel="noopener">Course Revision →</a>{% endif %}
+      {% if zip_url %}<a class="btn btn-gold btn-sm" href="{{ zip_url }}" download
+         title="The current batch and every earlier batch — each Curriculum, Syllabus and Course Revision in the Office's templates">Download all (ZIP)</a>{% endif %}
+      <button class="btn btn-ghost btn-sm" type="button" data-print>Print</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "admin/_programme_body.html" %}
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ programme_code }} — {{ title }}{% endblock %}
+
+{% block body %}
+<main id="main-content" class="share-page">
+  <header class="share-bar">
+    <img class="share-logo" alt="JAIN" src="{{ url_for('static', filename='img/jain-logo.png') }}" width="110">
+    <div class="share-title">
+      <strong>{{ title }} · {{ programme_code }}</strong>
+      <span>{{ dept.dept_name or '' }} · {{ year|ay }}</span>
+    </div>
+    <button class="btn btn-ghost btn-sm no-print" type="button" data-print>Print</button>
+    <a class="btn btn-sm no-print" href="{{ download_url }}">Download Word</a>
+  </header>
+
+  <div class="share-body">
+    {% include "share/_gen_doc.html" %}
+  </div>
+</main>
+{% endblock %}

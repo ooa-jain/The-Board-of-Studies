@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}{{ dept.dept_name }}{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.overview_departments') }}">Overview</a> <span>›</span>
+        <a href="{{ url_for('admin.overview_departments') }}">Departments</a> <span>›</span> {{ dept.dept_code }}</div>
+      <h1>{{ dept.dept_name }}</h1>
+      <p>{{ dept.dept_code }}{% if dept.campus %} · {{ dept.campus }}{% endif %}{% if dept.school %} · {{ dept.school }}{% endif %}</p>
+      <p class="dp-when">
+        {% if submitted_at %}<span class="od-when is-sent">Submitted on {{ (submitted_at|ist).strftime('%d %b %Y, %H:%M') }} IST</span>
+        {% elif updated_at %}<span class="od-when">Not submitted yet · last edited {{ (updated_at|ist).strftime('%d %b %Y, %H:%M') }} IST{% if last and last.name %} by {{ last.name }}{% endif %}</span>
+        {% else %}<span class="muted">Not started yet</span>{% endif %}
+      </p>
+    </div>
+    <div class="spacer head-aside">
+      <form class="dp-year" method="get" action="{{ url_for('admin.department_page', dept_code=dept.dept_code) }}">
+        <label>Academic year
+          <select name="year" onchange="this.form.submit()">
+            {% for y in years %}<option value="{{ y }}"{{ ' selected' if y == year }}>{{ y|ay }}{{ ' (current)' if y == current_year }}</option>{% endfor %}
+          </select></label>
+        <noscript><button class="btn btn-ghost btn-sm">Show</button></noscript>
+      </form>
+      <div class="flex head-aside-row">
+        <div class="bar" style="width:160px"><i style="width:{{ (done * 100 / (board|length or 1))|round|int }}%"></i></div>
+        <span class="bar-label">{{ done }} of {{ board|length }} stages</span>
+      </div>
+      <div class="flex mt-1 head-aside-row">
+        <details class="od-dl">
+          <summary class="btn btn-sm">Download report ▾</summary>
+          <div class="od-dl-menu" role="menu">
+            <span class="od-dl-h">Download as</span>
+            <a role="menuitem" href="{{ url_for('admin.export_department', dept_code=dept.dept_code, year=year) }}">Excel</a>
+            <a role="menuitem" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code, year=year) }}">Word</a>
+            <a role="menuitem" href="{{ url_for('admin.export_department_both', dept_code=dept.dept_code, year=year) }}">Everything (ZIP) — Excel, Word and every programme's batches</a>
+          </div>
+        </details>
+        <button class="btn btn-ghost btn-sm" type="button" id="dp-ver-open" aria-controls="dp-vers-panel" aria-expanded="false">
+          Versions{% if versions %} <span class="dp-ver-n">{{ versions|length }}</span>{% endif %}</button>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.submission_detail', dept_code=dept.dept_code, year=year) }}">Full detail</a>
+        {% if can('departments', 'edit') %}<button class="btn btn-sm" form="dp-act" name="next" value="/department/"
+          title="Open {{ dept.dept_name }}'s own pages for {{ year|ay }} and edit any stage">Edit as the Office</button>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set may_edit = can('departments', 'edit') %}
+{% if may_edit %}
+<form id="dp-act" method="post" action="{{ url_for('admin.department_act', dept_code=dept.dept_code) }}" hidden>
+  <input type="hidden" name="year" value="{{ year }}">
+</form>
+{% endif %}
+{% set words = {'submitted': 'Submitted', 'draft': 'In progress', 'returned': 'Sent back', 'open': 'Not started',
+                'locked': 'Not started', 'optional': 'Optional'} %}
+<div class="dp-grid">
+  <div class="dp-main">
+    <section class="panel" id="details">
+      <div class="panel-head"><h3>Department details</h3>
+        {% if may_edit %}<a class="btn btn-ghost btn-sm" href="{{ url_for('admin.department_form', dept_code=dept.dept_code) }}">Edit details</a>{% endif %}</div>
+      <dl class="dp-facts">
+        <div><dt>Code</dt><dd class="mono">{{ dept.dept_code }}</dd></div>
+        <div><dt>Department</dt><dd>{{ dept.dept_name or '—' }}</dd></div>
+        <div><dt>Faculty</dt><dd>{{ dept.faculty or '—' }}</dd></div>
+        <div><dt>School</dt><dd>{{ dept.school or '—' }}</dd></div>
+        <div><dt>Campus</dt><dd>{{ dept.campus or '—' }}{% if dept.place %} · {{ dept.place }}{% endif %}</dd></div>
+        <div><dt>Login</dt><dd class="mono">{{ dept.username or 'Not generated' }}</dd></div>
+        <div><dt>Status</dt><dd>{% if dept.active is sameas false %}<span class="od-st dp-returned">Disabled</span>{% else %}<span class="od-st dp-submitted">Active</span>{% endif %}</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel" id="programmes">
+      <div class="panel-head"><h3>Programmes · {{ year|ay }}</h3>
+        {% if may_edit %}<button class="btn btn-sm" type="button" data-toggle="dp-padd">+ Add programme</button>{% endif %}</div>
+      {% if not plist_confirmed %}
+      <p class="small muted dp-hint">The department has not saved its list for this year yet: these come from the Office's programme
+        workbook, each counted as run. A change here saves the list.</p>
+      {% endif %}
+      {% set dnames = dict(degrees) %}
+      {% macro pform(row, was) %}
+      <form class="dp-pform" method="post" action="{{ url_for('admin.department_programme_save', dept_code=dept.dept_code) }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="was" value="{{ was }}">
+        <label>Code<input name="programme_code" value="{{ row.programme_code or '' }}" required maxlength="30"
+               pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" autocomplete="off"></label>
+        <label class="dp-pform-wide">Programme<input name="programme_name" value="{{ row.programme_name or '' }}" required></label>
+        <label>Degree<select name="degree">{% for k, t in degrees %}<option value="{{ k }}"{{ ' selected' if (row.degree or 'UG') == k }}>{{ t }}</option>{% endfor %}</select></label>
+        <label>Category<input name="category" value="{{ row.category or '' }}"></label>
+        <label>Year introduced<input name="year_introduced" value="{{ row.year_introduced or '' }}" inputmode="numeric" maxlength="4" pattern="\d{4}"></label>
+        <span class="dp-pform-go"><button class="btn btn-sm">{{ 'Save' if was else 'Add' }}</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-cancel>Cancel</button></span>
+      </form>
+      {% endmacro %}
+      {% if may_edit %}<div class="dp-padd" id="dp-padd" hidden>{{ pform({}, '') }}</div>{% endif %}
+      <div class="table-wrap">
+        <table class="data dp-plist">
+          <thead><tr><th>Code</th><th>Programme</th><th>Degree</th><th>Category</th><th>Introduced</th><th>{{ year|ay }}</th>
+            {% if may_edit %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
+          <tbody>
+          {% for r in plist %}
+          {% set runs = r.decision != 'remove' %}
+          <tr class="{{ '' if runs else 'is-off' }}">
+            <td class="mono">{{ r.programme_code }}</td>
+            <td>{{ r.programme_name }}</td>
+            <td>{{ dnames.get(r.degree, r.degree or '—') }}</td>
+            <td class="small">{{ r.category or '—' }}</td>
+            <td>{{ r.year_introduced or '—' }}</td>
+            <td>{% if runs %}<span class="od-st dp-submitted">Runs</span>{% else %}<span class="od-st dp-open">Not this year</span>{% endif %}</td>
+            {% if may_edit %}
+            <td class="right nowrap">
+              <button class="btn btn-ghost btn-sm" type="button" data-toggle="pedit-{{ loop.index }}">Edit</button>
+              <form method="post" class="inline" action="{{ url_for('admin.department_programme_run', dept_code=dept.dept_code, programme_code=r.programme_code) }}"
+                    {% if runs %}onsubmit="return confirm('Take {{ r.programme_code|e }} off the list for {{ year|ay }}? Its record is kept, and it can be put back.')"{% endif %}>
+                <input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="run" value="{{ '0' if runs else '1' }}">
+                <button class="btn btn-ghost btn-sm">{{ 'Remove' if runs else 'Put back' }}</button>
+              </form>
+              {% if runs %}<button class="btn btn-ghost btn-sm" form="dp-act" name="next"
+                 value="/department/stage/prog_curriculum/{{ r.programme_code }}" title="Edit its Curriculum, Syllabus and Course Revision">Open</button>{% endif %}
+            </td>
+            {% endif %}
+          </tr>
+          {% if may_edit %}<tr class="dp-pedit" id="pedit-{{ loop.index }}" hidden><td colspan="7">{{ pform(r, r.programme_code) }}</td></tr>{% endif %}
+          {% else %}
+          <tr><td colspan="7" class="empty">No programmes for this department yet.{% if may_edit %} Add one above.{% endif %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>Stages</h3>
+        <span class="erp-legend"><span class="lg"><i class="dot st-submitted"></i>Completed</span> <span class="lg"><i class="dot st-draft"></i>In progress</span>
+          <span class="lg"><i class="dot st-open"></i>Not started</span> <span class="lg"><i class="dot st-returned"></i>Sent back</span>
+          <span class="lg"><i class="dot st-open is-upd"></i>Updated since you last looked</span></span></div>
+      <div class="table-wrap">
+        <table class="erp-table erp-dots dp-monitor">
+          <thead><tr>{% for b in board %}<th class="c">{{ b.title }}</th>{% endfor %}<th class="c">Done</th><th class="c">Comments</th></tr></thead>
+          <tbody><tr>
+            {% for b in board %}
+            {% set fresh = updates and b.key in updates.stages %}
+            {% set has = (submission.stages or {}).get(b.key, {}).get('data') %}
+            <td class="c">
+              {% if has %}<button type="button" class="dp-dot-btn" data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=b.key, year=year) }}"
+                 title="Review {{ b.title }} — {{ words.get(b.status, b.status) }}{% if fresh %} · updated since you last looked{% endif %}">
+                <i class="dot st-{{ b.status }}{{ ' is-upd' if fresh }}"></i></button>
+              {% else %}<i class="dot st-{{ b.status }}{{ ' is-upd' if fresh }}" title="{{ b.title }} — {{ words.get(b.status, b.status) }}"></i>{% endif %}
+              <span class="dp-dot-when">{% if b.timing.submitted %}Submitted {{ b.timing.submitted }}{% elif b.key == 'curriculum' %}see programmes{% elif b.timing.updated %}Saved {{ b.timing.updated }}{% else %}—{% endif %}</span>
+              {% if may_edit %}<button class="dp-edit-link" form="dp-act" name="next" value="/department/stage/{{ b.key }}">Edit</button>{% endif %}
+            </td>
+            {% endfor %}
+            <td class="c"><strong>{{ done }}/{{ board|length }}</strong></td>
+            <td class="c">{% if open_comments %}<span class="st st-returned">{{ open_comments }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          </tr></tbody>
+        </table>
+      </div>
+      <p class="small muted dp-hint">Click a dot to review what was entered.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>Programme progress</h3>
+        <span class="erp-legend"><span class="lg"><i class="dot st-submitted"></i>Submitted</span> <span class="lg"><i class="dot st-draft"></i>In progress</span>
+          <span class="lg"><i class="dot st-open"></i>Not started</span></span></div>
+      <div class="dp-levels">
+        {% for lv in ['UG', 'PG'] if levels[lv] %}
+        <div class="dp-level">
+          <h4 class="dp-level-h">{{ lv }} programmes <span class="muted small">{{ levels[lv]|length }}</span></h4>
+          {% for p in levels[lv] %}
+          <details class="dp-prog"{% if loop.first %} open{% endif %}>
+            <summary>
+              <span class="dp-prog-name"><strong>{{ p.name }}</strong><span class="small muted mono">{{ p.code }}{% if p.degree %} · {{ p.degree }}{% endif %}</span></span>
+              <span class="dp-prog-count{{ ' is-all' if p.done == p.total }}">{{ p.done }}/{{ p.total }} submitted</span>
+            </summary>
+            <ul class="dp-branch">
+              {% for i in p.parts %}
+              <li class="dp-leaf st-{{ i.status }}">
+                <i class="dot st-{{ i.status }}"></i>
+                <span class="dp-leaf-l">{{ i.label }}</span>
+                <span class="small muted">{% if i.when.submitted %}Submitted {{ i.when.submitted }}{% elif i.when.updated %}Last saved {{ i.when.updated }}{% elif i.status == 'optional' %}Only if the batch is begun{% else %}Not filled yet{% endif %}</span>
+                <span class="od-st dp-{{ i.status }}">{{ words.get(i.status, i.status) }}</span>
+                {% if i.has %}<button class="btn btn-ghost btn-sm" type="button"
+                   data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=i.key, programme=p.code, year=year) }}">Review</button>
+                {% else %}<span class="dp-noreview"></span>{% endif %}
+                {% if may_edit %}<button class="btn btn-ghost btn-sm" form="dp-act" name="next" value="/department/stage/{{ i.key }}/{{ p.code }}">Edit</button>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            <div class="dp-prog-foot"><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.programme_report', dept_code=dept.dept_code, programme_code=p.code, year=year) }}">Programme report →</a>
+              <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.programme_report_zip', dept_code=dept.dept_code, programme_code=p.code, year=year) }}" download
+                 title="The current batch and every earlier batch — Curriculum, Syllabus and Course Revision">All batches (ZIP)</a></div>
+          </details>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty">No programmes listed yet — they come from the department's Department Information.</p>
+        {% endfor %}
+      </div>
+    </section>
+    {% if can('departments', 'delete') %}
+    <section class="panel dp-danger">
+      <div class="panel-head"><h3>Delete</h3></div>
+      <div class="dp-danger-body">
+        <form method="post" action="{{ url_for('admin.wipe_department', dept_code=dept.dept_code) }}"
+              onsubmit="return confirm('Delete everything {{ dept.dept_name|e }} has entered and uploaded? This cannot be undone.')">
+          <input type="hidden" name="back" value="page">
+          <div><strong>Delete this department's data</strong>
+            <p class="small muted">Every stage, programme and uploaded file, in every year. The department and its login stay.</p></div>
+          <input name="confirm" placeholder="Type {{ dept.dept_code }}" required autocomplete="off" aria-label="Type the department code to confirm">
+          <button class="btn btn-danger btn-sm">Delete data</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.department_delete', dept_code=dept.dept_code) }}"
+              onsubmit="return confirm('Delete {{ dept.dept_name|e }} itself — its login and all its data? This cannot be undone.')">
+          <input type="hidden" name="back" value="page">
+          <div><strong>Delete this department</strong>
+            <p class="small muted">Removes the department from the portal, with its login and all its data.</p></div>
+          <input name="confirm" placeholder="Type {{ dept.dept_code }}" required autocomplete="off" aria-label="Type the department code to confirm">
+          <button class="btn btn-danger btn-sm">Delete department</button>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="dp-side panel" id="dp-vers-panel" aria-label="Versions" hidden>
+    <div class="panel-head"><h3>Versions <span class="muted small">last 5 days</span></h3>
+      <button class="dp-ver-x" type="button" id="dp-ver-close" aria-label="Close versions">×</button></div>
+    <ol class="dp-vers">
+      {% for v in versions %}
+      <li>
+        <div class="dp-ver-head"><strong>{{ v.title }}{% if v.programme_code %} · {{ v.programme_code }}{% endif %}</strong>
+          {% if v.kind == 'submit' %}<span class="od-st dp-submitted">Submitted</span>{% endif %}</div>
+        <div class="small muted">{{ (v.at|ist).strftime('%d %b, %H:%M') }}{% if v.name %} · {{ v.name }}{% endif %}</div>
+        {% if v.changes %}<ul class="dp-changes">{% for c in v.changes[:3] %}<li><span class="muted">{{ c.field }}:</span> {{ c.before }} → <strong>{{ c.after }}</strong></li>{% endfor %}
+          {% if v.changes|length > 3 %}<li class="muted">and {{ v.changes|length - 3 }} more</li>{% endif %}</ul>{% endif %}
+      </li>
+      {% else %}
+      <li class="muted small">No saved changes in the last 5 days.</li>
+      {% endfor %}
+    </ol>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-review.js') }}"></script>
+<script>
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("details.od-dl[open]").forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+    var t = e.target.closest("[data-toggle]");
+    if (t) {
+      var box = document.getElementById(t.getAttribute("data-toggle"));
+      if (box) { box.hidden = !box.hidden; if (!box.hidden) { var i = box.querySelector("input:not([type=hidden])"); if (i) i.focus(); } }
+    }
+    var c = e.target.closest("[data-cancel]");
+    if (c) { var holder = c.closest("[hidden], .dp-padd, .dp-pedit"); if (holder) holder.hidden = true; }
+  });
+  // Versions: shown only when asked for, sliding in from the right
+  (function () {
+    var panel = document.getElementById("dp-vers-panel"), open = document.getElementById("dp-ver-open"),
+        close = document.getElementById("dp-ver-close");
+    if (!panel || !open) return;
+    function show(on) {
+      if (on) { panel.hidden = false; requestAnimationFrame(function () { panel.classList.add("is-open"); }); }
+      else { panel.classList.remove("is-open"); setTimeout(function () { panel.hidden = true; }, 250); }
+      open.setAttribute("aria-expanded", on ? "true" : "false");
+      if (on) close.focus(); else open.focus();
+    }
+    open.addEventListener("click", function () { show(panel.hidden); });
+    close.addEventListener("click", function () { show(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) show(false); });
+  })();
+</script>
+{% endblock %}

@@ -18,15 +18,18 @@ from openpyxl import load_workbook
 # Candidate header keywords, in priority order, for each target field.
 HEADER_HINTS = {
     "dept_name": ["department name", "department", "dept name", "dept"],
-    "school": ["school", "faculty", "college", "institute"],
+    "faculty": ["faculty"],
+    "school": ["school", "college", "institute"],
     "dept_code": ["department code", "dept code", "code", "abbreviation", "abbr"],
-    "campus": ["campus", "location", "city", "centre", "center"],
+    "campus": ["campus", "centre", "center"],
+    "place": ["place", "city", "location", "town"],
 }
 
-CAMPUS_ALIASES = {
-    "bangalore": "Bengaluru", "bengaluru": "Bengaluru", "blr": "Bengaluru",
-    "jain global campus": "Bengaluru", "jgi": "Bengaluru", "kanakapura": "Bengaluru",
-    "jayanagar": "Bengaluru", "vv puram": "Bengaluru", "school street": "Bengaluru",
+# The city a campus stands in. The campus name itself is kept as the sheet
+# writes it — "Jayanagar Campus" is not the same record as "Jain Global
+# Campus", even though both are in Bangalore.
+PLACE_ALIASES = {
+    "bangalore": "Bangalore", "bengaluru": "Bangalore", "blr": "Bangalore",
     "kochi": "Kochi", "cochin": "Kochi", "ernakulam": "Kochi", "kerala": "Kochi",
 }
 
@@ -80,14 +83,23 @@ def build_mapping(headers):
     return mapping
 
 
-def normalise_campus(value, default="Bengaluru"):
+def normalise_campus(value, default="Jain Global Campus"):
+    """Keep the campus the sheet names; only tidy its spacing and its case."""
+    v = str(value or "").strip()
+    if not v:
+        return default
+    v = re.sub(r"\s+", " ", v)
+    return re.sub(r"\bcampus\b", "Campus", v, flags=re.I)
+
+
+def normalise_place(value, default="Bangalore"):
     v = _norm(value)
     if not v:
         return default
-    for alias, canonical in CAMPUS_ALIASES.items():
+    for alias, canonical in PLACE_ALIASES.items():
         if alias in v:
             return canonical
-    return value.strip().title() if isinstance(value, str) else default
+    return str(value).strip().title()
 
 
 def derive_code(dept_name: str, school: str = "", taken: set | None = None) -> str:
@@ -107,7 +119,8 @@ def derive_code(dept_name: str, school: str = "", taken: set | None = None) -> s
 
 def parse_workbook(file_bytes: bytes, sheet_name: str | None = None,
                    mapping_override: dict | None = None,
-                   default_campus: str = "Bengaluru"):
+                   default_campus: str = "Jain Global Campus",
+                   default_place: str = "Bangalore"):
     """
     Returns (rows, meta).  `rows` are candidate department dicts;
     `meta` carries the detected headers and mapping so the admin can correct it.
@@ -147,9 +160,11 @@ def parse_workbook(file_bytes: bytes, sheet_name: str | None = None,
 
         rows.append({
             "dept_name": name,
+            "faculty": cell("faculty"),
             "school": cell("school") or "—",
             "dept_code": code,
             "campus": normalise_campus(cell("campus"), default_campus),
+            "place": normalise_place(cell("place"), default_place),
         })
 
     meta = {

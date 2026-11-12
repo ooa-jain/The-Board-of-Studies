@@ -1,28 +1,52 @@
-"""Office of Academics administration console."""
+"""Office of Academic Affairs administration console."""
 
 from __future__ import annotations
 
 import io
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 
 from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
                    render_template, request, send_file, session, url_for)
 
 from . import ugc_rules as U
+from .access import (allows, current_place, current_scope, current_user, guard_admin_request, may_see,
+                     scope_q, view_scope)
 from .auth import admin_required
-from .db import audit, get_db, issue_department_login, now, rules_doc
+from .db import audit, forget_cached, get_db, issue_department_login, now, rules_doc, to_ist
 from .exporter import (department_excel, institution_excel, submission_word)
 from .importer import parse_workbook
+from .packs import available_packs, load_pack
+from .report import AdminLinks, ShareLinks
 from .schema import STAGE_BY_KEY, STAGES
-from .workflow import (compute_status, get_or_create_submission, progress,
-                       return_stage, stage_board, unlock_stage)
+from .workflow import (compute_status, department_analysis, get_or_create_submission,
+                       institution_analysis, programmes_of, progress,
+                       stage_analysis, return_stage, stage_board, unlock_stage, batches)
 
 bp = Blueprint("admin", __name__)
+# every admin page checks the signed-in person's sections and departments
+bp.before_request(guard_admin_request)
+
+
+_YEAR = re.compile(r"\d{4}-\d{2}")
 
 
 def _year():
+    """The academic year being looked at: the one asked for (?year=2026-27 on a
+    department's page and the links from it), else the portal's current one."""
     from .db import settings
+    asked = (request.args.get("year") or "").strip()
+    if _YEAR.fullmatch(asked):
+        return asked
     return settings().get("academic_year") or current_app.config["ACADEMIC_YEAR"]
+
+
+def _years_of(dept_code):
+    """Every academic year the department has a record for, and the current one, newest first."""
+    from .db import settings
+    now_y = settings().get("academic_year") or current_app.config["ACADEMIC_YEAR"]
+    have = set(get_db().submissions.distinct("academic_year", {"dept_code": dept_code}))
+    return sorted({y for y in have | {now_y} if y and _YEAR.fullmatch(str(y))}, reverse=True), now_y
 
 
 def _actor():
@@ -33,47 +57,424 @@ def _actor():
 # dashboard
 # ---------------------------------------------------------------------------
 
+def _unread_updates(dept_codes=None):
+    """What each department changed since the Office last looked (its unread
+    updates): how many, which stages and programme parts, since when, and
+    the latest few — for the red "Updated" tags."""
+    q = {"read": False, **scope_q()}
+    if dept_codes is not None:
+        mine = current_scope()
+        q["dept_code"] = {"$in": [c for c in dept_codes if mine is None or c in mine]}
+    out = {}
+    for n in get_db().notifications.find(q).sort("at", -1):
+        d = out.setdefault(n["dept_code"], {"count": 0, "stages": set(), "parts": set(), "since": None,
+                                            "latest": n.get("at"), "notes": []})
+        d["count"] += 1
+        stage = n.get("stage") or ""
+        parent = (STAGE_BY_KEY.get(stage) or {}).get("parent")
+        if n.get("programme_code") and stage:
+            d["parts"].add((n["programme_code"], stage))
+        if stage:
+            d["stages"].add(parent or stage)
+        first = n.get("first_at") or n.get("at")
+        if first and (d["since"] is None or first < d["since"]):
+            d["since"] = first
+        if len(d["notes"]) < 6:
+            d["notes"].append(n)
+    from datetime import timedelta
+    for d in out.values():
+        # a file is stored a moment before its update is written
+        d["files_since"] = d["since"] - timedelta(minutes=5) if d["since"] else None
+    return out
+
+
+def _activity(db, days_back=14):
+    """Updates from departments, a day at a time, for the last fortnight."""
+    from datetime import timedelta
+    today = to_ist(now()).replace(hour=0, minute=0, second=0, microsecond=0)     # days are Indian days
+    days = [today - timedelta(days=i) for i in range(days_back - 1, -1, -1)]
+    per_day = {d.date(): {"all": 0, "submitted": 0} for d in days}
+    for n in db.notifications.find({"at": {"$gte": days[0].astimezone(timezone.utc).replace(tzinfo=None)}, **scope_q()},
+                                   {"at": 1, "event": 1}):
+        k = to_ist(n["at"]).date()
+        if k in per_day:
+            per_day[k]["all"] += 1
+            if n.get("event") == "submitted":
+                per_day[k]["submitted"] += 1
+    series = [{"label": d.strftime("%a %d %b"), "day": d.strftime("%a")[:2], "date": d.strftime("%d"),
+               **per_day[d.date()]} for d in days]
+    peak = max([x["all"] for x in series] + [0])
+    return {"series": series, "peak": peak, "total": sum(x["all"] for x in series),
+            "submitted": sum(x["submitted"] for x in series)}
+
+
+def _picture(db, year):
+    """The whole institution in one reading — for the home and for the
+    one-click analysis, so the two can never disagree."""
+    departments = list(db.departments.find({"active": True, **scope_q()})
+                       .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year, **scope_q()})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department", **scope_q()})}
+    from .workflow import programme_progress
+    rows = []
+    for d in departments:
+        sub = subs.get(d["dept_code"])
+        r = department_analysis(d, sub, users.get(d["dept_code"]))
+        r["programmes"] = programme_progress(sub or {}, d)
+        r["prog_done"] = sum(1 for p in r["programmes"] if p["complete"])
+        rows.append(r)
+    totals = institution_analysis(rows)
+    stages = stage_analysis([r["board"] for r in rows])
+    for st in stages:
+        st["in_progress"] = st.get("draft", 0)
+        st["not_started"] = st.get("open", 0) + st.get("locked", 0)
+
+    progs = [p for r in rows for p in r["programmes"]]
+    levels = []
+    for lv in ("UG", "PG"):
+        mine = [p for p in progs if (p["level"] or "").upper().startswith(lv)]
+        if mine:
+            levels.append({"level": lv, "total": len(mine),
+                           "complete": sum(1 for p in mine if p["complete"]),
+                           "started": sum(1 for p in mine if p["started"])})
+    revs = [p["revision"] for p in progs if p["revision"] is not None]
+    programmes = {"total": len(progs), "complete": sum(1 for p in progs if p["complete"]),
+                  "started": sum(1 for p in progs if p["started"]), "levels": levels,
+                  "revision": round(sum(revs) / len(revs), 1) if revs else None,
+                  "revised": len(revs)}
+
+    def group(key):
+        out = {}
+        for r in rows:
+            g = out.setdefault(r["dept"].get(key) or "—", {"name": r["dept"].get(key) or "—", "departments": 0,
+                                                          "complete": 0, "done": 0, "total": 0})
+            g["departments"] += 1
+            g["complete"] += 1 if r["state"] == "complete" else 0
+            g["done"] += r["done"]
+            g["total"] += r["total"]
+        for g in out.values():
+            g["percent"] = round(g["done"] * 100 / g["total"]) if g["total"] else 0
+        return sorted(out.values(), key=lambda g: (-g["percent"], g["name"]))
+
+    attention = {"comments": db.comments.count_documents({"academic_year": year, "status": "open", **scope_q()}),
+                 "returned": sum(r["returned"] for r in rows),
+                 "bad_files": db.files.count_documents({"academic_year": year, **scope_q(), "$or": [
+                     {"keyword_match.status": "miss"}, {"keyword_match.looks_like": {"$exists": True}}]})}
+    attention["total"] = attention["comments"] + attention["returned"] + attention["bad_files"]
+    files = db.files.count_documents({"academic_year": year, **scope_q()})
+    return {"rows": rows, "totals": totals, "stages": stages, "programmes": programmes,
+            "by_campus": group("campus"), "by_school": group("school"), "attention": attention,
+            "files": files, "activity": _activity(db)}
+
+
+_STATE_RANK = {"complete": 5, "in_progress": 4, "returned": 3, "not_started": 2, "never_in": 1, "no_login": 0}
+
+
+def _ahead(r):
+    """How far a department has got: stages completed, then programmes
+    completed, then work begun (half-filled stages, programmes started)."""
+    return (r["percent"], r["prog_done"], r["half"] + r["returned"],
+            sum(1 for p in r["programmes"] if p["started"]), _STATE_RANK.get(r["state"], 0))
+
+
+def _findings(pic):
+    """What the numbers say, in sentences, most pressing first."""
+    t, rows, out = pic["totals"], pic["rows"], []
+    n = t["departments"]
+    if not n:
+        return ["No departments yet — import them to begin."]
+    out.append(f"{t['percent']}% of all stages are completed — {t['stages_done']} of {t['stages_total']} "
+               f"across {n} department{'s' if n != 1 else ''}.")
+    if t["complete"]:
+        out.append(f"{t['complete']} of {n} departments have completed every stage.")
+    idle = [r["dept"]["dept_name"] for r in rows if r["state"] in ("not_started", "never_in", "no_login")]
+    if idle:
+        names = ", ".join(idle[:4]) + (f" and {len(idle) - 4} more" if len(idle) > 4 else "")
+        out.append(f"{len(idle)} department{'s have' if len(idle) != 1 else ' has'} filed nothing yet: {names}.")
+    if t["returned"]:
+        out.append(f"{t['returned']} department{'s have' if t['returned'] != 1 else ' has'} a stage sent back for correction.")
+    stages = pic["stages"]
+    if stages:
+        slow = min(stages, key=lambda s: (s["submitted"], -s["n"]))
+        fast = max(stages, key=lambda s: (s["submitted"], -s["n"]))
+        if fast["submitted"] != slow["submitted"]:
+            out.append(f"Slowest stage: {slow['title']} — {slow['submitted']} of {n} completed. "
+                       f"Furthest along: {fast['title']} — {fast['submitted']} of {n}.")
+        elif not fast["submitted"]:
+            busy = max(s["in_progress"] for s in stages)
+            out.append("No stage has been completed by any department yet"
+                       + (f"; {busy} department{'s are' if busy != 1 else ' is'} filling stages now." if busy else "."))
+    lead = max(rows, key=_ahead)
+    if lead["state"] not in ("not_started", "never_in", "no_login"):
+        progs = len(lead["programmes"])
+        started = sum(1 for p in lead["programmes"] if p["started"])
+        out.append(f"Furthest ahead: {lead['dept']['dept_name']} — {lead['done']} of {lead['total']} stages completed"
+                   + (f", {lead['prog_done']} of {progs} programmes completed ({started} started)." if progs else "."))
+    pr = pic["programmes"]
+    if pr["total"]:
+        lv = " · ".join(f"{x['level']} {x['complete']} of {x['total']}" for x in pr["levels"])
+        out.append(f"Programmes completed: {pr['complete']} of {pr['total']}" + (f" ({lv})." if lv else "."))
+    if pr["revision"] is not None:
+        out.append(f"Average syllabus change reported in Course Revision: {pr['revision']}% "
+                   f"across {pr['revised']} programme{'s' if pr['revised'] != 1 else ''}.")
+    camp = pic["by_campus"]
+    if len(camp) > 1 and camp[0]["percent"] != camp[-1]["percent"]:
+        out.append(f"By campus, {camp[0]['name']} leads at {camp[0]['percent']}%; "
+                   f"{camp[-1]['name']} trails at {camp[-1]['percent']}%.")
+    a = pic["attention"]
+    if a["total"]:
+        out.append(f"Needs attention: {a['bad_files']} file{'s' if a['bad_files'] != 1 else ''} to check, "
+                   f"{a['returned']} sent back, {a['comments']} open comment{'s' if a['comments'] != 1 else ''}.")
+    return out
+
+
+def _sources(pic, year, made):
+    """Where every number on the home comes from: the rule it counts by, the
+    records it reads, when — and the departments behind it, so any figure
+    can be checked rather than taken on trust."""
+    rows, t = pic["rows"], pic["totals"]
+    scoped = current_scope() is not None
+    place = current_place()
+    whose = ("the departments you can see" if scoped else "every active department") + (f" in {place}" if place else "")
+    when = to_ist(made).strftime("%d %b %Y, %H:%M")
+    yr = str(year).replace("-", "\u2013")         # as it is printed: 2027–28
+
+    def names(items, note=None, limit=8):
+        items = list(items)
+        out = [{"name": r["dept"].get("dept_name") or r["dept"]["dept_code"], "code": r["dept"]["dept_code"],
+                "note": note(r) if note else ""} for r in items[:limit]]
+        return {"list": out, "more": max(0, len(items) - limit)}
+
+    by_state = lambda *st: [r for r in rows if r["state"] in st]
+    progs = [(r, p) for r in rows for p in r["programmes"]]
+    files_by = {}
+    for f in get_db().files.find({"academic_year": year, **scope_q(), "$or": [
+            {"keyword_match.status": "miss"}, {"keyword_match.looks_like": {"$exists": True}}]}, {"dept_code": 1}):
+        files_by[f["dept_code"]] = files_by.get(f["dept_code"], 0) + 1
+    comments_by = {}
+    for c in get_db().comments.find({"academic_year": year, "status": "open", **scope_q()}, {"dept_code": 1}):
+        comments_by[c["dept_code"]] = comments_by.get(c["dept_code"], 0) + 1
+    att = [r for r in rows if r["returned"] or files_by.get(r["dept"]["dept_code"]) or comments_by.get(r["dept"]["dept_code"])]
+
+    def att_note(r):
+        c = r["dept"]["dept_code"]
+        bits = [f"{r['returned']} sent back" if r["returned"] else "",
+                f"{files_by[c]} file{'s' if files_by[c] != 1 else ''}" if files_by.get(c) else "",
+                f"{comments_by[c]} comment{'s' if comments_by[c] != 1 else ''}" if comments_by.get(c) else ""]
+        return ", ".join(b for b in bits if b)
+
+    return {
+        "when": when,
+        "departments": {
+            "rule": f"Counts {whose} in the department master (inactive ones are left out). "
+                    "Completed: all stages submitted. Not started: no stage submitted or begun, or not signed in yet.",
+            "reads": f"Department master · {t['departments']} record{'s' if t['departments'] != 1 else ''}",
+            "behind": names(by_state("not_started", "never_in", "no_login"), lambda r: r["label"]),
+            "behind_label": "Not started"},
+        "stages": {
+            "rule": f"Each department has {rows[0]['total'] if rows else 0} stages for {yr}. A stage counts once the "
+                    "department has submitted it; a stage of programmes counts when every programme's part is submitted.",
+            "reads": f"Submissions for {yr} · {t['stages_done']} of {t['stages_total']} stages",
+            "behind": names(sorted(rows, key=lambda r: -r["done"]), lambda r: f"{r['done']}/{r['total']}"),
+            "behind_label": "Most completed first"},
+        "programmes": {
+            "rule": "Programmes listed in each department's Department Information (the university catalogue until it is "
+                    "saved). Completed: its Curriculum, every batch's Syllabus and its Course Revision are all submitted.",
+            "reads": f"Submissions for {yr} · {pic['programmes']['total']} programme{'s' if pic['programmes']['total'] != 1 else ''}",
+            "behind": {"list": [{"name": p["name"], "code": r["dept"]["dept_code"],
+                                 "note": f"{p['done']}/{p['total']} steps"} for r, p in progs if p["complete"]][:8],
+                       "more": max(0, sum(1 for _, p in progs if p["complete"]) - 8)},
+            "behind_label": "Completed"},
+        "attention": {
+            "rule": "Files whose keyword check failed or that look like a different document, stages sent back for "
+                    "correction, and comments still open.",
+            "reads": f"Files, submissions and comments for {yr}",
+            "behind": names(att, att_note), "behind_label": "Departments with something to look at"},
+        "updates": {
+            "rule": "Every save, upload and submission a department made in the last 14 days, as recorded when it happened. "
+                    "Unread: not yet marked as seen by the Office.",
+            "reads": f"Updates log · {pic['activity']['total']} in 14 days",
+            "behind": None},
+        "stage_chart": {"rule": "One bar per stage: how many departments have it completed, in progress, sent back or "
+                                "not started.", "reads": f"Submissions for {yr}"},
+        "campus_chart": {"rule": "Stages completed as a share of all stages of the campus's departments.",
+                         "reads": f"Department master + submissions for {yr}"},
+        "table": {"rule": "Each department's stages, progress and programmes, furthest behind first.",
+                  "reads": f"Department master + submissions for {yr}"},
+        "latest": {"rule": "The newest updates from departments, as they were recorded.", "reads": "Updates log"},
+    }
+
+
 @bp.route("/")
 @admin_required
 def dashboard():
     db = get_db()
     year = _year()
-    departments = list(db.departments.find({"active": True}).sort("dept_name", 1))
-    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year})}
-
-    rows, counts = [], {"not_started": 0, "in_progress": 0, "complete": 0}
-    for d in departments:
-        sub = subs.get(d["dept_code"])
-        p = progress(sub) if sub else {"done": 0, "total": len(STAGES), "percent": 0}
-        if not sub:
-            state = "not_started"
-        elif p["done"] == p["total"]:
-            state = "complete"
-        else:
-            state = "in_progress"
-        counts[state] += 1
-        rows.append({"dept": d, "progress": p, "state": state,
-                     "updated_at": (sub or {}).get("updated_at")})
-
-    by_campus = {}
-    for d in departments:
-        c = d.get("campus", "—")
-        by_campus.setdefault(c, {"total": 0, "complete": 0})
-        by_campus[c]["total"] += 1
+    pic = _picture(db, year)
+    # the departments furthest behind come first: they are the ones to chase
+    rows = sorted(pic["rows"], key=lambda r: (_ahead(r), r["dept"].get("dept_name", "")))
+    upd = _unread_updates()
     for r in rows:
-        if r["state"] == "complete":
-            by_campus[r["dept"].get("campus", "—")]["complete"] += 1
+        r["updates"] = upd.get(r["dept"]["dept_code"])
+    made = now()
+    return render_template("admin/dashboard.html", year=year, pic=pic, rows=rows, made=made,
+                           src=_sources(pic, year, made),
+                           latest=list(db.notifications.find(scope_q()).sort("at", -1).limit(8)))
 
-    stage_counts = []
-    for s in STAGES:
-        done = sum(1 for sub in subs.values() if compute_status(sub, s["key"]) == "submitted")
-        stage_counts.append({"title": s["title"], "key": s["key"], "done": done,
-                             "total": len(departments)})
 
-    return render_template("admin/dashboard.html", rows=rows, counts=counts,
-                           by_campus=by_campus, stage_counts=stage_counts,
-                           year=year, total=len(departments),
-                           recent=list(db.audit.find().sort("at", -1).limit(12)))
+@bp.route("/analysis/report")
+@admin_required
+def analysis_report():
+    """Analysis in one click: everything on one page, in charts and in
+    sentences, ready to print or save as PDF."""
+    db = get_db()
+    year = _year()
+    pic = _picture(db, year)
+    ranked = sorted(pic["rows"], key=lambda r: tuple(-x for x in _ahead(r)) + (r["dept"].get("dept_name", ""),))
+    return render_template("admin/analysis_report.html", year=year, pic=pic, ranked=ranked,
+                           findings=_findings(pic), made=now())
+
+
+@bp.route("/motion")
+@admin_required
+def motion():
+    """Motion: the year so far as a short animated explainer — title, stages,
+    programmes, campuses, the last fortnight, what the numbers say — to play
+    here or download as a video for a meeting. Drawn from the same reading as
+    the home, so the two never disagree; every scene says where it came from."""
+    db = get_db()
+    year = _year()
+    pic = _picture(db, year)
+    made = now()
+    t = pic["totals"]
+    scope = current_scope()
+    data = {
+        "year": str(year).replace("-", "\u2013"),
+        "made": made.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "scope": (("All departments" if scope is None
+                   else f"Your {t['departments']} department{'s' if t['departments'] != 1 else ''}")
+                  + (f" · {current_place()}" if current_place() else "")),
+        "totals": {k: t[k] for k in ("departments", "complete", "untouched", "stages_done", "stages_total", "percent")},
+        "stages": [{"title": st["title"], "done": st["submitted"], "prog": st["in_progress"], "back": st["returned"],
+                    "none": st["not_started"]} for st in pic["stages"]],
+        "programmes": {"total": pic["programmes"]["total"], "complete": pic["programmes"]["complete"],
+                       "levels": pic["programmes"]["levels"]},
+        "campus": [{"name": c["name"], "percent": c["percent"], "done": c["done"], "total": c["total"]}
+                   for c in pic["by_campus"]][:6],
+        "activity": [{"day": d["day"], "date": d["date"], "all": d["all"], "submitted": d["submitted"]}
+                     for d in pic["activity"]["series"]],
+        "attention": pic["attention"],
+        "findings": _findings(pic)[:4],
+    }
+    return render_template("admin/motion.html", year=year, data=data, made=made)
+
+
+@bp.route("/place")
+@admin_required
+def set_place():
+    """The place switch in the top bar: every page, count and download then
+    shows that place's departments (or all of them), until it is changed."""
+    to = (request.args.get("to") or "").strip()
+    if to in current_app.config["PLACES"]:
+        session["place"] = to
+    else:
+        session.pop("place", None)
+    nxt = request.args.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("admin.dashboard")
+    return redirect(nxt)
+
+
+# ---------------------------------------------------------------------------
+# analysis
+# ---------------------------------------------------------------------------
+
+@bp.route("/flow")
+@admin_required
+def flow():
+    """How one department's data moves from stage to stage, in 3D. The
+    department — and a programme of it — is chosen in the side panel."""
+    departments = list(get_db().departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
+    return render_template("admin/flow.html", year=_year(), departments=departments)
+
+
+def _flow_for(dept_code, programme_code=None):
+    from .flows import flows_for
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": _year()}) or {}
+    return dept, sub, flows_for(sub, dept, programme_code)
+
+
+@bp.route("/flow.json")
+@admin_required
+def flow_data():
+    code = request.args.get("dept") or abort(400)
+    _, _, data = _flow_for(code, request.args.get("prog") or None)
+    return jsonify(data)
+
+
+@bp.route("/flow.xlsx")
+@admin_required
+def flow_excel():
+    """One department's data mapping — every flow, for every programme."""
+    from .exporter import flow_mapping_excel
+    from .flows import flows_for
+    code = request.args.get("dept") or abort(400)
+    dept, sub, data = _flow_for(code)
+    per_prog = [(p, flows_for(sub, dept, p["code"])["flows"]) for p in data["programmes"]]
+    buf = flow_mapping_excel(data, per_prog, _year())
+    return send_file(buf, as_attachment=True,
+                     download_name=f"BoS-data-mapping-{code}-{_year()}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@bp.route("/analysis")
+@admin_required
+def analysis():
+    """Every department in one reading: done, part-done, untouched, failing.
+
+    The Office's standing question is "who still owes me what", and it used to
+    be answered by opening departments one at a time. This answers it once.
+    """
+    db = get_db()
+    year = _year()
+
+    # Demonstration mode. Everything it needs lives in app/demo.py; delete that
+    # module and this branch and the page is live-only.
+    if request.args.get("demo") == "1":
+        from .demo import demo_analysis
+        rows, totals, stages = demo_analysis()
+        return render_template("admin/analysis.html", rows=rows, totals=totals,
+                               stages=stages, year=year, demo=True,
+                               filters={"state": None, "q": ""})
+
+    departments = list(db.departments.find({"active": True, **scope_q()})
+                       .sort([("place", 1), ("campus", 1), ("dept_name", 1)]))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year, **scope_q()})}
+    users = {u.get("dept_code"): u for u in db.users.find({"role": "department", **scope_q()})}
+
+    rows = [department_analysis(d, subs.get(d["dept_code"]), users.get(d["dept_code"]))
+            for d in departments]
+    totals = institution_analysis(rows)
+    stages = stage_analysis([stage_board(subs.get(d["dept_code"]) or {})
+                             for d in departments])
+
+    # filtering happens after the totals, so the summary always describes the
+    # whole institution and not whatever slice is on screen
+    state = request.args.get("state")
+    search = (request.args.get("q") or "").strip().lower()
+    if state:
+        rows = [r for r in rows if r["state"] == state]
+    if search:
+        rows = [r for r in rows
+                if search in (r["dept"].get("dept_name", "") + " "
+                              + r["dept"].get("school", "") + " "
+                              + r["dept"].get("dept_code", "")).lower()]
+
+    return render_template("admin/analysis.html", rows=rows, totals=totals,
+                           stages=stages, year=year, demo=False,
+                           filters={"state": state, "q": search})
 
 
 # ---------------------------------------------------------------------------
@@ -84,10 +485,20 @@ def dashboard():
 @admin_required
 def departments():
     db = get_db()
-    q = {}
+    # the person's own departments; the place is this page's own choice below
+    # (it starts at the one chosen in the top bar)
+    mine = current_scope()
+    q = {} if mine is None else {"dept_code": {"$in": sorted(mine)}}
+    place = request.args.get("place") if "place" in request.args else current_place()
     campus = request.args.get("campus")
     school = request.args.get("school")
     search = (request.args.get("q") or "").strip()
+    if place:
+        from .access import codes_in_place
+        here = codes_in_place(place)
+        if mine is not None:
+            here &= set(mine)
+        q["dept_code"] = {"$in": sorted(here)}
     if campus:
         q["campus"] = campus
     if school:
@@ -95,12 +506,26 @@ def departments():
     if search:
         q["$or"] = [{"dept_name": {"$regex": search, "$options": "i"}},
                     {"dept_code": {"$regex": search, "$options": "i"}},
-                    {"school": {"$regex": search, "$options": "i"}}]
-    depts = list(db.departments.find(q).sort([("campus", 1), ("school", 1), ("dept_name", 1)]))
+                    {"school": {"$regex": search, "$options": "i"}},
+                    {"faculty": {"$regex": search, "$options": "i"}}]
+    depts = list(db.departments.find(q)
+                 .sort([("place", 1), ("campus", 1), ("school", 1), ("dept_name", 1)]))
+
+    # only the campuses in the city being looked at: offering Kochi Campus
+    # while Bangalore is selected would be a filter that can only return none
+    if place:
+        from .access import codes_in_place
+        in_place = set(db.departments.distinct("campus", {"dept_code": {"$in": sorted(codes_in_place(place))}}))
+    campuses = [c for c in current_app.config["CAMPUSES"] if not place or c in in_place]
     return render_template("admin/departments.html", departments=depts,
+                           demo=db.departments.find_one({"dept_code": "DEMO"}),
+                           packs=available_packs(),
                            schools=sorted(x for x in db.departments.distinct("school") if x),
-                           campuses=current_app.config["CAMPUSES"],
-                           filters={"campus": campus, "school": school, "q": search})
+                           campuses=campuses,
+                           places=current_app.config["PLACES"],
+                           total=db.departments.count_documents({} if mine is None else {"dept_code": {"$in": sorted(mine)}}),
+                           filters={"place": place, "campus": campus,
+                                    "school": school, "q": search})
 
 
 @bp.route("/departments/new", methods=["GET", "POST"])
@@ -112,24 +537,34 @@ def department_form(dept_code=None):
     if dept_code and not dept:
         abort(404)
 
+    # existing values offered as suggestions, so a new department lands in an
+    # existing faculty and school rather than a near-miss spelling of one
+    def _form(d):
+        return render_template(
+            "admin/department_form.html", dept=d,
+            campuses=current_app.config["CAMPUSES"],
+            places=current_app.config["PLACES"],
+            faculties=sorted(x for x in db.departments.distinct("faculty") if x),
+            schools=sorted(x for x in db.departments.distinct("school") if x))
+
     if request.method == "POST":
         f = request.form
         code = (f.get("dept_code") or "").strip().upper()
         if not code:
             flash("Department code is required.", "error")
-            return render_template("admin/department_form.html", dept=dept or f,
-                                   campuses=current_app.config["CAMPUSES"])
+            return _form(dept or f)
         clash = db.departments.find_one({"dept_code": code})
         if clash and (not dept or clash["_id"] != dept["_id"]):
             flash(f"Department code “{code}” is already in use.", "error")
-            return render_template("admin/department_form.html", dept=f,
-                                   campuses=current_app.config["CAMPUSES"])
+            return _form(f)
 
         payload = {
             "dept_code": code,
             "dept_name": (f.get("dept_name") or "").strip(),
+            "faculty": (f.get("faculty") or "").strip(),
             "school": (f.get("school") or "").strip(),
             "campus": f.get("campus") or current_app.config["CAMPUSES"][0],
+            "place": f.get("place") or current_app.config["PLACES"][0],
             "active": f.get("active") == "on",
             "updated_at": now(),
         }
@@ -142,11 +577,11 @@ def department_form(dept_code=None):
             db.departments.insert_one(payload)
             audit(_actor(), "department.created", code)
             flash(f"{payload['dept_name']} has been added. "
-                  f"Generate its login from the department list.", "success")
+                  f"Use “Issue every missing login” on the department list "
+                  f"to give it one.", "success")
         return redirect(url_for("admin.departments"))
 
-    return render_template("admin/department_form.html", dept=dept,
-                           campuses=current_app.config["CAMPUSES"])
+    return _form(dept)
 
 
 @bp.route("/departments/<dept_code>/toggle", methods=["POST"])
@@ -197,17 +632,50 @@ def credential_slip(dept_code):
                            login_url=url_for("auth.login", _external=True), year=_year())
 
 
+@bp.route("/departments/clear", methods=["POST"])
+@admin_required
+def departments_clear():
+    """Remove every department in one go, with its login and its submissions.
+
+    This empties the master, so it asks for the word to be typed rather than
+    for a button to be clicked. It is not as final as it sounds: seed.py puts
+    the whole list back from the Office of Academic Affairs workbook.
+    """
+    db = get_db()
+    if (request.form.get("confirm") or "").strip().upper() != "REMOVE ALL":
+        flash("Nothing was removed — type REMOVE ALL to confirm.", "warning")
+        return redirect(url_for("admin.departments"))
+
+    counts = {
+        "departments": db.departments.count_documents({}),
+        "logins": db.users.count_documents({"role": "department"}),
+        "submissions": db.submissions.count_documents({}),
+    }
+    db.departments.delete_many({})
+    db.users.delete_many({"role": "department"})
+    db.submissions.delete_many({})
+    audit(_actor(), "departments.cleared", detail=counts)
+    flash(f"Removed {counts['departments']} department(s), "
+          f"{counts['logins']} login(s) and {counts['submissions']} submission(s). "
+          f"Run seed.py to put the master back from the workbook.", "success")
+    return redirect(url_for("admin.departments"))
+
+
 @bp.route("/credentials/bulk", methods=["POST"])
 @admin_required
 def bulk_credentials():
     """Generate logins for every active department that has none."""
     db = get_db()
     made = 0
-    for dept in list(db.departments.find({"active": True, "username": {"$exists": False}})):
+    for dept in list(db.departments.find({"active": True, "username": {"$exists": False}, **scope_q()})):
         issue_department_login(db, dept, actor=_actor())
         made += 1
     audit(_actor(), "credentials.bulk", detail={"count": made})
-    flash(f"Generated logins for {made} department(s).", "success")
+    if made:
+        flash(f"Issued a login for {made} department(s). The passwords are on "
+              f"the credential sheet until each department signs in.", "success")
+    else:
+        flash("Every active department already has a login.", "info")
     return redirect(url_for("admin.departments"))
 
 
@@ -216,7 +684,7 @@ def bulk_credentials():
 def credential_sheet():
     """Printable sheet of every credential still in the clear."""
     db = get_db()
-    depts = list(db.departments.find({"initial_password": {"$exists": True}})
+    depts = list(db.departments.find({"initial_password": {"$exists": True}, **scope_q()})
                  .sort([("campus", 1), ("dept_name", 1)]))
     return render_template("admin/credential_sheet.html", departments=depts,
                            login_url=url_for("auth.login", _external=True), year=_year())
@@ -239,9 +707,13 @@ def import_departments():
 
     data = upload.read()
     sheet = request.form.get("sheet") or None
-    default_campus = request.form.get("default_campus") or "Bengaluru"
+    default_campus = (request.form.get("default_campus")
+                      or current_app.config["CAMPUSES"][0])
+    default_place = (request.form.get("default_place")
+                     or current_app.config["PLACES"][0])
     try:
-        rows, meta = parse_workbook(data, sheet, default_campus=default_campus)
+        rows, meta = parse_workbook(data, sheet, default_campus=default_campus,
+                                    default_place=default_place)
     except Exception as exc:
         flash(f"That file could not be read: {exc}", "error")
         return redirect(url_for("admin.import_departments"))
@@ -254,7 +726,9 @@ def import_departments():
     session["import_rows"] = rows[:500]
     return render_template("admin/import.html", preview=rows, meta=meta,
                            default_campus=default_campus,
-                           campuses=current_app.config["CAMPUSES"])
+                           default_place=default_place,
+                           campuses=current_app.config["CAMPUSES"],
+                           places=current_app.config["PLACES"])
 
 
 @bp.route("/import/commit", methods=["POST"])
@@ -277,6 +751,10 @@ def import_commit():
         existing = db.departments.find_one({"dept_code": r["dept_code"]})
         payload = {k: r[k] for k in
                    ("dept_name", "school", "dept_code", "campus")}
+        if r.get("place"):
+            payload["place"] = r["place"]
+        if r.get("faculty"):
+            payload["faculty"] = r["faculty"]
         payload["active"] = True
         payload["updated_at"] = now()
         if existing and not overwrite:
@@ -307,22 +785,389 @@ def import_commit():
 # submission monitor
 # ---------------------------------------------------------------------------
 
+@bp.route("/packs/<key>/load", methods=["POST"])
+@admin_required
+def pack_load(key):
+    """Fill a department from its Drive documents, already turned into portal data."""
+    if current_scope() is not None:
+        abort(403)                       # it may add a department: for those who see them all
+    try:
+        report = load_pack(key, _year(), _actor(), replace=request.form.get("replace") == "on")
+    except KeyError:
+        abort(404)
+    dept, s = report["dept"], report["summary"]
+    flash(f"{dept['dept_name']}: {len(report['written'])} programme part(s) filled from the Drive "
+          f"folder — {s['submitted']} submitted, {s['draft']} saved as drafts listing what is "
+          f"still to complete. {len(report['attached'])} file(s) attached"
+          + (f", {len(report['missing'])} not in the pack." if report["missing"] else ".")
+          + (f" {len(report['skipped'])} part(s) left as they were." if report["skipped"] else ""),
+          "success")
+    if report["password"]:
+        return redirect(url_for("admin.credential_slip", dept_code=dept["dept_code"]))
+    return redirect(url_for("admin.submission_detail", dept_code=dept["dept_code"]))
+
+
 @bp.route("/submissions")
 @admin_required
 def submissions():
+    """Overview → Monitor: every department, stage by stage."""
+    data = analysis_sheets(_year())
+    upd = _unread_updates()
+    for r in data["stages"]:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
+    # departments with something new since the Office last looked come first
+    rows = sorted(data["stages"], key=lambda r: (not r["updates"],
+                                                 -sum(c["status"] == "submitted" for c in r["cells"]),
+                                                 r["dept"].get("dept_name", "")))
+    return render_template("admin/submissions.html", rows=rows, year=_year(), STAGES=STAGES)
+
+
+@bp.route("/overview/departments")
+@admin_required
+def overview_departments():
+    """Overview → Departments: every department with its progress, when it
+    last moved, and its downloads; More opens the department's own page."""
+    data = analysis_sheets(_year())
+    db = get_db()
+    subs = {x["dept_code"]: x for x in db.submissions.find({"academic_year": _year(), **scope_q()},
+                                                            {"dept_code": 1, "updated_at": 1, "stages": 1})}
+    progs = {}
+    for p in data["programmes"]:
+        c = progs.setdefault(p["dept"]["dept_code"], [0, 0])
+        c[1] += 1
+        c[0] += all(v == "submitted" for v in p["parts"].values())
+    rows = []
+    for r in data["stages"]:
+        code = r["dept"]["dept_code"]
+        done = sum(c["status"] == "submitted" for c in r["cells"])
+        total = len(r["cells"])
+        sub = subs.get(code) or {}
+        sent = [st.get("submitted_at") for st in (sub.get("stages") or {}).values()
+                if isinstance(st, dict) and st.get("submitted_at")]
+        rows.append({"dept": r["dept"], "done": done, "total": total,
+                     "percent": round(done * 100 / total) if total else 0,
+                     "state": "complete" if done == total else "progress" if done or sub.get("updated_at") else "none",
+                     "programmes": progs.get(code, [0, 0]),
+                     "submitted_at": max(sent) if done == total and sent else None,
+                     "updated_at": sub.get("updated_at")})
+    upd = _unread_updates()
+    for r in rows:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
+    return render_template("admin/overview_departments.html", rows=rows, year=_year())
+
+
+@bp.route("/overview/departments/<dept_code>")
+@admin_required
+def department_page(dept_code):
+    """One department: when it submitted (or last edited), its stages, every
+    UG and PG programme with Curriculum, Syllabus and Course Revision, and the
+    changes it made, beside."""
+    from .notify import describe_changes
+    from .people import history
+    from .workflow import parts_for, programme_stage_state, programmes_of, stage_board, stage_state, stage_timing
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = _year()
+    sub = get_or_create_submission(dept_code, year)
+    board = stage_board(sub)
+    for b in board:
+        b["timing"] = stage_timing(stage_state(sub, b["key"]))
+    done = sum(b["status"] == "submitted" for b in board)
+    sent = [stage_state(sub, b["key"]).get("submitted_at") for b in board]
+    complete = done == len(board) and all(sent)
+    # every programme, UG and PG, with each part
+    parts = parts_for(STAGE_BY_KEY["curriculum"])
+    levels = {"UG": [], "PG": []}
+    for p in programmes_of(sub, dept):
+        code = p["programme_code"]
+        items = []
+        for k in parts:
+            st = programme_stage_state(sub, code, k)
+            d = STAGE_BY_KEY[k]
+            status = st.get("status") or ("draft" if st.get("data") else "open")
+            if d.get("optional") and not st.get("data"):
+                status = "optional"
+            label = ("Curriculum" if k == "prog_curriculum" else "Course Revision" if k == "prog_revision"
+                     else "Syllabus · Batch of " + (batches()["current"] if k == "prog_syllabus" else d.get("batch", "")))
+            items.append({"key": k, "label": label, "status": status, "has": bool(st.get("data")),
+                          "when": stage_timing(st)})
+        need = [i for i in items if i["status"] != "optional"]
+        levels["PG" if (p.get("level") or "") in ("PG", "PGD") else "UG"].append({
+            "code": code, "name": p.get("display_name") or p.get("programme_name") or code,
+            "degree": p.get("degree_level") or "", "parts": items,
+            "done": sum(i["status"] == "submitted" for i in need), "total": len(need)})
+    # what changed, newest first, each against the version before it
+    rows = history(dept_code, year)
+    before = {}
+    for v in reversed(rows):
+        k = (v["stage"], v["programme_code"])
+        v["changes"] = describe_changes(v["stage"], before.get(k), v.get("data"))
+        before[k] = v.get("data")
+        v["title"] = STAGE_BY_KEY.get(v["stage"], {}).get("title", v["stage"])
+    last = rows[0] if rows else None
+    updates = _unread_updates([dept_code]).get(dept_code)
+    comments = db.comments.count_documents({"dept_code": dept_code, "academic_year": year, "status": "open"})
+    from .workflow import programme_list
+    plist, confirmed = programme_list(sub, dept)
+    years, current_year = _years_of(dept_code)
+    return render_template("admin/department_page.html", dept=dept, submission=sub, board=board,
+                           updates=updates, open_comments=comments,
+                           done=done, complete=complete,
+                           submitted_at=max(x for x in sent if x) if complete else None,
+                           updated_at=sub.get("updated_at"), last=last,
+                           levels=levels, versions=rows[:60], year=year,
+                           years=years, current_year=current_year,
+                           plist=plist, plist_confirmed=confirmed, degrees=PROGRAMME_DEGREES,
+                           parts=parts)
+
+
+PROGRAMME_DEGREES = [("UG", "UG"), ("PG", "PG (2 years)"), ("PG-1Yr", "PG (1 year)"), ("PGD", "PG Diploma")]
+_PCODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,29}")
+
+
+def _office_person():
+    u = session.get("user") or {}
+    name = u.get("name") or u.get("username") or "Office"
+    return {"name": f"{name} (Office of Academic Affairs)", "email": u.get("email") or u.get("username") or ""}
+
+
+@bp.post("/departments/<dept_code>/programmes")
+@admin_required
+def department_programme_save(dept_code):
+    """Add a programme to a department's list for the year, or change one
+    (code, name, degree, category, year introduced)."""
+    from . import people
+    from .workflow import programme_list, save_programme_list
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = (request.form.get("year") or "").strip()
+    year = year if _YEAR.fullmatch(year) else _year()
+    back = redirect(url_for("admin.department_page", dept_code=dept_code, year=year) + "#programmes")
+    f = request.form
+    was = (f.get("was") or "").strip()
+    code = (f.get("programme_code") or "").strip().upper()
+    name = " ".join((f.get("programme_name") or "").split())
+    degree = f.get("degree") if f.get("degree") in dict(PROGRAMME_DEGREES) else "UG"
+    intro = (f.get("year_introduced") or "").strip()
+    if not _PCODE.fullmatch(code) or not name:
+        flash("A programme needs a code (letters and numbers) and a name.", "error")
+        return back
+    if intro and not re.fullmatch(r"\d{4}", intro):
+        flash("Year introduced is a year, such as 2021.", "error")
+        return back
+    sub = get_or_create_submission(dept_code, year)
+    rows, _ = programme_list(sub, dept)
+    codes = {str(r.get("programme_code") or "").strip().upper(): i for i, r in enumerate(rows)}
+    if code in codes and code != was.upper():
+        flash(f"{code} is already in the list.", "error")
+        return back
+    if was:
+        i = codes.get(was.upper())
+        if i is None:
+            flash("That programme is no longer in the list.", "error")
+            return back
+        row = rows[i]
+        old_code = str(row.get("programme_code") or "").strip()
+        if old_code != code:
+            # its Curriculum, Syllabus and Course Revision follow it to the new code
+            have = (sub.get("programmes") or {})
+            if code in have:
+                flash(f"There is already a record under {code}.", "error")
+                return back
+            if old_code in have:
+                db.submissions.update_one({"_id": sub["_id"]},
+                                          {"$set": {f"programmes.{code}": have[old_code]},
+                                           "$unset": {f"programmes.{old_code}": ""}})
+        row.update(programme_code=code, programme_name=name, degree=degree,
+                   category=(f.get("category") or "").strip(), year_introduced=intro)
+        what = "changed"
+    else:
+        rows.append({"programme_code": code, "programme_name": name, "degree": degree,
+                     "category": (f.get("category") or "").strip(), "year_introduced": intro,
+                     "minors": "", "source": "office", "decision": "keep"})
+        what = "added"
+    data = save_programme_list(dept_code, year, rows)
+    people.keep(dept_code, year, "dept_info", None, data, _office_person())
+    audit(_actor(), f"programme.{what}", dept_code, {"year": year, "programme": code, "was": was or None})
+    flash(f"{code} · {name} {what} for {year.replace('-', '–')}.", "success")
+    return back
+
+
+@bp.post("/departments/<dept_code>/programmes/<programme_code>/run")
+@admin_required
+def department_programme_run(dept_code, programme_code):
+    """Take a programme off the year's list, or put it back. Its record stays."""
+    from . import people
+    from .workflow import programme_list, save_programme_list
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = (request.form.get("year") or "").strip()
+    year = year if _YEAR.fullmatch(year) else _year()
+    sub = get_or_create_submission(dept_code, year)
+    rows, _ = programme_list(sub, dept)
+    row = next((r for r in rows if str(r.get("programme_code") or "").strip().upper() == programme_code.upper()), None)
+    if row is None:
+        abort(404)
+    run = request.form.get("run") == "1"
+    row["decision"] = "keep" if run else "remove"
+    data = save_programme_list(dept_code, year, rows)
+    people.keep(dept_code, year, "dept_info", None, data, _office_person())
+    audit(_actor(), "programme.run" if run else "programme.removed", dept_code,
+          {"year": year, "programme": programme_code})
+    flash(f"{programme_code} {'is back on' if run else 'is taken off'} the list for {year.replace('-', '–')}"
+          f"{'' if run else ' — its record is kept'}.", "success")
+    return redirect(url_for("admin.department_page", dept_code=dept_code, year=year) + "#programmes")
+
+
+@bp.post("/departments/<dept_code>/edit-as")
+@admin_required
+def department_act(dept_code):
+    """Open the department's own pages for the year, to edit as the Office."""
+    db = get_db()
+    db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = (request.form.get("year") or "").strip()
+    year = year if _YEAR.fullmatch(year) else _year()
+    nxt = request.form.get("next") or ""
+    if not re.fullmatch(r"/department/[A-Za-z0-9_/\-]*", nxt):
+        nxt = url_for("dept.dashboard")
+    session["act_as"] = {"dept_code": dept_code, "year": year}
+    audit(_actor(), "department.edit_as", dept_code, {"year": year})
+    return redirect(nxt)
+
+
+@bp.route("/edit-as/stop")
+@admin_required
+def act_stop():
+    """Back from a department's pages to its page in the Office's."""
+    a = session.pop("act_as", None) or {}
+    if a.get("dept_code"):
+        return redirect(url_for("admin.department_page", dept_code=a["dept_code"], year=a.get("year")))
+    from .access import home_url
+    return redirect(home_url())
+
+
+NO_FACULTY, NO_SCHOOL = "Faculty not set", "School not set"
+
+
+def _sum(rows):
+    """What a group of departments adds up to."""
+    done, total = sum(r["done"] for r in rows), sum(r["total"] for r in rows)
+    progs = [p for r in rows for p in r["programmes"]]
+    return {"departments": len(rows), "done": done, "total": total,
+            "percent": round(done * 100 / total) if total else 0,
+            "complete": sum(1 for r in rows if r["state"] == "complete"),
+            "untouched": sum(1 for r in rows if r["state"] in ("not_started", "never_in", "no_login")),
+            "returned": sum(1 for r in rows if r["returned"]),
+            "programmes": len(progs), "prog_done": sum(1 for p in progs if p["complete"]),
+            "updates": sum((r.get("updates") or {}).get("count", 0) for r in rows)}
+
+
+def _faculty_tree(rows):
+    """Faculty → school → departments, each level with its totals, in name order."""
+    tree = {}
+    for r in rows:
+        f = (r["dept"].get("faculty") or "").strip() or NO_FACULTY
+        sc = (r["dept"].get("school") or "").strip() or NO_SCHOOL
+        tree.setdefault(f, {}).setdefault(sc, []).append(r)
+    out = []
+    for f in sorted(tree, key=lambda x: (x == NO_FACULTY, x.lower())):
+        schools = []
+        for sc in sorted(tree[f], key=lambda x: (x == NO_SCHOOL, x.lower())):
+            depts = sorted(tree[f][sc], key=lambda r: r["dept"].get("dept_name", ""))
+            schools.append({"name": sc, "rows": depts, **_sum(depts)})
+        every = [r for x in schools for r in x["rows"]]
+        out.append({"name": f, "schools": schools, **_sum(every)})
+    return out
+
+
+@bp.route("/faculties")
+@admin_required
+def faculties():
+    """Overview → Faculties: every faculty; click one for its schools, a
+    school for its departments and all their data. Each level downloads as
+    a ZIP of every department's Excel and Word, folder by folder."""
     db = get_db()
     year = _year()
-    depts = {d["dept_code"]: d for d in db.departments.find({"active": True})}
-    subs = list(db.submissions.find({"academic_year": year}))
-    rows = []
-    for s in subs:
-        d = depts.get(s["dept_code"])
-        if not d:
-            continue
-        rows.append({"dept": d, "submission": s, "progress": progress(s),
-                     "board": stage_board(s)})
-    rows.sort(key=lambda r: -r["progress"]["percent"])
-    return render_template("admin/submissions.html", rows=rows, year=year, stages=STAGES)
+    pic = _picture(db, year)
+    upd = _unread_updates()
+    for r in pic["rows"]:
+        r["updates"] = upd.get(r["dept"]["dept_code"])
+    tree = _faculty_tree(pic["rows"])
+    fac_name, school_name = request.args.get("faculty"), request.args.get("school")
+    fac = next((f for f in tree if f["name"] == fac_name), None) if fac_name else None
+    school = next((x for x in fac["schools"] if x["name"] == school_name), None) if fac and school_name else None
+    if (fac_name and not fac) or (school_name and not school):
+        flash("That faculty or school has no departments you can see.", "info")
+        return redirect(url_for("admin.faculties"))
+    return render_template("admin/faculties.html", year=year, tree=tree, fac=fac, school=school,
+                           STAGES=STAGES)
+
+
+def _safe_name(text, limit=90):
+    """A name a file or folder can carry on any computer."""
+    text = re.sub(r'[\\/:*?"<>|\r\n\t]+', " ", str(text or "")).strip(" .")
+    return re.sub(r"\s+", " ", text)[:limit].strip() or "Untitled"
+
+
+@bp.route("/export/group.zip")
+@admin_required
+def export_group():
+    """A faculty or a school as a ZIP: a folder for each school, and in it each
+    department's Excel and Word (or only the one asked for, kind=xlsx|docx),
+    with a summary sheet for the faculty and for each school."""
+    import zipfile
+    db = get_db()
+    year = _year()
+    kind = request.args.get("kind") if request.args.get("kind") in ("xlsx", "docx") else "all"
+    want_x, want_w = kind in ("all", "xlsx"), kind in ("all", "docx")
+    fac_name, school_name = request.args.get("faculty") or "", request.args.get("school") or ""
+    depts = list(db.departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
+
+    def fac_of(d):
+        return (d.get("faculty") or "").strip() or NO_FACULTY
+
+    def school_of(d):
+        return (d.get("school") or "").strip() or NO_SCHOOL
+
+    depts = [d for d in depts if fac_of(d) == fac_name and (not school_name or school_of(d) == school_name)]
+    if not depts:
+        abort(404)
+    root = _safe_name(school_name or fac_name)
+    schools = {}
+    for d in depts:
+        schools.setdefault(school_of(d), []).append(d)
+    buf = io.BytesIO()
+    made, failed = 0, []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        if want_x:
+            z.writestr(f"{root}/{root} - summary.xlsx",
+                       institution_excel(year, [d["dept_code"] for d in depts], school_name or fac_name).getvalue())
+        for sc in sorted(schools, key=str.lower):
+            folder = root if school_name else f"{root}/{_safe_name(sc)}"
+            if not school_name and want_x:
+                z.writestr(f"{folder}/{_safe_name(sc)} - summary.xlsx",
+                           institution_excel(year, [d["dept_code"] for d in schools[sc]], sc).getvalue())
+            for d in schools[sc]:
+                name = _safe_name(f"{d['dept_code']} - {d.get('dept_name') or ''}")
+                links = ShareLinks(d["dept_code"], year)
+                try:
+                    if want_x:
+                        z.writestr(f"{folder}/{name}.xlsx", department_excel(d["dept_code"], year, links).getvalue())
+                    if want_w:
+                        z.writestr(f"{folder}/{name}.docx", submission_word(d["dept_code"], year, links).getvalue())
+                    made += 1
+                except Exception as e:           # one department's trouble does not cost the rest
+                    current_app.logger.exception("Export of %s failed", d["dept_code"])
+                    failed.append(d["dept_code"])
+                    z.writestr(f"{folder}/{name} - could not be made.txt",
+                               f"The Excel and Word for {d.get('dept_name')} could not be made: {e.__class__.__name__}: {e}\n"
+                               "Download them from the department's record, or tell the portal team.\n")
+    buf.seek(0)
+    audit(_actor(), "export.school" if school_name else "export.faculty", school_name or fac_name,
+          {"departments": made, "failed": failed, "kind": kind})
+    what = {"all": "", "xlsx": "-Excel", "docx": "-Word"}[kind]
+    return send_file(buf, as_attachment=True, mimetype="application/zip",
+                     download_name=f"BoS-{root.replace(' ', '-')}{what}-{year}.zip")
 
 
 @bp.route("/submissions/<dept_code>")
@@ -332,9 +1177,115 @@ def submission_detail(dept_code):
     year = _year()
     dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
     sub = get_or_create_submission(dept_code, year)
+    # from Department Information once saved, else the catalogue it starts from
+    prog_names = {p["programme_code"]: p.get("programme_name") or p["programme_code"]
+                  for p in programmes_of(sub, dept)}
+    updates = _unread_updates([dept_code]).get(dept_code)
     return render_template("admin/submission_detail.html", dept=dept, submission=sub,
+                           prog_names=prog_names, updates=updates,
                            board=stage_board(sub), progress=progress(sub),
-                           year=year, STAGE_BY_KEY=STAGE_BY_KEY)
+                           year=year, STAGE_BY_KEY=STAGE_BY_KEY,
+                           documents=_documents(dept_code, sub, year),
+                           batches=batches(),
+                           summaries=True)
+
+
+@bp.route("/submissions/<dept_code>/seen", methods=["POST"])
+@admin_required
+def mark_seen(dept_code):
+    """The Office has looked: the department's updates are read, and the red
+    tags go until it changes something again."""
+    n = get_db().notifications.update_many({"dept_code": dept_code, "read": False},
+                                           {"$set": {"read": True, "read_at": now()}}).modified_count
+    audit(_actor(), "updates.seen", f"{dept_code}: {n}")
+    return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+
+
+# ---------------------------------------------------------------------------
+# a department's uploaded documents: view them, and a short AI summary of each PDF
+# ---------------------------------------------------------------------------
+
+def _stored_names(node, out):
+    """Every uploaded file still attached somewhere in the submission."""
+    if isinstance(node, dict):
+        if node.get("stored") and node.get("name"):
+            out.append(node["stored"])
+        for v in node.values():
+            _stored_names(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _stored_names(v, out)
+    return out
+
+
+def _documents(dept_code, sub, year):
+    from .summarise import field_label
+    names = list(dict.fromkeys(_stored_names(sub.get("stages", {}), []) +
+                               _stored_names(sub.get("programmes", {}), [])))
+    if not names:
+        return []
+    recs = {r["stored_name"]: r for r in get_db().files.find(
+        {"dept_code": dept_code, "stored_name": {"$in": names}})}
+    groups, order = {}, []
+    for n in names:
+        r = recs.get(n)
+        if not r:
+            continue
+        stage = STAGE_BY_KEY.get(r.get("stage"), {})
+        t, grp = stage.get("title", r.get("stage", "")), stage.get("group", "")
+        title = grp if t and t in grp else " · ".join(x for x in (grp, t) if x)
+        if title not in groups:
+            groups[title] = []
+            order.append(title)
+        url = url_for("admin.document", dept_code=dept_code, stored=n)
+        is_pdf = r["original_name"].lower().endswith(".pdf")
+        groups[title].append({
+            "name": r["original_name"], "size": r.get("size"),
+            "label": field_label(r.get("stage", ""), r.get("field", "")),
+            "url": url, "is_pdf": is_pdf,
+            "viewable": is_pdf or r["original_name"].lower().rsplit(".", 1)[-1] in ("png", "jpg", "jpeg", "webp", "gif"),
+            "thumb": url + "?thumb=1" if is_pdf else None,
+            "summary": r.get("summary"), "summary_by": r.get("summary_by") or "AI",
+            "uploaded_at": r.get("uploaded_at"),
+            "match": r.get("keyword_match"),
+        })
+    return [{"title": t, "files": groups[t]} for t in order]
+
+
+def _file_rec(dept_code, stored):
+    from .drive_store import ensure_local
+    rec = get_db().files.find_one({"dept_code": dept_code, "stored_name": stored}) or abort(404)
+    return rec, ensure_local({**rec, "academic_year": rec.get("academic_year") or _year()})
+
+
+@bp.route("/documents/<dept_code>/<stored>")
+@admin_required
+def document(dept_code, stored):
+    from pathlib import Path
+    from .dept import INLINE_EXT, _thumbnail
+    rec, path = _file_rec(dept_code, stored)
+    if not path.exists():
+        abort(404)
+    suffix = Path(rec["original_name"]).suffix.lower()
+    if request.args.get("thumb") == "1":
+        drawn = _thumbnail(path) if suffix == ".pdf" else None
+        if not drawn:
+            abort(404)
+        return send_file(drawn, mimetype="image/png", max_age=86400)
+    inline = request.args.get("inline") == "1" and suffix in INLINE_EXT
+    return send_file(path, as_attachment=not inline, download_name=rec["original_name"])
+
+
+@bp.post("/documents/<dept_code>/<stored>/summary")
+@admin_required
+def document_summary(dept_code, stored):
+    from .summarise import SummaryError, summarise
+    rec, path = _file_rec(dept_code, stored)
+    try:
+        out = summarise(rec, path, refresh=request.args.get("refresh") == "1")
+    except SummaryError as e:
+        return jsonify({"ok": False, "error": str(e)})
+    return jsonify({"ok": True, **out})
 
 
 @bp.route("/submissions/<dept_code>/<stage_key>/return", methods=["POST"])
@@ -344,10 +1295,83 @@ def submission_return(dept_code, stage_key):
     if not note:
         flash("Say what needs correcting before you send a stage back.", "error")
         return redirect(url_for("admin.submission_detail", dept_code=dept_code))
-    return_stage(dept_code, _year(), stage_key, note, _actor())
-    audit(_actor(), "stage.returned", f"{dept_code}/{stage_key}", {"note": note})
-    flash(f"“{STAGE_BY_KEY[stage_key]['title']}” has been sent back for correction.", "info")
+    prog = (request.form.get("programme") or "").strip()
+    stage = STAGE_BY_KEY.get(stage_key) or abort(404)
+    if stage.get("parent") and prog:
+        # one programme's part, on its own
+        path = f"programmes.{prog}.{stage_key}"
+        get_db().submissions.update_one(
+            {"dept_code": dept_code, "academic_year": _year()},
+            {"$set": {f"{path}.status": "returned", f"{path}.returned_note": note,
+                      f"{path}.returned_by": _actor(), f"{path}.returned_at": now(),
+                      "status": "in_progress", "updated_at": now()}})
+        target = f"{dept_code}/{prog}/{stage_key}"
+    else:
+        return_stage(dept_code, _year(), stage_key, note, _actor())
+        target = f"{dept_code}/{stage_key}"
+    audit(_actor(), "stage.returned", target, {"note": note})
+    flash(f"“{stage['title']}”{' (' + prog + ')' if prog else ''} has been sent back for correction.", "info")
     return redirect(url_for("admin.submission_detail", dept_code=dept_code))
+
+
+@bp.route("/submissions/<dept_code>/review/<stage_key>")
+@admin_required
+def submission_review(dept_code, stage_key):
+    """Everything a department entered in one stage (or one programme's
+    part), for the review pop-up: the form's own layout, files pointed at
+    the Office's copies, how much is filled and how long it took."""
+    from .workflow import stage_timing
+    stage = STAGE_BY_KEY.get(stage_key) or abort(404)
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    sub = get_or_create_submission(dept_code, _year())
+    prog = request.args.get("programme") or ""
+    if prog:
+        state = (((sub.get("programmes") or {}).get(prog) or {}).get(stage_key) or {})
+        status = state.get("status") or "open"
+    else:
+        state = (sub.get("stages") or {}).get(stage_key) or {}
+        status = compute_status(sub, stage_key)
+
+    def point(node):
+        # a file's link becomes the admin's link to the same file
+        if isinstance(node, dict):
+            if node.get("stored") and node.get("name"):
+                node = dict(node)
+                node["url"] = url_for("admin.document", dept_code=dept_code, stored=node["stored"])
+                return node
+            return {k: point(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [point(v) for v in node]
+        return node
+
+    pname = ""
+    if prog:
+        pname = next((p.get("programme_name", "") for p in
+                      ((sub.get("stages") or {}).get("dept_info", {}).get("data", {}) or {}).get("programmes_offered", [])
+                      if p.get("programme_code") == prog), "") or prog
+    return jsonify({
+        "stage": {"key": stage_key, "title": stage.get("title"), "sections": stage.get("sections", [])},
+        "data": point(state.get("data") or {}),
+        "status": status,
+        "timing": stage_timing(state),
+        "summary": state.get("summary") or {},
+        "returned_note": state.get("returned_note") or "",
+        "dept_name": dept.get("dept_name", dept_code), "dept_code": dept_code,
+        "comment_url": url_for("admin.comment_add") if allows(current_user(), "comments", "edit") else "",
+        "comments": [{"text": c["text"], "at": to_ist(c["at"]).strftime("%d %b %Y"), "status": c.get("status"),
+                      "reply": c.get("reply", "")}
+                     for c in db.comments.find({"dept_code": dept_code, "academic_year": _year(),
+                                                "stage": stage_key, "programme_code": prog}).sort("at", -1)],
+        "programme": prog, "programme_name": pname,
+        "return_url": url_for("admin.submission_return", dept_code=dept_code, stage_key=stage_key)
+        if allows(current_user(), "overview", "edit") else "",
+        "unlock_url": url_for("admin.submission_unlock", dept_code=dept_code, stage_key=stage_key)
+        if allows(current_user(), "overview", "edit") else "",
+        # "Train" beside each file: its words, to add to its box's keywords
+        "train_url": url_for("admin.keywords_train") if allows(current_user(), "settings", "edit") else "",
+        "train_add_url": url_for("admin.keywords_add") if allows(current_user(), "settings", "edit") else "",
+    })
 
 
 @bp.route("/submissions/<dept_code>/<stage_key>/unlock", methods=["POST"])
@@ -399,6 +1423,7 @@ def rules():
         db.rules.update_one({"_id": "ugc"},
                             {"$set": {"table2": table, "totals": totals, "other": other,
                                       "updated_at": now(), "updated_by": _actor()}})
+        forget_cached()
         audit(_actor(), "rules.updated")
         flash("The credit rules have been updated. They apply to every validation from now on.",
               "success")
@@ -416,6 +1441,7 @@ def rules_reset():
                                         "totals": U.DEFAULT_TOTALS,
                                         "other": U.DEFAULT_OTHER_RULES,
                                         "updated_at": now(), "updated_by": _actor()}})
+    forget_cached()
     audit(_actor(), "rules.reset")
     flash("Credit rules restored to the published UGC Table 2 values.", "success")
     return redirect(url_for("admin.rules"))
@@ -430,17 +1456,121 @@ def rules_reset():
 def app_settings():
     db = get_db()
     if request.method == "POST":
-        db.settings.update_one(
-            {"_id": "app"},
-            {"$set": {"academic_year": (request.form.get("academic_year") or "").strip(),
-                      "submissions_open": request.form.get("submissions_open") == "on",
-                      "banner": (request.form.get("banner") or "").strip(),
-                      "updated_at": now()}})
+        from .db import settings as _s
+        was_dev = bool(_s().get("dev_mode"))
+        dev = request.form.get("dev_mode") == "on"
+        fields = {"academic_year": (request.form.get("academic_year") or "").strip(),
+                  "submissions_open": request.form.get("submissions_open") == "on",
+                  "dev_mode": dev,
+                  "banner": (request.form.get("banner") or "").strip(),
+                  "updated_at": now()}
+        # the batches: the current one, and the earlier ones whose syllabi
+        # departments keep — "2024-2025", one per line (or comma-separated)
+        if "current_batch" in request.form:
+            from .schema import batch_start
+            bad = []
+            cur = batch_start(request.form.get("current_batch"))
+            if not cur or not 2010 <= cur <= 2040:
+                bad.append(request.form.get("current_batch") or "(empty)")
+            else:
+                fields["current_batch"] = f"{cur}-{cur + 1}"
+            years = []
+            for raw in re.split(r"[,\n]+", request.form.get("existing_batches") or ""):
+                if not raw.strip():
+                    continue
+                y = batch_start(raw)
+                if not y or not 2010 <= y <= 2040:
+                    bad.append(raw.strip())
+                elif y != cur and f"{y}-{y + 1}" not in years:
+                    years.append(f"{y}-{y + 1}")
+            fields["existing_batches"] = sorted(years)
+            # the semesters each earlier batch uploads (5 and 6, 3 and 4 …)
+            chosen = dict(_s().get("batch_semesters") or {})
+            for b in batches()["existing"]:
+                if f"sems_{b['start']}_shown" in request.form:
+                    chosen[str(b["start"])] = sorted({int(n) for n in request.form.getlist(f"sems_{b['start']}")
+                                                      if n.isdigit() and 1 <= int(n) <= 8})
+            fields["batch_semesters"] = chosen
+            if bad:
+                flash("Not a batch year (use the form 2024-2025, from 2010 to 2040): "
+                      + ", ".join(bad), "error")
+                return redirect(url_for("admin.app_settings"))
+        db.settings.update_one({"_id": "app"}, {"$set": fields})
+        forget_cached()
         audit(_actor(), "settings.updated")
-        flash("Settings saved.", "success")
+        # Unlocking every stage for every department is worth its own line in
+        # the log, separate from whatever else was saved in the same form.
+        if dev != was_dev:
+            audit(_actor(), "settings.dev_mode." + ("on" if dev else "off"))
+            flash("Developer mode is ON — every stage is unlocked for every "
+                  "department." if dev else
+                  "Developer mode is off. Stages lock in sequence again.",
+                  "warning" if dev else "success")
+        else:
+            flash("Settings saved.", "success")
         return redirect(url_for("admin.app_settings"))
     from .db import settings as s
-    return render_template("admin/settings.html", settings=s())
+    return render_template("admin/settings.html", settings=s(), batches=batches(),
+                           stage_count=len(STAGES))
+
+
+@bp.post("/settings/next-batch")
+@admin_required
+def next_batch():
+    """Start the next batch at any time: the current batch (2026–2027) becomes
+    an earlier batch and the next year (2027–2028) the current one. Each
+    programme's current-batch syllabus moves, as it is, under that earlier
+    batch, and the current batch starts empty."""
+    from .db import settings as _s
+    from .schema import batch_key, batch_label, batch_start
+    db = get_db()
+    b = batches()
+    cur = batch_start(b["current"])
+    # the form names the batch it was shown, so a second click does nothing
+    if not cur or batch_start(request.form.get("from")) != cur:
+        flash("The batches have already changed. Nothing was moved.", "info")
+        return redirect(url_for("admin.app_settings"))
+    new = cur + 1
+    if new > 2040:
+        flash("Batches go up to 2040–2041.", "error")
+        return redirect(url_for("admin.app_settings"))
+    old_key = batch_key(cur)
+    moved = kept = 0
+    for sub in db.submissions.find({"programmes": {"$exists": True}}, {"programmes": 1}):
+        sets, unsets = {}, {}
+        for code, parts in (sub.get("programmes") or {}).items():
+            st = (parts or {}).get("prog_syllabus")
+            if not st:
+                continue
+            if ((parts or {}).get(old_key) or {}).get("data"):
+                kept += 1          # that earlier batch is already filled: leave both as they are
+                continue
+            sets[f"programmes.{code}.{old_key}"] = st
+            unsets[f"programmes.{code}.prog_syllabus"] = ""
+            moved += 1
+        if sets:
+            db.submissions.update_one({"_id": sub["_id"]}, {"$set": sets, "$unset": unsets})
+    earlier = sorted({f"{y}-{y + 1}" for y in [batch_start(x["label"]) for x in b["existing"]] + [cur] if y})
+    db.settings.update_one({"_id": "app"}, {"$set": {"current_batch": f"{new}-{new + 1}",
+                                                     "existing_batches": earlier, "updated_at": now()}},
+                           upsert=True)
+    forget_cached()
+    audit(_actor(), "batch.next", detail={"from": batch_label(cur), "to": batch_label(new),
+                                          "moved": moved, "kept": kept})
+    flash(f"The current batch is now {batch_label(new)}. Batch of {batch_label(cur)} is an earlier batch, "
+          f"with {moved} programme syllabus(es) moved to it as they were."
+          + (f" {kept} programme(s) already had a {batch_label(cur)} syllabus, so theirs were left in place." if kept else ""),
+          "success")
+    return redirect(url_for("admin.app_settings"))
+
+
+@bp.route("/storage")
+@admin_required
+def storage():
+    """Where the portal keeps what — MongoDB, Google Drive, the server — and how much."""
+    from .storage_report import report, size
+    return render_template("admin/storage.html", r=report(refresh=request.args.get("refresh") == "1"),
+                           size=size)
 
 
 @bp.route("/audit")
@@ -453,7 +1583,7 @@ def audit_log():
 @bp.route("/export/institution.xlsx")
 @admin_required
 def export_institution():
-    buf = institution_excel(_year())
+    buf = institution_excel(_year(), view_scope())
     audit(_actor(), "export.institution")
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Repository-{_year()}.xlsx",
@@ -463,19 +1593,793 @@ def export_institution():
 @bp.route("/export/<dept_code>.xlsx")
 @admin_required
 def export_department(dept_code):
-    buf = department_excel(dept_code, _year())
+    buf = department_excel(dept_code, _year(), ShareLinks(dept_code, _year()))
     audit(_actor(), "export.department", dept_code)
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-{dept_code}-{_year()}.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+@bp.route("/export/<dept_code>.zip")
+@admin_required
+def export_department_both(dept_code):
+    """The department's Excel and Word report together, in one ZIP — with
+    every programme's Curriculum, Syllabus and Course Revision, the current
+    batch's and each earlier batch's."""
+    import zipfile
+
+    from .docgen import programme_files
+    from .workflow import programmes_of
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    year = _year()
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"BoS-{dept_code}-{year}.xlsx", department_excel(dept_code, year, ShareLinks(dept_code, year)).getvalue())
+        z.writestr(f"BoS-Report-{dept_code}-{year}.docx", submission_word(dept_code, year, ShareLinks(dept_code, year)).getvalue())
+        # each programme: the current batch and every earlier batch, Curriculum, Syllabus, Course Revision
+        for p in programmes_of(sub, dept):
+            for path, data in programme_files(db, dept_code, year, p["programme_code"]) or []:
+                z.writestr(f"Programmes/{path}", data)
+    buf.seek(0)
+    audit(_actor(), "export.department", dept_code, {"kind": "both"})
+    return send_file(buf, as_attachment=True, download_name=f"BoS-{dept_code}-{year}.zip", mimetype="application/zip")
+
+
+@bp.route("/report/<dept_code>/<programme_code>")
+@admin_required
+def programme_report(dept_code, programme_code):
+    """One programme's whole record as a page to read or print."""
+    from .report import programme_context
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    ctx = programme_context(db, dept, _year(), programme_code, AdminLinks(dept_code, _year())) or abort(404)
+    return render_template("admin/programme_report.html", **ctx,
+                           zip_url=url_for("admin.programme_report_zip", dept_code=dept_code,
+                                           programme_code=ctx["programme"]["programme_code"]))
+
+
+@bp.route("/report/<dept_code>/<programme_code>/report.zip")
+@admin_required
+def programme_report_zip(dept_code, programme_code):
+    """One programme's whole record in one ZIP: the current batch and each
+    earlier batch, each with its Curriculum, Syllabus and Course Revision."""
+    from .docgen import programme_zip
+    out = programme_zip(get_db(), dept_code, _year(), programme_code) or abort(404)
+    audit(_actor(), "export.programme", f"{dept_code}/{programme_code}")
+    return send_file(out[0], as_attachment=True, download_name=out[1], mimetype="application/zip")
+
+
+@bp.route("/export/<dept_code>/preview/<kind>")
+@admin_required
+def export_preview(dept_code, kind):
+    """The Excel or Word download, shown in a browser tab: every sheet as a
+    tab of its own, with the download beside it."""
+    from .share import _docx_blocks, _xlsx_sheets
+    dept = get_db().departments.find_one({"dept_code": dept_code}) or abort(404)
+    links = ShareLinks(dept_code, _year())
+    if kind == "xlsx":
+        buf, body = department_excel(dept_code, _year(), links), None
+        body = _xlsx_sheets(buf, max_rows=3000, max_cols=12)
+        name, url = f"BoS-{dept_code}-{_year()}.xlsx", url_for("admin.export_department", dept_code=dept_code)
+    elif kind == "docx":
+        buf = submission_word(dept_code, _year(), links)
+        body = _docx_blocks(buf)
+        name, url = f"BoS-Report-{dept_code}-{_year()}.docx", url_for("admin.export_department_word",
+                                                                      dept_code=dept_code)
+    else:
+        abort(404)
+    rec = {"original_name": name, "dept_code": dept_code, "academic_year": _year(),
+           "size": len(buf.getvalue())}
+    return render_template("share/doc.html", rec=rec, dept=dept, kind=kind, body=body,
+                           file_url=url, download_url=url, hide_chrome=True)
+
+
+@bp.post("/departments/<dept_code>/wipe")
+@admin_required
+def wipe_department(dept_code):
+    """Delete everything the department has entered and uploaded — every year,
+    every stage, every file — keeping the department and its login."""
+    import shutil
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
+        flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
+        return redirect(_back_to(dept_code))
+    from .drive_store import trash_later
+    trash_later([r.get("drive_id") for r in db.files.find({"dept_code": dept_code}, {"drive_id": 1})])
+    counts = {}
+    for col in ("submissions", "files", "comments", "notifications", "versions"):
+        counts[col] = db[col].delete_many({"dept_code": dept_code}).deleted_count
+    root = current_app.config["UPLOAD_ROOT"]
+    for year_dir in (root.iterdir() if root.is_dir() else []):
+        folder = year_dir / dept_code
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+    audit(_actor(), "department.wiped", dept_code, counts)
+    flash(f"All of {dept['dept_name']}'s data is deleted: {counts['submissions']} record(s), "
+          f"{counts['files']} file(s). The department and its login are kept.", "success")
+    return redirect(_back_to(dept_code))
+
+
+def _back_to(dept_code):
+    """Back to the department page it was asked from (More), else the full detail."""
+    if request.form.get("back") == "page":
+        return url_for("admin.department_page", dept_code=dept_code)
+    return url_for("admin.submission_detail", dept_code=dept_code)
+
+
+@bp.post("/departments/<dept_code>/delete")
+@admin_required
+def department_delete(dept_code):
+    """Remove the department itself: its record, its login, and everything it
+    entered and uploaded. Asks for the code to be typed."""
+    import shutil
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    if (request.form.get("confirm") or "").strip().upper() != dept_code.upper():
+        flash(f"Type the department code {dept_code} to confirm. Nothing was deleted.", "error")
+        return redirect(_back_to(dept_code))
+    from .drive_store import trash_later
+    trash_later([r.get("drive_id") for r in db.files.find({"dept_code": dept_code}, {"drive_id": 1})])
+    counts = {col: db[col].delete_many({"dept_code": dept_code}).deleted_count
+              for col in ("submissions", "files", "comments", "notifications", "versions")}
+    counts["logins"] = db.users.delete_many({"dept_code": dept_code, "role": "department"}).deleted_count
+    db.departments.delete_one({"_id": dept["_id"]})
+    root = current_app.config["UPLOAD_ROOT"]
+    for year_dir in (root.iterdir() if root.is_dir() else []):
+        folder = year_dir / dept_code
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+    audit(_actor(), "department.deleted", dept_code, counts)
+    flash(f"{dept['dept_name']} is deleted, with its login and all its data.", "success")
+    return redirect(url_for("admin.overview_departments"))
+
+
+@bp.route("/report/<dept_code>/<programme_code>/<kind>.docx")
+@admin_required
+def programme_docx(dept_code, programme_code, kind):
+    """The programme's Curriculum ("c") or Syllabus ("s") in the Office's templates."""
+    from .share import DOCX, generated_docx
+    if kind not in ("c", "s", "v"):
+        abort(404)
+    out = generated_docx(kind, dept_code, programme_code, _year()) or abort(404)
+    return send_file(out[0], as_attachment=True, download_name=out[1], mimetype=DOCX)
+
+
 @bp.route("/export/<dept_code>.docx")
 @admin_required
 def export_department_word(dept_code):
-    buf = submission_word(dept_code, _year())
+    buf = submission_word(dept_code, _year(), ShareLinks(dept_code, _year()))
     audit(_actor(), "export.word", dept_code)
     return send_file(buf, as_attachment=True,
                      download_name=f"BoS-Report-{dept_code}-{_year()}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument."
                               "wordprocessingml.document")
+
+
+# ---------------------------------------------------------------------------
+# updates: what departments changed, as it happens
+# ---------------------------------------------------------------------------
+
+def _updates_query(args):
+    q = scope_q()
+    if args.get("dept"):
+        q["dept_code"] = args["dept"]
+    if args.get("event"):
+        q["event"] = args["event"]
+    if args.get("show") == "unread":
+        q["read"] = False
+    return q
+
+
+@bp.route("/updates")
+@admin_required
+def updates():
+    from .notify import EVENTS
+    db = get_db()
+    q = _updates_query(request.args)
+    items = list(db.notifications.find(q).sort("at", -1).limit(300))
+    days, order = {}, []
+    for n in items:
+        d = to_ist(n["at"]).strftime("%A, %d %B %Y")
+        if d not in days:
+            days[d] = []
+            order.append(d)
+        days[d].append(n)
+    depts = sorted({(n["dept_code"], n.get("dept_name", "")) for n in
+                    db.notifications.find(scope_q(), {"dept_code": 1, "dept_name": 1})}, key=lambda x: x[1])
+    counts = {k: db.notifications.count_documents({"event": k, **scope_q()}) for k in EVENTS}
+    return render_template("admin/updates.html", days=[(d, days[d]) for d in order],
+                           events=EVENTS, depts=depts, counts=counts, args=request.args,
+                           unread=db.notifications.count_documents({"read": False, **scope_q()}),
+                           total=db.notifications.count_documents(scope_q()))
+
+
+@bp.post("/updates/read")
+@admin_required
+def updates_read():
+    from bson import ObjectId
+    db = get_db()
+    one = request.form.get("id")
+    if one:
+        try:
+            db.notifications.update_one({"_id": ObjectId(one), **scope_q()}, {"$set": {"read": True}})
+        except Exception:
+            abort(400)
+    else:
+        db.notifications.update_many({"read": False, **scope_q()}, {"$set": {"read": True}})
+    if request.accept_mimetypes.best == "application/json" or request.is_json:
+        return jsonify({"ok": True})
+    return redirect(request.referrer or url_for("admin.updates"))
+
+
+@bp.route("/updates.json")
+@admin_required
+def updates_json():
+    """For the bell: how many are unread, and any newer than `after`."""
+    db = get_db()
+    q = {"read": False, **scope_q()}
+    after = request.args.get("after")
+    items = []
+    if after:
+        try:
+            since = datetime.fromisoformat(after)
+            items = [{"id": str(n["_id"]), "text": n["text"], "event": n["event"],
+                      "at": n["at"].isoformat(),
+                      "link": url_for("admin.submission_detail", dept_code=n["dept_code"])}
+                     for n in db.notifications.find({"at": {"$gt": since}, **scope_q()}).sort("at", 1).limit(5)]
+        except ValueError:
+            pass
+    return jsonify({"unread": db.notifications.count_documents(q), "items": items,
+                    "now": now().isoformat()})
+
+
+# ---------------------------------------------------------------------------
+# connectors: where updates are sent
+# ---------------------------------------------------------------------------
+
+def _connector_form(f):
+    from .notify import EVENTS, KINDS
+    kind = f.get("kind")
+    if kind not in KINDS:
+        return None, "Choose what kind of connector this is."
+    target = (f.get("target") or "").strip()
+    if kind == "email":
+        emails = [e.strip() for e in target.replace(";", ",").split(",") if e.strip()]
+        if not emails or not all(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", e) for e in emails):
+            return None, "Give one or more email addresses, separated by commas."
+        target = ", ".join(emails)
+    elif not target.startswith("https://"):
+        return None, "The webhook address must start with https://"
+    events = [e for e in f.getlist("events") if e in EVENTS]
+    if not events:
+        return None, "Choose at least one kind of update to send."
+    return {"kind": kind, "name": (f.get("name") or KINDS[kind]).strip()[:80], "target": target,
+            "events": events, "departments": (f.get("departments") or "").strip()[:400],
+            "active": True}, None
+
+
+def _mask(c):
+    if c["kind"] == "email":
+        return c["target"]
+    t = c["target"]
+    return t[:28] + "…" + t[-4:] if len(t) > 40 else t
+
+
+@bp.route("/connectors", methods=["GET", "POST"])
+@admin_required
+def connectors():
+    from .notify import EVENTS, KINDS, smtp_ready
+    db = get_db()
+    if request.method == "POST":
+        doc, err = _connector_form(request.form)
+        if err:
+            flash(err, "error")
+        else:
+            doc.update(created_at=now(), sent=0, failed=0)
+            db.connectors.insert_one(doc)
+            audit(_actor(), "connector.added", doc["kind"], {"name": doc["name"]})
+            flash(f"{doc['name']} connected. Use “Send test” to check it.", "success")
+        return redirect(url_for("admin.connectors"))
+    items = list(db.connectors.find().sort("created_at", 1))
+    for c in items:
+        c["shown"] = _mask(c)
+    return render_template("admin/connectors.html", items=items, kinds=KINDS, events=EVENTS,
+                           smtp=smtp_ready())
+
+
+def _connector(cid):
+    from bson import ObjectId
+    try:
+        c = get_db().connectors.find_one({"_id": ObjectId(cid)})
+    except Exception:
+        c = None
+    if not c:
+        abort(404)
+    return c
+
+
+@bp.post("/connectors/<cid>/toggle")
+@admin_required
+def connector_toggle(cid):
+    c = _connector(cid)
+    get_db().connectors.update_one({"_id": c["_id"]}, {"$set": {"active": not c.get("active")}})
+    audit(_actor(), "connector." + ("paused" if c.get("active") else "resumed"), c["kind"])
+    return redirect(url_for("admin.connectors"))
+
+
+@bp.post("/connectors/<cid>/delete")
+@admin_required
+def connector_delete(cid):
+    c = _connector(cid)
+    get_db().connectors.delete_one({"_id": c["_id"]})
+    audit(_actor(), "connector.removed", c["kind"], {"name": c.get("name")})
+    flash(f"{c.get('name')} removed.", "success")
+    return redirect(url_for("admin.connectors"))
+
+
+@bp.post("/connectors/<cid>/test")
+@admin_required
+def connector_test(cid):
+    from .notify import send_one, test_note
+    c = _connector(cid)
+    ok, words = send_one(c, test_note())
+    get_db().connectors.update_one({"_id": c["_id"]}, {
+        "$set": {"last_at": now(), "last_ok": ok, "last_status": "Test: " + words}})
+    flash(f"Test sent to {c.get('name')}." if ok else f"{c.get('name')}: the test failed — {words}",
+          "success" if ok else "error")
+    return redirect(url_for("admin.connectors"))
+
+
+# ---------------------------------------------------------------------------
+# keywords: what each upload box is checked for
+# ---------------------------------------------------------------------------
+
+@bp.route("/keywords", methods=["GET", "POST"])
+@admin_required
+def keywords():
+    from .keyword_match import default_keywords, overrides, upload_boxes
+    db = get_db()
+    boxes = upload_boxes()
+    if request.method == "POST":
+        mine = {}
+        for b in boxes:
+            raw = request.form.get("kw_" + b["field"], "")
+            words = list(dict.fromkeys(w.strip() for w in re.split(r"[,\n]+", raw) if w.strip()))[:30]
+            if words and words != default_keywords(b["field"], b["label"]):
+                mine[b["field"]] = words
+        # a mandatory box switched off: departments may leave it empty and still submit
+        optional = [b["field"] for b in boxes if b["required"] and not request.form.get("mand_" + b["field"])]
+        db.settings.update_one({"_id": "app"}, {"$set": {"keywords": mine, "optional_uploads": optional}},
+                               upsert=True)
+        forget_cached()
+        audit(_actor(), "keywords.updated", detail={"boxes": len(mine), "not_mandatory": optional})
+        flash("Saved. Keywords apply to the next upload — use “Check all files again” for the ones "
+              "already in. A box made not mandatory can be left empty from now on.", "success")
+        return redirect(url_for("admin.keywords"))
+
+    mine = overrides()
+    from .keyword_match import optional_uploads
+    off = optional_uploads()
+    for b in boxes:
+        b["mandatory"] = b["required"] and b["field"] not in off
+        b["default"] = default_keywords(b["field"], b["label"])
+        b["words"] = mine.get(b["field"]) or b["default"]
+        b["custom"] = b["field"] in mine
+        stats = {"match": 0, "weak": 0, "miss": 0, "unread": 0}
+        for r in db.files.find({"field": b["field"], "academic_year": _year()}, {"keyword_match": 1}):
+            s = (r.get("keyword_match") or {}).get("status")
+            if s in stats:
+                stats[s] += 1
+        b["stats"] = stats
+
+    status = request.args.get("status", "")
+    from .keyword_match import pdf_reader_ok
+    pdf_ok = pdf_reader_ok()
+    q = {"academic_year": _year(), "keyword_match": {"$exists": True}, **scope_q()}
+    if status:
+        q["keyword_match.status"] = status
+    names = {d["dept_code"]: d.get("dept_name", "") for d in db.departments.find({}, {"dept_code": 1, "dept_name": 1})}
+    files = []
+    for r in db.files.find(q).sort("uploaded_at", -1).limit(400):
+        files.append({"dept_code": r["dept_code"], "dept_name": names.get(r["dept_code"], r["dept_code"]),
+                      "name": r["original_name"], "field": r.get("field"),
+                      "match": r.get("keyword_match") or {}, "at": r.get("uploaded_at"),
+                      "url": url_for("admin.document", dept_code=r["dept_code"], stored=r["stored_name"])})
+    totals = {k: db.files.count_documents({"academic_year": _year(), "keyword_match.status": k})
+              for k in ("match", "weak", "miss", "unread")}
+    unchecked = db.files.count_documents({"academic_year": _year(), "keyword_match": {"$exists": False}})
+    return render_template("admin/keywords.html", boxes=boxes, files=files, totals=totals,
+                           status=status, unchecked=unchecked, pdf_ok=pdf_ok)
+
+
+@bp.post("/keywords/reset")
+@admin_required
+def keywords_reset():
+    get_db().settings.update_one({"_id": "app"}, {"$set": {"keywords": {}}}, upsert=True)
+    forget_cached()
+    audit(_actor(), "keywords.reset")
+    flash("Every box is back to its standard keywords.", "success")
+    return redirect(url_for("admin.keywords"))
+
+
+@bp.post("/keywords/recheck")
+@admin_required
+def keywords_recheck():
+    """Run the check again on every file this year — for files uploaded
+    before the check existed, or after the keywords changed."""
+    from .keyword_match import check
+    from .summarise import field_label
+    db = get_db()
+    from .drive_store import ensure_local
+    done = gone = 0
+    for r in db.files.find({"academic_year": _year()}):
+        path = ensure_local({**r, "academic_year": r.get("academic_year") or _year()})
+        if not path.exists():
+            gone += 1
+            continue
+        m = check(path, r.get("field", ""), field_label(r.get("stage", ""), r.get("field", "")))
+        db.files.update_one({"_id": r["_id"]}, {"$set": {"keyword_match": m}})
+        done += 1
+    audit(_actor(), "keywords.rechecked", detail={"files": done})
+    flash(f"Checked {done} file{'s' if done != 1 else ''} again"
+          + (f"; {gone} no longer on the server." if gone else "."), "success")
+    return redirect(url_for("admin.keywords"))
+
+
+@bp.post("/keywords/train")
+@admin_required
+def keywords_train():
+    """Train on one department's file: the words it carries that its upload
+    box's keywords do not have yet, for the Office to approve."""
+    from .drive_store import ensure_local
+    from .keyword_match import default_keywords, overrides, read_text, suggest, why_unread
+    from .summarise import field_label
+    j = request.get_json(silent=True) or {}
+    db = get_db()
+    rec = db.files.find_one({"dept_code": str(j.get("dept_code") or ""), "stored_name": str(j.get("stored") or "")})
+    if not rec or not rec.get("field"):
+        return jsonify({"ok": False, "error": "This file is not on record."}), 404
+    field = rec["field"]
+    label = field_label(rec.get("stage", ""), field)
+    current = overrides().get(field) or default_keywords(field, label)
+    path = ensure_local({**rec, "academic_year": rec.get("academic_year") or _year()})
+    text = read_text(path) if path.exists() else None
+    out = {"ok": True, "field": field, "label": label, "current": current,
+           "found": ((rec.get("keyword_match") or {}).get("found") or [])}
+    if text is None:
+        return jsonify({**out, "unread": True, "why": why_unread(path) if path.exists() else "missing",
+                        "suggestions": []})
+    return jsonify({**out, "unread": False, "suggestions": suggest(text, current)})
+
+
+@bp.post("/keywords/add")
+@admin_required
+def keywords_add():
+    """Add the approved words to an upload box's keywords, and check the file
+    they came from again."""
+    from .drive_store import ensure_local
+    from .keyword_match import add_keywords, check, default_keywords, overrides, upload_boxes
+    from .summarise import field_label
+    j = request.get_json(silent=True) or {}
+    field = str(j.get("field") or "")
+    box = next((b for b in upload_boxes() if b["field"] == field), None)
+    words = [str(w) for w in (j.get("words") or []) if str(w).strip()][:20]
+    if not box or not words:
+        return jsonify({"ok": False, "error": "Choose at least one keyword."}), 400
+    db = get_db()
+    current = overrides().get(field) or default_keywords(field, box["label"])
+    new = add_keywords(current, words)
+    added = new[len(current):]
+    db.settings.update_one({"_id": "app"}, {"$set": {f"keywords.{field}": new}}, upsert=True)
+    forget_cached()
+    audit(_actor(), "keywords.trained", detail={"field": field, "added": added,
+                                                "from": f"{j.get('dept_code', '')}/{j.get('stored', '')}"})
+    # the file it came from, checked with the new list
+    match = None
+    rec = db.files.find_one({"dept_code": str(j.get("dept_code") or ""), "stored_name": str(j.get("stored") or "")})
+    if rec:
+        path = ensure_local({**rec, "academic_year": rec.get("academic_year") or _year()})
+        if path.exists():
+            match = check(path, field, field_label(rec.get("stage", ""), field))
+            db.files.update_one({"_id": rec["_id"]}, {"$set": {"keyword_match": match}})
+    return jsonify({"ok": True, "added": added, "keywords": new, "match": match})
+
+
+# ---------------------------------------------------------------------------
+# the demo department
+# ---------------------------------------------------------------------------
+
+@bp.post("/demo-department")
+@admin_required
+def demo_department():
+    from . import demo_dept
+    try:
+        user, pw = demo_dept.create(_year(), current_app.config["UPLOAD_ROOT"], actor=_actor())
+    except Exception as e:                       # say why, rather than a bare 500
+        current_app.logger.exception("Could not make the demo department")
+        flash(f"The demo department could not be made — {e.__class__.__name__}: {e}"[:400], "error")
+        return redirect(url_for("admin.departments"))
+    audit(_actor(), "demo.created", demo_dept.CODE)
+    flash(f"{demo_dept.NAME} is ready. Username {user}, password {pw} — sign in as it "
+          "(in a private window) and press “Fill everything with sample data”.", "success")
+    return redirect(url_for("admin.departments"))
+
+
+@bp.post("/demo-department/remove")
+@admin_required
+def demo_department_remove():
+    from . import demo_dept
+    demo_dept.remove()
+    audit(_actor(), "demo.removed", demo_dept.CODE)
+    flash(f"{demo_dept.NAME} removed.", "success")
+    return redirect(url_for("admin.departments"))
+
+
+# ---------------------------------------------------------------------------
+# analysis sheets: every department, stage by stage, programme by programme,
+# document by document — and comments asking for a change
+# ---------------------------------------------------------------------------
+
+BOS_DOCS = [("pre_bos", "pre_bos_files", "diac_signed", "DIAC"), ("pre_bos", "pre_bos_files", "dpac_signed", "DPAC"),
+            ("bos_documents", "bos_files", "bos_composition", "BoS composition"),
+            ("bos_documents", "bos_files", "external_profiles", "Expert profiles"),
+            ("bos_documents", "bos_files", "minutes", "MoM"),
+            ("bos_documents", "bos_files", "geotagged_photos", "Photos"),
+            ("bos_documents", "bos_files", "attendance", "Attendance"),
+            ("bos_documents", "bos_files", "vision_mission", "Vision-Mission"),
+            ("bos_documents", "bos_files", "feedback_curriculum", "Feedback"),
+            ("bos_documents", "bos_files", "feedback_new_programme", "Feedback (new)")]
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _doc_state(val):
+    """One upload box, in a word: '' (nothing), ok, warn or bad, and why."""
+    vals = [v for v in (val if isinstance(val, list) else [val]) if isinstance(v, dict) and v.get("name")]
+    if not vals:
+        return "", ""
+    why = []
+    worst = "ok"
+    for v in vals:
+        m = v.get("match") or {}
+        t = m.get("template") or {}
+        if t and (t.get("blank") or t.get("half") or t.get("placeholders")):
+            worst = "bad"
+            why.append("blank: " + ", ".join(t.get("blank") or t.get("half") or ["Words only"]))
+        elif m.get("looks_like"):
+            worst = "bad"
+            why.append("looks like " + m["looks_like"])
+        elif m.get("status") == "miss":
+            worst = "bad" if worst != "bad" else worst
+            why.append("keywords do not match")
+        elif m.get("status") == "weak" and worst == "ok":
+            worst = "warn"
+            why.append("few keywords")
+    return worst, "; ".join(why) or f"{len(vals)} file{'s' if len(vals) != 1 else ''}"
+
+
+def analysis_sheets(year):
+    from .workflow import programme_stage_state, programmes_of, stage_timing
+    db = get_db()
+    depts = list(db.departments.find({"active": True, **scope_q()}).sort("dept_name", 1))
+    subs = {s["dept_code"]: s for s in db.submissions.find({"academic_year": year, **scope_q()})}
+    open_comments = {}
+    for c in db.comments.find({"academic_year": year, "status": "open", **scope_q()}):
+        open_comments[c["dept_code"]] = open_comments.get(c["dept_code"], 0) + 1
+    stages, progs, docs = [], [], []
+    for d in depts:
+        sub = subs.get(d["dept_code"]) or {"stages": {}, "programmes": {}}
+        row = {"dept": d, "cells": [], "comments": open_comments.get(d["dept_code"], 0)}
+        for s in STAGES:
+            st = (sub.get("stages") or {}).get(s["key"]) or {}
+            row["cells"].append({"key": s["key"], "title": s["title"],
+                                 "status": compute_status(sub, s["key"]) if sub.get("_id") else "open",
+                                 "timing": stage_timing(st)})
+        stages.append(row)
+        for p in programmes_of(sub, d) if sub.get("_id") else []:
+            code = p["programme_code"]
+            part = lambda k: programme_stage_state(sub, code, k)
+            cur = (part("prog_curriculum").get("data") or {})
+            rows = [r for r in (cur.get("semester_structure") or []) if isinstance(r, dict)]
+            syl = (part("prog_syllabus").get("data") or {}).get("courses") or []
+            rev = [r for r in ((part("prog_revision").get("data") or {}).get("courses") or []) if isinstance(r, dict)]
+            changes = [_num(r.get("avg_change")) for r in rev if r.get("avg_change") not in (None, "")]
+            progs.append({"dept": d, "code": code, "name": p.get("programme_name") or code,
+                          "degree": (cur.get("details") or {}).get("degree_level") or p.get("degree", ""),
+                          "courses": len(rows), "credits": int(sum(_num(r.get("credits")) for r in rows)),
+                          "syllabi": len(syl), "revised": len(rev),
+                          "avg_change": round(sum(changes) / len(changes), 1) if changes else None,
+                          "parts": {k: part(k).get("status") or "open"
+                                    for k in ("prog_curriculum", "prog_syllabus", "prog_revision")}})
+        drow = {"dept": d, "cells": []}
+        for stage, sec, field, label in BOS_DOCS:
+            val = (((sub.get("stages") or {}).get(stage) or {}).get("data") or {}).get(sec, {})
+            state, why = _doc_state((val or {}).get(field))
+            drow["cells"].append({"label": label, "state": state, "why": why, "stage": stage})
+        docs.append(drow)
+    comments = list(db.comments.find({"academic_year": year, **scope_q()}).sort("at", -1).limit(500))
+    names = {d["dept_code"]: d.get("dept_name", "") for d in depts}
+    return {"stages": stages, "programmes": progs, "documents": docs, "comments": comments,
+            "names": names, "doc_labels": [x[3] for x in BOS_DOCS]}
+
+
+@bp.route("/sheets")
+@admin_required
+def sheets():
+    tab = request.args.get("tab", "programmes")
+    if tab not in ("programmes", "documents", "comments"):
+        return redirect(url_for("admin.submissions"))
+    data = analysis_sheets(_year())
+    return render_template("admin/sheets.html", year=_year(), tab=tab,
+                           STAGES=STAGES, STAGE_BY_KEY=STAGE_BY_KEY, **data)
+
+
+@bp.route("/sheets.xlsx")
+@admin_required
+def sheets_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    data = analysis_sheets(_year())
+    wb = Workbook()
+    head = Font(bold=True, color="FFFFFF")
+    fill = PatternFill("solid", fgColor="0E2A5C")
+
+    def sheet(ws, header, rows):
+        ws.append(header)
+        for c in ws[1]:
+            c.font, c.fill = head, fill
+        for r in rows:
+            ws.append(r)
+        for col in ws.columns:
+            ws.column_dimensions[col[0].column_letter].width = max(12, min(48, max(len(str(c.value or "")) for c in col) + 2))
+        ws.freeze_panes = "B2"
+
+    ws = wb.active
+    ws.title = "Stages"
+    sheet(ws, ["Department", "Code", "Campus"] + [f"{s['title']}" for s in STAGES] + ["Open comments"],
+          [[r["dept"].get("dept_name"), r["dept"]["dept_code"], r["dept"].get("campus", "")]
+           + [c["status"] + (f" ({c['timing']['took']})" if c["timing"].get("took") else "") for c in r["cells"]]
+           + [r["comments"]] for r in data["stages"]])
+    sheet(wb.create_sheet("Programmes"),
+          ["Department", "Programme", "Code", "Degree", "Courses", "Credits", "Syllabi", "Revised courses",
+           "Avg % change", "Curriculum", "Current syllabus", "Revision"],
+          [[p["dept"].get("dept_name"), p["name"], p["code"], p["degree"], p["courses"], p["credits"],
+            p["syllabi"], p["revised"], p["avg_change"], p["parts"]["prog_curriculum"],
+            p["parts"]["prog_syllabus"], p["parts"]["prog_revision"]] for p in data["programmes"]])
+    sheet(wb.create_sheet("Documents"), ["Department"] + data["doc_labels"],
+          [[r["dept"].get("dept_name")] + [(c["state"] or "—") + (f": {c['why']}" if c["state"] in ("warn", "bad") else "")
+                                         for c in r["cells"]] for r in data["documents"]])
+    sheet(wb.create_sheet("Comments"), ["When", "Department", "Stage", "Programme", "Comment", "By", "Status", "Reply"],
+          [[to_ist(c["at"]).strftime("%d %b %Y %H:%M"), data["names"].get(c["dept_code"], c["dept_code"]),
+            STAGE_BY_KEY.get(c["stage"], {}).get("title", c["stage"]), c.get("programme_code", ""),
+            c["text"], c.get("by", ""), c.get("status", ""), c.get("reply", "")] for c in data["comments"]])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    audit(_actor(), "export.sheets")
+    return send_file(buf, as_attachment=True, download_name=f"BoS-Analysis-{_year()}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@bp.post("/comments")
+@admin_required
+def comment_add():
+    """A comment asking a department to change something — on a stage or
+    a programme's part. If it is submitted, it can be sent back with it."""
+    db = get_db()
+    f = request.form
+    code, stage = (f.get("dept") or "").strip(), (f.get("stage") or "").strip()
+    text = (f.get("text") or "").strip()
+    dept = db.departments.find_one({"dept_code": code}) if may_see(code) else None
+    if not dept or stage not in STAGE_BY_KEY or not text:
+        flash("Choose a department and a stage, and write the comment.", "error")
+        return redirect(request.referrer or url_for("admin.sheets"))
+    prog = (f.get("programme") or "").strip()
+    doc = {"dept_code": code, "academic_year": _year(), "stage": stage, "programme_code": prog,
+           "text": text[:2000], "by": _actor(), "at": now(), "status": "open", "reopened": False}
+    if f.get("reopen") == "on" and allows(current_user(), "overview", "edit"):
+        from .workflow import programme_stage_state
+        sub = get_or_create_submission(code, _year())
+        if prog:
+            if programme_stage_state(sub, prog, stage).get("status") == "submitted":
+                path = f"programmes.{prog}.{stage}"
+                db.submissions.update_one({"_id": sub["_id"]}, {"$set": {
+                    f"{path}.status": "returned", f"{path}.returned_note": text,
+                    f"{path}.returned_by": _actor(), f"{path}.returned_at": now(), "status": "in_progress"}})
+                doc["reopened"] = True
+        elif compute_status(sub, stage) == "submitted":
+            return_stage(code, _year(), stage, text, _actor())
+            doc["reopened"] = True
+    db.comments.insert_one(doc)
+    audit(_actor(), "comment.added", f"{code}/{prog + '/' if prog else ''}{stage}", {"reopened": doc["reopened"]})
+    flash(f"Comment sent to {dept.get('dept_name')}" + (" — the stage is open again for them to change it."
+                                                         if doc["reopened"] else "."), "success")
+    return redirect(request.referrer or url_for("admin.sheets", tab="comments"))
+
+
+@bp.post("/comments/<cid>/close")
+@admin_required
+def comment_close(cid):
+    from bson import ObjectId
+    try:
+        get_db().comments.update_one({"_id": ObjectId(cid), **scope_q()},
+                                     {"$set": {"status": "closed", "closed_at": now()}})
+    except Exception:
+        abort(400)
+    return redirect(request.referrer or url_for("admin.sheets", tab="comments"))
+
+
+@bp.route("/comments.json")
+@admin_required
+def comments_json():
+    q = {"academic_year": _year(), "dept_code": request.args.get("dept", "")}
+    if request.args.get("stage"):
+        q["stage"] = request.args["stage"]
+    if request.args.get("programme") is not None:
+        q["programme_code"] = request.args.get("programme", "")
+    return jsonify([{"text": c["text"], "by": c.get("by"), "at": to_ist(c["at"]).strftime("%d %b %Y %H:%M"),
+                     "status": c.get("status"), "reply": c.get("reply", "")}
+                    for c in get_db().comments.find(q).sort("at", -1)])
+
+
+# ---------------------------------------------------------------------------
+# calendar: what happened on which day
+# ---------------------------------------------------------------------------
+
+@bp.route("/calendar")
+@admin_required
+def calendar():
+    """A month of activity: a dot on each day something happened, coloured by
+    what; click a day for everything done on it."""
+    import calendar as cal
+    from datetime import date, timedelta
+    from .notify import EVENTS
+    db = get_db()
+    today = to_ist(now()).date()
+    try:
+        y, m = (int(x) for x in (request.args.get("month") or today.strftime("%Y-%m")).split("-"))
+        first = date(y, m, 1)
+    except (ValueError, TypeError):
+        first = today.replace(day=1)
+    last = first.replace(day=cal.monthrange(first.year, first.month)[1])
+    # the month and its days are Indian days; stored times are UTC
+    back = timedelta(hours=5, minutes=30)
+    start = datetime(first.year, first.month, 1) - back
+    end = datetime(last.year, last.month, last.day) + timedelta(days=1) - back
+
+    days = {}
+    for n in db.notifications.find({"at": {"$gte": start, "$lt": end}, **scope_q()}, {"at": 1, "event": 1}):
+        d = days.setdefault(to_ist(n["at"]).date(), {"total": 0, "events": {}})
+        d["total"] += 1
+        d["events"][n["event"]] = d["events"].get(n["event"], 0) + 1
+    for c in db.comments.find({"at": {"$gte": start, "$lt": end}, **scope_q()}, {"at": 1}):
+        d = days.setdefault(to_ist(c["at"]).date(), {"total": 0, "events": {}})
+        d["total"] += 1
+        d["events"]["comment"] = d["events"].get("comment", 0) + 1
+
+    weeks = cal.Calendar(firstweekday=0).monthdatescalendar(first.year, first.month)
+    try:
+        chosen = date.fromisoformat(request.args.get("day") or "")
+    except ValueError:
+        chosen = today if first <= today <= last else None
+    items, comments = [], []
+    if chosen:
+        a = datetime(chosen.year, chosen.month, chosen.day) - back
+        items = list(db.notifications.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}, **scope_q()})
+                     .sort("at", -1))
+        comments = list(db.comments.find({"at": {"$gte": a, "$lt": a + timedelta(days=1)}, **scope_q()})
+                        .sort("at", -1))
+    prev_m = (first - timedelta(days=1)).strftime("%Y-%m")
+    next_m = (last + timedelta(days=1)).strftime("%Y-%m")
+    names = {d["dept_code"]: d.get("dept_name", "") for d in db.departments.find({}, {"dept_code": 1, "dept_name": 1})}
+    return render_template("admin/calendar.html", weeks=weeks, first=first, days=days, today=today,
+                           chosen=chosen, items=items, comments=comments, prev_m=prev_m, next_m=next_m,
+                           events=EVENTS, names=names, STAGE_BY_KEY=STAGE_BY_KEY)

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> Reports</div>
+      <h1>Reports</h1>
+      <p>Your submission, programme by programme — each Curriculum, Syllabus and Course Revision as the Office's templates lay them out. View only; for a copy, contact the Office of Academic Affairs.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="card mb-2">
+  <div class="card-body tight">
+    <table class="data subs-table">
+      <tbody>
+      {% for p in rows %}
+        <tr>
+          <td><span class="mono small">{{ p.code }}</span> <strong>{{ p.name }}</strong></td>
+          <td class="small">{% if p.submitted == p.total %}<span class="pill pill-ok">✓ Submitted</span>
+            {% else %}<span class="muted">{{ p.submitted }} of {{ p.total }} documents submitted</span>{% endif %}</td>
+          <td class="subs-go">{% if p.submitted %}<a class="btn btn-ghost btn-sm" href="{{ p.url }}">See your submission →</a>
+            {% else %}<span class="small muted">Nothing submitted yet</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td class="muted">No programmes yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
