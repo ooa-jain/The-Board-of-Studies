@@ -147,6 +147,10 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span class="side-text">Updates</span>
       <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
     </a>{% endif %}
+    {% if can('comments') %}<a class="side-link nav-bell{{ ' is-on' if ep == 'admin.queries' }}" href="{{ url_for('admin.queries') }}" title="Queries from departments">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9.5 8.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 14.5v.01"/></svg><span class="side-text">Queries</span>
+      <b class="nav-bell-count" {% if not queries_open %}hidden{% endif %}>{{ queries_open if queries_open < 100 else '99+' }}</b>
+    </a>{% endif %}
     {% if can('settings') %}{{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log', 'admin.storage') or ep.startswith('admin.team')) }}{% endif %}
     <button class="side-link side-install" type="button" id="app-install" hidden title="Install the portal as an app">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg><span class="side-text">Install app</span></button>
@@ -513,6 +517,22 @@
 <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pw-show.js') }}"></script>
+{% if dept_shell and not current_user.acting %}
+<button type="button" id="query-btn" class="query-btn"
+        data-sections-url="{{ url_for('dept.query_sections') }}" data-raise-url="{{ url_for('dept.query_raise') }}">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9.5 8.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 14.5v.01"/></svg>
+  <span>Query</span>
+</button>
+<dialog id="query-dialog" class="query-dialog" aria-labelledby="qd-title">
+  <div class="qd-head">
+    <button type="button" class="qd-back" hidden aria-label="Back">←</button>
+    <h2 class="qd-title" id="qd-title">What is your query about?</h2>
+    <button type="button" class="qd-close" aria-label="Close">×</button>
+  </div>
+  <div class="qd-body"></div>
+</dialog>
+<script src="{{ url_for('static', filename='js/query.js') }}"></script>
+{% endif %}
 {% if side_shell %}<script src="{{ url_for('static', filename='js/shell.js') }}"></script>
 <script src="{{ url_for('static', filename='js/suggest.js') }}"></script>{% endif %}
 <script>
@@ -606,12 +626,12 @@
 /* Updates as they happen: every 20 seconds the bell asks for anything new
    and shows it as a message card; clicking one opens that department. */
 (function () {
-  var bell = document.querySelector(".nav-bell");
+  var bell = document.querySelector(".nav-bell[data-updates-url]");
   if (!bell || !window.fetch) return;
   var url = bell.getAttribute("data-updates-url"), after = null, count = bell.querySelector(".nav-bell-count");
-  var kinds = { submitted: "success", keyword_miss: "warning", uploaded: "info", saved: "info", programme: "info", password: "info" };
+  var kinds = { submitted: "success", keyword_miss: "warning", uploaded: "info", saved: "info", programme: "info", password: "info", query: "warning" };
   var titles = { submitted: "Stage submitted", keyword_miss: "Keyword check failed", uploaded: "File uploaded",
-                 saved: "Data changed", programme: "Programmes changed", password: "Password changed" };
+                 saved: "Data changed", programme: "Programmes changed", password: "Password changed", query: "Query raised" };
   function tick() {
     if (document.hidden) return;
     fetch(url + (after ? "?after=" + encodeURIComponent(after) : ""), { credentials: "same-origin" })

@@ -3275,6 +3275,7 @@
   const ICON = {
     plus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
     minus: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    x: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
   };
 
   // an icon and a word: "− Remove", "+ Keep", "+ Add"
@@ -3293,25 +3294,22 @@
     return b;
   }
 
+  /* Programmes offered: one multi-choice dropdown of the department's
+     programmes (UG and PG), and below it the ones chosen. A programme not
+     in the list is typed in (MA English, BA, M.Com…) and added; its name and
+     UG / PG can be changed afterwards. The rows keep their old shape:
+     decision "keep" is chosen, "remove" is not, source "new" was typed in. */
   function renderProgrammeList(section, host) {
     const data = rows(section.key);
     const tabs = section.tabs || [{ key: "all", label: "Programmes", degrees: null }];
     const tabOf = row => (tabs.find(t => t.degrees && t.degrees.includes(row.degree)) ||
                           tabs[0]).key;
+    const levels = tabs.map(t => t.key).filter(k => k !== "all");
+    const firstDegree = key => ((tabs.find(t => t.key === key) || {}).degrees || [key])[0];
+    const label = r => r.programme_name || r.programme_code || "Programme";
 
-    const wrap = el("div", "pl-wrap");
+    const wrap = el("div", "pd-wrap");
     host.appendChild(wrap);
-
-    const bar = el("div", "pl-bar");
-    const tally = el("span", "pl-tally");
-    tally.setAttribute("role", "status");
-    const search = el("input", "pl-search");
-    search.type = "search";
-    search.placeholder = "Find a programme";
-    search.setAttribute("aria-label", "Find a programme by name or code");
-    bar.appendChild(tally);
-    bar.appendChild(search);
-    wrap.appendChild(bar);
 
     // submitted: the list can still change — reopen it to add or remove
     if (CTX.readonly && CTX.key === "dept_info" && !CTX.sealed && CTX.urls.edit_programmes) {
@@ -3323,201 +3321,214 @@
       wrap.appendChild(re);
     }
 
-    // one panel per degree group, side by side
-    const cols = el("div", "pl-cols");
-    wrap.appendChild(cols);
-    const panels = {};
-    tabs.forEach((t, n) => {
-      const panel = el("section", `pl-panel pl-panel-${n % 2 ? "b" : "a"}`);
-      panel.setAttribute("aria-label", t.label);
-      const head = el("div", "pl-panel-head");
-      const title = el("h4", "pl-panel-title");
-      head.appendChild(title);
-      panel.appendChild(head);
-      const list = el("ol", "pl");
-      panel.appendChild(list);
-      if (!CTX.readonly) {
-        const addNew = () => {
-          data.push({ source: "new", decision: "keep", programme_code: "",
-                      programme_name: "", degree: (t.degrees || [""])[0] });
-          draw();
-          touch();
-          list.lastElementChild?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-          list.lastElementChild?.querySelector("input")?.focus();
-        };
-        const top = labelButton("pl-head-add", "plus", "Add", `Add a ${t.key === "all" ? "" : t.key + " "}programme`);
-        top.addEventListener("click", addNew);
-        panel.insertBefore(top, list);
-        const add = el("button", "pl-panel-add");
-        add.type = "button";
-        add.innerHTML = ICON.plus;
-        add.appendChild(el("span", null, `Add ${t.key === "all" ? "a" : t.key} programme`));
-        add.addEventListener("click", addNew);
-        panel.appendChild(add);
-      }
-      cols.appendChild(panel);
-      panels[t.key] = { tab: t, title: title, list: list, panel: panel };
+    // ---- the dropdown
+    const pick = el("div", "pd-pick");
+    const toggle = el("button", "pd-toggle");
+    toggle.type = "button";
+    toggle.setAttribute("aria-haspopup", "true");
+    toggle.setAttribute("aria-expanded", "false");
+    const toggleText = el("span", "pd-toggle-text");
+    toggle.appendChild(toggleText);
+    toggle.appendChild(el("span", "pd-caret", "▾"));
+    const menu = el("div", "pd-menu");
+    menu.hidden = true;
+    const search = el("input", "pd-search");
+    search.type = "search";
+    search.placeholder = "Find a programme";
+    search.setAttribute("aria-label", "Find a programme");
+    menu.appendChild(search);
+    const options = el("div", "pd-options");
+    menu.appendChild(options);
+
+    // not in the list: type it in
+    const addRow = el("div", "pd-add");
+    addRow.appendChild(el("div", "pd-add-h", "Not in the list? Type it in"));
+    const addLine = el("div", "pd-add-line");
+    const addName = el("input", "pd-add-name");
+    addName.type = "text";
+    addName.placeholder = "Programme name, e.g. MA English";
+    addName.setAttribute("aria-label", "New programme name");
+    const addLevel = el("select", "pd-add-level");
+    addLevel.setAttribute("aria-label", "UG or PG");
+    levels.forEach(k => addLevel.appendChild(new Option(k, k)));
+    const addBtn = el("button", "btn btn-sm pd-add-btn", "Add");
+    addBtn.type = "button";
+    addLine.appendChild(addName);
+    if (levels.length > 1) addLine.appendChild(addLevel);
+    addLine.appendChild(addBtn);
+    addRow.appendChild(addLine);
+    menu.appendChild(addRow);
+
+    pick.appendChild(toggle);
+    pick.appendChild(menu);
+    if (!CTX.readonly) wrap.appendChild(pick);
+
+    // ---- the chosen ones
+    const chosenHead = el("div", "pd-chosen-h");
+    wrap.appendChild(chosenHead);
+    const list = el("ol", "pd-list");
+    wrap.appendChild(list);
+
+    const open = on => {
+      menu.hidden = !on;
+      toggle.setAttribute("aria-expanded", on ? "true" : "false");
+      if (on) { drawOptions(); search.focus(); }
+    };
+    toggle.addEventListener("click", () => open(menu.hidden));
+    document.addEventListener("click", e => { if (!pick.contains(e.target)) open(false); });
+    pick.addEventListener("keydown", e => { if (e.key === "Escape") { open(false); toggle.focus(); } });
+    search.addEventListener("input", drawOptions);
+    // typing a level-word picks the level: "MA…" is PG, "BA…" is UG
+    addName.addEventListener("input", () => {
+      const lv = ProgName.level(ProgName.tidy(addName.value));
+      if (lv && levels.includes(lv)) addLevel.value = lv;
     });
+    const addTyped = () => {
+      const name = ProgName.tidy(addName.value);
+      if (!name) { addName.focus(); return; }
+      const lvl = levels.length > 1 ? addLevel.value : (levels[0] || "");
+      const same = data.find(r => String(r.programme_name || "").trim().toLowerCase() === name.toLowerCase());
+      if (same) {
+        same.decision = "keep";
+      } else {
+        const taken = new Set(data.map(r => String(r.programme_code || "").toUpperCase()));
+        data.push({ source: "new", decision: "keep", programme_name: name,
+                    programme_code: ProgName.code(name, taken), degree: firstDegree(lvl),
+                    year_introduced: String(Math.min(2027, Math.max(2024, new Date().getFullYear()))) });
+      }
+      addName.value = "";
+      draw(); touch();
+      addName.focus();
+    };
+    addBtn.addEventListener("click", addTyped);
+    addName.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addTyped(); } });
 
-    // every row is on screen now; kept for focusIssue
-    wrap.showRow = () => draw();
+    function drawOptions() {
+      const q = search.value.trim().toLowerCase();
+      options.textContent = "";
+      let shown = 0;
+      tabs.forEach(t => {
+        const mine = data.map((r, i) => [r, i])
+          .filter(([r]) => r.source !== "new" && tabOf(r) === t.key)
+          .filter(([r]) => !q || `${r.programme_code} ${r.programme_name}`.toLowerCase().includes(q));
+        if (!mine.length) return;
+        if (tabs.length > 1) options.appendChild(el("div", "pd-group", t.label));
+        mine.forEach(([r]) => {
+          shown++;
+          const opt = el("label", "pd-opt");
+          const box = el("input");
+          box.type = "checkbox";
+          box.checked = r.decision !== "remove";
+          box.addEventListener("change", () => {
+            r.decision = box.checked ? "keep" : "remove";
+            drawChosen(); touch();
+          });
+          opt.appendChild(box);
+          const txt = el("span", "pd-opt-t");
+          txt.appendChild(el("span", null, label(r)));
+          const meta = [r.degree, r.year_introduced && `since ${r.year_introduced}`].filter(Boolean).join(" · ");
+          if (meta) txt.appendChild(el("small", null, meta));
+          opt.appendChild(txt);
+          options.appendChild(opt);
+        });
+      });
+      if (!shown) options.appendChild(el("div", "pd-none",
+        q ? "Nothing matches. Type it in below." : "No programmes on record. Type each one in below."));
+    }
 
-    function input(row, name, def) {
-      const holder = el("div", "pl-in pl-in-" + name);
+    function field(row, name, def) {
+      const holder = el("div", "pl-in pd-in pl-in-" + name);
       holder.dataset.field = name;
       const i = makeInput(def, row[name], v => {
         row[name] = v; touch();
-        if (name === "degree") { row._degreeByHand = true; draw(); }
+        if (name === "degree") drawChosen();
       });
       i.setAttribute("aria-label", def.label);
+      if (name === "programme_name") {
+        // tidied ("ma english" -> "Master of Arts in English"); the code follows the name
+        i.addEventListener("change", () => {
+          const tidy = ProgName.tidy(i.value);
+          if (tidy !== i.value) { i.value = tidy; row.programme_name = tidy; }
+          const taken = new Set(data.filter(r => r !== row).map(r => String(r.programme_code || "").toUpperCase()));
+          if (tidy && !row._codeByHand) row.programme_code = ProgName.code(tidy, taken);
+          touch();
+        });
+      }
       holder.appendChild(i);
       attachLiveCheck(i, def, holder);
       return holder;
     }
 
-    function rowItem(row, i, n) {
-      const removed = row.decision === "remove";
-      const li = el("li", "pl-row" + (removed ? " is-off" : "") +
-                          (row.source === "new" ? " is-new" : ""));
-      li.dataset.row = i;
-      li.appendChild(el("span", "pl-num", String(n).padStart(2, "0")));
-
-      if (row.source === "new") {
-        const grid = el("div", "pl-new");
-        // a UG panel offers UG only, a PG panel its PG kinds only
-        const degs = (tabs.find(t => t.key === tabOf(row)) || {}).degrees || section.degrees || [];
-        if (!row.year_introduced) row.year_introduced = String(Math.min(2027, Math.max(2024, new Date().getFullYear())));
-        const codeBox = input(row, "programme_code",
-          { name: "programme_code", label: "Programme code", type: "text", required: true,
-            placeholder: "e.g. MSCDS" });
-        // the code is made from the name (MSCDS) and kept, not shown
-        codeBox.hidden = true;
-        grid.appendChild(codeBox);
-        grid.appendChild(input(row, "degree",
-          { name: "degree", label: "Degree", type: "select", required: true,
-            options: degs }));
-        grid.appendChild(input(row, "year_introduced",
-          { name: "year_introduced", label: "Since (year introduced)", type: "select", required: true,
-            options: ["2024", "2025", "2026", "2027"] }));
-        const nameBox = input(row, "programme_name",
-          { name: "programme_name", label: "Programme name", type: "text", required: true,
-            placeholder: "Full programme name — e.g. Master of Science in Data Science" });
-        grid.appendChild(nameBox);
-        // the name, once typed, is put in proper form ("master of science in
-        // data science" -> "Master of Science in Data Science"), and the code is
-        // made from it the way the others are (MSCDS) unless typed by hand
-        const nameIn = nameBox.querySelector("input");
-        const codeIn = codeBox.querySelector("input");
-        if (codeIn) codeIn.addEventListener("input", () => { row._codeByHand = !!codeIn.value.trim(); });
-        if (nameIn) nameIn.addEventListener("change", () => {
-          const tidy = ProgName.tidy(nameIn.value);
-          if (tidy !== nameIn.value) { nameIn.value = tidy; row.programme_name = tidy; }
-          if (!row._codeByHand && codeIn) {
-            const taken = new Set(data.filter(r => r !== row).map(r => String(r.programme_code || "").toUpperCase()));
-            const code = ProgName.code(tidy, taken);
-            if (code) { codeIn.value = code; row.programme_code = code; }
-          }
-          const lv = ProgName.level(tidy);
-          if (lv && degs.includes(lv) && row.degree !== lv && !row._degreeByHand) {
-            row.degree = lv;
-            const sel = grid.querySelector(".pl-in-degree select");
-            if (sel) sel.value = lv;
-          }
-          touch();
-        });
-        const body = el("div", "pl-body");
-        body.appendChild(el("span", "pl-tag", "New"));
-        body.appendChild(grid);
+    function drawChosen() {
+      const chosen = data.map((r, i) => [r, i]).filter(([r]) => r.decision !== "remove");
+      // grouped UG first, then PG
+      chosen.sort((a, b) => tabs.findIndex(t => t.key === tabOf(a[0])) - tabs.findIndex(t => t.key === tabOf(b[0])));
+      const counts = levels.map(k => `${chosen.filter(([r]) => tabOf(r) === k).length} ${k}`).join(" · ");
+      toggleText.textContent = chosen.length
+        ? `${chosen.length} programme${chosen.length === 1 ? "" : "s"} chosen — add or change`
+        : "Choose your programmes";
+      chosenHead.textContent = "";
+      chosenHead.appendChild(el("strong", null, `Programmes you run this year: ${chosen.length}`));
+      if (chosen.length && counts) chosenHead.appendChild(el("span", "pd-counts", counts));
+      list.textContent = "";
+      if (!chosen.length) {
+        list.appendChild(el("li", "pd-empty", CTX.readonly ? "No programmes chosen."
+          : "None chosen yet. Open the list above and tick the programmes you run."));
+      }
+      chosen.forEach(([row, i], n) => {
+        const li = el("li", "pd-row" + (row.source === "new" ? " is-new" : ""));
+        li.dataset.row = i;
+        li.appendChild(el("span", "pd-num", String(n + 1).padStart(2, "0")));
+        const body = el("div", "pd-body");
+        if (row.source === "new" && !CTX.readonly) {
+          // typed in: name and UG / PG can be changed here
+          const degs = (tabs.find(t => t.key === tabOf(row)) || {}).degrees || section.degrees || [];
+          const allDegs = tabs.flatMap(t => t.degrees || []);
+          body.appendChild(field(row, "programme_name",
+            { name: "programme_name", label: "Programme name", type: "text", required: true }));
+          body.appendChild(field(row, "degree",
+            { name: "degree", label: "Degree", type: "select", required: true,
+              options: allDegs.length ? allDegs : degs }));
+          // the code is made from the name and kept in the record, not shown
+          const code = el("div", "pl-in-programme_code");
+          code.dataset.field = "programme_code";
+          code.hidden = true;
+          body.appendChild(code);
+        } else {
+          body.appendChild(el("span", "pd-name", label(row)));
+          const meta = [row.degree, row.year_introduced && `since ${row.year_introduced}`].filter(Boolean).join(" · ");
+          if (meta) body.appendChild(el("span", "pd-meta", meta));
+        }
         li.appendChild(body);
         if (!CTX.readonly) {
-          const del = labelButton("pl-minus", "minus", "Remove", "Take this new programme off");
-          del.addEventListener("click", () => { data.splice(i, 1); draw(); touch(); });
+          const del = iconButton("pd-del", "x", `Remove ${label(row)}`);
+          del.addEventListener("click", () => {
+            if (row.source === "new") data.splice(i, 1);
+            else row.decision = "remove";
+            draw(); touch();
+          });
           li.appendChild(del);
         }
-        return li;
-      }
-
-      const body = el("div", "pl-body");
-      body.appendChild(el("span", "pl-name", row.programme_name || ""));
-      const meta = el("span", "pl-meta");
-      // the code stays in the record; the list shows the name, level and year
-      const rest = [row.degree, row.year_introduced && `since ${row.year_introduced}`,
-                    row.minors].filter(Boolean).join(" · ");
-      if (rest) meta.appendChild(document.createTextNode(" " + rest));
-      body.appendChild(meta);
-      li.appendChild(body);
-
-      // ticked: the department runs this programme; unticked: it does not
-      const pick = el("label", "pl-pick");
-      const box = el("input");
-      box.type = "checkbox";
-      box.checked = !removed;
-      box.disabled = !!CTX.readonly;
-      box.setAttribute("aria-label", `Offer ${row.programme_name || row.programme_code}`);
-      const word = el("span", "pl-pick-word", removed ? "Not offered" : "Offered");
-      box.addEventListener("change", () => {
-        row.decision = box.checked ? "keep" : "remove";
-        li.classList.toggle("is-off", !box.checked);
-        word.textContent = box.checked ? "Offered" : "Not offered";
-        paintCounts();
-        touch();
+        list.appendChild(li);
       });
-      pick.appendChild(box);
-      pick.appendChild(word);
-      li.appendChild(pick);
-      return li;
-    }
-
-    // the number offered in each panel, and the tally above the lists
-    function paintCounts() {
-      Object.values(panels).forEach(({ tab, title }) => {
-        const live = data.filter(r => tabOf(r) === tab.key && r.decision !== "remove").length;
-        title.textContent = "";
-        title.appendChild(el("span", null, tab.label));
-        title.appendChild(el("span", "pl-panel-n", String(live)));
-      });
-      const offered = data.filter(r => r.decision !== "remove" && r.source !== "new").length;
-      const off = data.filter(r => r.decision === "remove").length;
-      const added = data.filter(r => r.source === "new").length;
-      tally.textContent = `${offered} offered · ${off} not offered` + (added ? ` · ${added} new` : "");
     }
 
     function draw() {
-      Object.values(panels).forEach(({ tab, list }) => {
-        const mine = data.map((r, i) => [r, i]).filter(([r]) => tabOf(r) === tab.key);
-        list.textContent = "";
-        if (!mine.length) {
-          list.appendChild(el("li", "pl-empty",
-            `No ${tab.key === "all" ? "" : tab.key + " "}programmes on record. ` +
-            "Use Add to put in each one you run this year."));
-        }
-        mine.forEach(([row, i], n) => list.appendChild(rowItem(row, i, n + 1)));
-      });
-
-      paintCounts();
-      filter();
+      drawChosen();
+      if (!menu.hidden) drawOptions();
     }
 
-    function filter() {
-      const q = search.value.trim().toLowerCase();
-      wrap.querySelectorAll(".pl-row").forEach(li => {
-        const row = data[+li.dataset.row] || {};
-        const hay = `${row.programme_code} ${row.programme_name}`.toLowerCase();
-        li.hidden = !!q && row.source !== "new" && !hay.includes(q);
-      });
-    }
-    search.addEventListener("input", filter);
-
+    // every chosen row is on screen; kept for focusIssue
+    wrap.showRow = () => draw();
     draw();
 
-    // arriving from Curriculum's "add a new UG / PG programme": start the row
+    // arriving from Curriculum's "add a new UG / PG programme": open the type-in
     if (CTX.add_level && !CTX.readonly) {
       const want = tabs.find(t => t.key === CTX.add_level) ||
                    tabs.find(t => t.degrees && t.degrees.includes(CTX.add_level));
-      const target = want && panels[want.key];
-      if (target && !data.some(r => r.source === "new" && !r.programme_code && !r.programme_name)) {
-        target.panel.querySelector(".pl-panel-add")?.click();
-      }
+      if (want && levels.includes(want.key)) addLevel.value = want.key;
+      open(true);
+      addName.focus();
     }
   }
 
@@ -4838,7 +4849,7 @@
     const behind = target.closest ? target.closest(".bento-form") : null;
     if (behind && behind.hidden && behind.openForm) behind.openForm(iss.field);
     // a programme that is not the one on screen (or a row in the other panel)
-    const plWrap = document.querySelector(`#sec-${iss.section} .pl-wrap, ` +
+    const plWrap = document.querySelector(`#sec-${iss.section} .pl-wrap, #sec-${iss.section} .pd-wrap, ` +
                                           `#sec-${iss.section} .rc-wrap`);
     if (plWrap && !iss._shown && iss.row !== null && iss.row !== undefined) {
       const want = `[data-row="${iss.row}"]` + (iss.field ? ` [data-field="${iss.field}"]` : "");

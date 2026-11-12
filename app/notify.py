@@ -36,6 +36,7 @@ EVENTS = {
     "keyword_miss": ("Upload failed the keyword check", True),
     "programme": ("Programmes changed", True),
     "password": ("Password changed", False),
+    "query": ("Query raised", True),
 }
 
 KINDS = {
@@ -203,6 +204,8 @@ def unread_count():
 
 def _link(note):
     base = current_app.config.get("PUBLIC_URL") or ""
+    if note.get("event") == "query":
+        return f"{base}/admin/queries" if base else ""
     return f"{base}/admin/submissions/{note['dept_code']}" if base else ""
 
 

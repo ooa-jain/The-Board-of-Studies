@@ -256,6 +256,7 @@ def test_submitting_department_information_unlocks_pre_bos(app, client):
         "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
                 "hod_email": "head@example.edu", "hod_phone": "9999999999"},
         "contact": {"office_email": "office@example.edu", "faculty_count": 24},
+        "strength": {"faculty_count": 24, "students_first_year": 120, "students_final_semester": 98},
         "programmes_offered": PROGRAMMES_OK,
     }
     r = client.post("/department/api/dept_info/submit", json=payload)
@@ -284,6 +285,7 @@ DEPT_INFO_OK = {
     "identity": {"dept_name": "Department of Commerce", "school": "School of Commerce",
                  "dept_code": "COM", "campus": "Jain Global Campus"},
     "contact": {"office_email": "office@example.edu", "faculty_count": 24},
+    "strength": {"faculty_count": 24, "students_first_year": 120, "students_final_semester": 98},
     "programmes_offered": PROGRAMMES_OK,
 }
 
@@ -608,6 +610,7 @@ def test_admin_can_return_a_stage_for_correction(app, client):
         "hod": {"hod_name": "Test Head", "hod_designation": "Professor",
                 "hod_email": "head@example.edu", "hod_phone": "9999999999"},
         "contact": {"office_email": "office@example.edu", "faculty_count": 1},
+        "strength": {"faculty_count": 1, "students_first_year": 30, "students_final_semester": 28},
         "programmes_offered": PROGRAMMES_OK})
     client.get("/logout")
 

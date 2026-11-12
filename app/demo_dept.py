@@ -253,6 +253,8 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
         return {"identity": {"dept_name": NAME, "faculty": DEPT["faculty"], "school": DEPT["school"],
                              "campus": DEPT["campus"], "academic_year": year},
                 "contact": {"office_email": "demo.office@example.edu", "faculty_count": 18},
+                "strength": {"faculty_count": 18, "students_first_year": 120,
+                             "students_final_semester": 104},
                 "programmes_offered": PROGRAMMES}
     if stage_key == "pre_bos":
         return {"pre_bos_files": {k: files[k] for k in ("diac_signed", "dpac_signed", "pre_bos_minutes")

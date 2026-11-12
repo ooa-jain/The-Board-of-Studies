@@ -76,6 +76,7 @@ ENDPOINTS = {
     "document": ("documents", "view"), "document_summary": ("documents", "view"),
     "comment_add": ("comments", "edit"), "comment_close": ("comments", "edit"),
     "comments_json": ("comments", "view"),
+    "queries": ("comments", "view"), "query_status": ("comments", "edit"),
     "calendar": ("calendar", "view"),
     "flow": ("flow", "view"), "flow_data": ("flow", "view"), "flow_excel": ("flow", "view"),
     "updates": ("updates", "view"), "updates_json": ("updates", "view"), "updates_read": ("updates", "edit"),

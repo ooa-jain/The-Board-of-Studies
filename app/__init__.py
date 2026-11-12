@@ -77,11 +77,12 @@ def create_app(config_object=Config):
         from .auth import page_user
         # in the department's pages while the Office edits it: that department
         user = page_user() or {}
-        unread, batch_info = 0, None
+        unread, batch_info, queries_open = 0, None, 0
         if user.get("role") == "admin":
             try:
                 from .access import scope_q
                 unread = database.get_db().notifications.count_documents({"read": False, **scope_q()})
+                queries_open = database.get_db().queries.count_documents({"status": "open", **scope_q()})
                 from .workflow import batches
                 batch_info = batches()
             except Exception:
@@ -117,6 +118,7 @@ def create_app(config_object=Config):
             "dept_nav": dept_nav,
             "dept_drive": dept_drive,
             "updates_unread": unread,
+            "queries_open": queries_open,
             "batch_info": batch_info,
             "current_user": user or None,
             "app_settings": database.settings(),

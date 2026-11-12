@@ -2383,3 +2383,38 @@ def calendar():
     return render_template("admin/calendar.html", weeks=weeks, first=first, days=days, today=today,
                            chosen=chosen, items=items, comments=comments, prev_m=prev_m, next_m=next_m,
                            events=EVENTS, names=names, STAGE_BY_KEY=STAGE_BY_KEY)
+
+
+# ---------------------------------------------------------------------------
+# queries — Academics questions departments raise with the Query button
+# ---------------------------------------------------------------------------
+
+@bp.route("/queries")
+@admin_required
+def queries():
+    show = request.args.get("show", "open")
+    if show not in ("open", "resolved", "all"):
+        show = "open"
+    q = scope_q()
+    if show != "all":
+        q["status"] = show
+    items = list(get_db().queries.find(q).sort("at", -1).limit(500))
+    base = scope_q()
+    counts = {s: get_db().queries.count_documents({**base, "status": s}) for s in ("open", "resolved")}
+    counts["all"] = counts["open"] + counts["resolved"]
+    return render_template("admin/queries.html", items=items, show=show, counts=counts)
+
+
+@bp.post("/queries/<qid>/status")
+@admin_required
+def query_status(qid):
+    from bson import ObjectId
+    from .queries import set_status
+    status = request.form.get("status", "resolved")
+    try:
+        oid = ObjectId(qid)
+        set_status(oid, status, _actor(), scope_q())
+    except Exception:
+        abort(400)
+    audit(_actor(), "query." + status, qid)
+    return redirect(request.referrer or url_for("admin.queries"))

@@ -186,6 +186,42 @@ def help_page():
     return render_template("dept/help.html", dept=_dept(), chapters=chapters, files=files)
 
 
+@bp.route("/query/sections")
+@department_required
+def query_sections():
+    """Technical query: the sections of the Help walkthrough, each a link to it."""
+    from .queries import help_sections
+    return jsonify(sections=[dict(s, url=url_for("dept.help_page") + f"#{s['n']}")
+                             for s in help_sections(current_app.static_folder)],
+                   help_url=url_for("dept.help_page"))
+
+
+@bp.post("/query")
+@department_required
+def query_raise():
+    """Academics query: raised as a ticket for the Office of Academic Affairs."""
+    from .queries import raise_ticket
+    if acting():
+        return jsonify(ok=False, error="The Office cannot raise a query for a department."), 400
+    body = request.get_json(silent=True) or {}
+    subject = " ".join(str(body.get("subject") or "").split())
+    text = str(body.get("text") or "").strip()
+    if len(text) < 5:
+        return jsonify(ok=False, error="Please write your question."), 400
+    dept = _dept()
+    me = _me()
+    person = me.get("person") or {}
+    page = str(body.get("page") or "")
+    if not page.startswith("/"):
+        page = ""
+    t = raise_ticket(dept, subject=subject, text=text, person=person, page=page,
+                     year=_year(), actor=me["username"])
+    notify_record(dept, "query", text=f"{t['ticket']}: {subject or text[:80]}",
+                  actor=me["username"], person=person.get("name", ""))
+    audit(me["username"], "query.raised", f"{dept['dept_code']} {t['ticket']}")
+    return jsonify(ok=True, ticket=t["ticket"])
+
+
 @bp.route("/versions")
 @department_required
 def versions():

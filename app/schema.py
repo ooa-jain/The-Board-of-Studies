@@ -266,9 +266,22 @@ DEPARTMENT_INFORMATION = {
             ],
         },
         {
+            "key": "strength",
+            "title": "Faculty and students",
+            "type": "fields",
+            "fields": [
+                {"name": "faculty_count", "label": "Number of faculty", "type": "integer",
+                 "required": True, "min": 0, "max": 5000},
+                {"name": "students_first_year", "label": "Students in 1st year", "type": "integer",
+                 "required": True, "min": 0, "max": 100000},
+                {"name": "students_final_semester", "label": "Students in the final semester",
+                 "type": "integer", "required": True, "min": 0, "max": 100000},
+            ],
+        },
+        {
             "key": "programmes_offered",
             "title": "Programmes offered",
-            "help": "Tick the programmes you run this year — one is enough. Add a new programme at the end.",
+            "help": "Choose the programmes you run this year from the list. Not in the list? Type its name and add it.",
             "type": "programme_list",
             "degrees": ["UG", "PG", "PG-1Yr", "PGD"],
             # the tabs the list is split into, by the workbook's Degree column
