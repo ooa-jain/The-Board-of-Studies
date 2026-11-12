@@ -1457,11 +1457,8 @@ def app_settings():
     db = get_db()
     if request.method == "POST":
         from .db import settings as _s
-        was_dev = bool(_s().get("dev_mode"))
-        dev = request.form.get("dev_mode") == "on"
         fields = {"academic_year": (request.form.get("academic_year") or "").strip(),
                   "submissions_open": request.form.get("submissions_open") == "on",
-                  "dev_mode": dev,
                   "banner": (request.form.get("banner") or "").strip(),
                   "updated_at": now()}
         # the batches: the current one, and the earlier ones whose syllabi
@@ -1498,16 +1495,7 @@ def app_settings():
         db.settings.update_one({"_id": "app"}, {"$set": fields})
         forget_cached()
         audit(_actor(), "settings.updated")
-        # Unlocking every stage for every department is worth its own line in
-        # the log, separate from whatever else was saved in the same form.
-        if dev != was_dev:
-            audit(_actor(), "settings.dev_mode." + ("on" if dev else "off"))
-            flash("Developer mode is ON — every stage is unlocked for every "
-                  "department." if dev else
-                  "Developer mode is off. Stages lock in sequence again.",
-                  "warning" if dev else "success")
-        else:
-            flash("Settings saved.", "success")
+        flash("Settings saved.", "success")
         return redirect(url_for("admin.app_settings"))
     from .db import settings as s
     return render_template("admin/settings.html", settings=s(), batches=batches(),

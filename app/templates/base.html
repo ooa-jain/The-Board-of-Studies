@@ -81,17 +81,15 @@
 </button>
 {%- endmacro %}
 
-{# Developer mode, while it is on: a laptop in the menu, for everyone, that
-   opens to say what it means (the admin gets the switch) #}
-{% macro dev_item() -%}
-{% if app_settings and app_settings.dev_mode %}
+{# Review & submit, in the department's menu: every stage at once, and the
+   Drive import where the department has a Drive folder #}
+{% macro review_item() -%}
+{% if current_user and current_user.role == 'department' and not current_user.acting %}
 <details class="side-dev">
-  <summary class="side-link" title="Developer Preview is on — all stages open for testing">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9H5zM2.5 18h19M9 18l.5-1.5h5L15 18"/></svg>
-    <span class="side-text">Developer Preview</span><i class="side-dot st-draft"></i></summary>
-  <div class="side-dev-body">All stages are open for testing. Checks and saving work as usual.
-    {% if current_user and current_user.role == 'admin' and can('settings', 'edit') %}<a href="{{ url_for('admin.app_settings') }}">Turn it off</a>{% endif %}
-    {% if current_user and current_user.role == 'department' %}
+  <summary class="side-link" title="Review &amp; submit — every stage at once">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4M5 4h14v16H5z"/></svg>
+    <span class="side-text">Review &amp; submit</span></summary>
+  <div class="side-dev-body">See every stage at once, fix what is left and submit them together.
     {% if dept_drive %}
     <div class="side-dev-drive">
       <strong>{{ 'Data imported from your Drive folder' if dept_drive.done else 'Import from your Drive folder' }}</strong>
@@ -103,7 +101,7 @@
       </form>
     </div>
     {% endif %}
-    <a class="side-dev-btn" href="{{ url_for('dept.dashboard', review=1) }}">Review &amp; submit all stages →</a>{% endif %}</div>
+    <a class="side-dev-btn" href="{{ url_for('dept.dashboard', review=1) }}">Review &amp; submit all stages →</a></div>
 </details>
 {% endif %}
 {%- endmacro %}
@@ -154,7 +152,6 @@
     {% if can('settings') %}{{ side_link(url_for('admin.app_settings'), 'Settings', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2', ep in ('admin.app_settings', 'admin.rules', 'admin.keywords', 'admin.connectors', 'admin.audit_log', 'admin.storage') or ep.startswith('admin.team')) }}{% endif %}
     <button class="side-link side-install" type="button" id="app-install" hidden title="Install the portal as an app">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg><span class="side-text">Install app</span></button>
-    {{ dev_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       <span class="side-who"><strong>{{ current_user.name }}</strong><small>{{ app_settings.academic_year|ay if app_settings else '' }}</small></span>
@@ -228,7 +225,7 @@
     {% endif %}
     <a class="side-link{{ ' is-on' if ep == 'dept.help_page' }}" href="{{ url_for('dept.help_page') }}" title="Help — video and user manual">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span class="side-text">Help</span></a>
-    {{ dev_item() }}
+    {{ review_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       {% if current_user.acting %}

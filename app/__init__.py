@@ -97,14 +97,13 @@ def create_app(config_object=Config):
                                                or app.config["ACADEMIC_YEAR"])
                 dept_nav = [{"key": s["key"], "title": s["title"], "status": s["status"]}
                             for s in stage_board(sub)]
-                # the Drive import, offered in the Developer Preview item
-                if database.settings().get("dev_mode"):
-                    from .autofill import pack_for
-                    d = database.get_db().departments.find_one({"dept_code": user["dept_code"]})
-                    pack = d and pack_for(database.get_db(), d)
-                    if pack:
-                        dept_drive = {"done": bool(sub.get("autofilled")),
-                                      "folder": (pack.get("source") or {}).get("folder")}
+                # the Drive import, offered in the Review & submit item
+                from .autofill import pack_for
+                d = database.get_db().departments.find_one({"dept_code": user["dept_code"]})
+                pack = d and pack_for(database.get_db(), d)
+                if pack:
+                    dept_drive = {"done": bool(sub.get("autofilled")),
+                                  "folder": (pack.get("source") or {}).get("folder")}
             except Exception:
                 dept_nav = None
         acting_dept = None

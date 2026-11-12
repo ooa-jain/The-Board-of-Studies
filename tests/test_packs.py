@@ -449,11 +449,9 @@ def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloa
     r = client.post("/department/drive/fill", follow_redirects=True)
     body = r.get_data(as_text=True)
     assert "Data imported from your Drive folder" in body
-    # once imported, syncing again lives in the Developer Preview item
+    # once imported, syncing again lives in the Review & submit item of the menu
     assert 'class="demo-strip drive-strip"' not in body
     from app.db import get_db
-    with app.app_context():
-        get_db().settings.update_one({"_id": "app"}, {"$set": {"dev_mode": True}}, upsert=True)
     body = client.get("/department/").get_data(as_text=True)
     assert "Re-sync from Drive" in body and "side-dev-drive" in body
     sub = _sub(app, code)

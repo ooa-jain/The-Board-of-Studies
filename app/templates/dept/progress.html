@@ -94,7 +94,7 @@
 <script>
   (function () {
     // Review & submit all: the button here, or arriving with ?review=1 (the
-    // Developer preview item in the menu)
+    // Review & submit item in the menu)
     var open = function () { window.SubmitAll.open({
       record: {{ url_for('dept.api_record')|tojson }}, submit: {{ url_for('dept.api_submit_all')|tojson }} }); };
     var b = document.getElementById("btn-all");

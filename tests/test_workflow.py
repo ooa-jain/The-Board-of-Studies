@@ -986,38 +986,27 @@ def test_developer_mode_does_not_rewrite_what_is_already_filed(app):
         assert compute_status(sub, STAGE_KEYS[-1], dev=True) == "open"
 
 
-def test_developer_mode_says_so_on_every_page(app, client):
-    """It is easy to switch on and easy to forget, so it announces itself."""
+def test_review_and_submit_is_in_every_department_menu(app, client):
+    """What Developer Preview offered is now part of the ordinary menu, with
+    no developer wording and no switch to turn it on."""
     u, p = make_department(app)
     login(client, u, p)
-    assert 'class="side-dev"' not in client.get("/department/").get_data(as_text=True)
-
-    set_dev_mode(app, True)
     for path in ("/department/", "/department/stage/dept_info"):
         body = client.get(path).get_data(as_text=True)
-        # a laptop in the menu, not a banner across the top
-        assert 'class="side-dev"' in body and "Developer Preview" in body, path
-        assert "dev-banner" not in body, path
+        assert 'class="side-dev"' in body and "Review &amp; submit all stages" in body, path
+        assert "Developer Preview" not in body and "dev-banner" not in body, path
 
 
-def test_the_switch_is_on_the_settings_page_and_is_logged(app, client):
-    """Unlocking every department at once leaves a trace in the audit log."""
+def test_settings_no_longer_carry_a_developer_switch(app, client):
     from app.db import get_db
     login(client, app.config["ADMIN_USERNAME"], app.config["ADMIN_PASSWORD"])
-
-    assert 'name="dev_mode"' in client.get("/admin/settings").get_data(as_text=True)
-
-    client.post("/admin/settings", data={"academic_year": "2027-28",
-                                         "dev_mode": "on", "banner": ""})
-    with app.app_context():
-        assert get_db().settings.find_one({"_id": "app"})["dev_mode"] is True
-        assert get_db().audit.find_one({"action": "settings.dev_mode.on"})
-
-    # saving the form again without the box ticked turns it off
+    page = client.get("/admin/settings").get_data(as_text=True)
+    assert 'name="dev_mode"' not in page and "Developer mode" not in page
+    # the admin's own menu has no Review & submit item: it is the department's
+    assert 'class="side-dev"' not in page
     client.post("/admin/settings", data={"academic_year": "2027-28", "banner": ""})
     with app.app_context():
-        assert get_db().settings.find_one({"_id": "app"})["dev_mode"] is False
-        assert get_db().audit.find_one({"action": "settings.dev_mode.off"})
+        assert get_db().audit.find_one({"action": "settings.updated"})
 
 
 def test_a_department_still_cannot_reach_the_switch(app, client):
