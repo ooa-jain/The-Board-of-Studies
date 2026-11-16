@@ -340,6 +340,8 @@ def _category_credits(data, ctx):
 
 def r_ugc_table2_minimums(data, ctx, sk):
     """Check the credits in each category against UGC Table 2."""
+    if ctx.get("flow"):
+        return []                       # a "No UGC" department: nothing to match
     matrix = _category_credits(data, ctx)
     track = ctx.get("track")
     degree = ctx.get("degree_level")
@@ -377,6 +379,8 @@ def r_ugc_table2_minimums(data, ctx, sk):
 
 
 def r_ugc_total_credits(data, ctx, sk):
+    if ctx.get("flow"):
+        return []
     matrix = _category_credits(data, ctx)
     track = ctx.get("track")
     if not track:
@@ -399,7 +403,7 @@ def r_ugc_total_credits(data, ctx, sk):
 def r_ugc_research_or_lieu(data, ctx, sk):
     """Honours without research: 3 courses / 12 credits in lieu."""
     degree = ctx.get("degree_level")
-    if degree != U.HONOURS_NO_RESEARCH:
+    if degree != U.HONOURS_NO_RESEARCH or ctx.get("flow"):
         return []
     matrix = _vals(data, sk)
     lieu_credits = _num(matrix.get("in_lieu_credits"))
@@ -487,7 +491,7 @@ def r_marks_add_up(data, ctx, sk):
 
 def r_semester_within_duration(data, ctx, sk):
     sems = ctx.get("semesters")
-    if not sems:
+    if not sems or ctx.get("flow"):       # one flow: semesters 1 to 8, as the column allows
         return []
     out = []
     for i, r in enumerate(_rows(data, sk)):
@@ -891,6 +895,15 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
     if programme:
         deg = programme.get("degree_level")
         ctx["degree_level"] = deg
+        # a "No UGC" department's UG programme: one flow, no UGC Table 2
+        try:
+            from .db import get_db
+            from .schema import is_flow, is_pg
+            dept = get_db().departments.find_one({"dept_code": submission.get("dept_code")},
+                                                 {"credit_rules": 1}) if submission.get("dept_code") else None
+            ctx["flow"] = is_flow(dept) and not is_pg(deg)
+        except Exception:
+            ctx["flow"] = False
         ctx["track"] = U.get_track(deg)
         yrs = _int(programme.get("duration_years"))
         ctx["semesters"] = _int(programme.get("semesters")) or (yrs * 2 if yrs else None)

@@ -1114,3 +1114,61 @@ def all_fields(stage: dict):
         elif section.get("type") == "fields":
             for f in section.get("fields", []):
                 yield section, f
+
+
+# --------------------------------------------------------------------------
+# Rules & UGC: a department the Office marks "No UGC" files a UG programme's
+# structure as one flow, semesters 1 to 8, with no Honours or Honours with
+# Research blocks and no UGC Table 2 check — the credit tables are worked
+# out from whatever it enters.
+# --------------------------------------------------------------------------
+
+CREDIT_RULE_MODES = {
+    "ugc": "UGC — 3-year, Honours, Honours with Research",
+    "flow": "No UGC — semesters 1 to 8 in one flow",
+}
+
+
+def is_flow(department) -> bool:
+    return (department or {}).get("credit_rules") == "flow"
+
+
+def flow_stage(stage: dict) -> dict:
+    """A UG programme's Curriculum for a "No UGC" department."""
+    import copy
+    if not stage or stage.get("key") != "prog_curriculum" or stage.get("level") == "PG":
+        return stage
+    s = copy.deepcopy(stage)
+    s["flow"] = True
+    for sec in s["sections"]:
+        if sec["key"] == "semester_structure":
+            for c in sec["columns"]:
+                if c["name"] == "semester":
+                    c["max"], c["choices"] = 8, list(SEMESTERS)
+            sec["help"] = ("Enter one course per row, semesters 1 to 8 in one list — "
+                           "only the semesters the programme has.")
+        elif sec["key"] == "credit_distribution":
+            sec["help"] = "Worked out from the programme structure."
+            sec["rules"] = [r for r in sec.get("rules", []) if not r.startswith("ugc_")]
+    return s
+
+
+def flow_rows(data: dict, key="semester_structure") -> dict:
+    """One flow: no row is kept for Honours or Honours with Research only.
+    A course listed under both (as the split form shows semesters 7-8) is
+    kept once."""
+    if not isinstance(data, dict) or not isinstance(data.get(key), list):
+        return data
+    out, seen = [], set()
+    for r in data[key]:
+        if isinstance(r, dict) and r.get("track") in ("Honours", "Honours with Research"):
+            sig = (str(r.get("semester")), str(r.get("course_code") or "").strip().upper(),
+                   str(r.get("course_title") or "").strip().lower())
+            if sig in seen:
+                continue
+            seen.add(sig)
+            r = {k: v for k, v in r.items() if k != "track"}
+        elif isinstance(r, dict):
+            r = {k: v for k, v in r.items() if k != "track"}
+        out.append(r)
+    return {**data, key: out}

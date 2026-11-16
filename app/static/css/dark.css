@@ -5402,6 +5402,39 @@ html[data-theme="dark"] .q-tabs a.is-on {
 html[data-theme="dark"] .q-tabs a.is-on span {
   color: #ffffff;
 }
+html[data-theme="dark"] .ru-school-head {
+  background: #181b21;
+  border-bottom: 1px solid #2e3542;
+}
+html[data-theme="dark"] .ru-n {
+  color: #aab2c1;
+}
+html[data-theme="dark"] .ru-row {
+  border-top: 1px solid #2e3542;
+}
+html[data-theme="dark"] .ru-row:first-child {
+  border-top: 0;
+}
+html[data-theme="dark"] .ru-row.is-flow {
+  background: #2b190e;
+}
+html[data-theme="dark"] .ru-name small {
+  color: #aab2c1;
+}
+html[data-theme="dark"] .ru-seg {
+  border: 1px solid #2e3542;
+  background: #121519;
+}
+html[data-theme="dark"] .ru-opt span {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .ru-opt input:checked + span {
+  background: #2962ae;
+  color: #ffffff;
+}
+html[data-theme="dark"] .ru-opt input:focus-visible + span {
+  outline: 2px solid #2563eb;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

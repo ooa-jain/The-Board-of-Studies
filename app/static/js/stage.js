@@ -1848,7 +1848,7 @@
     const DERIVED = Object.fromEntries(RULES.map(r => [r.field, r]));
     // a UG programme structure lists semesters 1–6 once, then semesters 7–8
     // for Honours and again for Honours with Research, each with its own add
-    const GROUPS = (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG)
+    const GROUPS = (section.key === "semester_structure" && CTX.key === "prog_curriculum" && !IS_PG && !FLOW)
       ? [{ track: "All semesters", label: "3-Year UG", sub: "Semesters 1 – 6", sems: [1, 2, 3, 4, 5, 6] },
          { track: "Honours", label: "4-Year UG (Honours)", sub: "Semesters 7 – 8", sems: [7, 8], optional: true },
          { track: "Honours with Research", label: "4-Year UG (Honours with Research)",
@@ -2649,6 +2649,10 @@
 
   // a PG programme fills the PG Course Matrix (STAGE.level is "PG")
   const IS_PG = STAGE.level === "PG";
+  // a "No UGC" department (Admin › Rules & UGC): one flow, semesters 1 to 8,
+  // no Honours blocks and no UGC Table 2 — the tables total what is entered
+  const FLOW = !!STAGE.flow;
+  const ONE_LIST = IS_PG || FLOW;
   const freshRow = section => (IS_PG && section && section.key === "semester_structure")
     ? { cia: 60, ese: 40, total_marks: 100 } : {};
   // the columns of the template's "Classification of Credits" table
@@ -2675,14 +2679,15 @@
   const DEGREE = () => String((state.details || {}).degree_level || "");
   const TRACKED = r => r.track === "Honours" || r.track === "Honours with Research";
   function typeTotals(all) {
-    const upto6 = all.filter(r => num(r.semester) <= 6 && !TRACKED(r));
+    // one flow (PG, or a "No UGC" department): every semester in one list
+    const upto6 = ONE_LIST ? all.slice() : all.filter(r => num(r.semester) <= 6 && !TRACKED(r));
     const researchOnly = r => r.track === "Honours with Research" ||
       (num(r.semester) > 6 && !TRACKED(r) && r.nep_category === "Research Project / Dissertation");
     const honoursOnly = r => r.track === "Honours";
     const honLater = all.filter(r => !upto6.includes(r) && !researchOnly(r));
     const resLater = all.filter(r => !upto6.includes(r) && !honoursOnly(r));
     return { upto6, honLater, resLater,
-             fourYear: !IS_PG && (honLater.length + resLater.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year")),
+             fourYear: !ONE_LIST && (honLater.length + resLater.length > 0 || (DEGREE() && DEGREE() !== "UG - 3 Year")),
              honours: upto6.concat(honLater), research: upto6.concat(resLater) };
   }
 
@@ -2753,7 +2758,7 @@
       const T = typeTotals(all);
       const COLS1 = DIST_GROUPS.length + 4;
       sems(T.upto6).forEach(sem => semRow(sem, T.upto6));
-      totRow(IS_PG ? "TOTAL" : "3-Year UG", T.upto6, IS_PG ? null : "UG - 3 Year");
+      totRow(ONE_LIST ? "TOTAL" : "3-Year UG", T.upto6, ONE_LIST ? null : "UG - 3 Year");
       if (T.fourYear) {
         b1.appendChild(band("Honours", COLS1));
         sems(T.honLater).forEach(sem => semRow(sem, T.honLater));
@@ -2792,7 +2797,7 @@
       const chosen = deg => "total cd-type" + (deg === DEGREE() ? " is-chosen" : "");
       const inSem = (rows, sem) => rows.filter(r => num(r.semester) === sem);
       sems(T2.upto6).forEach(sem => line(String(sem), inSem(T2.upto6, sem)));
-      line(IS_PG ? "TOTAL" : "3-Year UG", T2.upto6, IS_PG ? "total cd-type" : chosen("UG - 3 Year"));
+      line(ONE_LIST ? "TOTAL" : "3-Year UG", T2.upto6, ONE_LIST ? "total cd-type" : chosen("UG - 3 Year"));
       if (T2.fourYear) {
         const band2 = label => { const tr = el("tr", "cd-band"); const td = el("td", null, label);
                                  td.colSpan = 5; tr.appendChild(td); b2.appendChild(tr); };
@@ -2813,7 +2818,7 @@
 
     // --- UGC Table 2, from the same courses (only this programme's track)
     function ugcCheck(all) {
-      if (IS_PG) return;              // UGC Table 2 is for UG programmes
+      if (ONE_LIST) return;           // UGC Table 2 is for UG programmes under UGC rules
       const side = document.getElementById("credit-tally");
       if (!CREDIT || !CREDIT.rows || !CREDIT.rows.length) {
         box.appendChild(el("p", "small muted",
@@ -4620,6 +4625,11 @@
           // says — courses in semesters 7–8 make it 4-year, else 3-year
           if (f.name === "degree_level" && CTX.key === "prog_curriculum" && !IS_PG) {
             const d = state[section.key];
+            // one flow: no 3-year / Honours degree is worked out from it
+            if (FLOW) {
+              if (!CTX.readonly && d._degree_auto && d.degree_level) { d._degree_auto = false; setVal(section.key, "degree_level", ""); }
+              return;
+            }
             const sems = (state.semester_structure || []).filter(r => r && num(r.semester) !== null);
             if (!CTX.readonly && sems.length && (!d.degree_level || d._degree_auto)) {
               const want = sems.some(r => num(r.semester) > 6) ? "UG - 4 Year (Honours with Research)" : "UG - 3 Year";

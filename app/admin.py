@@ -2406,3 +2406,40 @@ def query_status(qid):
         abort(400)
     audit(_actor(), "query." + status, qid)
     return redirect(request.referrer or url_for("admin.queries"))
+
+
+# ---------------------------------------------------------------------------
+# Rules & UGC — for each department, under its school: UGC (3-year, Honours,
+# Honours with Research, checked against UGC Table 2) or No UGC (semesters
+# 1 to 8 in one flow; the credit tables total whatever is entered)
+# ---------------------------------------------------------------------------
+
+@bp.route("/rules-ugc", methods=["GET", "POST"])
+@admin_required
+def rules_ugc():
+    from .schema import CREDIT_RULE_MODES
+    db = get_db()
+    q = scope_q()
+    if request.method == "POST":
+        changed = 0
+        for d in db.departments.find(q, {"dept_code": 1, "credit_rules": 1}):
+            want = request.form.get("mode." + d["dept_code"])
+            if want not in CREDIT_RULE_MODES:
+                continue
+            if (d.get("credit_rules") or "ugc") != want:
+                db.departments.update_one({"_id": d["_id"]},
+                                          {"$set": {"credit_rules": want, "updated_at": now()}})
+                audit(_actor(), "rules_ugc." + want, d["dept_code"])
+                changed += 1
+        flash(f"Saved — {changed} department{'s' if changed != 1 else ''} changed." if changed
+              else "Nothing changed.", "success")
+        return redirect(url_for("admin.rules_ugc"))
+    depts = list(db.departments.find(q, {"dept_code": 1, "dept_name": 1, "school": 1, "campus": 1,
+                                         "credit_rules": 1, "active": 1})
+                 .sort([("school", 1), ("dept_name", 1)]))
+    schools = {}
+    for d in depts:
+        schools.setdefault(d.get("school") or "No school given", []).append(d)
+    flow_count = sum(1 for d in depts if d.get("credit_rules") == "flow")
+    return render_template("admin/rules_ugc.html", schools=sorted(schools.items()),
+                           modes=CREDIT_RULE_MODES, total=len(depts), flow_count=flow_count)

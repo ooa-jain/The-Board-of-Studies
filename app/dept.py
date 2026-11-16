@@ -532,8 +532,17 @@ def stage(stage_key, programme_code=None):
     page_stage = relax(page_stage)
     if stage_def.get("existing_batch"):
         page_stage = _batch_semesters(page_stage)
+    # a "No UGC" department: a UG structure is one flow, semesters 1 to 8
+    from .schema import flow_rows, flow_stage, is_flow
+    flow = stage_key == "prog_curriculum" and is_flow(dept) and page_stage.get("level") != "PG"
+    if flow:
+        page_stage = flow_stage(page_stage)
+        calc = {**calc, "flow": True, "track": None, "required_total": None}
+        credit_matrix = None
     if stage_key == "prog_curriculum":
         data = category_groups(data, deg)
+        if flow:
+            data = flow_rows(data)
     elif stage_def.get("existing_batch"):
         data = category_groups(data, deg, "batch_courses")
     # where "go to the next stage" leads when this one is left as a draft

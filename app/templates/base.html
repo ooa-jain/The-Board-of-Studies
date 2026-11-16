@@ -145,6 +145,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.6 2H4.4L6 16zM10 20.5a2 2 0 0 0 4 0"/></svg><span class="side-text">Updates</span>
       <b class="nav-bell-count" {% if not updates_unread %}hidden{% endif %}>{{ updates_unread if updates_unread < 100 else '99+' }}</b>
     </a>{% endif %}
+    {% if can('settings') %}{{ side_link(url_for('admin.rules_ugc'), 'Rules & UGC', 'M9 5h11M9 12h11M9 19h11M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2', ep == 'admin.rules_ugc') }}{% endif %}
     {% if can('comments') %}<a class="side-link nav-bell{{ ' is-on' if ep == 'admin.queries' }}" href="{{ url_for('admin.queries') }}" title="Queries from departments">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9.5 8.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 14.5v.01"/></svg><span class="side-text">Queries</span>
       <b class="nav-bell-count" {% if not queries_open %}hidden{% endif %}>{{ queries_open if queries_open < 100 else '99+' }}</b>

@@ -5226,3 +5226,28 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .q-tabs a.is-on { background: var(--ink-800); border-color: var(--ink-800); color: #fff; }
 .q-tabs a.is-on span { color: #fff; }
 .q-text { white-space: pre-line; }
+
+/* ---- admin Rules & UGC ---- */
+.ru-count { margin: 0 0 10px; }
+.ru-form { display: grid; gap: 14px; }
+.ru-school { padding: 0; overflow: hidden; }
+.ru-school-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; background: var(--ink-050); border-bottom: 1px solid var(--line); }
+.ru-school-head h2 { margin: 0; font-size: 1rem; }
+.ru-n { font-size: .75rem; color: var(--ink-faint); font-weight: 600; margin-left: 4px; }
+.ru-all { display: flex; align-items: center; gap: 6px; }
+.ru-list { list-style: none; margin: 0; padding: 0; }
+.ru-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; border-top: 1px solid var(--line); }
+.ru-row:first-child { border-top: 0; }
+.ru-row.is-flow { background: var(--warn-bg); }
+.ru-name { display: grid; gap: 2px; min-width: 0; }
+.ru-name small { color: var(--ink-faint); font-size: .78rem; }
+.ru-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.ru-opt { position: relative; cursor: pointer; }
+.ru-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.ru-opt span { display: block; padding: 6px 14px; font-size: .82rem; font-weight: 600; color: var(--ink-soft); }
+.ru-opt input:checked + span { background: var(--ink-800); color: #fff; }
+.ru-opt input:focus-visible + span { outline: 2px solid var(--gold-500); outline-offset: -2px; }
+.ru-opt input:disabled { cursor: default; }
+.ru-save { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; }
