@@ -39,6 +39,27 @@ DEGREE_LEVELS = [
 # every course in the programme structure is marked out of this
 MARKS_TOTAL = 100
 
+# teaching weeks in a semester: contact hours are the weekly L + T + P + E × this
+TEACHING_WEEKS = 15
+
+
+def contact_hours(c: dict):
+    """A course's contact hours: (L + T + P + E) a week × 15 weeks, from its
+    L-T-P-E; a course with none keeps what it holds."""
+    try:
+        h = float(c.get("hours_per_week"))
+        if str(c.get("ltpe") or "").strip():
+            return int(round(h * TEACHING_WEEKS))
+    except (TypeError, ValueError):
+        pass
+    try:
+        parts = [float(x) for x in str(c.get("ltpe") or "").split("-")]
+        if len(parts) == 4:
+            return int(round(sum(parts) * TEACHING_WEEKS))
+    except ValueError:
+        pass
+    return c.get("teaching_hours")
+
 # the semesters a course can sit in — picked from a list, never typed
 SEMESTERS = list(range(1, 9))
 
@@ -157,7 +178,12 @@ def course_info(r):
     credits = num("credits")
     if credits is not None:
         out["credits"] = credits
-        out["teaching_hours"] = int(round(credits * 15))
+    # contact hours: every hour of L, T, P and E a week, over 15 weeks —
+    # 2-0-0-3 is 2 × 15 + 3 × 15 = 75 (without L-T-P-E: 15 for every credit)
+    if "hours_per_week" in out:
+        out["teaching_hours"] = int(round(out["hours_per_week"] * TEACHING_WEEKS))
+    elif credits is not None:
+        out["teaching_hours"] = int(round(credits * TEACHING_WEEKS))
     cia, ese = num("cia"), num("ese")
     if cia is not None and ese is not None:
         out["ca_ese"] = f"{cia}:{ese}"
@@ -701,7 +727,7 @@ PROGRAMME_SYLLABUS = {
                  "min": 0, "max": 20},
                 {"name": "hours_per_week", "label": "Hours per week", "type": "integer",
                  "min": 0, "max": 40, "hidden": True},
-                # contact hours: 15 for every credit
+                # contact hours: (L + T + P + E) a week × 15 weeks
                 {"name": "teaching_hours", "label": "Contact Hours", "type": "integer",
                  "required": True, "min": 0, "max": 600},
                 {"name": "ca_ese", "label": "CA : ESE", "type": "readonly", "hidden": True},

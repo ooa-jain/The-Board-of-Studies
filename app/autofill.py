@@ -328,7 +328,7 @@ def _syllabus(sub, programme, stored, year):
         if c.get("hours_per_week") in (None, ""):
             c["hours_per_week"] = int(float(credits)) if float(credits) >= 1 else 1
         if c.get("teaching_hours") in (None, "") or int(float(c.get("teaching_hours") or 0)) < 10:
-            c["teaching_hours"] = int(round(float(credits) * 15))
+            c["teaching_hours"] = int(round(float(c.get("hours_per_week") or credits) * 15))
         if not str(c.get("pedagogy") or "").strip():
             c["pedagogy"] = PEDAGOGY
         if not str(c.get("outcomes") or "").strip():

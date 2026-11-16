@@ -1708,7 +1708,7 @@
   /* An earlier batch's own courses, as the syllabus sheets take them: from
      the course list on the same page, as it stands (saved or not). */
   /* A course's Course Information, from its line of the Curriculum table —
-     semester, credits, L-T-P-E, contact hours (15 for every credit) and
+     semester, credits, L-T-P-E, contact hours ((L + T + P + E) × 15) and
      CA : ESE — as the server's course_info works it out. */
   function courseInfo(r) {
     const out = {};
@@ -1716,7 +1716,10 @@
     const h = ["l", "t", "p", "e"].map(k => num(r[k]));
     if (h.every(x => x !== null)) { out.ltpe = h.join("-"); out.hours_per_week = h.reduce((a, b) => a + b, 0); }
     const cr = num(r.credits);
-    if (cr !== null) { out.credits = cr; out.teaching_hours = Math.round(cr * 15); }
+    if (cr !== null) out.credits = cr;
+    // contact hours: (L + T + P + E) a week × 15 weeks — 2-0-0-3 is 30 + 45 = 75
+    if (out.hours_per_week !== undefined) out.teaching_hours = Math.round(out.hours_per_week * 15);
+    else if (cr !== null) out.teaching_hours = Math.round(cr * 15);
     const ca = num(r.cia), es = num(r.ese);
     if (ca !== null && es !== null) out.ca_ese = `${ca}:${es}`;
     return out;

@@ -79,9 +79,9 @@
     {% for c in syllabus %}
     <details class="rep-course">
       <summary><span class="mono">{{ c.course_code or '—' }}</span> <strong>{{ c.course_title }}</strong>
-        <span class="small muted">· {{ c.credits }} credits · {{ c.teaching_hours or '—' }} hours</span>
+        <span class="small muted">· {{ c.credits }} credits · {{ contact_hours(c) or '—' }} hours</span>
         {% if c.outcomes and c.modules %}<span class="pill pill-ok">✓</span>{% endif %}</summary>
-      <p class="small">L-T-P-E {{ c.ltpe or '—' }} · Semester {{ c.semester or '—' }} · Contact Hours {{ c.teaching_hours or '—' }} · Credits {{ c.credits or '—' }} · CA : ESE {{ c.ca_ese or '—' }}</p>
+      <p class="small">L-T-P-E {{ c.ltpe or '—' }} · Semester {{ c.semester or '—' }} · Contact Hours {{ contact_hours(c) or '—' }} · Credits {{ c.credits or '—' }} · CA : ESE {{ c.ca_ese or '—' }}</p>
       {% if c.objectives %}<p class="small"><strong>Course Objectives</strong></p>
       <ol class="small">{% for o in c.objectives.splitlines() if o.strip() %}<li>{{ o }}</li>{% endfor %}</ol>{% endif %}
       {% if c.co_table is iterable and c.co_table is not string and c.co_table %}<p class="small"><strong>Course Outcomes</strong></p>

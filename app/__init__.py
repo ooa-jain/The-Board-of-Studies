@@ -66,6 +66,9 @@ def create_app(config_object=Config):
         """A stored time as Indian time: {{ x.at|ist }}.strftime(...) — see db.to_ist."""
         return database.to_ist(value)
 
+    from .schema import contact_hours as _contact_hours
+    app.jinja_env.globals["contact_hours"] = _contact_hours
+
     @app.template_filter("ay")
     def _academic_year(value):
         """An academic year as it is printed: 2027–28, with an en dash."""

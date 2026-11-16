@@ -37,7 +37,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Emu, Pt, RGBColor
 
-from .schema import DEFAULT_REGULATIONS, STAGE_BY_KEY
+from .schema import DEFAULT_REGULATIONS, STAGE_BY_KEY, contact_hours
 from .workflow import programmes_of
 
 BASE = Path(__file__).parent / "doc_templates" / "jain_base.docx"
@@ -664,7 +664,7 @@ def _course_sheet(doc, programme_name, c, width, cols=None):
     for r, (k1, v1, k2, v2) in enumerate((
             ("Course Code", c.get("course_code") or "", "L-T-P-E", c.get("ltpe") or ""),
             ("Semester", ROMAN[int(sem) - 1] if sem and 1 <= sem <= len(ROMAN) else _fmt(c.get("semester")),
-             "Contact Hours", _fmt(c.get("teaching_hours"))),
+             "Contact Hours", _fmt(contact_hours(c))),
             ("Credits", _fmt(c.get("credits")), "CA: ESE", c.get("ca_ese") or "")), start=1):
         cells = t.rows[r].cells
         for n, (v, bold) in enumerate(((k1, True), (v1, False), (k2, True), (v2, False))):
@@ -823,7 +823,7 @@ def batch_syllabus_file(path, programme_name, batch_label, courses):
         doc.add_heading(f"Course Code: {c.get('course_code') or ''} — Name of the Course: {c.get('course_title') or ''}", level=2)
         doc.add_paragraph(f"Semester {_fmt(c.get('semester'))} · Course Credits: {_fmt(c.get('credits'))} · "
                           f"No. of Hours per Week: {_fmt(c.get('hours_per_week'))} · "
-                          f"Total No. of Teaching Hours: {_fmt(c.get('teaching_hours'))}")
+                          f"Total No. of Teaching Hours: {_fmt(contact_hours(c))}")
         outs = _lines(c.get("outcomes"))
         if outs:
             doc.add_paragraph("Course Outcomes: " + "; ".join(f"CO{i}: {o}" for i, o in enumerate(outs, 1)))

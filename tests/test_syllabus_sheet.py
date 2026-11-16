@@ -13,8 +13,15 @@ from test_workflow import login
 def test_course_information_comes_from_the_curriculum_line():
     from app.schema import course_info
     r = {"semester": 1, "l": 2, "t": 0, "p": 2, "e": 3, "credits": 4, "cia": 70, "ese": 30}
+    # contact hours: (L + T + P + E) a week × 15 weeks — 7 × 15
     assert course_info(r) == {"semester": 1, "ltpe": "2-0-2-3", "hours_per_week": 7, "credits": 4,
-                              "teaching_hours": 60, "ca_ese": "70:30"}
+                              "teaching_hours": 105, "ca_ese": "70:30"}
+    # Business Ethics, 2-0-0-3 for 3 credits: 2 × 15 + 3 × 15 = 75, not 3 × 15 = 45
+    ethics = {"l": 2, "t": 0, "p": 0, "e": 3, "credits": 3}
+    assert course_info(ethics)["teaching_hours"] == 75
+    from app.schema import contact_hours
+    assert contact_hours({"ltpe": "2-0-0-3", "hours_per_week": 5, "teaching_hours": 45}) == 75
+    assert contact_hours({"teaching_hours": 45}) == 45
     # what the line does not have yet is left out, not guessed
     assert course_info({"credits": "3"}) == {"credits": 3, "teaching_hours": 45}
     assert course_info({}) == {}

@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 
 from . import ugc_rules as U
 from .db import get_db, to_ist
-from .schema import STAGES
+from .schema import STAGES, contact_hours
 from .workflow import compute_status, programmes_of, progress
 
 NAVY = "0F2A4A"
@@ -392,7 +392,7 @@ def _programmes_sheet(wb, rep):
                 mods = "; ".join(f"{m.get('title') or ''} ({m.get('hours') or '—'})"
                                  for m in c.get("modules") or [] if isinstance(m, dict))
                 _put(ws, r, [c.get("course_code"), c.get("course_title"), mods, c.get("semester"), "", "", "",
-                             c.get("credits"), c.get("hours_per_week"), c.get("teaching_hours"), ""], wrap=True)
+                             c.get("credits"), c.get("hours_per_week"), contact_hours(c), ""], wrap=True)
                 r += 1
         else:
             ws.cell(row=r, column=1, value="Not entered yet.").font = Font(italic=True, color="7A8699")
