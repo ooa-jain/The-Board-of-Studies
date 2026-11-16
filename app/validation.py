@@ -425,6 +425,8 @@ LONG_COURSES = ("Research Project / Dissertation", "Summer Internship")
 
 
 def r_ltpe_credit_arithmetic(data, ctx, sk):
+    if ctx.get("flow"):
+        return []                 # a No UGC department: no credit rule, the tables add up what is entered
     cfg = U.DEFAULT_OTHER_RULES
     w = cfg["credit_from_hours"]
     tol = cfg["credit_arithmetic_tolerance"]
@@ -832,11 +834,16 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     deg = ((data.get("details") or {}) if isinstance(data.get("details"), dict) else {}).get("degree_level") \
         or ctx.get("degree_level")
     stage = for_level(stage, deg)
+    # a No UGC department: one flow, its own course categories, no credit rule
+    flow = bool(ctx.get("flow")) and stage_key == "prog_curriculum"
+    if flow:
+        from .schema import flow_stage
+        stage = flow_stage(stage)
     # an upload box the Office has made not mandatory
     from .keyword_match import relax
     stage = relax(stage)
     if stage_key == "prog_curriculum":
-        data = category_groups(data, deg)
+        data = category_groups(data, deg, flow=flow)
     elif stage.get("existing_batch"):
         data = category_groups(data, deg, "batch_courses")
 
@@ -900,7 +907,8 @@ def build_context(submission: dict, programme: dict | None = None, rules_doc: di
             from .db import get_db
             from .schema import is_flow, is_pg
             dept = get_db().departments.find_one({"dept_code": submission.get("dept_code")},
-                                                 {"credit_rules": 1}) if submission.get("dept_code") else None
+                                                 {"credit_rules": 1, "school": 1, "faculty": 1}) \
+                if submission.get("dept_code") else None
             ctx["flow"] = is_flow(dept) and not is_pg(deg)
         except Exception:
             ctx["flow"] = False

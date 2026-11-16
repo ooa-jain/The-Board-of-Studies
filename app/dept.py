@@ -540,7 +540,7 @@ def stage(stage_key, programme_code=None):
         calc = {**calc, "flow": True, "track": None, "required_total": None}
         credit_matrix = None
     if stage_key == "prog_curriculum":
-        data = category_groups(data, deg)
+        data = category_groups(data, deg, flow=flow)
         if flow:
             data = flow_rows(data)
     elif stage_def.get("existing_batch"):
@@ -1037,10 +1037,10 @@ def _submit_one(dept, sub, stage_key, programme, data):
                                            programme, _me()["username"])
     if status != "submitted":
         return {"ok": False, "status": status, "issues": issues, "summary": summary}
-    _tell(dept, "submitted", stage_key, programme,
-          changes=describe_changes(stage_key, before, apply_defaults(stage_key, data)))
-    people.keep(dept["dept_code"], _year(), stage_key, programme_code, apply_defaults(stage_key, data),
-                _person(), kind="submit")
+    from .workflow import _flow_for
+    filed = apply_defaults(stage_key, data, programme, _flow_for(sub, stage_key, programme))
+    _tell(dept, "submitted", stage_key, programme, changes=describe_changes(stage_key, before, filed))
+    people.keep(dept["dept_code"], _year(), stage_key, programme_code, filed, _person(), kind="submit")
     audit(_me()["username"], "stage.submitted",
           f"{dept['dept_code']}/{programme_code + '/' if programme_code else ''}{stage_key}")
     return {"ok": True, "status": status, "issues": issues, "summary": summary}

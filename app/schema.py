@@ -221,7 +221,7 @@ _OLDER_GROUPS = {
 }
 
 
-def course_category(value, credits=None, title=""):
+def course_category(value, credits=None, title="", flow=False):
     """A course group as one of the course categories: a group already one of
     them stays; any other word (an older draft's, a pack's own) becomes the
     category it stands for. A course with no credits is counted as non-credit
@@ -229,6 +229,8 @@ def course_category(value, credits=None, title=""):
     v = str(value or "").strip()
     if v in NEP_CATEGORIES:
         return v
+    if flow and v == "Discipline Specific Elective (DSE)":
+        return v                       # a No UGC department keeps DSE as its own category
     if v in _OLDER_GROUPS:
         return _OLDER_GROUPS[v]
     # the group's own words decide; a course's title only when it has no group
@@ -1065,7 +1067,7 @@ def for_level(stage: dict, degree_level) -> dict:
     return s
 
 
-def category_groups(data: dict, degree_level, key="semester_structure") -> dict:
+def category_groups(data: dict, degree_level, key="semester_structure", flow=False) -> dict:
     """A programme's structure (or an earlier batch's course list, with
     key="batch_courses") with every course group one of the course categories
     (an older draft's Discipline Specific Elective, Generic Core and the like
@@ -1080,7 +1082,8 @@ def category_groups(data: dict, degree_level, key="semester_structure") -> dict:
     for r in rows:
         if isinstance(r, dict):
             r = dict(r)
-            r["nep_category"] = course_category(r.get("nep_category"), r.get("credits"), r.get("course_title"))
+            r["nep_category"] = course_category(r.get("nep_category"), r.get("credits"), r.get("course_title"),
+                                                flow=flow)
             if pg:
                 r.pop("track", None)
         out.append(r)
@@ -1161,8 +1164,36 @@ CREDIT_RULE_MODES = {
 }
 
 
+# schools and faculties on No UGC unless the Office says otherwise: Design,
+# Allied Healthcare, every Engineering school or faculty, and Law
+_FLOW_BY_DEFAULT = re.compile(r"design|allied\s+health|engineering|\blaw\b", re.I)
+
+
+def default_flow(department) -> bool:
+    d = department or {}
+    return bool(_FLOW_BY_DEFAULT.search(" ".join(str(d.get(k) or "") for k in ("school", "faculty"))))
+
+
+def credit_mode(department) -> str:
+    """"flow" (No UGC) or "ugc": the Office's choice, or else by its school."""
+    v = (department or {}).get("credit_rules")
+    if v in CREDIT_RULE_MODES:
+        return v
+    return "flow" if default_flow(department) else "ugc"
+
+
 def is_flow(department) -> bool:
-    return (department or {}).get("credit_rules") == "flow"
+    return credit_mode(department) == "flow"
+
+
+# a No UGC department's course categories: no Minor; Major as CC / Core,
+# DSE on its own, and Multidisciplinary as GEC / OE / MDC; the rest as they are
+DSE = "Discipline Specific Elective (DSE)"
+FLOW_CATEGORIES = ["Major (Core)", DSE, "Multidisciplinary", "Ability Enhancement Courses (AEC)",
+                   AEC_LANGUAGE, "Skill Enhancement Courses (SEC)", "Value Added Courses (VAC)",
+                   "Summer Internship", "Research Project / Dissertation"]
+FLOW_LABELS = {**CATEGORY_LABELS, "Major (Core)": "Major / CC / Core", DSE: "DSE — Discipline Specific Elective",
+               "Multidisciplinary": "GEC / OE / MDC"}
 
 
 def flow_stage(stage: dict) -> dict:
@@ -1172,13 +1203,20 @@ def flow_stage(stage: dict) -> dict:
         return stage
     s = copy.deepcopy(stage)
     s["flow"] = True
+    # no Minor: its annexure goes too
+    s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
     for sec in s["sections"]:
         if sec["key"] == "semester_structure":
             for c in sec["columns"]:
                 if c["name"] == "semester":
                     c["max"], c["choices"] = 8, list(SEMESTERS)
+                elif c["name"] == "nep_category":
+                    c["options"], c["option_labels"] = list(FLOW_CATEGORIES), dict(FLOW_LABELS)
             sec["help"] = ("Enter one course per row, semesters 1 to 8 in one list — "
-                           "only the semesters the programme has.")
+                           "only the semesters the programme has. No credit rule applies: "
+                           "the tables add up what is entered.")
+            # no credit rule: L-T-P-E suggests the credits, nothing checks them
+            sec["rules"] = [r for r in sec.get("rules", []) if r != "ltpe_credit_arithmetic"]
         elif sec["key"] == "credit_distribution":
             sec["help"] = "Worked out from the programme structure."
             sec["rules"] = [r for r in sec.get("rules", []) if not r.startswith("ugc_")]

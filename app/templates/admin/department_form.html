@@ -52,13 +52,13 @@
       </div>
 
       {# UGC or No UGC — the same switch as Admin › Rules & UGC #}
-      {% set mode = (dept.credit_rules if dept else '') or 'ugc' %}
       <fieldset class="de-rules">
         <legend>Rules</legend>
+        {% if mode_auto and mode == 'flow' %}<p class="small muted" style="margin:0">No UGC automatically — {{ dept.school or dept.faculty }}.</p>{% endif %}
         <label class="check"><input type="radio" name="credit_rules" value="ugc" {{ 'checked' if mode == 'ugc' }}>
           <span><strong>UGC</strong> — 3-year, Honours and Honours with Research, checked against UGC Table 2</span></label>
         <label class="check"><input type="radio" name="credit_rules" value="flow" {{ 'checked' if mode == 'flow' }}>
-          <span><strong>No UGC</strong> — semesters 1 to 8 in one flow; the credit tables total what is entered</span></label>
+          <span><strong>No UGC</strong> — semesters 1 to 8 in one flow, no Minor, no credit rule; the tables total what is entered</span></label>
       </fieldset>
 
       <label class="check mb-2">

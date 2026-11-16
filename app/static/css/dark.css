@@ -5467,6 +5467,9 @@ html[data-theme="dark"] .de-removed {
 html[data-theme="dark"] .de-removed li {
   border: 1px dashed #2e3542;
 }
+html[data-theme="dark"] .ru-auto {
+  color: #f6966f;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

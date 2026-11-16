@@ -319,9 +319,17 @@ def _sems(rows):
     return sorted({_num(r.get("semester")) for r in rows if _num(r.get("semester")) is not None})
 
 
-def _in_group(r, cat):
+# a No UGC department's Classification of Credits: no Minor; DSE and GEC / OE / MDC on their own
+FLOW_DIST_GROUPS = [
+    ("Major (Core)", "Major / CC / Core"),
+    ("Discipline Specific Elective (DSE)", "DSE"),
+    ("Multidisciplinary", "GEC / OE / MDC"),
+] + DIST_GROUPS[3:]
+
+
+def _in_group(r, cat, flow=False):
     c = r.get("nep_category")
-    return c == cat or (cat == "Major (Core)" and c == "Discipline Specific Elective (DSE)") or \
+    return c == cat or (not flow and cat == "Major (Core)" and c == "Discipline Specific Elective (DSE)") or \
         (cat == "Ability Enhancement Courses (AEC)" and c == "Ability Enhancement Courses (AEC) - Language")
 
 
@@ -374,9 +382,11 @@ def _profile_table(doc, cur, width, degree_level=None):
     _widths(t, [width * 0.06, width * 0.17, width * 0.77])
 
 
-def _classification_table(doc, rows, width, title="Classification of Credits and Number of Non-Credit Courses"):
+def _classification_table(doc, rows, width, title="Classification of Credits and Number of Non-Credit Courses",
+                          flow=False):
     base, blocks = _blocks(rows)
-    heads = (["Semester"] + [g[1] for g in DIST_GROUPS] +
+    groups = FLOW_DIST_GROUPS if flow else DIST_GROUPS
+    heads = (["Semester"] + [g[1] for g in groups] +
              ["Total Credits", "No. of Mandatory Non-Credit Course/s",
               "No. of Mandatory Non-Credit Audit Course/s"])
     t = doc.add_table(rows=0, cols=len(heads))
@@ -395,7 +405,7 @@ def _classification_table(doc, rows, width, title="Classification of Credits and
 
     def line(label, rs, bold=False):
         cells = t.add_row().cells
-        vals = ([label] + [_fmt(_credits([r for r in rs if _in_group(r, g[0])])) for g in DIST_GROUPS]
+        vals = ([label] + [_fmt(_credits([r for r in rs if _in_group(r, g[0], flow)])) for g in groups]
                 + [_fmt(_credits(rs)), str(nc(rs)), str(audit(rs))])
         for i, v in enumerate(vals):
             _write(cells[i], v, bold=bold, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -410,12 +420,12 @@ def _classification_table(doc, rows, width, title="Classification of Credits and
     _widths(t, [w] * len(heads))
 
 
-def _structure_table(doc, rows, width):
+def _structure_table(doc, rows, width, flow=False):
     t = doc.add_table(rows=0, cols=7)
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _band(t, "Programme Structure", GREEN)
-    heads = ["Course Code", "Course Title", "Major / Minor", "Credits",
+    heads = ["Course Code", "Course Title", "Major / DSE" if flow else "Major / Minor", "Credits",
              "Continuous Assessment Marks", "End Semester Examination Marks", "Total Marks"]
     hr = t.add_row().cells
     for i, h in enumerate(heads):
@@ -439,7 +449,8 @@ def _structure_table(doc, rows, width):
             for g in groups:
                 _band(t, heads_by.get(g, (g or "OTHER COURSES").upper()), PALE)
                 for r in [x for x in rs if (x.get("nep_category") or "") == g]:
-                    mm = ("Major" if _in_group(r, "Major (Core)") else
+                    mm = ("Major" if _in_group(r, "Major (Core)", flow) else
+                          "DSE" if flow and g == "Discipline Specific Elective (DSE)" else
                           "Minor" if g == "Minor Stream" else "")
                     cells = t.add_row().cells
                     vals = [r.get("course_code") or "", r.get("course_title") or "", mm,
@@ -550,9 +561,12 @@ def curriculum_docx(db, dept_code, year, programme_code):
     if not rec:
         return None
     _dept, prog, cur, _ = rec
-    from .schema import category_groups, is_pg
+    from .schema import category_groups, flow_rows, is_flow, is_pg
     deg = (cur.get("details") or {}).get("degree_level") or prog.get("degree_level")
-    cur = category_groups(cur, deg)
+    flow = is_flow(_dept) and not is_pg(deg)
+    cur = category_groups(cur, deg, flow=flow)
+    if flow:
+        cur = flow_rows(cur)
     if is_pg(deg):
         return _pg_curriculum_docx(prog, cur, deg)
     name, spec, batch = _title_line(prog, cur)
@@ -571,7 +585,7 @@ def curriculum_docx(db, dept_code, year, programme_code):
             if isinstance(r, dict) and _num(r.get("semester")) is not None]
     _page_break(doc)
     if rows:
-        _classification_table(doc, rows, width)
+        _classification_table(doc, rows, width, flow=flow)
     else:
         _para(doc, "Classification of Credits — the programme structure is not entered yet.",
               size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
@@ -579,13 +593,13 @@ def curriculum_docx(db, dept_code, year, programme_code):
     _page_break(doc)
     _para(doc, "Programme Structure", bold=True, size=13, color=NAVY, after=6)
     if rows:
-        _structure_table(doc, rows, width)
+        _structure_table(doc, rows, width, flow=flow)
         doc.add_paragraph()
         _summary_table(doc, rows, width)
     else:
         _para(doc, "No courses entered yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
 
-    minors = [m for m in (cur.get("minors") or []) if isinstance(m, dict)]
+    minors = [m for m in (cur.get("minors") or []) if isinstance(m, dict)] if not flow else []
     if minors:
         _page_break(doc)
         _minors_table(doc, minors, width)

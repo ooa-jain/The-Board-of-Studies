@@ -2773,7 +2773,17 @@
   const freshRow = section => (IS_PG && section && section.key === "semester_structure")
     ? { cia: 60, ese: 40, total_marks: 100 } : {};
   // the columns of the template's "Classification of Credits" table
-  const DIST_GROUPS = [
+  const DIST_GROUPS = FLOW ? [
+    // a No UGC department: no Minor; DSE and GEC / OE / MDC on their own
+    ["Major (Core)", "Major / CC / Core"],
+    ["Discipline Specific Elective (DSE)", "DSE"],
+    ["Multidisciplinary", "GEC / OE / MDC"],
+    ["Ability Enhancement Courses (AEC)", "Ability Enhancement / AEC"],
+    ["Skill Enhancement Courses (SEC)", "Skill Enhancement / SEC"],
+    ["Value Added Courses (VAC)", "Common Value Added / VAC"],
+    ["Summer Internship", "Summer Internship / INTERNSHIP"],
+    ["Research Project / Dissertation", "Research Project / Dissertation / PROJECT"],
+  ] : [
     ["Major (Core)", "Major"],
     ["Minor Stream", "Minor"],
     ["Multidisciplinary", "Multi-Disciplinary / OE"],
@@ -2785,7 +2795,7 @@
   ];
   // a discipline elective sits in the Major column, as UGC Table 2 counts it
   const inGroup = (r, cat) => r.nep_category === cat ||
-    (cat === "Major (Core)" && r.nep_category === "Discipline Specific Elective (DSE)") ||
+    (!FLOW && cat === "Major (Core)" && r.nep_category === "Discipline Specific Elective (DSE)") ||
     (cat === "Ability Enhancement Courses (AEC)" && r.nep_category === AEC_LANGUAGE);
   const NC_COURSE = "Mandatory Non-Credit Course";
   const NC_AUDIT = "Mandatory Non-Credit Audit Course";

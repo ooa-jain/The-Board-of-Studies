@@ -540,7 +540,7 @@ def department_form(dept_code=None):
     # existing values offered as suggestions, so a new department lands in an
     # existing faculty and school rather than a near-miss spelling of one
     def _form(d):
-        from .schema import CREDIT_RULE_MODES
+        from .schema import CREDIT_RULE_MODES, credit_mode
         from .workflow import master_programmes, workbook_programmes
         master = removed = []
         if dept:
@@ -555,7 +555,8 @@ def department_form(dept_code=None):
             faculties=sorted(x for x in db.departments.distinct("faculty") if x),
             schools=sorted(x for x in db.departments.distinct("school") if x),
             master=master, removed=removed, degrees=PROGRAMME_DEGREES,
-            modes=CREDIT_RULE_MODES)
+            modes=CREDIT_RULE_MODES, mode=credit_mode(d) if d else "ugc",
+            mode_auto=bool(d) and (d.get("credit_rules") not in CREDIT_RULE_MODES))
 
     if request.method == "POST":
         f = request.form
@@ -578,8 +579,10 @@ def department_form(dept_code=None):
             "active": f.get("active") == "on",
             "updated_at": now(),
         }
-        from .schema import CREDIT_RULE_MODES
-        if f.get("credit_rules") in CREDIT_RULE_MODES:
+        from .schema import CREDIT_RULE_MODES, credit_mode
+        if f.get("credit_rules") in CREDIT_RULE_MODES and (
+                (dept or {}).get("credit_rules") in CREDIT_RULE_MODES
+                or f["credit_rules"] != credit_mode({**(dept or {}), **payload, "credit_rules": None})):
             payload["credit_rules"] = f["credit_rules"]
         if dept:
             db.departments.update_one({"_id": dept["_id"]}, {"$set": payload})
@@ -2435,11 +2438,12 @@ def rules_ugc():
     q = scope_q()
     if request.method == "POST":
         changed = 0
-        for d in db.departments.find(q, {"dept_code": 1, "credit_rules": 1}):
+        from .schema import credit_mode
+        for d in db.departments.find(q, {"dept_code": 1, "credit_rules": 1, "school": 1, "faculty": 1}):
             want = request.form.get("mode." + d["dept_code"])
             if want not in CREDIT_RULE_MODES:
                 continue
-            if (d.get("credit_rules") or "ugc") != want:
+            if credit_mode(d) != want:
                 db.departments.update_one({"_id": d["_id"]},
                                           {"$set": {"credit_rules": want, "updated_at": now()}})
                 audit(_actor(), "rules_ugc." + want, d["dept_code"])
@@ -2447,13 +2451,17 @@ def rules_ugc():
         flash(f"Saved — {changed} department{'s' if changed != 1 else ''} changed." if changed
               else "Nothing changed.", "success")
         return redirect(url_for("admin.rules_ugc"))
-    depts = list(db.departments.find(q, {"dept_code": 1, "dept_name": 1, "school": 1, "campus": 1,
+    from .schema import credit_mode
+    depts = list(db.departments.find(q, {"dept_code": 1, "dept_name": 1, "school": 1, "faculty": 1, "campus": 1,
                                          "credit_rules": 1, "active": 1})
                  .sort([("school", 1), ("dept_name", 1)]))
     schools = {}
     for d in depts:
+        # Design, Allied Healthcare, Engineering and Law are No UGC unless set otherwise
+        d["mode"] = credit_mode(d)
+        d["auto"] = d.get("credit_rules") not in CREDIT_RULE_MODES
         schools.setdefault(d.get("school") or "No school given", []).append(d)
-    flow_count = sum(1 for d in depts if d.get("credit_rules") == "flow")
+    flow_count = sum(1 for d in depts if d["mode"] == "flow")
     return render_template("admin/rules_ugc.html", schools=sorted(schools.items()),
                            modes=CREDIT_RULE_MODES, total=len(depts), flow_count=flow_count)
 

@@ -5284,3 +5284,4 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .de-removed li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
   border: 1px dashed var(--line); border-radius: 8px; }
 .de-removed form { margin: 0; }
+.ru-auto { color: var(--warn); font-weight: 600; }

@@ -537,7 +537,7 @@ def save_draft(dept_code, academic_year, stage_key, data, programme_code=None, s
     )
 
 
-def apply_defaults(stage_key, data, programme=None):
+def apply_defaults(stage_key, data, programme=None, flow=False):
     """The standard wording a department sees as grey placeholder text
     ("prefill_text"), and item 9 worked out from the programme's name and
     specialisation ("derive_from"), stand in for any box left empty. Applied
@@ -549,7 +549,7 @@ def apply_defaults(stage_key, data, programme=None):
         # a UG programme's degree is not asked: unless it has one, its structure says
         details = dict(data.get("details") or {}) if isinstance(data.get("details"), dict) else {}
         named = str(details.get("degree_level") or "")
-        if (programme or {}).get("level") != "PG" and not named.startswith("PG") \
+        if not flow and (programme or {}).get("level") != "PG" and not named.startswith("PG") \
                 and (not named or details.get("_degree_auto")) and data.get("semester_structure"):
             details.update(degree_level=ug_degree(data.get("semester_structure")), _degree_auto=True)
             data["details"] = details
@@ -557,7 +557,7 @@ def apply_defaults(stage_key, data, programme=None):
         or (programme or {}).get("degree_level")
     stage = for_level(STAGE_BY_KEY.get(stage_key) or {}, deg)
     if stage_key == "prog_curriculum":
-        data = category_groups(data, deg)
+        data = category_groups(data, deg, flow=flow)
     elif stage.get("existing_batch"):
         data = category_groups(data, deg, "batch_courses")
 
@@ -586,8 +586,18 @@ def apply_defaults(stage_key, data, programme=None):
     return data
 
 
+def _flow_for(submission, stage_key, programme):
+    """Is this a No UGC department's UG Curriculum?"""
+    if stage_key != "prog_curriculum" or not programme:
+        return False
+    from .schema import is_flow, is_pg
+    dept = get_db().departments.find_one({"dept_code": submission.get("dept_code")},
+                                         {"credit_rules": 1, "school": 1, "faculty": 1})
+    return is_flow(dept) and not is_pg(programme.get("degree_level"))
+
+
 def validate_only(submission, stage_key, data, programme=None):
-    data = apply_defaults(stage_key, data, programme)
+    data = apply_defaults(stage_key, data, programme, _flow_for(submission, stage_key, programme))
     issues, summary = validate_stage(stage_key, data, _ctx_for(submission, stage_key, programme))
     return issues, summary
 
@@ -596,7 +606,7 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
     """Validate and, if clean, lock the stage and unlock the next one."""
     db = get_db()
     submission = get_or_create_submission(dept_code, academic_year)
-    data = apply_defaults(stage_key, data, programme)
+    data = apply_defaults(stage_key, data, programme, _flow_for(submission, stage_key, programme))
     issues, summary = validate_stage(stage_key, data, _ctx_for(submission, stage_key, programme))
 
     programme_code = (programme or {}).get("programme_code")
