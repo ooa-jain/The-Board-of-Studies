@@ -5435,6 +5435,23 @@ html[data-theme="dark"] .ru-opt input:checked + span {
 html[data-theme="dark"] .ru-opt input:focus-visible + span {
   outline: 2px solid #2563eb;
 }
+html[data-theme="dark"] .lang-del {
+  border: 1px solid #2e3542;
+  background: #121519;
+  color: #afb8ca;
+}
+html[data-theme="dark"] .lang-del:hover {
+  color: #e48b81;
+  border-color: #ad3325;
+}
+html[data-theme="dark"] .lang-add {
+  border: 1px dashed #2c5488;
+  background: #121519;
+  color: #b2c9e6;
+}
+html[data-theme="dark"] .lang-add:hover {
+  background: #181b21;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

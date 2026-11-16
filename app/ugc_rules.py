@@ -108,6 +108,7 @@ NEP_CATEGORY_TO_KEY = {
     "Minor Stream": "minor_stream",
     "Multidisciplinary": "multidisciplinary",
     "Ability Enhancement Courses (AEC)": "aec",
+    "Ability Enhancement Courses (AEC) - Language": "aec",
     "Skill Enhancement Courses (SEC)": "sec",
     "Value Added Courses (VAC)": "vac",
     "Summer Internship": "internship",

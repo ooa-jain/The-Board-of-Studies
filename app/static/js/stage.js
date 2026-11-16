@@ -14,6 +14,8 @@
   const STAGE = JSON.parse(document.getElementById("stage-def").textContent);
   const CREDIT = JSON.parse(document.getElementById("credit-def").textContent || "{}");
   const CTX = window.STAGE_CTX;
+  // the AEC category for language courses: one row, a code and title per language
+  const AEC_LANGUAGE = "Ability Enhancement Courses (AEC) - Language";
 
   // A new programme's name in proper form, and a code made from it the way
   // the catalogue's codes are: the degree (MSC, BCA, MBA…) then the initials
@@ -96,7 +98,38 @@
       }
       return out;
     }
-    return { tidy, code, level };
+    // the name as it is usually said: "BCA · Cyber Security", "MCA"
+    const SHORT = [
+      [/^bachelor of computer applications?\b/i, "BCA"], [/^master of computer applications?\b/i, "MCA"],
+      [/^bachelor of business administration\b/i, "BBA"], [/^master of business administration\b/i, "MBA"],
+      [/^bachelor of commerce\b/i, "B.Com"], [/^master of commerce\b/i, "M.Com"],
+      [/^bachelor of science\b/i, "B.Sc"], [/^master of science\b/i, "M.Sc"],
+      [/^bachelor of technology\b/i, "B.Tech"], [/^master of technology\b/i, "M.Tech"],
+      [/^bachelor of design\b/i, "B.Des"], [/^master of design\b/i, "M.Des"],
+      [/^bachelor of arts\b/i, "BA"], [/^master of arts\b/i, "MA"],
+    ];
+    function short(name) {
+      const n = String(name || "").trim();
+      for (const [re, ab] of SHORT) {
+        if (!re.test(n)) continue;
+        const spec = n.replace(re, "")
+          .replace(/\((?:[^()]*hon(?:ou)?rs[^()]*)\)/ig, " ")
+          .replace(/^[\s(]*(?:with\s+)?(?:speciali[sz]ation\s+in|in)\s+/i, "")
+          .replace(/^\(\s*with\s+speciali[sz]ation\s+in\s+/i, "")
+          .replace(/[()]/g, " ").replace(/\s+/g, " ").trim();
+        return spec ? `${ab} · ${spec}` : ab;
+      }
+      return "";
+    }
+    // the same programme, however it is written: "MCA", "Master of Computer
+    // Application", "Bachelor of Computer Applications (Honours / …)"
+    function same(a, b) {
+      const norm = x => String(x || "").toLowerCase()
+        .replace(/\((?:[^()]*hon(?:ou)?rs[^()]*)\)/g, " ").replace(/applications\b/g, "application")
+        .replace(/[^a-z0-9]+/g, " ").trim();
+      return !!a && !!b && norm(tidy(a)) === norm(tidy(b));
+    }
+    return { tidy, code, level, short, same };
   })();
   // run after every change: counts that follow a table, and the like
   const refreshers = [];
@@ -2099,8 +2132,69 @@
       rowsChanged();
     }
 
+    /* AEC (Language): one row, many languages — a course code and title for
+       each (Kannada, Hindi, French…), one L-T-P-E, credits and marks for
+       all. Stored as "C1 / C2" and "Title 1 / Title 2", as an elective pair
+       is, so each language has its own syllabus. */
+    const LANG_OK = ["nep_category", "course_code", "course_title"]
+      .every(n => section.columns.some(c => c.name === n));
+    const isLang = row => row.nep_category === AEC_LANGUAGE;
+    function langEditor(row, changed) {
+      const split = (v, sep) => String(v || "").split(sep).map(x => x.trim());
+      const codes = split(row.course_code, "/");
+      const titles = split(row.course_title, " / ");
+      const n = Math.max(codes.length, titles.length, 1);
+      const pairs = Array.from({ length: n }, (_, k) => ({ code: codes[k] || "", title: titles[k] || "" }));
+      const codeBox = el("div", "lang-list");
+      const titleBox = el("div", "lang-list");
+      function write() {
+        const kept = pairs.filter(p => p.code.trim() || p.title.trim());
+        row.course_code = kept.map(p => p.code.trim()).join(" / ");
+        row.course_title = kept.map(p => p.title.trim()).join(" / ");
+        changed();
+      }
+      function paint(focusAt) {
+        codeBox.textContent = "";
+        titleBox.textContent = "";
+        pairs.forEach((p, k) => {
+          const ci = el("input", "lang-in");
+          ci.type = "text"; ci.value = p.code; ci.placeholder = "Code";
+          ci.setAttribute("aria-label", `Language ${k + 1} course code`);
+          ci.readOnly = !!CTX.readonly;
+          ci.addEventListener("input", () => { p.code = ci.value; write(); });
+          codeBox.appendChild(ci);
+          const line = el("div", "lang-line");
+          const ti = el("input", "lang-in");
+          ti.type = "text"; ti.value = p.title; ti.placeholder = k ? "e.g. Hindi" : "e.g. Kannada";
+          ti.setAttribute("aria-label", `Language ${k + 1} course title`);
+          ti.readOnly = !!CTX.readonly;
+          ti.addEventListener("input", () => { p.title = ti.value; write(); });
+          line.appendChild(ti);
+          if (!CTX.readonly && pairs.length > 1) {
+            const x = el("button", "lang-del", "×");
+            x.type = "button";
+            x.title = "Remove this language";
+            x.setAttribute("aria-label", `Remove language ${k + 1}`);
+            x.addEventListener("click", () => { pairs.splice(k, 1); write(); paint(Math.max(0, k - 1)); });
+            line.appendChild(x);
+          }
+          titleBox.appendChild(line);
+          if (focusAt === k) setTimeout(() => ci.focus(), 0);
+        });
+        if (!CTX.readonly) {
+          const add = el("button", "lang-add", "+ Add a language");
+          add.type = "button";
+          add.addEventListener("click", () => { pairs.push({ code: "", title: "" }); paint(pairs.length - 1); });
+          titleBox.appendChild(add);
+        }
+      }
+      paint();
+      return { codes: codeBox, titles: titleBox };
+    }
+
     function drawRow(row, i, shown, g) {
       if (!CTX.readonly && settle(row)) settled = true;
+      const lang = LANG_OK && isLang(row) ? langEditor(row, () => { touch(); showTotals(); }) : null;
       const tr = el("tr");
       tr.dataset.row = i;
       tr._row = row;
@@ -2121,6 +2215,13 @@
         }
         const holder = el("div");
         holder.dataset.field = c.name;
+        if (lang && (c.name === "course_code" || c.name === "course_title")) {
+          td.className = "rt-lang";
+          holder.appendChild(c.name === "course_code" ? lang.codes : lang.titles);
+          td.appendChild(holder);
+          tr.appendChild(td);
+          return;
+        }
         if (COURSE_LINKS[c.type]) {
           const L = { type: c.type, row: row, holder: holder, key: null };
           links.push(L);
@@ -2138,7 +2239,20 @@
           return;
         }
         const input = makeInput(c, row[c.name], (v) => {
+          const wasLang = LANG_OK && isLang(row);
           row[c.name] = v;
+          if (c.name === "nep_category" && LANG_OK && wasLang !== isLang(row)) {
+            // the row changes shape: one code and title, or a list of languages
+            const now = drawRow(row, rows(section.key).indexOf(row), shown, g);
+            links = links.filter(L => L.row !== row || now.contains(L.holder));
+            tr.replaceWith(now);
+            renumber();
+            touch();
+            showTotals();
+            const sel = now.querySelector('[data-field="nep_category"] select');
+            if (sel) sel.focus();
+            return;
+          }
           if (DERIVED[c.name]) markManual(row, c.name, cells);
           derive(RULES, row, cells);
           touch();
@@ -2668,7 +2782,8 @@
   ];
   // a discipline elective sits in the Major column, as UGC Table 2 counts it
   const inGroup = (r, cat) => r.nep_category === cat ||
-    (cat === "Major (Core)" && r.nep_category === "Discipline Specific Elective (DSE)");
+    (cat === "Major (Core)" && r.nep_category === "Discipline Specific Elective (DSE)") ||
+    (cat === "Ability Enhancement Courses (AEC)" && r.nep_category === AEC_LANGUAGE);
   const NC_COURSE = "Mandatory Non-Credit Course";
   const NC_AUDIT = "Mandatory Non-Credit Audit Course";
 
@@ -3392,7 +3507,8 @@
       const name = ProgName.tidy(addName.value);
       if (!name) { addName.focus(); return; }
       const lvl = levels.length > 1 ? addLevel.value : (levels[0] || "");
-      const same = data.find(r => String(r.programme_name || "").trim().toLowerCase() === name.toLowerCase());
+      const same = data.find(r => String(r.programme_name || "").trim().toLowerCase() === name.toLowerCase())
+        || data.find(r => ProgName.same(r.programme_name, name));
       if (same) {
         same.decision = "keep";
       } else {
@@ -3413,9 +3529,12 @@
       options.textContent = "";
       let shown = 0;
       tabs.forEach(t => {
+        const words = q.split(/\s+/).filter(Boolean);
+        const hay = r => `${r.programme_code} ${r.programme_name} ${ProgName.short(r.programme_name)} ` +
+                         ProgName.tidy(String(r.programme_name || "")).toLowerCase();
         const mine = data.map((r, i) => [r, i])
           .filter(([r]) => r.source !== "new" && tabOf(r) === t.key)
-          .filter(([r]) => !q || `${r.programme_code} ${r.programme_name}`.toLowerCase().includes(q));
+          .filter(([r]) => !words.length || words.every(w => hay(r).toLowerCase().includes(w)));
         if (!mine.length) return;
         if (tabs.length > 1) options.appendChild(el("div", "pd-group", t.label));
         mine.forEach(([r]) => {
@@ -3430,8 +3549,10 @@
           });
           opt.appendChild(box);
           const txt = el("span", "pd-opt-t");
-          txt.appendChild(el("span", null, label(r)));
-          const meta = [r.degree, r.year_introduced && `since ${r.year_introduced}`].filter(Boolean).join(" · ");
+          const sh = ProgName.short(r.programme_name);
+          txt.appendChild(el("span", null, sh || label(r)));
+          const meta = [sh && label(r), r.degree, r.year_introduced && `since ${r.year_introduced}`]
+            .filter(Boolean).join(" · ");
           if (meta) txt.appendChild(el("small", null, meta));
           opt.appendChild(txt);
           options.appendChild(opt);
@@ -3500,8 +3621,12 @@
           code.hidden = true;
           body.appendChild(code);
         } else {
-          body.appendChild(el("span", "pd-name", label(row)));
-          const meta = [row.degree, row.year_introduced && `since ${row.year_introduced}`].filter(Boolean).join(" · ");
+          const sh = ProgName.short(row.programme_name);
+          const nm = el("span", "pd-name", sh || label(row));
+          if (sh) nm.title = label(row);
+          body.appendChild(nm);
+          const meta = [sh && label(row), row.degree, row.year_introduced && `since ${row.year_introduced}`]
+            .filter(Boolean).join(" · ");
           if (meta) body.appendChild(el("span", "pd-meta", meta));
         }
         li.appendChild(body);

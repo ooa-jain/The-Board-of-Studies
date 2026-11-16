@@ -115,10 +115,12 @@ def test_a_pg_curriculum_is_the_pg_course_matrix_and_ug_stays_as_it_was():
     batch = for_level(STAGE_BY_KEY["prog_syllabus_b2025"], "PG - 2 Year")
     bcols = {c["name"]: c for c in next(s for s in batch["sections"] if s["key"] == "batch_courses")["columns"]}
     assert bcols["nep_category"]["options"] == NEP_CATEGORIES
-    # the list is the credit table's own eight headings, and nothing else
+    # the list is the credit table's own eight headings (Major as Core Course,
+    # and AEC with its Language row), and nothing else
     from app.schema import CATEGORY_LABELS
     assert [CATEGORY_LABELS[c] for c in NEP_CATEGORIES] == [
-        "Major", "Minor", "Multi-Disciplinary / OE", "Ability Enhancement / AEC", "Skill Enhancement / SEC",
+        "Major / Core Course (CC)", "Minor", "Multi-Disciplinary / OE", "Ability Enhancement / AEC",
+        "Ability Enhancement / AEC (Language)", "Skill Enhancement / SEC",
         "Common Value Added / VAC", "Summer Internship / INTERNSHIP", "Research Project / Dissertation / PROJECT"]
     assert cols["nep_category"]["option_labels"] == CATEGORY_LABELS
     # a UG programme's saved Discipline Specific Elective reads as Major, and keeps its track

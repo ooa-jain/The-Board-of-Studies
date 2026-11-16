@@ -49,11 +49,12 @@ BLUE = "ADD8E6"       # Honours / Honours with Research bands
 NAVY = "1F4E79"       # semester bands, headings
 
 GROUP_HEADS = [
-    ("Major (Core)", "MAJOR COURSES"),
+    ("Major (Core)", "MAJOR COURSES — CORE COURSES (CC)"),
     ("Discipline Specific Elective (DSE)", "DISCIPLINE SPECIFIC ELECTIVES"),
     ("Minor Stream", "MINOR COURSES"),
     ("Multidisciplinary", "MULTIDISCIPLINARY / OPEN ELECTIVE COURSES"),
     ("Ability Enhancement Courses (AEC)", "ABILITY ENHANCEMENT COURSES"),
+    ("Ability Enhancement Courses (AEC) - Language", "ABILITY ENHANCEMENT COURSES — LANGUAGE"),
     ("Skill Enhancement Courses (SEC)", "SKILL ENHANCEMENT COURSES"),
     ("Value Added Courses (VAC)", "VALUE ADDED COURSES"),
     ("Summer Internship", "SUMMER INTERNSHIP"),
@@ -320,7 +321,8 @@ def _sems(rows):
 
 def _in_group(r, cat):
     c = r.get("nep_category")
-    return c == cat or (cat == "Major (Core)" and c == "Discipline Specific Elective (DSE)")
+    return c == cat or (cat == "Major (Core)" and c == "Discipline Specific Elective (DSE)") or \
+        (cat == "Ability Enhancement Courses (AEC)" and c == "Ability Enhancement Courses (AEC) - Language")
 
 
 def _credits(rows):

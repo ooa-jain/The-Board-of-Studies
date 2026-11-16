@@ -5251,3 +5251,16 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .ru-opt input:focus-visible + span { outline: 2px solid var(--gold-500); outline-offset: -2px; }
 .ru-opt input:disabled { cursor: default; }
 .ru-save { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; }
+
+/* ---- AEC (Language): a code and title for each language in one row ---- */
+.rt-lang { vertical-align: top; }
+.lang-list { display: grid; gap: 6px; min-width: 130px; }
+.lang-line { display: flex; align-items: center; gap: 4px; }
+.lang-line .lang-in { flex: 1; min-width: 150px; }
+.lang-in { width: 100%; }
+.lang-del { flex: none; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%;
+  background: var(--surface); color: var(--ink-soft); cursor: pointer; line-height: 1; }
+.lang-del:hover { color: var(--err); border-color: var(--err); }
+.lang-add { justify-self: start; border: 1px dashed var(--ink-600); border-radius: 999px; background: var(--surface);
+  color: var(--ink-600); font: inherit; font-size: .78rem; font-weight: 600; padding: 3px 10px; cursor: pointer; }
+.lang-add:hover { background: var(--ink-050); }

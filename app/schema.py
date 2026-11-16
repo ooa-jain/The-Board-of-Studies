@@ -47,6 +47,7 @@ NEP_CATEGORIES = [
     "Minor Stream",
     "Multidisciplinary",
     "Ability Enhancement Courses (AEC)",
+    "Ability Enhancement Courses (AEC) - Language",
     "Skill Enhancement Courses (SEC)",
     "Value Added Courses (VAC)",
     "Summer Internship",
@@ -165,15 +166,20 @@ def course_info(r):
 
 # what each is called in the Course category list: the credit table's own headings
 CATEGORY_LABELS = {
-    "Major (Core)": "Major",
+    "Major (Core)": "Major / Core Course (CC)",
     "Minor Stream": "Minor",
     "Multidisciplinary": "Multi-Disciplinary / OE",
     "Ability Enhancement Courses (AEC)": "Ability Enhancement / AEC",
+    "Ability Enhancement Courses (AEC) - Language": "Ability Enhancement / AEC (Language)",
     "Skill Enhancement Courses (SEC)": "Skill Enhancement / SEC",
     "Value Added Courses (VAC)": "Common Value Added / VAC",
     "Summer Internship": "Summer Internship / INTERNSHIP",
     "Research Project / Dissertation": "Research Project / Dissertation / PROJECT",
 }
+
+# AEC (Language): one row in the structure, a course code and title for each
+# language ("K1 / H1", "Kannada / Hindi"), one L-T-P-E, credits and marks
+AEC_LANGUAGE = "Ability Enhancement Courses (AEC) - Language"
 
 # what an older draft (or a pack) called a course group, read as the category it stands for
 _OLDER_GROUPS = {
