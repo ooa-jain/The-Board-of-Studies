@@ -5264,3 +5264,23 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .lang-add { justify-self: start; border: 1px dashed var(--ink-600); border-radius: 999px; background: var(--surface);
   color: var(--ink-600); font: inherit; font-size: .78rem; font-weight: 600; padding: 3px 10px; cursor: pointer; }
 .lang-add:hover { background: var(--ink-050); }
+
+/* ---- Departments › Edit: rules and the department's own programme list ---- */
+.dept-edit { max-width: 960px; margin: 24px auto; }
+.dept-edit + .dept-edit { margin-top: 0; }
+.de-rules { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px 6px; margin: 14px 0; display: grid; gap: 6px; }
+.de-rules legend { font-size: .82rem; font-weight: 700; padding: 0 6px; }
+.de-n { font-size: .75rem; color: var(--ink-faint); font-weight: 600; margin-left: 4px; }
+.de-note { margin: 0 0 12px; }
+.de-table td { vertical-align: middle; }
+.de-act { text-align: right; white-space: nowrap; }
+.de-act form { margin: 0; }
+.de-add { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.de-add h4, .de-removed h4 { margin: 0 0 8px; font-size: .95rem; }
+.de-add-grid { display: grid; grid-template-columns: 150px 1fr 150px 100px; gap: 10px; margin-bottom: 10px; }
+@media (max-width: 760px) { .de-add-grid { grid-template-columns: 1fr 1fr; } .de-add-name { grid-column: 1 / -1; } }
+.de-removed { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.de-removed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.de-removed li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
+  border: 1px dashed var(--line); border-radius: 8px; }
+.de-removed form { margin: 0; }

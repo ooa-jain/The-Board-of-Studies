@@ -540,12 +540,22 @@ def department_form(dept_code=None):
     # existing values offered as suggestions, so a new department lands in an
     # existing faculty and school rather than a near-miss spelling of one
     def _form(d):
+        from .schema import CREDIT_RULE_MODES
+        from .workflow import master_programmes, workbook_programmes
+        master = removed = []
+        if dept:
+            master = master_programmes(dept)
+            have = {str(r.get("programme_code") or "").upper() for r in master}
+            removed = [r for r in workbook_programmes(dept)
+                       if str(r.get("programme_code") or "").upper() not in have]
         return render_template(
             "admin/department_form.html", dept=d,
             campuses=current_app.config["CAMPUSES"],
             places=current_app.config["PLACES"],
             faculties=sorted(x for x in db.departments.distinct("faculty") if x),
-            schools=sorted(x for x in db.departments.distinct("school") if x))
+            schools=sorted(x for x in db.departments.distinct("school") if x),
+            master=master, removed=removed, degrees=PROGRAMME_DEGREES,
+            modes=CREDIT_RULE_MODES)
 
     if request.method == "POST":
         f = request.form
@@ -568,6 +578,9 @@ def department_form(dept_code=None):
             "active": f.get("active") == "on",
             "updated_at": now(),
         }
+        from .schema import CREDIT_RULE_MODES
+        if f.get("credit_rules") in CREDIT_RULE_MODES:
+            payload["credit_rules"] = f["credit_rules"]
         if dept:
             db.departments.update_one({"_id": dept["_id"]}, {"$set": payload})
             audit(_actor(), "department.updated", code)
@@ -2443,3 +2456,126 @@ def rules_ugc():
     flow_count = sum(1 for d in depts if d.get("credit_rules") == "flow")
     return render_template("admin/rules_ugc.html", schools=sorted(schools.items()),
                            modes=CREDIT_RULE_MODES, total=len(depts), flow_count=flow_count)
+
+
+
+# ---------------------------------------------------------------------------
+# a department's own programme list (Departments › Edit): kept from year to
+# year; a programme added or removed here is added or removed for good —
+# for every year whose list is not yet saved, and for this year's too
+# ---------------------------------------------------------------------------
+
+def _master_change(dept, change, note):
+    """Apply `change(rows)` to the department's programme list, then to this
+    year's Programmes offered if the department has already saved it."""
+    from . import people
+    from .workflow import master_programmes, programme_list, save_programme_list
+    db = get_db()
+    rows = master_programmes(dept)
+    year_change = change(rows)
+    db.departments.update_one({"_id": dept["_id"]}, {"$set": {"programmes_master": rows, "updated_at": now()}})
+    year = _year()
+    sub = db.submissions.find_one({"dept_code": dept["dept_code"], "academic_year": year})
+    if sub and year_change:
+        plist, saved = programme_list(sub, dept)
+        if saved and year_change(plist):
+            data = save_programme_list(dept["dept_code"], year, plist)
+            people.keep(dept["dept_code"], year, "dept_info", None, data, _office_person())
+    audit(_actor(), "programme.master." + note[0], dept["dept_code"], {"programme": note[1]})
+
+
+def _row_code(r):
+    return str(r.get("programme_code") or "").strip().upper()
+
+
+@bp.post("/departments/<dept_code>/programme-list/add")
+@admin_required
+def department_master_add(dept_code):
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    back = redirect(url_for("admin.department_form", dept_code=dept_code) + "#programmes")
+    f = request.form
+    code = (f.get("programme_code") or "").strip().upper()
+    name = " ".join((f.get("programme_name") or "").split())
+    degree = f.get("degree") if f.get("degree") in dict(PROGRAMME_DEGREES) else "UG"
+    intro = (f.get("year_introduced") or "").strip()
+    if not _PCODE.fullmatch(code) or not name:
+        flash("A programme needs a code (letters and numbers) and a name.", "error")
+        return back
+    if intro and not re.fullmatch(r"\d{4}", intro):
+        flash("Since is a year, such as 2021.", "error")
+        return back
+    from .workflow import master_programmes
+    if code in {_row_code(r) for r in master_programmes(dept)}:
+        flash(f"{code} is already in the list.", "error")
+        return back
+    new = {"programme_code": code, "programme_name": name, "degree": degree,
+           "year_introduced": intro, "category": "", "minors": ""}
+
+    def change(rows):
+        rows.append(dict(new))
+
+        def this_year(plist):
+            row = next((r for r in plist if _row_code(r) == code), None)
+            if row:
+                if row.get("decision") == "keep":
+                    return False
+                row["decision"] = "keep"
+            else:
+                plist.append({**new, "source": "office", "decision": "keep"})
+            return True
+        return this_year
+    _master_change(dept, change, ("added", code))
+    flash(f"{code} · {name} added to {dept.get('dept_name')}'s programmes.", "success")
+    return back
+
+
+@bp.post("/departments/<dept_code>/programme-list/<programme_code>/remove")
+@admin_required
+def department_master_remove(dept_code, programme_code):
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    code = programme_code.strip().upper()
+
+    def change(rows):
+        rows[:] = [r for r in rows if _row_code(r) != code]
+
+        def this_year(plist):
+            row = next((r for r in plist if _row_code(r) == code), None)
+            if not row or row.get("decision") == "remove":
+                return False
+            row["decision"] = "remove"        # its record is kept
+            return True
+        return this_year
+    _master_change(dept, change, ("removed", code))
+    flash(f"{code} removed from {dept.get('dept_name')}'s programmes — anything already filed for it is kept.",
+          "success")
+    return redirect(url_for("admin.department_form", dept_code=dept_code) + "#programmes")
+
+
+@bp.post("/departments/<dept_code>/programme-list/<programme_code>/restore")
+@admin_required
+def department_master_restore(dept_code, programme_code):
+    from .workflow import workbook_programmes
+    db = get_db()
+    dept = db.departments.find_one({"dept_code": dept_code}) or abort(404)
+    code = programme_code.strip().upper()
+    row = next((r for r in workbook_programmes(dept) if _row_code(r) == code), None) or abort(404)
+
+    def change(rows):
+        if code not in {_row_code(r) for r in rows}:
+            rows.append(dict(row))
+
+        def this_year(plist):
+            have = next((r for r in plist if _row_code(r) == code), None)
+            if have:
+                if have.get("decision") == "keep":
+                    return False
+                have["decision"] = "keep"
+            else:
+                plist.append({**row, "source": "catalogue", "decision": "keep"})
+            return True
+        return this_year
+    _master_change(dept, change, ("restored", code))
+    flash(f"{code} is back on {dept.get('dept_name')}'s programmes.", "success")
+    return redirect(url_for("admin.department_form", dept_code=dept_code) + "#programmes")

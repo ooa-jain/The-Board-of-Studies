@@ -5452,6 +5452,21 @@ html[data-theme="dark"] .lang-add {
 html[data-theme="dark"] .lang-add:hover {
   background: #181b21;
 }
+html[data-theme="dark"] .de-rules {
+  border: 1px solid #2e3542;
+}
+html[data-theme="dark"] .de-n {
+  color: #aab2c1;
+}
+html[data-theme="dark"] .de-add {
+  border-top: 1px solid #2e3542;
+}
+html[data-theme="dark"] .de-removed {
+  border-top: 1px solid #2e3542;
+}
+html[data-theme="dark"] .de-removed li {
+  border: 1px dashed #2e3542;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

@@ -729,16 +729,33 @@ def prefill_for(stage_key, department, academic_year, programme=None, submission
     return out
 
 
+MASTER_FIELDS = ("programme_code", "programme_name", "degree", "year_introduced",
+                 "category", "minors")
+
+
+def workbook_programmes(department):
+    """The department's programmes as the Office of Academic Affairs workbook lists them."""
+    everyone = list(get_db().departments.find({}, {"dept_name": 1, "campus": 1}))
+    return [{k: r.get(k, "") for k in MASTER_FIELDS}
+            for r in catalogue.programmes_for(department or {}, everyone)]
+
+
+def master_programmes(department):
+    """The department's own programme list, kept from year to year: the one
+    the Office set on its Edit page (Departments › Edit), or else the
+    workbook's."""
+    kept = (department or {}).get("programmes_master")
+    if isinstance(kept, list):
+        return [{k: r.get(k, "") for k in MASTER_FIELDS} for r in kept if isinstance(r, dict)]
+    return workbook_programmes(department)
+
+
 def catalogue_rows(department, offered=False):
-    """The department's programmes from the Office of Academic Affairs workbook, as
+    """The department's programmes (its own list, or the workbook's), as
     rows of the Programmes offered list. Each starts not offered: the
     department ticks the ones it runs ("keep" is ticked, "remove" is not)."""
-    everyone = list(get_db().departments.find({}, {"dept_name": 1, "campus": 1}))
-    fields = ("programme_code", "programme_name", "degree", "year_introduced",
-              "category", "minors")
-    return [{**{k: r.get(k, "") for k in fields}, "source": "catalogue",
-             "decision": "keep" if offered else "remove"}
-            for r in catalogue.programmes_for(department or {}, everyone)]
+    return [{**r, "source": "catalogue", "decision": "keep" if offered else "remove"}
+            for r in master_programmes(department)]
 
 
 def programme_list(submission, department):

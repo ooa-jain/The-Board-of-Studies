@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ 'Edit' if dept else 'Add' }} department{% endblock %}
 {% block content %}
-<div class="card" style="max-width:720px;margin:24px auto">
+<div class="card dept-edit">
   <div class="card-head"><h3>{{ 'Edit ' + dept.dept_name if dept else 'Add a department' }}</h3></div>
   <div class="card-body">
-    <form method="post">
+    <form method="post" id="dept-form">
       <div class="fields-grid">
         <div class="field">
           <label>Department name<span class="req">*</span></label>
@@ -51,6 +51,16 @@
         </div>
       </div>
 
+      {# UGC or No UGC — the same switch as Admin › Rules & UGC #}
+      {% set mode = (dept.credit_rules if dept else '') or 'ugc' %}
+      <fieldset class="de-rules">
+        <legend>Rules</legend>
+        <label class="check"><input type="radio" name="credit_rules" value="ugc" {{ 'checked' if mode == 'ugc' }}>
+          <span><strong>UGC</strong> — 3-year, Honours and Honours with Research, checked against UGC Table 2</span></label>
+        <label class="check"><input type="radio" name="credit_rules" value="flow" {{ 'checked' if mode == 'flow' }}>
+          <span><strong>No UGC</strong> — semesters 1 to 8 in one flow; the credit tables total what is entered</span></label>
+      </fieldset>
+
       <label class="check mb-2">
         <input type="checkbox" name="active" {{ 'checked' if not dept or dept.active }}>
         <span>Active — the department can sign in and submit</span>
@@ -61,14 +71,79 @@
         <a class="btn btn-ghost" href="{{ url_for('admin.departments') }}">Cancel</a>
         {% if dept %}
         <span class="spacer"></span>
-        <form method="post" action="{{ url_for('admin.department_toggle', dept_code=dept.dept_code) }}">
-          <button class="btn btn-ghost btn-sm" type="submit">
-            {{ 'Disable' if dept.active else 'Re-enable' }} this department
-          </button>
-        </form>
+        <button class="btn btn-ghost btn-sm" type="submit" form="dept-toggle">
+          {{ 'Disable' if dept.active else 'Re-enable' }} this department
+        </button>
         {% endif %}
       </div>
     </form>
+    {% if dept %}
+    <form method="post" id="dept-toggle" action="{{ url_for('admin.department_toggle', dept_code=dept.dept_code) }}" hidden></form>
+    {% endif %}
   </div>
 </div>
+
+{% if dept %}
+<div class="card dept-edit" id="programmes">
+  <div class="card-head"><h3>Programmes <span class="de-n">{{ master|length }}</span></h3></div>
+  <div class="card-body">
+    <p class="small muted de-note">The department's own list, kept from year to year. A programme added or removed
+      here is added or removed for good — the department's Programmes offered shows the change, this year too.
+      Anything already filed for a removed programme is kept.</p>
+    <table class="data de-table">
+      <thead><tr><th scope="col">Code</th><th scope="col">Programme</th><th scope="col">Degree</th>
+        <th scope="col">Since</th><th scope="col"></th></tr></thead>
+      <tbody>
+      {% for p in master %}
+      <tr>
+        <td class="mono small">{{ p.programme_code }}</td>
+        <td>{{ p.programme_name }}</td>
+        <td class="small">{{ p.degree }}</td>
+        <td class="small">{{ p.year_introduced or '—' }}</td>
+        <td class="de-act">
+          <form method="post" action="{{ url_for('admin.department_master_remove', dept_code=dept.dept_code, programme_code=p.programme_code) }}"
+                onsubmit="return confirm('Remove {{ p.programme_code }} from {{ dept.dept_name|e }}\'s programmes for good?')">
+            <button class="btn btn-ghost btn-sm" type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">No programmes yet. Add one below.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <form method="post" class="de-add" action="{{ url_for('admin.department_master_add', dept_code=dept.dept_code) }}">
+      <h4>Add a programme</h4>
+      <div class="de-add-grid">
+        <div class="field"><label for="np-code">Code</label>
+          <input id="np-code" type="text" name="programme_code" required pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,29}"
+                 placeholder="e.g. BCAREG" style="text-transform:uppercase"></div>
+        <div class="field de-add-name"><label for="np-name">Programme name</label>
+          <input id="np-name" type="text" name="programme_name" required placeholder="e.g. Bachelor of Computer Applications"></div>
+        <div class="field"><label for="np-deg">Degree</label>
+          <select id="np-deg" name="degree">{% for k, label in degrees %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="np-year">Since</label>
+          <input id="np-year" type="text" name="year_introduced" inputmode="numeric" pattern="\d{4}" placeholder="2026"></div>
+      </div>
+      <button class="btn btn-sm" type="submit">Add programme</button>
+    </form>
+
+    {% if removed %}
+    <div class="de-removed">
+      <h4>Removed <span class="de-n">{{ removed|length }}</span></h4>
+      <p class="small muted">In the Office of Academic Affairs workbook, but taken off this department's list.</p>
+      <ul>
+        {% for p in removed %}
+        <li><span><span class="mono small">{{ p.programme_code }}</span> {{ p.programme_name }} <span class="small muted">· {{ p.degree }}</span></span>
+          <form method="post" action="{{ url_for('admin.department_master_restore', dept_code=dept.dept_code, programme_code=p.programme_code) }}">
+            <button class="btn btn-ghost btn-sm" type="submit">Put back</button>
+          </form></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}

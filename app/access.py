@@ -66,6 +66,8 @@ ENDPOINTS = {
     "overview_departments": ("overview", "view"), "department_page": ("overview", "view"),
     "department_programme_save": ("departments", "edit"), "department_programme_run": ("departments", "edit"),
     "department_act": ("departments", "edit"),
+    "department_master_add": ("departments", "edit"), "department_master_remove": ("departments", "edit"),
+    "department_master_restore": ("departments", "edit"),
     "mark_seen": ("overview", "edit"), "submission_return": ("overview", "edit"),
     "submission_unlock": ("overview", "edit"),
     "export_institution": ("overview", "view"), "export_department": ("overview", "view"),
