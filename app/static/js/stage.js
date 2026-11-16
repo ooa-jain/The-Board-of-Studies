@@ -3788,15 +3788,20 @@
       return box;
     }
 
-    /* The level of Bloom's Taxonomy a module reaches: one of BTA 1 – BTA 6. */
-    const BTA = ["BTA 1 (Remembering)", "BTA 2 (Understanding)", "BTA 3 (Applying)",
-                 "BTA 4 (Analyzing)", "BTA 5 (Evaluating)", "BTA 6 (Creating)"];
+    /* The Bloom's Taxonomy Level (BTL) a module reaches: BTL 1 – BTL 6. A
+       syllabus saved earlier says "BTA 3 (Applying)"; it reads as BTL 3. */
+    const BTL = ["BTL 1 (Remembering)", "BTL 2 (Understanding)", "BTL 3 (Applying)",
+                 "BTL 4 (Analyzing)", "BTL 5 (Evaluating)", "BTL 6 (Creating)"];
     function btaPick(m) {
       const sel = el("select", "bta-sel");
-      sel.setAttribute("aria-label", "Bloom's Taxonomy level");
+      sel.setAttribute("aria-label", "Bloom's Taxonomy Level (BTL)");
       sel.appendChild(new Option(CTX.readonly ? "—" : "Choose", ""));
-      BTA.forEach(b => sel.appendChild(new Option(b, b)));
-      sel.value = BTA.includes(m.bta) ? m.bta : "";
+      BTL.forEach(b => sel.appendChild(new Option(b, b)));
+      if (/^BTA /.test(m.bta || "")) {
+        m.bta = m.bta.replace(/^BTA /, "BTL ");
+        if (!CTX.readonly) setTimeout(touch, 0);
+      }
+      sel.value = BTL.includes(m.bta) ? m.bta : "";
       sel.disabled = !!CTX.readonly;
       sel.classList.toggle("is-empty", !sel.value);
       sel.addEventListener("change", () => { m.bta = sel.value; sel.classList.toggle("is-empty", !sel.value); touch(); });
@@ -3809,8 +3814,10 @@
       if (!mods.length && !CTX.readonly) mods.push({});
       const head = el("tr", "sh-syl-head");
       head.appendChild(cell("th", "sh-left", ["Course Content:"]));
-      head.appendChild(cell("th", "sh-cos", ["CO's"]));
-      head.appendChild(cell("th", "sh-bta", ["BTA"]));
+      head.appendChild(cell("th", "sh-cos", ["COs"]));
+      const btl = cell("th", "sh-bta", ["BTL"]);
+      btl.title = "Bloom's Taxonomy Level. If a module has two COs, enter the higher BTL of the two.";
+      head.appendChild(btl);
       head.appendChild(cell("th", "sh-hours", ["Hours"]));
       tbody.appendChild(head);
       const sum = el("span");

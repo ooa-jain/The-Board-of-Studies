@@ -226,7 +226,7 @@
     revision_year: {{ (revision_year or '')|tojson }},
     // a syllabus: the programme's POs and PSOs (its mapping's columns, each with its
     // description) and where they are added, its Objective (each course's Course
-    // Objectives starts from it) and the verbs that suggest a CO's Bloom's level
+    // Objectives starts from it) and the verbs that suggest each CO's Bloom's level
     outcome_cols: {{ (outcome_cols or [])|tojson }},
     // this page's document in "Your submission" (view only)
     submission_url: {{ (url_for('dept.programme_report', programme_code=programme.programme_code, batch=my_doc.batch, doc=my_doc.doc) if my_doc else '')|tojson }},

@@ -1204,3 +1204,10 @@ def flow_rows(data: dict, key="semester_structure") -> dict:
             r = {k: v for k, v in r.items() if k != "track"}
         out.append(r)
     return {**data, key: out}
+
+
+def btl(value) -> str:
+    """A module's Bloom's Taxonomy Level as it is printed: BTL 3 (Applying).
+    A syllabus saved before the rename says BTA 3; it reads as BTL 3."""
+    v = str(value or "").strip()
+    return "BTL " + v[4:] if v.startswith("BTA ") else v

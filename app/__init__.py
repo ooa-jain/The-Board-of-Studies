@@ -68,6 +68,8 @@ def create_app(config_object=Config):
 
     from .schema import contact_hours as _contact_hours
     app.jinja_env.globals["contact_hours"] = _contact_hours
+    from .schema import btl as _btl
+    app.jinja_env.filters["btl"] = _btl
 
     @app.template_filter("ay")
     def _academic_year(value):

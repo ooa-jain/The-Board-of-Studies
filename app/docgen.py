@@ -37,7 +37,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Emu, Pt, RGBColor
 
-from .schema import DEFAULT_REGULATIONS, STAGE_BY_KEY, contact_hours
+from .schema import DEFAULT_REGULATIONS, STAGE_BY_KEY, btl, contact_hours
 from .workflow import programmes_of
 
 BASE = Path(__file__).parent / "doc_templates" / "jain_base.docx"
@@ -725,7 +725,7 @@ def _course_sheet(doc, programme_name, c, width, cols=None):
         p.paragraph_format.tab_stops.add_tab_stop(Emu(int(width)), alignment=2)   # the hours, on the right
         r = p.add_run(f"Module {n}: {m.get('title') or ''}".rstrip(": "))
         r.bold, r.font.size = True, Pt(10)
-        tags = [", ".join(m["cos"]) if isinstance(m.get("cos"), list) and m.get("cos") else "", m.get("bta") or ""]
+        tags = [", ".join(m["cos"]) if isinstance(m.get("cos"), list) and m.get("cos") else "", btl(m.get("bta"))]
         if any(tags):
             extra = p.add_run("  (" + "; ".join(x for x in tags if x) + ")")
             extra.font.size = Pt(9)

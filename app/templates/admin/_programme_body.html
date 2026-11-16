@@ -89,7 +89,7 @@
       {% elif c.outcomes %}<p class="small"><strong>Course Outcomes</strong></p>
       <ol class="small">{% for o in c.outcomes.splitlines() if o.strip() %}<li>{{ o }}</li>{% endfor %}</ol>{% endif %}
       {% if c.modules %}<p class="small"><strong>Course Content</strong></p>
-      <ol class="small">{% for m in c.modules %}<li><strong>{{ m.title }}</strong>{% if m.hours %} ({{ m.hours }} hours){% endif %}{% if m.bta %} · {{ m.bta }}{% endif %}{% if m.revised %} — <span class="pre">{{ m.revised }}</span>{% endif %}</li>{% endfor %}</ol>{% endif %}
+      <ol class="small">{% for m in c.modules %}<li><strong>{{ m.title }}</strong>{% if m.hours %} ({{ m.hours }} hours){% endif %}{% if m.bta %} · {{ m.bta|btl }}{% endif %}{% if m.revised %} — <span class="pre">{{ m.revised }}</span>{% endif %}</li>{% endfor %}</ol>{% endif %}
       {% for label, key in (("Text Books", "text_books"), ("Book References", "books"), ("Web References", "web_references")) %}
       {% if c[key] %}<p class="small"><strong>{{ label }}</strong></p>
       <ul class="small">{% for b in c[key].splitlines() if b.strip() %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
