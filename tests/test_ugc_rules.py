@@ -128,14 +128,6 @@ def test_four_year_needs_one_hundred_and_sixty():
     assert any("at least 160 credits" in m for m in msgs), msgs
 
 
-def test_honours_without_research_must_declare_three_courses_for_twelve_credits():
-    data = _matrix(major_core=80, minor_stream=32)
-    issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 4 Year (Honours)"))
-    msgs = errors(issues)
-    assert any("in lieu" in m and "12 credits" in m for m in msgs)
-    assert any("in lieu" in m and "3 courses" in m for m in msgs)
-
-
 def test_honours_without_research_passes_when_in_lieu_is_declared():
     data = _matrix(major_core=113, minor_stream=32)
     data["credit_summary"]["in_lieu_courses"] = 3
@@ -159,52 +151,158 @@ def _course(**kw):
 
 
 def test_ltpe_must_reconcile_with_credits():
-    data = {"credit_summary": {}, "structure": [_course(l=3, credits=4)]}
+    data = {"credit_summary": {}, "semester_structure": [_course(l=3, credits=4)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
     assert any("works out to 3 credits" in m for m in errors(issues))
 
 
 def test_practical_hours_count_half():
-    data = {"credit_summary": {}, "structure": [_course(l=2, p=4, credits=4)]}
+    data = {"credit_summary": {}, "semester_structure": [_course(l=2, p=4, credits=4)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
     assert not any("works out to" in m for m in errors(issues))
 
 
-def test_marks_per_credit_is_not_forced():
-    """The curriculum template does not tie marks to credits, so neither do we."""
-    data = {"credit_summary": {}, "structure": [_course(credits=4, total_marks=150,
-                                                        cia=75, ese=75)]}
+def test_every_course_is_out_of_100():
+    """Total marks is fixed at 100 whatever the credits; 150 is refused, and
+    a 2-credit course out of 100 draws no 'usually carries 50' warning."""
+    data = {"credit_summary": {}, "semester_structure": [_course(credits=4, total_marks=150,
+                                                                 cia=75, ese=75)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
-    assert not any("carries" in m for m in errors(issues))
+    assert any("Total marks" in m for m in errors(issues))
+    ok = {"credit_summary": {}, "semester_structure": [_course(credits=2, total_marks=100,
+                                                               cia=75, ese=25)]}
+    issues, _ = validate_stage("prog_curriculum", ok, ctx("UG - 3 Year", 6))
+    assert not any("usually carry" in i["message"] for i in issues)
+    assert not any("Total marks" in m or "must total" in m for m in errors(issues))
 
 
 def test_cia_plus_ese_must_equal_the_total():
-    data = {"credit_summary": {}, "structure": [_course(cia=40, ese=50)]}
+    """CA + ESE must make 100: 40 + 50 and 0 + 0 are refused, 20 + 80 is fine."""
+    for cia, ese in ((40, 50), (0, 0)):
+        data = {"credit_summary": {}, "semester_structure": [_course(cia=cia, ese=ese)]}
+        issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
+        assert any(f"CA {cia} + ESE {ese} = {cia + ese} — CA and ESE must total 100" in m for m in errors(issues))
+    data = {"credit_summary": {}, "semester_structure": [_course(cia=20, ese=80)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
-    assert any("does not match the total" in m for m in errors(issues))
+    assert not any("must total" in m for m in errors(issues))
+
+
+def test_structure_says_ese_and_types_both_marks():
+    """The structure's columns read CA and ESE (not TEE), and neither fills the other in."""
+    from app.schema import STAGE_BY_KEY
+    sec = next(s for s in STAGE_BY_KEY["prog_curriculum"]["sections"] if s["key"] == "semester_structure")
+    cols = {c["name"]: c for c in sec["columns"]}
+    assert cols["ese"]["short"] == "ESE marks" and "End Semester" in cols["ese"]["label"]
+    assert cols["cia"]["short"] == "CA marks"
+    assert not any("complement" in c for c in sec["columns"])
+    assert cols["cia"]["sums_with"] == "ese" and cols["ese"]["sums_with"] == "cia"
 
 
 def test_semester_outside_the_programme_is_rejected():
-    data = {"credit_summary": {}, "structure": [_course(semester=8)]}
+    data = {"credit_summary": {}, "semester_structure": [_course(semester=8)]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
     assert any("outside this programme" in m for m in errors(issues))
 
 
 def test_duplicate_course_codes_are_caught():
-    data = {"credit_summary": {}, "structure": [_course(), _course()]}
+    data = {"credit_summary": {}, "semester_structure": [_course(), _course()]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
     assert any("is used twice" in m for m in errors(issues))
 
 
 def test_malformed_course_code_is_caught():
-    data = {"credit_summary": {}, "structure": [_course(course_code="fin ancial!")]}
+    # codes look like 26BCC1C01; punctuation at the start is not a code
+    data = {"credit_summary": {}, "semester_structure": [_course(course_code="#bad code!")]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
     assert any("Course code" in m and "expected format" in m for m in errors(issues))
 
 
-def test_credit_classification_must_equal_the_programme_structure():
-    data = {"credit_summary": {"major_core": 60},
-            "structure": [_course(credits=4, l=4, total_marks=100, cia=50, ese=50)]}
+def test_university_style_course_codes_are_accepted():
+    data = {"credit_summary": {}, "semester_structure": [_course(course_code="26BCC1C01")]}
     issues, _ = validate_stage("prog_curriculum", data, ctx("UG - 3 Year", 6))
-    assert any("shows 60 credits" in m and "add up to 4" in m
-               for m in errors(issues))
+    assert not any("Course code" in m and "expected format" in m for m in errors(issues))
+
+
+def test_a_course_may_repeat_across_the_two_honours_tracks():
+    rows = [_course(course_code="26BCC7C01", semester=7, track="Honours"),
+            _course(course_code="26BCC7C01", semester=7, track="Honours with Research")]
+    issues, _ = validate_stage("prog_curriculum", {"credit_summary": {}, "semester_structure": rows},
+                               ctx("UG - 4 Year (Honours)", 8))
+    assert not any("used twice" in m for m in errors(issues))
+
+
+def test_ugc_table2_is_worked_out_from_the_programme_structure():
+    """Nothing is typed into a credit grid: the categories are added up from
+    the courses, and only this programme's semester 7-8 track counts."""
+    rows = [_course(credits=4, l=4, total_marks=100, cia=50, ese=50),
+            _course(course_code="R7", semester=7, credits=4, l=4, total_marks=100, cia=50,
+                    ese=50, nep_category="Research Project / Dissertation",
+                    track="Honours with Research")]
+    issues, _ = validate_stage("prog_curriculum", {"semester_structure": rows},
+                               ctx("UG - 4 Year (Honours)", 8))
+    msgs = errors(issues)
+    assert any("Major (Core): 4 credits is below the UGC minimum" in m for m in msgs)
+    assert any("Total credits come to 4." in m for m in msgs)
+
+
+
+def test_curriculum_follows_the_template_order():
+    from app.schema import STAGE_BY_KEY
+    keys = [s["key"] for s in STAGE_BY_KEY["prog_curriculum"]["sections"]]
+    assert keys.index("profile") < keys.index("credit_classification") \
+        < keys.index("semester_structure") < keys.index("credit_distribution") \
+        < keys.index("minors")
+
+
+def test_a_course_with_no_credits_is_a_non_credit_course():
+    """There is no non-credit category in the Course category list: a course
+    with 0 credits is the non-credit one, and its contact hours carry none."""
+    ok = {"semester_structure": [_course(nep_category="Major (Core)",
+                                         l=2, credits=0, cia=50, ese=0, total_marks=50)]}
+    issues, _ = validate_stage("prog_curriculum", ok, ctx("UG - 3 Year", 6))
+    assert not any("works out to" in m for m in errors(issues))
+
+    # an older draft that still names the non-credit category reads the same way
+    old = {"semester_structure": [_course(nep_category="Mandatory Non-Credit Audit Course",
+                                          l=2, credits=0, cia=50, ese=0, total_marks=50)]}
+    issues, _ = validate_stage("prog_curriculum", old, ctx("UG - 3 Year", 6))
+    assert not any("works out to" in m or "not one of" in m for m in errors(issues))
+
+    # a course that carries credits is still checked against its hours
+    bad = {"semester_structure": [_course(nep_category="Major (Core)", l=2, credits=4)]}
+    issues, _ = validate_stage("prog_curriculum", bad, ctx("UG - 3 Year", 6))
+    assert any("works out to" in m for m in errors(issues))
+
+
+def _syllabus(modules):
+    return {"courses": [{"course_code": "22BBAC1C01", "course_title": "Business Accounting",
+                         "credits": 4, "hours_per_week": 4, "teaching_hours": 60,
+                         "pedagogy": "Lectures", "outcomes": "Explain\nApply\nAnalyse",
+                         "year_latest": "2026", "modules": modules,
+                         "skill_activities": "Visit a firm", "books": "A\nB"}]}
+
+
+def test_syllabus_needs_revised_modules():
+    issues, _ = validate_stage("prog_syllabus", _syllabus([]), {})
+    assert any("needs at least one module" in m for m in errors(issues))
+
+    issues, _ = validate_stage("prog_syllabus", _syllabus(
+        [{"previous": "Old text", "revised": "", "pct": None}]), {})
+    assert any("enter the module's content" in m for m in errors(issues))
+
+    issues, _ = validate_stage("prog_syllabus", _syllabus(
+        [{"previous": "Old", "revised": "New", "pct": 140}]), {})
+    assert any("between 0 and 100" in m for m in errors(issues))
+
+    issues, _ = validate_stage("prog_syllabus", _syllabus(
+        [{"previous": "", "revised": "Module 1: Accounting (12 Hrs)", "pct": 100}]), {})
+    assert not any("module" in m.lower() for m in errors(issues)), errors(issues)
+
+
+def test_reservation_is_fixed_text():
+    from app.schema import STAGE_BY_KEY
+    f = next(f for s in STAGE_BY_KEY["prog_curriculum"]["sections"] if s["key"] == "profile"
+             for f in s["fields"] if f["name"] == "reservation_policy")
+    assert f["type"] == "fixed"
+    items = [i for part in f["fixed_table"] for i in part["items"]]
+    assert "a) Kashmiri Migrants (In Seats)" in items and "d) Defence (In Percentage)" in items

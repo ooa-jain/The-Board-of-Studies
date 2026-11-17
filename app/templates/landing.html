@@ -1,254 +1,119 @@
 {% extends "base.html" %}
-{% block title %}Board of Studies Data Repository{% endblock %}
+{# The sign-in page: the portal's scene — the stages as glass panels taking
+   turns at the front, each card ticking itself off, the gears turning — and
+   the department login beside it. Signed-in users never see it: the route
+   sends them to their own home. #}
+{% block title %}BoS Academic Portal{% endblock %}
+{% block body_class %}is-login{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+{% endblock %}
 
 {% block body %}
-<main id="main-content">
-<section class="hero">
-  <div class="wrap">
-    <span class="chip">
-      <span class="chip-dot" aria-hidden="true"></span>
-      Open for {{ app_settings.academic_year if app_settings else 'this academic year' }}
-    </span>
-    <span class="eyebrow">Office of Academics · JAIN (Deemed-to-be University)</span>
-    <h1 class="hero-display">Filled once,<br><em>checked as you type</em>.</h1>
-    <p>
-      Every department submits its Board of Studies documentation here, in one sequence, on one form.
-      The templates that used to travel as Word and Excel attachments are now typed fields, and the
-      UGC credit rules are applied by the portal before anything is accepted.
-    </p>
-    <div class="hero-actions">
-      <a class="btn btn-gold btn-lg" href="{{ url_for('auth.login') }}">Sign in to your department</a>
-      <a class="btn btn-ghost btn-lg" href="#how">How the submission works</a>
-    </div>
+<main id="main-content" class="login">
+  <div class="login-glow" aria-hidden="true"></div>
 
-    <div class="hero-stats">
-      <div><div class="n">{{ stats.departments }}</div><div class="l">Departments</div></div>
-      <div><div class="n">{{ stats.schools }}</div><div class="l">Schools &amp; faculties</div></div>
-      <div><div class="n">{{ stats.campuses }}</div><div class="l">Campuses</div></div>
-      <div><div class="n">{{ STAGES|length }}</div><div class="l">Submission stages</div></div>
-    </div>
-  </div>
-</section>
+  <section class="login-copy">
+    <img class="login-logo" alt="JAIN (Deemed-to-be University)"
+         src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+    <span class="login-kicker">Board of Studies | {{ app_settings.academic_year|ay if app_settings else '' }}</span>
+    <h1>BoS Academic Portal</h1>
+    <p class="login-lede">Your record, stage by stage — fill each one, tick it off, and it goes to the
+      Office of Academic Affairs.</p>
 
-<section class="section">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">The campuses</span>
-      <h2>Two campuses, one submission process</h2>
-      <p>Departments at both campuses follow the same stage order and the same credit rules.</p>
-    </div>
+    <div class="login-card" id="signin">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="login-alert is-{{ 'error' if category == 'error' else category }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
 
-    <div class="campus-grid">
-      {% for c in campuses %}
-      <article class="campus">
-        <div class="campus-art">
-          {% if c.art == 'bengaluru' %}
-          <svg viewBox="0 0 600 180" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Stylised Bengaluru campus skyline">
-            <defs>
-              <linearGradient id="skyB" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#0f2a4a"/><stop offset="100%" stop-color="#1e4d80"/>
-              </linearGradient>
-              <linearGradient id="glowB" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#c8a44b" stop-opacity=".55"/>
-                <stop offset="100%" stop-color="#c8a44b" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <rect width="600" height="180" fill="url(#skyB)"/>
-            <circle cx="470" cy="46" r="86" fill="url(#glowB)"/>
-            <circle cx="470" cy="46" r="17" fill="#ddc078" opacity=".85"/>
-            <!-- tree canopy, left -->
-            <g fill="#0a1d34" opacity=".55">
-              <circle cx="46" cy="118" r="26"/><circle cx="74" cy="110" r="20"/><circle cx="22" cy="126" r="18"/>
-            </g>
-            <!-- civic building with dome -->
-            <g fill="#0a1d34">
-              <rect x="196" y="98" width="208" height="62"/>
-              <rect x="236" y="82" width="128" height="20"/>
-              <path d="M300 44c26 0 44 20 44 38h-88c0-18 18-38 44-38z"/>
-              <rect x="296" y="30" width="8" height="16"/>
-              <circle cx="300" cy="28" r="5"/>
-            </g>
-            <g fill="#c8a44b" opacity=".78">
-              {% for i in range(10) %}<rect x="{{ 208 + i*19 }}" y="112" width="8" height="18" rx="1"/>{% endfor %}
-              {% for i in range(6) %}<rect x="{{ 248 + i*19 }}" y="86" width="7" height="11" rx="1"/>{% endfor %}
-            </g>
-            <!-- towers right -->
-            <g fill="#0a1d34">
-              <rect x="430" y="70" width="46" height="90"/>
-              <rect x="486" y="92" width="38" height="68"/>
-              <rect x="534" y="58" width="42" height="102"/>
-            </g>
-            <g fill="#4ba3c8" opacity=".55">
-              {% for r in range(5) %}{% for cc in range(3) %}
-              <rect x="{{ 438 + cc*13 }}" y="{{ 80 + r*15 }}" width="7" height="8"/>
-              {% endfor %}{% endfor %}
-              {% for r in range(6) %}{% for cc in range(3) %}
-              <rect x="{{ 542 + cc*12 }}" y="{{ 68 + r*15 }}" width="7" height="8"/>
-              {% endfor %}{% endfor %}
-            </g>
-            <!-- low blocks left -->
-            <g fill="#0a1d34">
-              <rect x="94" y="120" width="60" height="40"/><rect x="158" y="106" width="34" height="54"/>
-            </g>
-            <rect y="160" width="600" height="20" fill="#081726"/>
-          </svg>
-          {% else %}
-          <svg viewBox="0 0 600 180" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Stylised Kochi waterfront">
-            <defs>
-              <linearGradient id="skyK" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#0f2a4a"/><stop offset="100%" stop-color="#17557a"/>
-              </linearGradient>
-              <linearGradient id="glowK" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#4ba3c8" stop-opacity=".5"/>
-                <stop offset="100%" stop-color="#4ba3c8" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <rect width="600" height="180" fill="url(#skyK)"/>
-            <circle cx="120" cy="50" r="92" fill="url(#glowK)"/>
-            <circle cx="120" cy="50" r="18" fill="#ddc078" opacity=".8"/>
-            <!-- cantilevered fishing nets -->
-            <g stroke="#0a1d34" stroke-width="4" fill="none" stroke-linecap="round">
-              <path d="M330 150 L330 78 L262 108"/>
-              <path d="M330 92 L292 74"/>
-              <path d="M300 150 L330 112"/>
-              <path d="M262 108 L246 96 M262 108 L250 122 M246 96 L250 122"/>
-              <path d="M452 150 L452 86 L396 112"/>
-              <path d="M452 98 L420 82"/>
-              <path d="M426 150 L452 118"/>
-              <path d="M396 112 L382 101 M396 112 L386 125 M382 101 L386 125"/>
-            </g>
-            <g stroke="#c8a44b" stroke-width="1.2" fill="none" opacity=".7">
-              <path d="M246 96 L250 122 L262 108 Z"/>
-              <path d="M382 101 L386 125 L396 112 Z"/>
-            </g>
-            <!-- palms -->
-            <g stroke="#0a1d34" stroke-width="4" fill="none" stroke-linecap="round">
-              <path d="M76 150 L80 104"/>
-              <path d="M80 104 C64 92 48 96 40 104 M80 104 C96 90 114 94 122 102 M80 104 C70 86 78 72 90 66 M80 104 C92 90 108 88 118 92"/>
-              <path d="M540 150 L536 112"/>
-              <path d="M536 112 C522 102 508 106 500 112 M536 112 C550 100 566 104 574 110 M536 112 C530 96 540 84 550 80"/>
-            </g>
-            <!-- low buildings -->
-            <g fill="#0a1d34" opacity=".9">
-              <rect x="150" y="122" width="72" height="28"/>
-              <path d="M150 122 L186 104 L222 122 Z"/>
-              <rect x="480" y="128" width="54" height="22"/>
-              <path d="M480 128 L507 112 L534 128 Z"/>
-            </g>
-            <g fill="#c8a44b" opacity=".7">
-              <rect x="164" y="130" width="9" height="12"/><rect x="182" y="130" width="9" height="12"/><rect x="200" y="130" width="9" height="12"/>
-              <rect x="492" y="134" width="8" height="10"/><rect x="510" y="134" width="8" height="10"/>
-            </g>
-            <!-- water -->
-            <rect y="150" width="600" height="30" fill="#0c3550"/>
-            <g stroke="#4ba3c8" stroke-width="1.6" opacity=".45" fill="none">
-              <path d="M20 160 q14 -5 28 0 t28 0 t28 0"/>
-              <path d="M180 168 q14 -5 28 0 t28 0 t28 0"/>
-              <path d="M360 160 q14 -5 28 0 t28 0 t28 0"/>
-              <path d="M470 171 q14 -5 28 0 t28 0 t28 0"/>
-            </g>
-          </svg>
-          {% endif %}
-        </div>
-        <div class="campus-body">
-          <h3>{{ c.name }} <span class="pill pill-gold">Campus</span></h3>
-          <div class="loc">{{ c.state }}, India</div>
-          <p>{{ c.blurb }}</p>
-          <div class="campus-meta">
-            <div>
-              <div class="n">{{ per_campus.get(c.name, 0) }}</div>
-              <div class="l">Departments registered</div>
-            </div>
-            <div>
-              <div class="n">{{ STAGES|length }}</div>
-              <div class="l">Stages to complete</div>
-            </div>
-          </div>
-        </div>
-      </article>
+      <form method="post" action="{{ url_for('auth.login') }}" autocomplete="on">
+        {# where to land afterwards, when something sent you here to sign in #}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <label class="login-field">
+          <span>Username</span>
+          <input type="text" id="username" name="username" required autofocus
+                 autocapitalize="none" spellcheck="false" autocomplete="username"
+                 placeholder="e.g. cse.scse.4821">
+        </label>
+        <label class="login-field">
+          <span>Password</span>
+          <span class="login-pw">
+            <input type="password" id="password" name="password" required
+                   autocomplete="current-password" placeholder="As issued to your department">
+            <button class="login-show" type="button" id="pw-toggle" aria-pressed="false"
+                    aria-controls="password">Show</button>
+          </span>
+        </label>
+        <button class="login-go" type="submit">Sign in <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="login-note">No login, or it stopped working? Write to the Office of Academic Affairs ·
+        <a href="{{ url_for('public.about') }}">Help</a></p>
+    </div>
+    <span class="login-hint" aria-hidden="true">Move the pointer to turn the scene · click a panel</span>
+  </section>
+
+  <section class="login-stage" aria-hidden="true">
+    <div class="login-stage-cap">
+      <span class="lsc-k">How it works</span>
+      <b>Every stage, ticked off — then on to the Office.</b>
+      <span class="lsc-steps"><span class="lsc-step" data-step="0"><i>1</i>Pre-BoS</span>
+        <span class="lsc-step" data-step="1"><i>2</i>BoS Documents</span>
+        <span class="lsc-step" data-step="2"><i>3</i>Curriculum</span></span>
+    </div>
+    <div class="login-scene" id="login-scene">
+      {% set panels = [
+        ('blue', 'Pre-BoS', ['DIAC composition', 'DPAC composition', 'Minutes of the meeting']),
+        ('slate', 'BoS Documents', ['Minutes of meeting', 'Attendance', 'Photos']),
+        ('glass', 'Curriculum', ['Programme structure', 'Syllabus', 'Course revision']),
+      ] %}
+      {% for tone, title, items in panels %}
+      <div class="lp lp-{{ tone }}" data-pos="{{ loop.index0 }}">
+        <span class="lp-dot"></span>
+        <span class="lp-title">{{ title }}</span>
+        {% for it in items %}
+        <span class="lp-card"><b>{{ it }}</b><i></i><i class="short"></i><em class="lp-tick">✓</em></span>
+        {% endfor %}
+      </div>
       {% endfor %}
     </div>
-  </div>
-</section>
+    <svg class="login-gear g1" viewBox="0 0 100 100"><use href="#login-gear"/></svg>
+    <svg class="login-gear g2" viewBox="0 0 100 100"><use href="#login-gear"/></svg>
+    <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <linearGradient id="lg-metal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#eef2f8"/><stop offset=".5" stop-color="#8b97ab"/>
+          <stop offset="1" stop-color="#2c3648"/>
+        </linearGradient>
+        <g id="login-gear">
+          <path fill="url(#lg-metal)" stroke="#1d2533" stroke-width="1.5"
+                d="M44 4h12l2 12 9 4 10-7 9 9-7 10 4 9 12 2v12l-12 2-4 9 7 10-9 9-10-7-9 4-2 12H44l-2-12-9-4-10 7-9-9
+                   7-10-4-9-12-2V44l12-2 4-9-7-10 9-9 10 7 9-4z"/>
+          <circle cx="50" cy="50" r="15" fill="#0b1324" stroke="#cfd8e6" stroke-width="2"/>
+        </g>
+      </defs>
+    </svg>
+  </section>
 
-<section class="section section-dark" id="how">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Behind the scenes</span>
-      <h2>How a submission moves</h2>
-      <p>Each stage unlocks the next. Nothing is accepted until it passes validation, so a
-         department never finds out weeks later that a credit total was short.</p>
-    </div>
-    <div class="flow">
-      <div>
-        <h4>The Office of Academics issues a login</h4>
-        <p>One account per department, named after the department code. The Office generates the
-           password and hands it over.</p>
-      </div>
-      <div>
-        <h4>Pre-BoS is filled first</h4>
-        <p>DIAC, Board of Studies and Programme Assessment Committee compositions. Everything else
-           stays locked until these are submitted.</p>
-      </div>
-      <div>
-        <h4>UGC Mandatory Disclosure opens</h4>
-        <p>Programme information, credit distribution and syllabus. The credit table is checked
-           against UGC Table 2 as it is typed.</p>
-      </div>
-      <div>
-        <h4>Evidence, approval, repository</h4>
-        <p>Feedback, meeting papers and the approval chain, ending in a sealed consolidated record
-           for the academic year.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="section">
-  <div class="wrap">
-    <div class="grid grid-2" style="align-items:center;gap:40px">
-      <div>
-        <span class="eyebrow">The checking</span>
-        <h2>The credit rules live in the portal, not in a reviewer's head</h2>
-        <p class="muted">
-          UGC Table 2 sets the minimum credits a degree must award in each category. The portal holds
-          that table, applies the right column for a three-year or four-year programme, adds the
-          in-lieu rule for Honours students who do not take research, and refuses a submission whose
-          totals do not reconcile with the course list.
-        </p>
-        <p class="muted">
-          Marks are checked against credits at 1 credit = 25 marks, contact hours are checked against
-          credits, course codes must be unique and correctly formed, and category totals in the
-          summary must equal the sum of the courses actually listed.
-        </p>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>UGC Table 2 — minimum credits</h3></div>
-        <div class="card-body" style="padding:0">
-          <table class="credits">
-            <thead>
-              <tr><th scope="col">Category</th><th scope="col" class="num">3-year UG</th><th scope="col" class="num">4-Year UG</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Major (Core)</td><td class="num">60</td><td class="num">80</td></tr>
-              <tr><td>Minor Stream</td><td class="num">24</td><td class="num">32</td></tr>
-              <tr><td>Multidisciplinary</td><td class="num">09</td><td class="num">09</td></tr>
-              <tr><td>Ability Enhancement (AEC)</td><td class="num">08</td><td class="num">08</td></tr>
-              <tr><td>Skill Enhancement (SEC)</td><td class="num">09</td><td class="num">09</td></tr>
-              <tr><td>Value Added Courses</td><td class="num">06 – 08</td><td class="num">06 – 08</td></tr>
-              <tr><td>Summer Internship</td><td class="num">02 – 04</td><td class="num">02 – 04</td></tr>
-              <tr><td>Research Project / Dissertation</td><td class="num">—</td><td class="num">12</td></tr>
-              <tr class="total"><td>Total</td><td class="num">120</td><td class="num">160</td></tr>
-            </tbody>
-          </table>
-          <p class="small muted" style="padding:12px 16px;margin:0;border-top:1px solid var(--line)">
-            Honours students not undertaking research do 3 courses for 12 credits in lieu of a
-            research project or dissertation.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+  <footer class="login-foot">JAIN (Deemed-to-be University) · Office of Academic Affairs</footer>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Show / hide the password, as the button says.
+  (function () {
+    var btn = document.getElementById("pw-toggle"), input = document.getElementById("password");
+    if (!btn || !input) return;
+    btn.addEventListener("click", function () {
+      var shown = input.type === "text";
+      input.type = shown ? "password" : "text";
+      btn.textContent = shown ? "Show" : "Hide";
+      btn.setAttribute("aria-pressed", shown ? "false" : "true");
+      input.focus();
+    });
+  })();
+</script>
+<script src="{{ url_for('static', filename='js/login-scene.js') }}"></script>
 {% endblock %}

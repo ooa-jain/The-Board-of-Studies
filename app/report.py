@@ -1,0 +1,317 @@
+"""
+One department's record as a single report — what the Excel and Word
+downloads print, top to bottom on one sheet:
+
+    the department, the stages and what each holds (✓ filled, ✗ not yet,
+    with every uploaded document as a link that opens it on the portal),
+    then the UG and PG programmes, each with its parts and a link to the
+    programme's own report page.
+
+`links` turns a file or a programme into a URL. The downloads use share
+links (app/share.py), which open without signing in; AdminLinks point at the
+admin pages; with no links (a script) the names are printed without them.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from .db import now_ist, to_ist
+
+from .schema import STAGE_BY_KEY, STAGES
+from .workflow import compute_status, part_status, prefill_for, programmes_of, progress
+
+STATUS_WORDS = {"submitted": "✓ Submitted", "draft": "In progress", "returned": "Returned",
+                "open": "Not started", "locked": "Locked"}
+PARTS = ("prog_curriculum", "prog_syllabus", "prog_revision")
+
+
+class NoLinks:
+    def file(self, stage, value):
+        return None
+
+    def programme(self, code):
+        return None
+
+    def generated(self, kind, code):
+        return None
+
+
+_VIEWABLE = (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif")
+
+
+def _inline(value):
+    # a PDF or a picture opens in the browser tab; anything else downloads
+    return 1 if str(value.get("name", "")).lower().endswith(_VIEWABLE) else None
+
+
+class AdminLinks:
+    """Links for the Office's downloads: documents and programme reports on the admin side."""
+
+    def __init__(self, dept_code, year=None):
+        self.dept_code, self.year = dept_code, year
+
+    def file(self, stage, value):
+        from flask import url_for
+        return url_for("admin.document", dept_code=self.dept_code, stored=value["stored"],
+                       inline=_inline(value), _external=True)
+
+    def programme(self, code):
+        from flask import url_for
+        return url_for("admin.programme_report", dept_code=self.dept_code,
+                       programme_code=code, _external=True)
+
+    def generated(self, kind, code):
+        # shown on the page with a Download button, as in the downloads
+        if self.year:
+            return ShareLinks(self.dept_code, self.year).generated(kind, code)
+        from flask import url_for
+        return url_for("admin.programme_docx", dept_code=self.dept_code, programme_code=code,
+                       kind=kind, _external=True)
+
+
+def _blank(v):
+    return v is None or v == "" or v == [] or v == {} or (isinstance(v, str) and not v.strip())
+
+
+def files_in(value):
+    """The uploaded files in a field's value: one, several, or none."""
+    if isinstance(value, dict) and value.get("stored"):
+        return [value]
+    if isinstance(value, list):
+        return [v for v in value if isinstance(v, dict) and v.get("stored")]
+    return []
+
+
+def _text(v, limit=240):
+    if _blank(v):
+        return ""
+    if isinstance(v, (list, tuple)):
+        s = "; ".join(_text(x, limit) for x in v if not _blank(x))
+    elif isinstance(v, dict):
+        s = "; ".join(f"{k}: {_text(x, limit)}" for k, x in v.items() if not _blank(x))
+    elif isinstance(v, datetime):
+        s = to_ist(v).strftime("%d %b %Y")
+    else:
+        s = str(v)
+    s = " ".join(s.split())
+    return s if len(s) <= limit else s[:limit - 1] + "…"
+
+
+def _field_text(f, v):
+    """A field's value to read: a programme's POs or PSOs as "PO1: …" lines."""
+    if f.get("type") == "outcome_list":
+        from .schema import outcome_texts
+        return "\n".join(f"{f.get('prefix', '')}{n}: {t}" for n, t in enumerate(outcome_texts(v), start=1))
+    return v
+
+
+def section_items(stage_key, data, links):
+    """What one stage or part holds, field by field: (filled, label, text, [(name, url)])."""
+    from .keyword_match import relax
+    items = []
+    # an upload box the Office has made not mandatory is optional here too
+    for section in relax(STAGE_BY_KEY.get(stage_key) or {}).get("sections", []):
+        payload = (data or {}).get(section["key"])
+        kind = section.get("type", "fields")
+        if kind == "fields":
+            vals = payload if isinstance(payload, dict) else {}
+            for f in section.get("fields", []):
+                if f.get("type") == "fixed" or f.get("hidden"):
+                    continue
+                v = _field_text(f, vals.get(f["name"]))
+                docs = [(x.get("name") or "file", links.file(stage_key, x)) for x in files_in(v)]
+                text = "" if docs else _text(v)
+                if not f.get("required") and not docs and not text:
+                    continue                      # an optional box left empty says nothing
+                items.append((bool(docs or text), f.get("label") or f["name"], text, docs))
+        elif kind == "programme_list":
+            rows = payload if isinstance(payload, list) else []
+            kept = [r for r in rows if r.get("decision") != "remove"]
+            items.append((bool(kept), section.get("title") or "Programmes",
+                          f"{len(kept)} offered · {len(rows) - len(kept)} not offered", []))
+        elif kind == "table":
+            rows = [r for r in (payload or []) if isinstance(r, dict)] if isinstance(payload, list) else []
+            docs = [(x.get("name") or "file", links.file(stage_key, x))
+                    for r in rows for v in r.values() for x in files_in(v)]
+            items.append((bool(rows), section.get("title") or section["key"],
+                          f"{len(rows)} row{'s' if len(rows) != 1 else ''}" if rows else "", docs))
+    return items
+
+
+def _documents(stage_key, data, links):
+    out = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("stored") and node.get("name"):
+                out.append((node["name"], links.file(stage_key, node)))
+                return
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(data or {})
+    return out
+
+
+def build(db, dept_code, year, links=None):
+    links = links or NoLinks()
+    dept = db.departments.find_one({"dept_code": dept_code}) or {}
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+    p = progress(sub)
+
+    info = [("Department", dept.get("dept_name")), ("Department code", dept.get("dept_code")),
+            ("Faculty", dept.get("faculty")), ("School", dept.get("school")),
+            ("Campus", dept.get("campus")), ("Academic year", year),
+            ("Progress", f"{p['done']} of {p['total']} stages submitted"),
+            ("Report generated", now_ist().strftime("%d %b %Y, %H:%M"))]
+
+    stages = []
+    for s in STAGES:
+        if s.get("parts"):
+            # Curriculum: one line here; its detail is under each programme
+            codes = [x["programme_code"] for x in programmes_of(sub, dept)]
+            states = [part_status(sub, c, k) for c in codes for k in PARTS]
+            status = compute_status(sub, s["key"])
+            if status != "locked" and states:
+                status = ("submitted" if all(x == "submitted" for x in states) else
+                          "returned" if "returned" in states else
+                          "draft" if any(x in ("draft", "submitted") for x in states) else status)
+            stages.append({"key": s["key"], "title": s["title"], "group": s["group"],
+                           "status": status, "submitted_at": None,
+                           "filled": states.count("submitted"), "total": len(states),
+                           "unit": "programme parts submitted", "items": [],
+                           "container": True, "returned_note": None})
+            continue
+        state = (sub.get("stages") or {}).get(s["key"]) or {}
+        # never saved: what the stage opens with (the department's own record
+        # and its catalogue programmes), so the report shows what is there
+        data = state.get("data") or prefill_for(s["key"], dept, year, None, sub)
+        items = section_items(s["key"], data, links)
+        stages.append({
+            "key": s["key"], "title": s["title"], "group": s["group"],
+            "status": compute_status(sub, s["key"]),
+            "submitted_at": state.get("submitted_at"),
+            "filled": sum(1 for i in items if i[0]), "total": len(items),
+            "items": items, "returned_note": state.get("returned_note"),
+        })
+
+    programmes = {"UG": [], "PG": []}
+    for prog in programmes_of(sub, dept):
+        code = prog["programme_code"]
+        parts = []
+        docs = []
+        courses = 0
+        has = {}
+        for k in PARTS:
+            state = (((sub.get("programmes") or {}).get(code) or {}).get(k)) or {}
+            data = state.get("data") or {}
+            if k == "prog_curriculum":
+                courses = len(data.get("semester_structure") or [])
+            has[k] = bool(data.get("semester_structure") or data.get("courses"))
+            parts.append({"key": k, "title": STAGE_BY_KEY[k]["title"],
+                          "status": part_status(sub, code, k),
+                          "errors": (state.get("summary") or {}).get("errors", 0)})
+            docs += [(STAGE_BY_KEY[k]["title"], n, u) for n, u in _documents(k, data, links)]
+        level = "PG" if prog.get("level") in ("PG", "PGD") else "UG"
+        programmes[level].append({**prog, "parts": parts, "documents": docs, "courses": courses,
+                                  "report": links.programme(code),
+                                  # generated documents only once there is something in them
+                                  "curriculum_doc": has["prog_curriculum"] and links.generated("c", code),
+                                  "syllabus_doc": has["prog_syllabus"] and links.generated("s", code),
+                                  "revision_doc": has["prog_revision"] and links.generated("v", code)})
+
+    return {"dept": dept, "submission": sub, "year": year, "info": info,
+            "stages": stages, "programmes": programmes}
+
+
+def programme_context(db, dept, year, programme_code, links):
+    """Everything the programme report page shows; None if there is no such programme."""
+    sub = db.submissions.find_one({"dept_code": dept["dept_code"], "academic_year": year}) or {}
+    programme = next((p for p in programmes_of(sub, dept)
+                      if p["programme_code"].upper() == str(programme_code).upper()), None)
+    if not programme:
+        return None
+    code = programme["programme_code"]
+    stored = (sub.get("programmes") or {}).get(code) or {}
+    parts = []
+    from .workflow import batches, semester_short
+    # the current batch's three parts, then each earlier batch (its Curriculum,
+    # Syllabus and Course Revision in one part)
+    titles = {k: STAGE_BY_KEY[k]["title"] for k in PARTS}
+    for b in batches()["existing"]:
+        sems = semester_short(b["semesters"])
+        titles[b["key"]] = f"Earlier batch {b['label']}" + (f" · {sems}" if sems else "") + \
+            " — Curriculum, Syllabus, Course Revision"
+    for k in titles:
+        st = stored.get(k) or {}
+        status = part_status(sub, code, k)
+        parts.append({"key": k, "title": titles[k], "status": status,
+                      "status_word": status_word(status), "submitted_at": st.get("submitted_at"),
+                      "note": st.get("returned_note"),
+                      "errors": (st.get("summary") or {}).get("errors", 0),
+                      "documents": _documents(k, st.get("data") or {}, links)})
+    cur = (stored.get("prog_curriculum") or {}).get("data") or {}
+    # a PG programme in the PG Course Matrix's terms: its course groups and items 1 to 13
+    from .schema import for_level, category_groups
+    deg = (cur.get("details") or {}).get("degree_level") or programme.get("degree_level")
+    cur = category_groups(cur, deg)
+    # in the template's own order, items 1 to 12
+    profile = [(f["label"], _field_text(f, (cur.get(sec["key"]) or {}).get(f["name"])))
+               for sec in for_level(STAGE_BY_KEY["prog_curriculum"], deg)["sections"]
+               if sec["key"] in ("details", "profile") for f in sec["fields"]
+               if not f.get("hidden") and f.get("type") != "fixed"
+               and (cur.get(sec["key"]) or {}).get(f["name"]) not in (None, "")]
+    semesters = {}
+    for r in cur.get("semester_structure") or []:
+        semesters.setdefault(r.get("semester") or "—", []).append(r)
+    return {"dept": dept, "programme": programme, "year": year, "parts": parts,
+            "curriculum_doc": bool(cur.get("semester_structure")) and links.generated("c", code),
+            "syllabus_doc": bool(((stored.get("prog_syllabus") or {}).get("data") or {}).get("courses"))
+            and links.generated("s", code),
+            "revision_doc": bool(((stored.get("prog_revision") or {}).get("data") or {}).get("courses"))
+            and links.generated("v", code),
+            "profile": profile,
+            "semesters": sorted(semesters.items(), key=lambda kv: str(kv[0])),
+            "minors": cur.get("minors") or [],
+            "syllabus": ((stored.get("prog_syllabus") or {}).get("data") or {}).get("courses") or [],
+            "revision": ((stored.get("prog_revision") or {}).get("data") or {}).get("courses") or []}
+
+
+class ShareLinks:
+    """Links that open without signing in, like a Drive "anyone with the link"
+    share: each carries a signed code naming exactly one file or one programme
+    report, so it cannot be changed to reach anything else."""
+
+    def __init__(self, dept_code, year):
+        self.dept_code, self.year = dept_code, year
+
+    def file(self, stage, value):
+        from flask import url_for
+
+        from .share import doc_token
+        return url_for("share.doc", token=doc_token(self.dept_code, value["stored"]),
+                       _external=True)
+
+    def programme(self, code):
+        from flask import url_for
+
+        from .share import report_token
+        return url_for("share.report", token=report_token(self.dept_code, code, self.year),
+                       _external=True)
+
+    def generated(self, kind, code):
+        """kind "c": the Curriculum in the Office's template; "s": the Syllabus."""
+        from flask import url_for
+
+        from .share import generated_token
+        from .share import ENDPOINTS
+        return url_for(ENDPOINTS[kind],
+                       token=generated_token(kind, self.dept_code, code, self.year),
+                       _external=True)
+
+
+def status_word(status):
+    return STATUS_WORDS.get(status, (status or "").title())

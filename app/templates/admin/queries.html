@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Queries{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Queries</div>
+      <h1>Queries from departments</h1>
+      <p>Academic questions departments raise with the Query button. Each one is a ticket.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<nav class="q-tabs" aria-label="Show">
+  {% for key, label in [('open', 'Open'), ('resolved', 'Resolved'), ('all', 'All')] %}
+  <a href="{{ url_for('admin.queries', show=key) }}" class="{{ 'is-on' if show == key }}"{% if show == key %} aria-current="page"{% endif %}>{{ label }} <span>{{ counts[key] }}</span></a>
+  {% endfor %}
+</nav>
+
+<div class="card">
+  <table class="data sheet-table">
+    <thead><tr><th scope="col">Ticket</th><th scope="col">Raised</th><th scope="col">Department</th>
+      <th scope="col">From</th><th scope="col">Query</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
+    <tbody>
+    {% for q in items %}
+    <tr>
+      <td class="mono"><strong>{{ q.ticket }}</strong></td>
+      <td class="small mono">{{ (q.at|ist).strftime('%d %b %Y, %I:%M %p') }}</td>
+      <td class="small">{{ q.dept_name or q.dept_code }}{% if q.campus %}<div class="muted">{{ q.campus }}</div>{% endif %}</td>
+      <td class="small">{{ q.name or '—' }}{% if q.email %}<div><a href="mailto:{{ q.email }}">{{ q.email }}</a></div>{% endif %}</td>
+      <td>{% if q.subject %}<strong>{{ q.subject }}</strong><br>{% endif %}<span class="q-text">{{ q.text }}</span></td>
+      <td><span class="sh-pill is-{{ 'submitted' if q.status == 'resolved' else 'returned' }}">{{ 'Resolved' if q.status == 'resolved' else 'Open' }}</span>
+        {% if q.status == 'resolved' and q.resolved_at %}<div class="small muted">{{ (q.resolved_at|ist).strftime('%d %b') }}</div>{% endif %}</td>
+      <td>{% if can('comments', 'edit') %}
+        <form method="post" action="{{ url_for('admin.query_status', qid=q._id) }}">
+          <input type="hidden" name="status" value="{{ 'open' if q.status == 'resolved' else 'resolved' }}">
+          <button class="btn btn-ghost btn-sm">{{ 'Reopen' if q.status == 'resolved' else 'Mark resolved' }}</button>
+        </form>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="empty">{{ 'No open queries.' if show == 'open' else 'No queries here.' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

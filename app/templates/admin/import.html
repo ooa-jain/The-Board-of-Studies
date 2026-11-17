@@ -25,7 +25,7 @@
         <label>Excel workbook (.xlsx)<span class="req">*</span></label>
         <input type="file" name="workbook" accept=".xlsx,.xlsm" required>
         <span class="help">The importer looks for columns named like Department, School, Campus,
-          and Campus. Any HoD columns in the sheet are ignored. It does not matter which row the headings are on.</span>
+          Campus and Place. Any HoD columns in the sheet are ignored. It does not matter which row the headings are on.</span>
       </div>
       <div class="field">
         <label>Sheet name (optional)</label>
@@ -34,7 +34,13 @@
       <div class="field">
         <label>Campus to assume when the sheet does not say</label>
         <select name="default_campus">
-          <option>Bengaluru</option><option>Kochi</option>
+          {% for c in CAMPUSES %}<option>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Place to assume when the sheet does not say</label>
+        <select name="default_place">
+          {% for pl in PLACES %}<option>{{ pl }}</option>{% endfor %}
         </select>
       </div>
       <button class="btn" type="submit">Read the workbook</button>
@@ -73,7 +79,7 @@
           <thead>
             <tr><th scope="col" style="width:42px"><span class="sr-only">Include</span></th>
                 <th scope="col">Department</th><th scope="col">School</th><th scope="col">Code</th>
-                <th scope="col">Campus</th>
+                <th scope="col">Campus</th><th scope="col">Place</th>
                 <th scope="col"><span class="sr-only">Status</span></th></tr>
           </thead>
           <tbody>
@@ -84,6 +90,7 @@
               <td class="small">{{ r.school }}</td>
               <td class="mono small">{{ r.dept_code }}</td>
               <td class="small">{{ r.campus }}</td>
+              <td class="small">{{ r.place }}</td>
               <td>{% if r.exists %}<span class="pill pill-warn">Exists</span>{% else %}<span class="pill pill-ok">New</span>{% endif %}</td>
             </tr>
             {% endfor %}

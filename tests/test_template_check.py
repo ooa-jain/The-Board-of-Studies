@@ -1,0 +1,98 @@
+"""The signed DIAC and PAC forms: a Word upload is checked against the
+university's template, and categories left blank are named — as a
+reminder, not a block: a category may not apply, and a signed PDF or a
+scanned copy cannot be read row by row."""
+
+import io
+import tempfile
+from pathlib import Path
+
+from test_workflow import DEPT_INFO_OK, login, make_department
+
+ROOT = Path(__file__).resolve().parent.parent / "app" / "static" / "templates"
+DIAC, PAC = ROOT / "Composition_of_DIAC.docx", ROOT / "Composition_of_PAC.docx"
+
+
+def _filled(src, field, skip=()):
+    from app.template_check import fill
+    out = Path(tempfile.mkdtemp()) / "form.docx"
+    return fill(src, out, field, skip=skip).read_bytes()
+
+
+def _up(client, name, data, field):
+    return client.post("/department/api/upload", data={
+        "file": (io.BytesIO(data), name), "stage": "pre_bos", "field": field,
+    }, content_type="multipart/form-data").get_json()
+
+
+def test_the_empty_template_is_all_blank():
+    from app.template_check import check, problems
+    r = check(DIAC, "diac_signed")
+    assert r["filled"] == 0 and r["total"] == 7 and r["placeholders"] == 7
+    assert "Blank — fill Dean of Faculty / Director of School" in problems(r)[0]
+    r = check(PAC, "dpac_signed")
+    assert r["total"] == 14 and "Academician" in r["blank"]
+
+
+def test_a_filled_form_passes_and_a_half_filled_one_names_the_gaps():
+    from app.template_check import check, problems
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "x.docx"
+        p.write_bytes(_filled(PAC, "dpac_signed"))
+        assert check(p, "dpac_signed")["ok"]
+        p.write_bytes(_filled(PAC, "dpac_signed", skip=["Alumni", "Parent"]))
+        r = check(p, "dpac_signed")
+        assert r["blank"] == ["Alumni", "Parent"] and not r["ok"]
+        assert problems(r) == ["Blank — fill Alumni, Parent"]
+
+
+def test_a_blank_category_is_a_reminder_not_a_block(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    assert client.post("/department/api/dept_info/submit", json=DEPT_INFO_OK).get_json()["ok"]
+
+    diac = _up(client, "diac.docx", _filled(DIAC, "diac_signed", skip=["Alumni"]), "diac_signed")
+    assert diac["match"]["template"]["blank"] == ["Alumni"]
+    dpac = _up(client, "pac.docx", _filled(PAC, "dpac_signed"), "dpac_signed")
+    assert dpac["match"]["template"]["ok"]
+
+    data = {"pre_bos_files": {"diac_signed": diac, "dpac_signed": dpac,
+                              "pre_bos_minutes": {"name": "minutes.pdf", "stored": "x-minutes.pdf", "size": 900}}}
+    assert client.post("/department/api/pre_bos/save", json=data).get_json()["ok"]
+    j = client.post("/department/api/pre_bos/validate", json=data).get_json()
+    blank = [i for i in j["issues"] if "Blank — fill Alumni" in i["message"]]
+    assert blank and all(i["level"] == "warning" for i in blank)
+    # it goes through: a category that does not apply can stay empty
+    assert client.post("/department/api/pre_bos/submit", json=data).get_json()["ok"]
+
+
+def test_a_signed_pdf_or_scan_is_not_read_row_by_row(tmp_path):
+    from app.template_check import check
+    pdf = tmp_path / "diac.pdf"
+    pdf.write_bytes(b"%PDF-1.4 scanned")
+    assert check(pdf, "diac_signed", text="Composition of DIAC  Dean  Industry") is None
+    assert check(pdf, "diac_signed", text=None) is None
+
+
+def test_the_templates_can_be_downloaded(client):
+    r = client.get("/static/templates/Composition_of_DIAC.docx")
+    assert r.status_code == 200 and r.data[:2] == b"PK"
+
+
+def test_every_document_template_offered_exists():
+    """Each upload that offers a reference template points at a real file,
+    and every BoS document that has a paper form offers one."""
+    from pathlib import Path
+
+    from app.schema import STAGE_BY_KEY
+    static = Path(__file__).resolve().parents[1] / "app" / "static"
+    offered = {}
+    for key in ("pre_bos", "bos_documents"):
+        for sec in STAGE_BY_KEY[key]["sections"]:
+            for f in sec.get("fields", []):
+                if f.get("template"):
+                    offered[f["name"]] = f["template"]
+                    assert (static / f["template"]).is_file(), f["template"]
+    for name in ("bos_composition", "external_profiles", "minutes", "attendance", "vision_mission",
+                 "feedback_curriculum", "feedback_new_programme", "pre_bos_minutes"):
+        assert name in offered, name

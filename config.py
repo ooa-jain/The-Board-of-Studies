@@ -1,4 +1,4 @@
-"""Configuration for the JAIN OoA BoS Data Repository Portal."""
+"""Configuration for the JAIN Office of Academics Data Portal."""
 import os
 from pathlib import Path
 
@@ -20,12 +20,43 @@ class Config:
 
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "ooa.admin")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "ChangeThisOnFirstLogin!")
-    ADMIN_NAME = os.getenv("ADMIN_NAME", "Office of Academics")
+    ADMIN_NAME = os.getenv("ADMIN_NAME", "Office of Academic Affairs")
 
     ACADEMIC_YEAR = os.getenv("ACADEMIC_YEAR", "2027-28")
 
     UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", BASE_DIR / "uploads"))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_MB", "32")) * 1024 * 1024
+
+    # Uploaded files in Google Drive (app/drive_store.py): "disk" keeps them on
+    # the server only; "drive" also sends each to Drive through the Apps Script.
+    FILE_STORE = os.getenv("FILE_STORE", "disk").strip().lower()
+    DRIVE_SCRIPT_URL = os.getenv("DRIVE_SCRIPT_URL", "").strip()
+    DRIVE_SCRIPT_SECRET = os.getenv("DRIVE_SCRIPT_SECRET", "").strip()
+
+    # Short AI summaries of uploaded PDFs. Any service with an OpenAI-style
+    # chat API works: Google Gemini (free tier), Groq, xAI Grok, OpenAI …
+    # AI_* names win; the older XAI_* names still work. No key = feature off.
+    AI_API_KEY = (os.getenv("AI_API_KEY") or os.getenv("XAI_API_KEY") or "").strip()
+    AI_API_URL = (os.getenv("AI_API_URL") or os.getenv("XAI_API_URL")
+                  or "https://api.x.ai/v1/chat/completions")
+    AI_MODEL = os.getenv("AI_MODEL") or os.getenv("XAI_MODEL") or "grok-4"
+    # for scanned PDFs, read as pictures; must be a model that takes images
+    AI_VISION_MODEL = os.getenv("AI_VISION_MODEL") or os.getenv("XAI_VISION_MODEL") or AI_MODEL
+    # shown under each summary: "by Gemini"
+    AI_NAME = os.getenv("AI_NAME") or ("Grok" if "x.ai" in AI_API_URL else "AI")
+
+    # Email connector. The server and its password live only in .env; the
+    # admin chooses who receives updates on the Connectors page.
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM = os.getenv("SMTP_FROM", "") or os.getenv("SMTP_USER", "")
+    SMTP_SSL = _bool("SMTP_SSL", False)       # True for port 465
+    # links in emails and chat messages point here
+    PUBLIC_URL = os.getenv("PUBLIC_URL", "").rstrip("/")
+    # tests send connectors inline instead of on a thread
+    CONNECTORS_SYNC = _bool("CONNECTORS_SYNC", False)
 
     PORT = int(os.getenv("PORT", "8102"))
     DEBUG = _bool("FLASK_DEBUG", False)
@@ -33,11 +64,22 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = _bool("SESSION_COOKIE_SECURE", not DEBUG)
-    PERMANENT_SESSION_LIFETIME = 60 * 60 * 10  # 10 hours
+    # a sign-in lasts this many days on the same browser (renewed while in use)
+    PERMANENT_SESSION_LIFETIME = 60 * 60 * 24 * int(os.getenv("SESSION_DAYS", "14"))
+    # who is working on a shared department login, remembered on the browser
+    PERSON_COOKIE_DAYS = int(os.getenv("PERSON_COOKIE_DAYS", "180"))
 
-    CAMPUSES = ["Bengaluru", "Kochi"]
+    # The campuses as the Office of Academics workbook spells them, and the
+    # two cities they sit in.
+    PLACES = ["Bangalore", "Kochi"]
+    CAMPUSES = [
+        "Jain Global Campus", "Jayanagar Campus", "JC Road Campus",
+        "JP Nagar Campus", "Lalbagh Campus", "Lalbagh Campus (Jainology)",
+        "Sheshadri Road Campus", "Whitefield Campus", "Yelahanka Campus",
+        "The Sports School", "Kochi Campus",
+    ]
 
     ALLOWED_UPLOAD_EXT = {
-        ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv",
+        ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv", ".pptx", ".ppt",
         ".png", ".jpg", ".jpeg", ".webp", ".zip",
     }

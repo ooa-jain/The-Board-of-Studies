@@ -9,8 +9,8 @@
         <a href="{{ url_for('admin.submissions') }}">Submissions</a> <span>›</span>
         {{ dept.campus }} <span>›</span> {{ dept.school }}
       </div>
-      <h1>{{ dept.dept_name }}</h1>
-      <p>{{ dept.dept_code }} · {{ dept.school }} · {{ dept.campus }}</p>
+      <h1>{{ dept.dept_name }}{% if updates %} <span class="upd-tag upd-tag-lg">Updated · {{ updates.count }}</span>{% endif %}</h1>
+      <p>{{ dept.dept_code }}{% if dept.place %} · {{ dept.place }}{% endif %}</p>
     </div>
     <div class="spacer" style="text-align:right">
       <div class="flex" style="justify-content:flex-end">
@@ -20,8 +20,13 @@
         <span class="bar-label">{{ progress.done }} / {{ progress.total }}</span>
       </div>
       <div class="flex mt-1" style="justify-content:flex-end">
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}">Excel</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}">Word</a>
+        {# downloads the file and opens a preview of it in another tab #}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department', dept_code=dept.dept_code) }}"
+           data-preview="{{ url_for('admin.export_preview', dept_code=dept.dept_code, kind='xlsx') }}">Excel</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.export_department_word', dept_code=dept.dept_code) }}"
+           data-preview="{{ url_for('admin.export_preview', dept_code=dept.dept_code, kind='docx') }}">Word</a>
+        <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener"
+           href="{{ url_for('admin.export_preview', dept_code=dept.dept_code, kind='xlsx') }}">Preview</a>
       </div>
     </div>
   </div>
@@ -29,6 +34,140 @@
 {% endblock %}
 
 {% block content %}
+{% if updates %}
+{# what changed since the Office last looked; Mark as seen clears the tags #}
+<section class="upd-banner" aria-label="Updated since you last looked">
+  <div class="upd-banner-head">
+    <span class="upd-tag">Updated</span>
+    <strong>{{ updates.count }} change{{ 's' if updates.count != 1 }} since you last looked</strong>
+    <span class="small muted">— since {{ (updates.since|ist).strftime('%d %b, %H:%M') }}</span>
+    {% if can('overview', 'edit') %}
+    <form method="post" action="{{ url_for('admin.mark_seen', dept_code=dept.dept_code) }}" class="spacer">
+      <button class="btn btn-ghost btn-sm" type="submit">Mark as seen</button>
+    </form>
+    {% endif %}
+  </div>
+  <ul class="upd-list">
+    {% for n in updates.notes %}
+    <li><span class="upd-when">{{ (n.at|ist).strftime('%d %b, %H:%M') }}</span>
+      <span class="upd-what">{{ n.text.split(' — ', 1)[1] if ' — ' in n.text else n.text }}{% if n.person %} <span class="muted">· {{ n.person }}</span>{% endif %}</span></li>
+    {% endfor %}
+    {% if updates.count > updates.notes|length %}<li class="muted small">and {{ updates.count - updates.notes|length }} more — <a href="{{ url_for('admin.updates', dept=dept.dept_code, show='unread') }}">see them all</a></li>{% endif %}
+  </ul>
+</section>
+{% endif %}
+{% macro kw_tags(m) %}{% for w in m.expected or [] %}{% set hit = w in (m.found or []) %}<span class="kw-tag{{ ' is-hit' if hit }}" title="{{ w }}">{{ (m.seen[(m.found).index(w)] if hit and m.seen else w.split('/')[0]|trim) }}</span> {% endfor %}{% endmacro %}
+{% if dept.demo %}
+<div class="demo-strip">
+  <span class="demo-badge" aria-hidden="true">DEMO</span>
+  <div><strong>Sign in as this department</strong>
+    <span class="small muted">In a private window, so you stay signed in here:
+      username <code class="mono">{{ dept.username }}</code>{% if dept.initial_password %}, password
+      <code class="mono">{{ dept.initial_password }}</code>{% endif %}. Press “Fill everything with sample data”
+      there, then submit stage by stage and watch it arrive under the bell.</span></div>
+</div>
+{% endif %}
+{% set imp = submission.imported_from %}
+{% if imp %}
+<details class="card mb-2 import-card">
+  <summary class="card-head">
+    <h3 style="margin:0;font-size:1rem">Filled from the department's Drive folder</h3>
+    <span class="spacer small muted">{{ (imp.at|ist).strftime('%d %b %Y, %H:%M') }} · {{ imp.by }} ·
+      {{ imp.notes|length }} note{{ '' if imp.notes|length == 1 else 's' }}</span>
+  </summary>
+  <div class="card-body">
+    <p class="small">Source: <a href="{{ imp.source.folder }}" target="_blank" rel="noopener">{{ imp.source.folder_name }}</a>
+      — {{ imp.source.files|join(' · ') }}</p>
+    {% if imp.files %}
+    <p class="small mt-1"><strong>Files kept with this record</strong> — the rest are in each programme's
+      Curriculum and Syllabus, and under Uploaded documents below.</p>
+    <ul class="small import-files">
+      {% for f in imp.files %}<li><a href="{{ url_for('admin.document', dept_code=dept.dept_code, stored=f.stored) }}">{{ f.name }}</a>
+        <span class="muted">{{ (f.size / 1024)|round|int }} KB</span></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if imp.files_missing %}
+    <p class="small note-err">Not attached — these were not in the pack: {{ imp.files_missing|join(' · ') }}.
+      Add them to <code>app/pack_data/files/csit/</code> and press Load again, or upload them in the
+      programme's own page.</p>
+    {% endif %}
+    <ul class="small import-notes">{% for n in imp.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+  </div>
+</details>
+{% endif %}
+{% set ndocs = documents|sum(attribute='files', start=[])|length %}
+<section class="card mb-2 docs-card" id="documents">
+  <div class="card-head">
+    <h3 style="margin:0;font-size:1rem">Uploaded documents</h3>
+    <span class="spacer small muted">
+      {{ ndocs }} file{{ '' if ndocs == 1 else 's' }}
+      {% if summaries %}· press ✦ Summary on a PDF for a short summary{% endif %}
+    </span>
+  </div>
+  <div class="card-body tight">
+    {% if not documents %}
+      <p class="small muted">Nothing uploaded yet.</p>
+    {% endif %}
+    {% for g in documents %}
+      <div class="docs-group">{{ g.title }}</div>
+      <div class="docs-files">
+      {% for f in g.files %}
+      <div class="doc-row{{ ' has-summary' if f.summary }}">
+        <div class="file-preview kind-{{ 'pdf' if f.is_pdf else 'other' }}">
+          <a class="file-thumb{{ '' if f.thumb else ' is-drawn' }}" href="{{ f.url }}?inline=1" target="_blank" rel="noopener"
+             title="Open {{ f.name }}">
+            {% if f.thumb %}<img src="{{ f.thumb }}" alt="First page of {{ f.name }}" loading="lazy"
+                 onload="this.parentNode.classList.add('is-loaded')"
+                 onerror="this.parentNode.classList.add('is-drawn');this.remove()">{% endif %}
+            {% if not f.thumb %}<span class="file-drawn"><span class="file-ext">{{ f.name.rsplit('.',1)[-1]|upper }}</span></span>{% endif %}
+          </a>
+          <div class="file-meta">
+            <span class="doc-label">{{ f.label }}{% if updates and f.uploaded_at and updates.files_since and f.uploaded_at >= updates.files_since %} <span class="upd-tag">New</span>{% endif %}</span>
+            <strong class="file-name">{{ f.name }}</strong>
+            <span class="file-facts">{% if f.size %}{{ (f.size / 1024)|round|int }} KB{% endif %}{% if f.uploaded_at %} · {{ (f.uploaded_at|ist).strftime('%d %b %Y') }}{% endif %}</span>
+            <div class="file-acts">
+              {% if f.viewable %}<a class="file-act is-view" href="{{ f.url }}?inline=1" target="_blank" rel="noopener">View</a>{% endif %}
+              <a class="file-act" href="{{ f.url }}">Download</a>
+              {% if f.is_pdf and summaries %}
+              <button class="file-act is-ai" type="button" data-summary="{{ url_for('admin.document_summary', dept_code=dept.dept_code, stored=f.url.rsplit('/',1)[-1]) }}">✦ Summary</button>
+              {% endif %}
+            </div>
+            {% set m = f.match %}
+            {% set t = m.template if m else None %}
+            {% if t %}
+            {% set bad = t.blank or t.half or t.placeholders %}
+            <div class="tpl-check {{ 'is-bad' if bad else 'is-ok' }}">
+              <span class="kw-icon">{{ '!' if bad else '✓' }}</span>
+              <strong>{% if bad %}Blank in the {{ t.template }}{% else %}{{ t.template }}: every category filled ({{ t.filled }} of {{ t.total }}){% endif %}</strong>
+              {% if bad %}<ul>
+                {% if t.blank %}<li>No name yet: {{ t.blank|join(', ') }}</li>{% endif %}
+                {% if t.half %}<li>Designation missing: {{ t.half|join(', ') }}</li>{% endif %}
+                {% if t.placeholders %}<li>“Words only” still written in {{ t.placeholders }} place(s)</li>{% endif %}
+              </ul>{% endif %}
+            </div>
+            {% endif %}
+            {% if m and m.status %}
+            <div class="kw-match is-{{ m.status }}">
+              <span class="kw-icon">{{ '✓' if m.status == 'match' else '–' if m.status == 'unread' else '!' }}</span>
+              <strong>{% if m.looks_like %}Wrong document — looks like {{ m.looks_like }}{% else %}{{ {'match': 'Keywords match', 'weak': 'Few keywords match', 'miss': 'No expected keywords found', 'unread': 'Keywords not checked'}[m.status] }}{% endif %}</strong>
+              {% if m.status == 'unread' %}<span class="kw-sub">no text to read (a scan, image or zip) — open it to check</span>
+              {% else %}<span class="kw-tags">{{ kw_tags(m) }}</span>{% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% if f.summary %}
+        <div class="file-summary">
+          <div class="fs-head"><span class="fs-spark">✦</span><strong>Summary</strong><span class="fs-by">by {{ f.summary_by }} · check it against the document</span></div>
+          <div class="fs-text">{{ f.summary }}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</section>
 {% set ns = namespace(group=None) %}
 {% for s in board %}
   {% if s.group != ns.group %}{% set ns.group = s.group %}<div class="group-label">{{ s.group }}</div>{% endif %}
@@ -41,11 +180,12 @@
         <span class="small muted">{{ s.blurb }}</span>
       </div>
       <span class="spacer flex">
+        {% if updates and s.key in updates.stages %}<span class="upd-tag" title="Changed since you last looked">Updated</span>{% endif %}
         {% if s.errors %}<span class="pill pill-err">{{ s.errors }} errors</span>{% endif %}
         {% if s.warnings %}<span class="pill pill-warn">{{ s.warnings }} warnings</span>{% endif %}
         {% if s.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
         {% elif s.status == 'returned' %}<span class="pill pill-err">Returned</span>
-        {% elif s.status == 'draft' %}<span class="pill pill-warn">In progress</span>
+        {% elif s.status == 'draft' %}<span class="pill pill-warn pill-progress">In progress</span>
         {% elif s.status == 'locked' %}<span class="pill pill-lock">Locked</span>
         {% else %}<span class="pill pill-gold">Open</span>{% endif %}
       </span>
@@ -55,11 +195,12 @@
     {% if state.data or s.status in ('submitted','returned','locked') %}
     <div class="card-body tight">
       <div class="flex flex-wrap small muted">
-        {% if s.submitted_at %}<span>Submitted {{ s.submitted_at.strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
+        {% if s.submitted_at %}<span>Submitted {{ (s.submitted_at|ist).strftime('%d %b %Y, %H:%M') }}</span>{% endif %}
         {% if s.returned_note %}<span style="color:var(--err)">Returned: {{ s.returned_note }}</span>{% endif %}
         <span class="spacer"></span>
 
-        {% if s.status == 'locked' %}
+        {% if not can('overview', 'edit') %}
+        {% elif s.status == 'locked' %}
         <form method="post" action="{{ url_for('admin.submission_unlock', dept_code=dept.dept_code, stage_key=s.key) }}">
           <button class="btn btn-ghost btn-sm" type="submit">Open this stage anyway</button>
         </form>
@@ -77,38 +218,8 @@
       </div>
 
       {% if state.data %}
-      <details class="mt-1">
-        <summary class="small" style="cursor:pointer;color:var(--ink-600)">View what was submitted</summary>
-        <div class="mt-1" style="max-height:420px;overflow:auto">
-          {% for section in STAGE_BY_KEY[s.key].sections %}
-            {% set payload = state.data.get(section.key) %}
-            {% if payload %}
-            <h4 class="small" style="margin:14px 0 6px">{{ section.title }}</h4>
-            {% if payload is mapping %}
-              <table class="data">
-                {% for k, v in payload.items() %}
-                <tr><td class="small" style="width:240px;color:var(--ink-soft)">{{ k }}</td>
-                    <td class="small">{% if v is mapping %}{{ v.get('name', v) }}{% elif v is iterable and v is not string %}{{ v|map(attribute='name')|join(', ') }}{% else %}{{ v }}{% endif %}</td></tr>
-                {% endfor %}
-              </table>
-            {% elif payload is iterable %}
-              <div class="table-wrap">
-                <table class="data">
-                  <thead><tr>{% for c in section.columns %}<th scope="col">{{ c.label }}</th>{% endfor %}</tr></thead>
-                  <tbody>
-                    {% for row in payload %}
-                    <tr>{% for c in section.columns %}
-                      <td class="small">{{ row.get(c.name) if row.get(c.name) is not mapping else row.get(c.name).get('name','') }}</td>
-                    {% endfor %}</tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% endif %}
-            {% endif %}
-          {% endfor %}
-        </div>
-      </details>
+      <button class="btn btn-sm mt-1" type="button"
+              data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=s.key) }}">Review what was entered</button>
       {% endif %}
 
       {% if state.issues %}
@@ -129,22 +240,71 @@
 {% endfor %}
 
 {% if submission.programmes %}
-<div class="group-label">Per-programme records</div>
+<div class="group-label">Programmes — click a step to review it</div>
+{% set words = {'submitted': 'Submitted', 'returned': 'Sent back', 'draft': 'In progress'} %}
 {% for code, stages in submission.programmes.items() %}
 <div class="card mb-1">
-  <div class="card-head"><h3 style="font-size:1rem">{{ code }}</h3>
-    <span class="spacer small muted">{{ stages|length }} stage record(s)</span></div>
+  <div class="card-head"><h3 style="font-size:1rem">{{ prog_names.get(code, code) }}</h3>
+    <span class="spacer small muted mono">{{ code }}</span></div>
   <div class="card-body tight">
-    {% for skey, st in stages.items() %}
-    <div class="flex small" style="padding:6px 0;border-bottom:1px solid var(--line)">
-      <span>{{ STAGE_BY_KEY[skey].title if skey in STAGE_BY_KEY else skey }}</span>
-      <span class="spacer"></span>
-      {% if st.summary and st.summary.errors %}<span class="pill pill-err">{{ st.summary.errors }} errors</span>{% endif %}
-      <span class="pill {{ 'pill-ok' if st.status == 'submitted' else 'pill-warn' }}">{{ st.status }}</span>
-    </div>
-    {% endfor %}
+    <ol class="pmap">
+      {% set keys = stages.keys()|list %}
+      {% set ordered = [] %}
+      {% for k in ['prog_curriculum', 'prog_syllabus'] if k in keys %}{% set _ = ordered.append(k) %}{% endfor %}
+      {% for k in keys|sort if k.startswith('prog_syllabus_b') %}{% set _ = ordered.append(k) %}{% endfor %}
+      {% for k in ['prog_revision'] if k in keys %}{% set _ = ordered.append(k) %}{% endfor %}
+      {% for skey in ordered %}
+      {% set st = stages[skey] %}
+      {% set sd = STAGE_BY_KEY.get(skey, {}) %}
+      {% set c = 1 if skey == 'prog_curriculum' else 2 if skey == 'prog_syllabus' else 4 if skey == 'prog_revision' else 3 %}
+      <li class="pmap-node pmap-c{{ c }} is-{{ st.status or 'open' }}">
+        <button type="button" class="pmap-pill" {% if st.data %}data-review="{{ url_for('admin.submission_review', dept_code=dept.dept_code, stage_key=skey, programme=code) }}"{% else %}disabled{% endif %}
+                title="{{ words.get(st.status, 'Not started') }}{% if st.summary and st.summary.errors %} · {{ st.summary.errors }} errors{% endif %}">
+          <span class="pmap-n">{{ loop.index }}</span>
+          <span class="pmap-title">{% if skey == 'prog_syllabus' %}Batch of {{ batches.current }}{% elif sd.existing_batch %}Batch of {{ sd.batch }}{% elif skey == 'prog_revision' %}Revision{% else %}{{ sd.title or skey }}{% endif %}</span>
+          <i class="pmap-dot" aria-hidden="true"></i>
+          <span class="pmap-tag">{{ words.get(st.status, 'Not started') }}</span>
+          {% if updates and (code, skey) in updates.parts %}<span class="upd-tag">Updated</span>{% endif %}
+        </button>
+      </li>
+      {% endfor %}
+    </ol>
   </div>
 </div>
 {% endfor %}
 {% endif %}
+
+{% if can('departments', 'delete') %}
+<details class="card danger-zone mt-2">
+  <summary>Delete all of this department's data</summary>
+  <div class="card-body">
+    <p class="small">Every stage, programme part, uploaded file, comment and update of
+      <strong>{{ dept.dept_name }}</strong>, in every academic year, is deleted for good. The department
+      and its login stay, so it can start again.</p>
+    <form method="post" action="{{ url_for('admin.wipe_department', dept_code=dept.dept_code) }}" class="flex">
+      <input name="confirm" placeholder="Type {{ dept.dept_code }} to confirm" autocomplete="off" required>
+      <button class="btn btn-danger btn-sm">Delete all data</button>
+    </form>
+  </div>
+</details>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/summary.js') }}"></script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-review.js') }}"></script>
+<script>
+  // Excel / Word: the file downloads here, and its preview opens in another tab
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("a[data-preview]");
+    if (a && !e.ctrlKey && !e.metaKey) window.open(a.dataset.preview, "_blank", "noopener");
+  });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-summary]");
+    if (!b) return;
+    var row = b.closest(".doc-row");
+    window.PortalSummary.load(row, b.dataset.summary, false);
+  });
+</script>
 {% endblock %}

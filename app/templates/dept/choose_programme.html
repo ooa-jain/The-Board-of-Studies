@@ -9,12 +9,12 @@
         <a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> {{ stage.group }}
       </div>
       <h1>{{ stage.title }}</h1>
-      <p>{{ stage.blurb }}</p>
+      <p>Choose UG or PG, then open a programme to fill its Curriculum, Syllabus and Course Revision.</p>
     </div>
     <div class="spacer head-aside">
       {% if status == 'submitted' %}<span class="pill pill-ok">All programmes submitted</span>
       {% elif status == 'returned' %}<span class="pill pill-err">Returned for correction</span>
-      {% elif status == 'draft' %}<span class="pill pill-warn">In progress</span>
+      {% elif status == 'draft' %}<span class="pill pill-warn pill-progress">In progress</span>
       {% else %}<span class="pill pill-gold">Open</span>{% endif %}
     </div>
   </div>
@@ -22,47 +22,47 @@
 {% endblock %}
 
 {% block content %}
-{% for level in ('UG', 'PG') if groups.get(level) %}
-<div class="group-label">{{ level }} programmes</div>
-<div class="grid grid-2 mb-2">
-  {% for p in groups[level] %}
-  <div class="card">
-    <div class="card-head">
-      <h3>{{ p.programme_name }}</h3>
-    </div>
-    <div class="card-body">
-      <p class="small muted mb-1">
-        <span class="mono">{{ p.programme_code }}</span> · {{ p.degree_level }}
-        {% if p.specialisation %} · {{ p.specialisation }}{% endif %} · batch {{ p.batch }}
-      </p>
-      <div class="part-list">
-        {% for part in p.parts %}
-        <div class="part-row">
-          <div class="part-info">
-            <strong>{{ part.title }}</strong>
-            {% if part.note %}<span class="small note-err">Returned: {{ part.note }}</span>{% endif %}
-          </div>
-          {% if part.errors and part.status != 'submitted' %}<span class="pill pill-err">{{ part.errors }} to fix</span>{% endif %}
-          {% if part.status == 'submitted' %}<span class="pill pill-ok">Submitted</span>
-          {% elif part.status == 'returned' %}<span class="pill pill-err">Returned</span>
-          {% elif part.status == 'draft' %}<span class="pill pill-warn">In progress</span>
-          {% else %}<span class="pill">Not started</span>{% endif %}
-          <a class="btn btn-sm {{ 'btn-ghost' if part.status == 'submitted' else 'btn-gold' if part.status == 'open' else '' }}"
-             href="{{ url_for('dept.stage', stage_key=part.key, programme_code=p.programme_code) }}">
-            {{ 'View' if part.status == 'submitted' else 'Correct' if part.status == 'returned'
-               else 'Continue' if part.status == 'draft' else 'Start' }}
-          </a>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
+{% set words = {'done': 'Completed', 'progress': 'In progress', 'returned': 'Returned', 'new': 'Not started'} %}
+<nav class="lvl-tabs" aria-label="Programme level">
+  {% for lv in ('UG', 'PG') %}
+  {% set progs = groups.get(lv, []) %}
+  <a href="{{ url_for('dept.stage', stage_key=stage.key, level=lv) }}" class="lvl-tab{{ ' is-on' if lv == level }}"
+     {% if lv == level %}aria-current="page"{% endif %}>
+    <b>{{ lv }} programmes</b>
+    <span class="lvl-count">{{ progs|selectattr('state', 'equalto', 'done')|list|length }}/{{ progs|length }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+<div class="prog-list">
+  {% for p in groups.get(level, []) %}
+  <a class="prog-row is-{{ p.state }}" href="{{ p.url }}" id="prog-{{ p.programme_code }}">
+    <span class="prog-code mono">{{ p.programme_code }}</span>
+    <span class="prog-name">{{ p.programme_name }}
+      {% if p.degree_level %}<small>{{ p.degree_level }}{% if p.batch %} · batch {{ p.batch }}{% endif %}</small>{% endif %}
+      {% for note in p.parts|selectattr('note')|map(attribute='note')|unique %}<small class="note-err">Returned: {{ note }}</small>{% endfor %}
+    </span>
+    <span class="prog-progress" title="{{ p.done }} of {{ p.total }} parts submitted">
+      <span class="prog-bar"><i style="width:{{ (p.done * 100 / p.total)|round|int if p.total else 0 }}%"></i>
+        <i class="is-filled" style="width:{{ ((p.filled - p.done) * 100 / p.total)|round|int if p.total else 0 }}%"></i></span>
+      <small>{{ p.done }}/{{ p.total }} submitted</small>
+    </span>
+    <span class="prog-state">{{ words[p.state] }}</span>
+    <span class="prog-go" aria-hidden="true">›</span>
+  </a>
+  {% else %}
+  <p class="muted">No {{ level }} programmes yet.</p>
   {% endfor %}
 </div>
-{% endfor %}
 
-<p class="small muted">
-  A programme missing here? Add it to <a href="{{ url_for('dept.stage', stage_key='dept_info') }}">Department
-  Information</a> — ask the Office of Academics to reopen that stage if it is already submitted.
-</p>
+<div class="add-prog-strip">
+  <div>
+    <strong>Oops! Missed a programme?</strong>
+    <span class="small muted">You can still add it to the Programme List!</span>
+  </div>
+  <div class="spacer flex">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.add_programme', level='UG') }}">+ Add a UG programme</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.add_programme', level='PG') }}">+ Add a PG programme</a>
+  </div>
+</div>
 {% endblock %}

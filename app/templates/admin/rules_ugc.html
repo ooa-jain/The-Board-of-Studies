@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Rules & UGC{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs"><a href="{{ url_for('admin.dashboard') }}">Home</a> <span>›</span> Rules &amp; UGC</div>
+      <h1>Rules &amp; UGC</h1>
+      <p>For each department, choose how its UG programmes are filed.
+        <strong>UGC</strong>: 3-year, Honours and Honours with Research, checked against UGC Table 2.
+        <strong>No UGC</strong>: semesters 1 to 8 in one flow, no Honours or Research, no Minor, no credit
+        rule — course categories Major / CC / Core, DSE, GEC / OE / MDC, SEC and the rest; the tables
+        total whatever the department enters. Design, Allied Healthcare, Engineering and Law are No UGC
+        automatically. PG programmes are not affected.</p>
+    </div>
+    <div class="spacer head-aside">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin.rules') }}">UGC Table 2 credits</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set editable = can('settings', 'edit') %}
+<p class="small muted ru-count">{{ total }} departments · {{ flow_count }} on No UGC</p>
+<form method="post" class="ru-form">
+  {% for school, depts in schools %}
+  <section class="card ru-school" data-school>
+    <div class="ru-school-head">
+      <h2>{{ school }} <span class="ru-n">{{ depts|length }}</span></h2>
+      {% if editable %}
+      <div class="ru-all" role="group" aria-label="Set every department in {{ school }}">
+        <span class="small muted">Set all:</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-set="ugc">UGC</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-set="flow">No UGC</button>
+      </div>
+      {% endif %}
+    </div>
+    <ul class="ru-list">
+      {% for d in depts %}
+      {% set mode = d.mode %}
+      <li class="ru-row{{ ' is-flow' if mode == 'flow' }}">
+        <div class="ru-name"><strong>{{ d.dept_name or d.dept_code }}</strong>
+          <small>{{ d.dept_code }}{% if d.campus %} · {{ d.campus }}{% endif %}{% if d.active is sameas false %} · inactive{% endif %}{% if d.auto and mode == 'flow' %} · <span class="ru-auto">No UGC automatically ({{ d.school or d.faculty }})</span>{% endif %}</small></div>
+        <div class="ru-seg" role="radiogroup" aria-label="Rules for {{ d.dept_name or d.dept_code }}">
+          {% for key, label in [('ugc', 'UGC'), ('flow', 'No UGC')] %}
+          <label class="ru-opt" title="{{ modes[key] }}">
+            <input type="radio" name="mode.{{ d.dept_code }}" value="{{ key }}" {{ 'checked' if mode == key }} {{ 'disabled' if not editable }}>
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% else %}
+  <div class="card"><div class="card-body"><p class="muted">No departments yet.</p></div></div>
+  {% endfor %}
+  {% if editable and schools %}
+  <div class="ru-save"><button class="btn" type="submit">Save</button></div>
+  {% endif %}
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  function paint(row) {
+    var on = row.querySelector("input[value=flow]");
+    row.classList.toggle("is-flow", !!(on && on.checked));
+  }
+  document.querySelectorAll(".ru-row").forEach(function (row) {
+    row.addEventListener("change", function () { paint(row); });
+  });
+  document.querySelectorAll("[data-school] [data-set]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var box = b.closest("[data-school]");
+      box.querySelectorAll("input[value=" + b.dataset.set + "]").forEach(function (i) { i.checked = true; });
+      box.querySelectorAll(".ru-row").forEach(paint);
+    });
+  });
+})();
+</script>
+{% endblock %}

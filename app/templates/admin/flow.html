@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Data Flow{% endblock %}
+
+{% block header %}
+<div class="page-head">
+  <div class="wrap">
+    <div>
+      <div class="crumbs">Office of Academic Affairs <span>›</span> Data Flow</div>
+      <h1>How a department's data flows — {{ year|ay }}</h1>
+      <p>Choose a department — and one of its programmes — to see what it enters once and every
+        stage the portal carries it to. The 2D tree reads from left to right; click a field to follow it.
+        In 3D, drag to turn, scroll to zoom and hover a line for its value.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flow-layout">
+  <div class="flow-stage card" id="flow-stage" data-view="2d">
+    <div class="flow-views" role="group" aria-label="View">
+      <button type="button" data-view-btn="2d" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h5v4H4zM15 3h5v4h-5zM15 10h5v4h-5zM15 17h5v4h-5zM9 7h3v12h3M12 12h3M12 5h3"/></svg>2D tree</button>
+      <button type="button" data-view-btn="3d" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>3D</button>
+    </div>
+    <div id="flow-tree" class="flow-tree" aria-label="Tree of where a department's data is entered and used again"></div>
+    <div id="flow-canvas" class="flow-canvas" role="img"
+         aria-label="Three-dimensional map of where a department's data is entered and used again"></div>
+    <div class="flow-empty" id="flow-empty">
+      <strong>Choose a department</strong>
+      <span>Pick one in the panel on the right to draw its data map.</span>
+    </div>
+    <div class="flow-tip" id="flow-tip" hidden></div>
+    <div class="flow-toolbar">
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-reset">Reset view</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-all" aria-pressed="false">Name every flow</button>
+      <button class="btn btn-ghost btn-sm" type="button" id="flow-spin" aria-pressed="false">Rotate</button>
+    </div>
+  </div>
+
+  <aside class="flow-side">
+    <div class="card">
+      <div class="card-head"><h3 class="card-title-sm">Department</h3></div>
+      <div class="card-body tight">
+        <label class="lbl" for="flow-dept">Department</label>
+        <select id="flow-dept">
+          <option value="">Choose a department…</option>
+          {% for d in departments %}
+          <option value="{{ d.dept_code }}">{{ d.dept_name }} — {{ d.campus }}</option>
+          {% endfor %}
+        </select>
+        <label class="lbl mt-1" for="flow-prog">Programme</label>
+        <select id="flow-prog" disabled><option value="">All programmes</option></select>
+        <p class="small muted mt-1" id="flow-info">The map follows the programme you choose, with
+          its own batch, degree, courses and credits.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3 class="card-title-sm">Key</h3></div>
+      <div class="card-body tight small">
+        <ul class="flow-key">
+          <li><i class="fk-copied"></i> Copied — filled in as it is</li>
+          <li><i class="fk-worked-out"></i> Worked out — calculated from it</li>
+          <li><i class="fk-offered"></i> Offered — “Fill in all” in one click</li>
+        </ul>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<section class="card flow-map" id="mapping">
+  <div class="card-head">
+    <h3 class="card-title-sm">Data mapping <span class="muted" id="map-for"></span></h3>
+    <span class="spacer"></span>
+    <a class="btn btn-gold btn-sm" id="map-xlsx" href="#" aria-disabled="true" hidden>Download Excel</a>
+  </div>
+  <div class="card-body tight">
+    <div class="table-wrap">
+      <table class="data flow-map-table">
+        <thead><tr><th>Field</th><th>Entered in</th><th>Used again in</th><th>How</th><th>Value</th></tr></thead>
+        <tbody id="map-body"><tr><td colspan="5" class="muted">Choose a department above.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<noscript><div class="alert alert-error">The map needs JavaScript; the table above lists every flow.</div></noscript>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/OrbitControls.js') }}"></script>
+<script>
+  window.FLOW_URL = {{ url_for('admin.flow_data')|tojson }};
+  window.FLOW_XLSX = {{ url_for('admin.flow_excel')|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/flow-tree.js') }}"></script>
+<script src="{{ url_for('static', filename='js/flow3d.js') }}"></script>
+{% endblock %}
