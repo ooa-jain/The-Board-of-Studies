@@ -2866,12 +2866,51 @@
         tr.appendChild(el("td", "num", String(audit(rows))));
         b1.appendChild(tr);
       };
+      // a total checked against UGC Table 2 as the Office set it: red when it
+      // is below the minimum, above the maximum, or there when it does not apply
+      const UGC = (CTX.calc || {}).ugc_table;
+      const ugcMark = (td, got, deg, key) => {
+        if (ONE_LIST || !UGC || !deg) return;
+        const track = (UGC.tracks || {})[deg];
+        if (!track) return;
+        let lo, hi, applies = true, what;
+        if (key === "total") {
+          lo = (UGC.totals || {})[track]; hi = null; what = "Total credits";
+        } else {
+          const row = (UGC.rows || []).find(x => x.key === key);
+          if (!row) return;
+          const spec = row[track] || {};
+          applies = !!spec.applicable && !(key === "research" && deg === UGC.honours_no_research);
+          lo = spec.min; hi = spec.max; what = row.label;
+          // Honours without research: 12 credits in lieu, not a research project
+          if (key === "research" && deg === UGC.honours_no_research) return;
+        }
+        let why = "";
+        if (!applies) { if (got) why = `${what} does not apply here (UGC Table 2)`; }
+        else if (lo != null && got < lo) why = `${what}: ${fmt(got)} is below the UGC minimum of ${lo}`;
+        else if (hi != null && got > hi) why = `${what}: ${fmt(got)} is above the UGC maximum of ${hi}`;
+        if (why) {
+          td.classList.add("cd-off");
+          td.title = why + " (Admin › UGC Table 2 credits)";
+        } else if (lo != null && applies) {
+          td.classList.add("cd-ok");
+          td.title = `${what}: UGC ${hi != null ? lo + "–" + hi : "minimum " + lo} — met`;
+        }
+      };
+      const nepKey = (CTX.calc || {}).nep_to_key || {};
       const totRow = (label, counted, deg) => {
         const tot = el("tr", "total cd-type" + (deg && deg === DEGREE() ? " is-chosen" : ""));
         tot.appendChild(el("td", null, label));
-        DIST_GROUPS.forEach(([cat]) => tot.appendChild(el("td", "num",
-          fmt(sumBy(counted.filter(r => inGroup(r, cat)), r => num(r.credits))))));
-        tot.appendChild(el("td", "num", fmt(sumBy(counted, r => num(r.credits)))));
+        DIST_GROUPS.forEach(([cat]) => {
+          const got = sumBy(counted.filter(r => inGroup(r, cat)), r => num(r.credits));
+          const td = el("td", "num", fmt(got));
+          ugcMark(td, got, deg, nepKey[cat]);
+          tot.appendChild(td);
+        });
+        const all = sumBy(counted, r => num(r.credits));
+        const totTd = el("td", "num", fmt(all));
+        ugcMark(totTd, all, deg, "total");
+        tot.appendChild(totTd);
         tot.appendChild(el("td", "num", String(nc(counted))));
         tot.appendChild(el("td", "num", String(audit(counted))));
         b1.appendChild(tot);
@@ -2899,6 +2938,10 @@
       const w1 = el("div", "rt-wrap");
       w1.appendChild(t1);
       box.appendChild(w1);
+      if (t1.querySelector(".cd-off")) {
+        box.appendChild(el("p", "cd-off-note",
+          "Totals in red are outside the UGC Table 2 credits set by the Office — point at one to see the rule."));
+      }
       }
       if (!wants("summary")) return;
 

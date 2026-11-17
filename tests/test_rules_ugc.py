@@ -96,3 +96,23 @@ def test_ugc_department_keeps_the_honours_split_and_checks(app, client):
         "semester_structure": [_row(1, "Major (Core)", 4, 0)]}).get_json()
     msgs = " ".join(i["message"] for i in body.get("issues", []))
     assert "UGC" in msgs
+
+
+def test_classification_checks_use_the_offices_ugc_table(app, client):
+    """The Classification of Credits marks totals in red against UGC Table 2
+    as the Office set it — the page carries those figures."""
+    from app.db import forget_cached, get_db
+    from app.ugc_rules import DEFAULT_TABLE_2
+    u, p = make_department(app)
+    with app.app_context():
+        table = [dict(r) for r in DEFAULT_TABLE_2]
+        table[0] = {**table[0], "ug3": {"min": 66, "max": None, "applicable": True}}
+        get_db().rules.update_one({"_id": "ugc"}, {"$set": {"table2": table, "totals": {"ug3": 130, "ug4": 170}}},
+                                  upsert=True)
+        forget_cached()
+    login(client, u, p)
+    page = client.get("/department/stage/prog_curriculum/BCMREG").get_data(as_text=True)
+    calc = json.loads(page.split("calc: ")[1].split(",\n")[0])
+    major = next(r for r in calc["ugc_table"]["rows"] if r["key"] == "major_core")
+    assert major["ug3"]["min"] == 66 and calc["ugc_table"]["totals"] == {"ug3": 130, "ug4": 170}
+    assert calc["ugc_table"]["tracks"]["UG - 3 Year"] == "ug3"

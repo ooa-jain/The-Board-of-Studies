@@ -5285,3 +5285,7 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
   border: 1px dashed var(--line); border-radius: 8px; }
 .de-removed form { margin: 0; }
 .ru-auto { color: var(--warn); font-weight: 600; }
+
+/* Classification of Credits: a total outside UGC Table 2 (as the Office set it) */
+.cd-table td.cd-off, .cd-table tr.cd-type.is-chosen td.cd-off { background: var(--err-bg); color: var(--err); font-weight: 700; box-shadow: inset 0 0 0 1px var(--err); }
+.cd-off-note { margin: 8px 0 0; font-size: .82rem; color: var(--err); }

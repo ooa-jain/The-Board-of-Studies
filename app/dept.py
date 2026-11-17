@@ -427,6 +427,18 @@ def stage(stage_key, programme_code=None):
         # the UGC total for each degree, for Programme Information's credits
         "degree_totals": {d: (rules_doc().get("totals") or U.DEFAULT_TOTALS).get(t)
                           for d, t in U.DEGREE_TO_TRACK.items() if t},
+        # UGC Table 2 as the Office set it (Admin › UGC Table 2 credits): each
+        # category's minimum and maximum for 3-year and 4-year, and the totals
+        # — the Classification of Credits marks a total that falls outside in red
+        "ugc_table": {
+            "rows": [{"key": r["key"], "label": r["label"],
+                      **{t: {k: (r.get(t) or {}).get(k) for k in ("min", "max", "applicable")}
+                         for t in ("ug3", "ug4")}}
+                     for r in (rules_doc().get("table2") or U.DEFAULT_TABLE_2)],
+            "totals": rules_doc().get("totals") or U.DEFAULT_TOTALS,
+            "tracks": dict(U.DEGREE_TO_TRACK),
+            "honours_no_research": U.HONOURS_NO_RESEARCH,
+        },
     }
 
     fill = []
