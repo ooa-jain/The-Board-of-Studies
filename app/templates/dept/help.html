@@ -5,7 +5,11 @@
 <div class="page-head">
   <div class="wrap">
     <div>
+      {% if dept %}
       <div class="crumbs"><a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> Help</div>
+      {% else %}
+      <div class="crumbs"><a href="{{ url_for('public.landing') }}">BoS Academic Portal</a> <span>›</span> Help</div>
+      {% endif %}
       <h1>How the portal works</h1>
       <p>Watch the walkthrough section by section — click a section to jump to it — or read the user manual.</p>
     </div>
@@ -58,7 +62,8 @@
   </div>
 </section>
 
-<p class="small muted">Still stuck? Write to the Office of Academic Affairs — they can see your record and help.</p>
+<p class="small muted">Still stuck? Write to the Office of Academic Affairs — they can see your record and help.
+  {% if not dept and not current_user %}<a href="{{ url_for('public.landing') }}">Back to sign in</a>{% endif %}</p>
 {% endblock %}
 
 {% block scripts %}

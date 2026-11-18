@@ -77,3 +77,15 @@ def test_academic_query_becomes_a_ticket_the_office_resolves(app, client):
     client.post(f"/admin/queries/{t['_id']}/status", data={"status": "open"})
     with app.app_context():
         assert get_db().queries.find_one({"ticket": "Q-0001"})["status"] == "open"
+
+
+def test_help_opens_without_signing_in(client):
+    """The sign-in page's Help goes to the video and the user manual, which
+    need no login."""
+    page = client.get("/").get_data(as_text=True)
+    assert 'href="/help"' in page
+    r = client.get("/help")
+    assert r.status_code == 200
+    body = r.get_data(as_text=True)
+    assert "How the portal works" in body and "User manual" in body
+    assert "Back to sign in" in body

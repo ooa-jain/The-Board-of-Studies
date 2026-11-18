@@ -140,6 +140,29 @@ FILINGS = [
 ]
 
 
+def help_media():
+    """The Help walkthrough's sections and the help files, each with its date
+    as a version so a new video or manual is not served from a stale cache."""
+    import json
+    from pathlib import Path
+    folder = Path(current_app.static_folder) / "help"
+    try:
+        chapters = json.loads((folder / "chapters.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        chapters = []
+    files = {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
+             for n in ("walkthrough.mp4", "manual.pdf", "poster.jpg")}
+    return chapters, files
+
+
+@bp.route("/help")
+def help_public():
+    """Help without signing in: the walkthrough video, section by section, and
+    the user manual — the same as a department's Help page."""
+    chapters, files = help_media()
+    return render_template("dept/help.html", dept=None, chapters=chapters, files=files)
+
+
 @bp.route("/about")
 def about():
     return render_template("about.html", campuses=CAMPUS_INFO, filings=FILINGS)

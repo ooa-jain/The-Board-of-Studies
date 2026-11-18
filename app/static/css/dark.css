@@ -7283,3 +7283,7 @@ html[data-theme="dark"] .login-note a:hover {
 html[data-theme="dark"] .login-foot {
   color: #a2aab9;
 }
+html[data-theme="dark"] body.is-login .theme-float {
+  background: transparent;
+  box-shadow: none;
+}
