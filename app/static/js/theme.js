@@ -22,7 +22,8 @@
       b.title = words;
     });
     // the university's logo: the light one, made for dark grounds, in dark mode
-    document.querySelectorAll('img[src*="/img/jain-logo"]').forEach(function (img) {
+    // (a logo that always sits on navy keeps the light one: data-logo="light")
+    document.querySelectorAll('img[src*="/img/jain-logo"]:not([data-logo="light"])').forEach(function (img) {
       var src = img.getAttribute("src");
       var want = dark ? src.replace("/img/jain-logo.png", "/img/jain-logo-light.png")
                       : src.replace("/img/jain-logo-light.png", "/img/jain-logo.png");

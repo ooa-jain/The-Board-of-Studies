@@ -1,8 +1,7 @@
 {% extends "base.html" %}
-{# The sign-in page: the portal's scene — the stages as glass panels taking
-   turns at the front, each card ticking itself off, the gears turning — and
-   the department login beside it. Signed-in users never see it: the route
-   sends them to their own home. #}
+{# The sign-in page: a navy panel with the portal's name and its four stages,
+   and the department login on white beside it. Signed-in users never see it:
+   the route sends them to their own home. #}
 {% block title %}BoS Academic Portal{% endblock %}
 {% block body_class %}is-login{% endblock %}
 {% block head %}
@@ -11,17 +10,24 @@
 
 {% block body %}
 <main id="main-content" class="login">
-  <div class="login-glow" aria-hidden="true"></div>
+  <section class="login-side">
+    <img class="login-logo" data-logo="light" alt="JAIN (Deemed-to-be University)"
+         src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
+    <div>
+      <span class="login-kicker">Board of Studies | {{ app_settings.academic_year|ay if app_settings else '' }}</span>
+      <h1>BoS Academic Portal</h1>
+      <p class="login-lede">Your department's Board of Studies record, stage by stage — filled, checked and
+        sent to the Office of Academic Affairs.</p>
+    </div>
+    <ol class="login-steps" aria-label="The four stages">
+      <li>1 · Department Information</li><li>2 · Pre-BoS</li><li>3 · BoS Documents</li><li>4 · Curriculum</li>
+    </ol>
+  </section>
 
-  <section class="login-copy">
-    <img class="login-logo" alt="JAIN (Deemed-to-be University)"
-         src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
-    <span class="login-kicker">Board of Studies | {{ app_settings.academic_year|ay if app_settings else '' }}</span>
-    <h1>BoS Academic Portal</h1>
-    <p class="login-lede">Your record, stage by stage — fill each one, tick it off, and it goes to the
-      Office of Academic Affairs.</p>
-
-    <div class="login-card" id="signin">
+  <section class="login-main">
+    <div class="login-box" id="signin">
+      <h2>Sign in</h2>
+      <p class="login-sub">Use the login issued to your department.</p>
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}
           <div class="login-alert is-{{ 'error' if category == 'error' else category }}" role="alert">{{ message }}</div>
@@ -51,52 +57,8 @@
       <p class="login-note">No login, or it stopped working? Write to the Office of Academic Affairs ·
         <a href="{{ url_for('public.about') }}">Help</a></p>
     </div>
-    <span class="login-hint" aria-hidden="true">Move the pointer to turn the scene · click a panel</span>
+    <footer class="login-foot">JAIN (Deemed-to-be University) · Office of Academic Affairs</footer>
   </section>
-
-  <section class="login-stage" aria-hidden="true">
-    <div class="login-stage-cap">
-      <span class="lsc-k">How it works</span>
-      <b>Every stage, ticked off — then on to the Office.</b>
-      <span class="lsc-steps"><span class="lsc-step" data-step="0"><i>1</i>Pre-BoS</span>
-        <span class="lsc-step" data-step="1"><i>2</i>BoS Documents</span>
-        <span class="lsc-step" data-step="2"><i>3</i>Curriculum</span></span>
-    </div>
-    <div class="login-scene" id="login-scene">
-      {% set panels = [
-        ('blue', 'Pre-BoS', ['DIAC composition', 'DPAC composition', 'Minutes of the meeting']),
-        ('slate', 'BoS Documents', ['Minutes of meeting', 'Attendance', 'Photos']),
-        ('glass', 'Curriculum', ['Programme structure', 'Syllabus', 'Course revision']),
-      ] %}
-      {% for tone, title, items in panels %}
-      <div class="lp lp-{{ tone }}" data-pos="{{ loop.index0 }}">
-        <span class="lp-dot"></span>
-        <span class="lp-title">{{ title }}</span>
-        {% for it in items %}
-        <span class="lp-card"><b>{{ it }}</b><i></i><i class="short"></i><em class="lp-tick">✓</em></span>
-        {% endfor %}
-      </div>
-      {% endfor %}
-    </div>
-    <svg class="login-gear g1" viewBox="0 0 100 100"><use href="#login-gear"/></svg>
-    <svg class="login-gear g2" viewBox="0 0 100 100"><use href="#login-gear"/></svg>
-    <svg width="0" height="0" style="position:absolute">
-      <defs>
-        <linearGradient id="lg-metal" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#eef2f8"/><stop offset=".5" stop-color="#8b97ab"/>
-          <stop offset="1" stop-color="#2c3648"/>
-        </linearGradient>
-        <g id="login-gear">
-          <path fill="url(#lg-metal)" stroke="#1d2533" stroke-width="1.5"
-                d="M44 4h12l2 12 9 4 10-7 9 9-7 10 4 9 12 2v12l-12 2-4 9 7 10-9 9-10-7-9 4-2 12H44l-2-12-9-4-10 7-9-9
-                   7-10-4-9-12-2V44l12-2 4-9-7-10 9-9 10 7 9-4z"/>
-          <circle cx="50" cy="50" r="15" fill="#0b1324" stroke="#cfd8e6" stroke-width="2"/>
-        </g>
-      </defs>
-    </svg>
-  </section>
-
-  <footer class="login-foot">JAIN (Deemed-to-be University) · Office of Academic Affairs</footer>
 </main>
 {% endblock %}
 
@@ -115,5 +77,4 @@
     });
   })();
 </script>
-<script src="{{ url_for('static', filename='js/login-scene.js') }}"></script>
 {% endblock %}

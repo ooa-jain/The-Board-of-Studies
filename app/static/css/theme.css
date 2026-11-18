@@ -112,3 +112,13 @@ html[data-theme="dark"]:root .lp-tick { background: #e7ecf4; }
 html[data-theme="dark"]:root .lp-card.is-done .lp-tick { background: #16a34a; color: #fff; }
 html[data-theme="dark"]:root .lsc-steps i { background: rgba(255, 255, 255, .16); color: #fff; }
 html[data-theme="dark"]:root .lsc-step.is-on i { background: #fff; color: #0e2a5c; }
+
+
+/* The sign-in page's navy panel stays navy in dark mode (the generated dark
+   rules would lift it to a bright blue, as they do navy buttons). */
+html[data-theme="dark"] body.is-login .login-side {
+  background: linear-gradient(160deg, #060c1a 0%, #0b1a33 55%, #142c4d 100%); color: #ffffff; }
+html[data-theme="dark"] body.is-login .login-side h1 { color: #ffffff; }
+html[data-theme="dark"] body.is-login .login-kicker { color: #9fb3d1; }
+html[data-theme="dark"] body.is-login .login-lede { color: #c9d4e6; }
+html[data-theme="dark"] body.is-login .login-steps li { color: #dbe4f2; border-color: rgba(255, 255, 255, .25); }

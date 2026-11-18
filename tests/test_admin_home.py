@@ -38,10 +38,15 @@ def test_the_analysis_says_what_the_numbers_mean(app, client):
     assert "Analysis in one click" not in client.get("/admin/submissions").get_data(as_text=True)
 
 
-def test_the_sign_in_page_is_light_with_the_scene_as_its_picture(app, client):
+def test_the_sign_in_page_is_split_navy_and_white(app, client):
+    """The navy side: the light logo (kept light in either theme), the name
+    and the four stages; the white side: the sign-in form."""
     page = client.get("/").get_data(as_text=True)
-    assert "img/jain-logo.png" in page and "jain-logo-light.png" not in page
-    assert "login-stage-cap" in page and "Every stage, ticked off" in page
+    assert 'class="login-side"' in page and 'class="login-main"' in page
+    assert "img/jain-logo-light.png" in page and 'data-logo="light"' in page
+    for stage in ("Department Information", "Pre-BoS", "BoS Documents", "Curriculum"):
+        assert stage in page
+    assert "Use the login issued to your department." in page
 
 
 def test_a_department_s_changes_carry_a_red_tag_until_the_office_marks_them_seen(app, client):

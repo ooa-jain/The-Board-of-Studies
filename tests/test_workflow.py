@@ -672,12 +672,12 @@ def test_grouped_board_counts_each_group(app):
         assert sum(g["total"] for g in groups) == len(stage_board(sub))
 
 
-def test_the_home_page_is_the_sign_in_scene(client):
-    """The sign-in page is the stage scene with the login beside it — no
-    loading curtain, no hand, no top bar."""
+def test_the_home_page_is_the_sign_in_page(client):
+    """The home page is the sign-in page — no loading curtain, no hand, no
+    top bar, and no animated scene any more."""
     body = client.get("/").get_data(as_text=True)
-    assert 'id="login-scene"' in body and 'name="username"' in body and 'name="password"' in body
-    assert "js/login-scene.js" in body
+    assert 'id="signin"' in body and 'name="username"' in body and 'name="password"' in body
+    assert "js/login-scene.js" not in body and 'id="pw-toggle"' in body
     assert "preload-canvas" not in body and "intro-hand" not in body
     assert 'class="topbar' not in body
 
