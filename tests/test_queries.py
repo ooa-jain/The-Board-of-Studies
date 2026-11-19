@@ -111,3 +111,38 @@ def test_about_is_gone_and_help_is_in_the_bar(client):
     assert ">About<" not in page and 'class="nav-theme"' in page and 'class="theme-float"' not in page
     # the sign-in page has no bar: the switch sits in the corner
     assert 'class="theme-float"' in client.get("/").get_data(as_text=True)
+
+
+_PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4"
+        b"\x89\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82")
+
+
+def test_bug_report_needs_a_screenshot_and_reaches_the_office(app, client):
+    import io
+    from app.db import get_db
+    u, p = make_department(app)
+    login(client, u, p)
+    page = client.get("/department/stage/dept_info").get_data(as_text=True)
+    assert 'id="bug-btn"' in page and 'id="query-btn"' in page and "Report a bug" in page
+
+    form = {"title": "Upload box stuck", "email": "head@example.edu", "where": "Pre-BoS",
+            "text": "The DIAC file does not upload.", "page": "/department/stage/pre_bos"}
+    r = client.post("/department/bug", data=form, content_type="multipart/form-data")
+    assert r.status_code == 400 and "screenshot" in r.get_json()["error"]
+    # not a picture
+    r = client.post("/department/bug", data={**form, "screenshot": (io.BytesIO(b"hello"), "x.png", "image/png")},
+                    content_type="multipart/form-data")
+    assert r.status_code == 400
+    r = client.post("/department/bug", data={**form, "screenshot": (io.BytesIO(_PNG), "shot.png", "image/png")},
+                    content_type="multipart/form-data").get_json()
+    assert r["ok"] and r["ticket"] == "B-0001"
+    with app.app_context():
+        t = get_db().queries.find_one({"ticket": "B-0001"})
+        assert t["kind"] == "bug" and t["where"] == "Pre-BoS" and t["screenshot"]
+        assert get_db().notifications.find_one({"event": "bug"})
+
+    _admin(app, client)
+    page = client.get("/admin/queries").get_data(as_text=True)
+    assert "B-0001" in page and "Upload box stuck" in page and "in Pre-BoS" in page
+    shot = client.get(f"/admin/queries/{t['_id']}/screenshot")
+    assert shot.status_code == 200 and shot.data == _PNG

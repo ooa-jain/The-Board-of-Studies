@@ -5315,22 +5315,6 @@ html[data-theme="dark"] .pd-empty {
   color: #aab2c1;
   border: 1px dashed #2e3542;
 }
-html[data-theme="dark"] .query-btn {
-  border: 0;
-  background: #2962ae;
-  color: #ffffff;
-  box-shadow: 0 6px 22px rgba(9, 19, 36, 0.09);
-}
-html[data-theme="dark"] .query-btn svg {
-  fill: none;
-  stroke: currentColor;
-}
-html[data-theme="dark"] .query-btn:hover {
-  background: #2e64a8;
-}
-html[data-theme="dark"] .query-btn:focus-visible {
-  outline: 3px solid #2563eb;
-}
 html[data-theme="dark"] .query-dialog {
   border: 1px solid #2e3542;
   background: #121519;
@@ -5528,6 +5512,23 @@ html[data-theme="dark"] .so-err {
 }
 html[data-theme="dark"] .so-final {
   color: #87deac;
+}
+html[data-theme="dark"] .side-link.side-btn {
+  border: 0;
+  background: none;
+}
+html[data-theme="dark"] .qd-field small {
+  color: #aab2c1;
+}
+html[data-theme="dark"] .qd-field input.is-auto {
+  background: #181b21;
+  color: #afb8ca;
+}
+html[data-theme="dark"] .q-shot img {
+  border: 1px solid #2e3542;
+}
+html[data-theme="dark"] .q-shot:hover img {
+  border-color: #2c5488;
 }
 
 /* ---- erp.css ---- */

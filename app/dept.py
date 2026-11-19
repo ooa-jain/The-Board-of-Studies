@@ -215,6 +215,48 @@ def query_raise():
     return jsonify(ok=True, ticket=t["ticket"])
 
 
+@bp.post("/bug")
+@department_required
+def bug_report():
+    """Report a bug: its name, the e-mail (from the sign-in), where it is, what
+    went wrong, and a screenshot (required). Sent to the Office as a ticket."""
+    from .queries import SHOT_MAX, SHOT_TYPES, report_bug
+    if acting():
+        return jsonify(ok=False, error="The Office cannot report a bug for a department."), 400
+    f = request.form
+    title = " ".join(str(f.get("title") or "").split())
+    text = str(f.get("text") or "").strip()
+    where = " ".join(str(f.get("where") or "").split()) or "Somewhere else"
+    me = _me()
+    person = me.get("person") or {}
+    email = (person.get("email") or f.get("email") or "").strip().lower()
+    shot = request.files.get("screenshot")
+    if len(title) < 3:
+        return jsonify(ok=False, error="Give the bug a name."), 400
+    if "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify(ok=False, error="Give a working e-mail."), 400
+    if len(text) < 5:
+        return jsonify(ok=False, error="Say what the issue is."), 400
+    if not shot or not shot.filename:
+        return jsonify(ok=False, error="Add a screenshot — it is required."), 400
+    data = shot.read(SHOT_MAX + 1)
+    kind = (shot.mimetype or "").lower()
+    if kind not in SHOT_TYPES or not (data[:8] == b"\x89PNG\r\n\x1a\n" or data[:3] == b"\xff\xd8\xff"
+                                      or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")):
+        return jsonify(ok=False, error="The screenshot must be a PNG, JPG or WebP picture."), 400
+    if len(data) > SHOT_MAX:
+        return jsonify(ok=False, error="The screenshot is over 5 MB."), 400
+    dept = _dept()
+    page = str(f.get("page") or "")
+    t = report_bug(dept, title=title, text=text, where=where, email=email, person=person,
+                   shot_bytes=data, shot_type=kind, upload_root=current_app.config["UPLOAD_ROOT"],
+                   page=page if page.startswith("/") else "", year=_year(), actor=me["username"])
+    notify_record(dept, "bug", text=f"{t['ticket']}: {title} ({where})",
+                  actor=me["username"], person=person.get("name", ""))
+    audit(me["username"], "bug.reported", f"{dept['dept_code']} {t['ticket']}")
+    return jsonify(ok=True, ticket=t["ticket"])
+
+
 @bp.route("/versions")
 @department_required
 def versions():

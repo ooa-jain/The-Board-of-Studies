@@ -37,6 +37,7 @@ EVENTS = {
     "programme": ("Programmes changed", True),
     "password": ("Password changed", False),
     "query": ("Query raised", True),
+    "bug": ("Bug reported", True),
 }
 
 KINDS = {
@@ -204,7 +205,7 @@ def unread_count():
 
 def _link(note):
     base = current_app.config.get("PUBLIC_URL") or ""
-    if note.get("event") == "query":
+    if note.get("event") in ("query", "bug"):
         return f"{base}/admin/queries" if base else ""
     return f"{base}/admin/submissions/{note['dept_code']}" if base else ""
 

@@ -35,14 +35,42 @@ def help_sections(static_folder) -> list[dict]:
             for i, c in enumerate(chapters) if isinstance(c, dict)]
 
 
-def _next_number() -> int:
+def _next_number(counter="queries") -> int:
     doc = get_db().counters.find_one_and_update(
-        {"_id": "queries"}, {"$inc": {"n": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
+        {"_id": counter}, {"$inc": {"n": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
     return int(doc["n"])
 
 
-def ticket_no(n) -> str:
-    return f"Q-{int(n):04d}"
+def ticket_no(n, prefix="Q") -> str:
+    return f"{prefix}-{int(n):04d}"
+
+
+SHOT_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+SHOT_MAX = 5 * 1024 * 1024
+
+
+def report_bug(dept: dict, *, title: str, text: str, where: str, email: str, person: dict | None,
+               shot_bytes: bytes, shot_type: str, upload_root, page: str = "", year: str = "",
+               actor: str = "") -> dict:
+    """A bug a department reports, with its screenshot: a ticket B-0001 …"""
+    import uuid
+    n = _next_number("bugs")
+    folder = Path(upload_root) / "bug_reports"
+    folder.mkdir(parents=True, exist_ok=True)
+    stored = f"{ticket_no(n, 'B')}-{uuid.uuid4().hex[:8]}{SHOT_TYPES[shot_type]}"
+    (folder / stored).write_bytes(shot_bytes)
+    doc = {
+        "number": n, "ticket": ticket_no(n, "B"), "kind": "bug",
+        "dept_code": dept["dept_code"], "dept_name": dept.get("dept_name", ""),
+        "campus": dept.get("campus", ""), "academic_year": year,
+        "subject": title[:MAX_SUBJECT], "text": text[:MAX_TEXT], "where": where[:60],
+        "name": (person or {}).get("name", ""), "email": email[:120],
+        "screenshot": stored, "screenshot_type": shot_type,
+        "actor": actor, "page": page[:300], "status": "open", "at": now(),
+    }
+    doc["_id"] = get_db().queries.insert_one(doc).inserted_id
+    send_mail(doc, "raised")
+    return doc
 
 
 def raise_ticket(dept: dict, *, subject: str, text: str, person: dict | None,

@@ -2410,6 +2410,22 @@ def queries():
     return render_template("admin/queries.html", items=items, show=show, counts=counts)
 
 
+@bp.route("/queries/<qid>/screenshot")
+@admin_required
+def query_screenshot(qid):
+    """A bug report's screenshot."""
+    from bson import ObjectId
+    from flask import send_from_directory
+    try:
+        doc = get_db().queries.find_one({"_id": ObjectId(qid), **scope_q()})
+    except Exception:
+        abort(404)
+    if not doc or not doc.get("screenshot"):
+        abort(404)
+    folder = current_app.config["UPLOAD_ROOT"] / "bug_reports"
+    return send_from_directory(folder, doc["screenshot"], mimetype=doc.get("screenshot_type") or None)
+
+
 @bp.post("/queries/<qid>/status")
 @admin_required
 def query_status(qid):

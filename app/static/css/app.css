@@ -5166,18 +5166,7 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .pd-empty { padding: 12px; color: var(--ink-faint); font-size: .88rem; border: 1px dashed var(--line); border-radius: var(--radius-sm); }
 @media (max-width: 600px) { .pd-row { align-items: flex-start; } }
 
-/* ---- the Query button on the right of the department's pages ---- */
-.query-btn {
-  position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 60;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 12px 8px; border: 0; border-radius: 12px 0 0 12px;
-  background: var(--ink-800); color: #fff; font: inherit; font-size: .78rem; font-weight: 600;
-  letter-spacing: .03em; cursor: pointer; box-shadow: var(--shadow);
-}
-.query-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.query-btn span { writing-mode: vertical-rl; transform: rotate(180deg); }
-.query-btn:hover { background: var(--ink-700); }
-.query-btn:focus-visible { outline: 3px solid var(--gold-500); outline-offset: 2px; }
+/* ---- Query and Report a bug: the pop-up ---- */
 .query-dialog {
   width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink);
@@ -5216,7 +5205,6 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .qd-done { display: grid; gap: 8px; justify-items: start; }
 .qd-ticket { font-size: 1.4rem; font-family: ui-monospace, monospace; }
 .qd-done p { margin: 0; color: var(--ink-soft); }
-@media (max-width: 600px) { .query-btn { top: auto; bottom: 84px; } }
 
 /* ---- admin Queries ---- */
 .q-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -5323,3 +5311,12 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .so-undo { border: 0; background: none; color: var(--ink-600); font: inherit; font-size: .8rem; text-decoration: underline; cursor: pointer; }
 .so-err { margin: 8px 0 0; color: var(--err); font-size: .85rem; }
 .so-final { margin: 0; font-weight: 600; color: var(--ok); }
+
+/* Query and Report a bug in the department's menu: buttons that look like the menu's links */
+.side-link.side-btn { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.qd-field { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; }
+.qd-field small { font-weight: 400; color: var(--ink-faint); font-size: .76rem; }
+.qd-field input.is-auto { background: var(--ink-050); color: var(--ink-soft); }
+.qd-field input[type=file] { font-weight: 400; }
+.q-shot img { display: block; width: 120px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.q-shot:hover img { border-color: var(--ink-600); }

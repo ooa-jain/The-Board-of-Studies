@@ -226,6 +226,17 @@
     {% endif %}
     <a class="side-link{{ ' is-on' if ep == 'dept.help_page' }}" href="{{ url_for('dept.help_page') }}" title="Help — video and user manual">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span class="side-text">Help</span></a>
+    {% if not current_user.acting %}
+    {# Query: the Help video's sections, each opening the video there; Report a bug: a short form #}
+    <button type="button" class="side-link side-btn" id="query-btn" title="Query — how to do something"
+            data-sections-url="{{ url_for('dept.query_sections') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9.5 8.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 14.5v.01"/></svg><span class="side-text">Query</span></button>
+    <button type="button" class="side-link side-btn" id="bug-btn" title="Report a bug"
+            data-bug-url="{{ url_for('dept.bug_report') }}"
+            data-email="{{ (current_user.person or {}).get('email', '') }}"
+            data-name="{{ (current_user.person or {}).get('name', '') }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9V7a3 3 0 0 1 6 0v2M7 9h10v5a5 5 0 0 1-10 0zM12 11v8M4 13h3M17 13h3M5 8l2 2M19 8l-2 2M5 19l2-2M19 19l-2-2"/></svg><span class="side-text">Report a bug</span></button>
+    {% endif %}
     {{ review_item() }}
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
@@ -519,11 +530,6 @@
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pw-show.js') }}"></script>
 {% if dept_shell and not current_user.acting %}
-<button type="button" id="query-btn" class="query-btn"
-        data-sections-url="{{ url_for('dept.query_sections') }}" data-raise-url="{{ url_for('dept.query_raise') }}">
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9.5 8.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 14.5v.01"/></svg>
-  <span>Query</span>
-</button>
 <dialog id="query-dialog" class="query-dialog" aria-labelledby="qd-title">
   <div class="qd-head">
     <button type="button" class="qd-back" hidden aria-label="Back">←</button>
@@ -630,9 +636,9 @@
   var bell = document.querySelector(".nav-bell[data-updates-url]");
   if (!bell || !window.fetch) return;
   var url = bell.getAttribute("data-updates-url"), after = null, count = bell.querySelector(".nav-bell-count");
-  var kinds = { submitted: "success", keyword_miss: "warning", uploaded: "info", saved: "info", programme: "info", password: "info", query: "warning" };
+  var kinds = { submitted: "success", keyword_miss: "warning", uploaded: "info", saved: "info", programme: "info", password: "info", query: "warning", bug: "warning" };
   var titles = { submitted: "Stage submitted", keyword_miss: "Keyword check failed", uploaded: "File uploaded",
-                 saved: "Data changed", programme: "Programmes changed", password: "Password changed", query: "Query raised" };
+                 saved: "Data changed", programme: "Programmes changed", password: "Password changed", query: "Query raised", bug: "Bug reported" };
   function tick() {
     if (document.hidden) return;
     fetch(url + (after ? "?after=" + encodeURIComponent(after) : ""), { credentials: "same-origin" })
