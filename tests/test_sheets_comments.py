@@ -10,6 +10,8 @@ def _demo_filled_and_submitted(app, client):
         user, pw = demo_dept.create("2027-28", app.config["UPLOAD_ROOT"])
     login(client, user, pw)
     client.post("/department/demo/fill-all")
+    from test_workflow import approve_both
+    approve_both(client)
     assert client.post("/department/api/submit-all").get_json()["ok"]
     client.get("/logout")
     return user, pw

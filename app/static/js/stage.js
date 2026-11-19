@@ -1959,8 +1959,7 @@
         tbody.appendChild(tr);
         rowsChanged();
         touch();
-        const first = tr.querySelector("input, select, textarea");
-        if (first) first.focus();
+        bringIn(tr);
       });
       foot.appendChild(add);
     }
@@ -2051,8 +2050,22 @@
     const groupOf = row => (GROUPS.find(g => g.track === row.track) || GROUPS[0]);
     let settled = false;
 
+    // a line wherever the semester changes, so each semester reads as its own block
+    function markSems() {
+      if (!section.columns.some(c => c.name === "semester")) return;
+      let prev = null;
+      tbody.querySelectorAll("tr").forEach(tr => {
+        if (!tr._row) { prev = null; return; }          // a group's heading starts afresh
+        const sem = String(tr._row.semester ?? "");
+        tr.classList.toggle("rt-sem-start", prev !== null && sem !== prev);
+        prev = sem;
+      });
+    }
+    refreshers.push(markSems);
+
     // after a row is added or taken off: the count and the totals
     function rowsChanged() {
+      markSems();
       const data = rows(section.key);
       const min = section.min_rows || 0;
       count.textContent = `${data.length} row${data.length === 1 ? "" : "s"}`;
@@ -2121,8 +2134,7 @@
               renumber();
               rowsChanged();
               touch();
-              const first = tr.querySelector("select, input");
-              if (first) first.focus();
+              bringIn(tr);
             });
             td.appendChild(add);
             tr.appendChild(td);
@@ -2133,6 +2145,15 @@
       if (settled) touch();
       showTotals(true);
       rowsChanged();
+    }
+
+    // a new row: the page moves to it, marked for a moment, the cursor in its first box
+    function bringIn(tr) {
+      tr.scrollIntoView({ behavior: "smooth", block: "center" });
+      tr.classList.add("rt-new");
+      setTimeout(() => tr.classList.remove("rt-new"), 1600);
+      const first = tr.querySelector("select, input, textarea");
+      if (first) first.focus({ preventScroll: true });
     }
 
     /* AEC (Language): one row, many languages — a course code and title for
@@ -2328,6 +2349,25 @@
         });
         td.appendChild(b);
         tr.appendChild(td);
+      }
+      // L, T, P, E: once the number cannot grow (a 2 in L, a 5 in P, or two
+      // digits), the cursor goes on to the next box, and from E to Credits
+      if (!CTX.readonly) {
+        const HOP = ["l", "t", "p", "e", "credits"];
+        HOP.slice(0, 4).forEach((name, k) => {
+          const box = cells[name];
+          const col = section.columns.find(c => c.name === name);
+          if (!box || box.tagName !== "INPUT" || !col) return;
+          const max = Number(col.max) || 9;
+          box.addEventListener("input", e => {
+            if (e.inputType && !e.inputType.startsWith("insert")) return;    // deleting stays put
+            const v = box.value.trim();
+            // 0, or a digit no second one could follow (3 in L, which stops at 10), or two digits
+            if (!/^\d+$/.test(v) || (v.length < 2 && v !== "0" && Number(v) * 10 <= max)) return;
+            const next = HOP.slice(k + 1).map(n => cells[n]).find(x => x && !x.readOnly && !x.disabled);
+            if (next) { next.focus(); if (next.select) next.select(); }
+          });
+        });
       }
       if (!CTX.readonly && derive(RULES, row, cells)) touch();
       checkPair(row, cells, null);                  // marked, without the pop-up, as the page opens
@@ -4134,7 +4174,9 @@
         tr.appendChild(td);
         trs.push(tr);
       }
-      const tb = part("CO-PO-PSO Mapping:", trs, "sh-map");
+      // CO-PO Mapping when the programme has no PSOs
+      const title = defs.some(([n]) => /^PSO/.test(n)) ? "CO-PO-PSO Mapping:" : "CO-PO Mapping:";
+      const tb = part(title, trs, "sh-map");
       tb.closest("table").dataset.field = "outcomes";
     }
 
@@ -4875,6 +4917,13 @@
               state[section.key][f.name] = n;
               b._input.value = String(n);
             });
+          }
+          if (f.unless) {
+            // shown only while the box it depends on is not ticked (PSOs not applicable)
+            const on = v => v === true || v === "true" || v === "on" || v === 1 || v === "1" || v === "Yes";
+            const sync = () => { b.hidden = on((state[section.key] || {})[f.unless]); };
+            sync();
+            refreshers.push(sync);
           }
           grid.appendChild(b);
           made.push([f, b]);

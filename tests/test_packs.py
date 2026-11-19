@@ -463,6 +463,8 @@ def test_signing_in_offers_to_fill_from_drive_and_the_record_submits_and_downloa
     info = dict(sub["stages"]["dept_info"]["data"],
                 strength={"faculty_count": 20, "students_first_year": 110, "students_final_semester": 95})
     assert client.post("/department/api/dept_info/save", json=info).get_json()["ok"]
+    from test_workflow import approve_both
+    approve_both(client)
     j = client.post("/department/api/submit-all").get_json()
     assert j["ok"], j.get("failed")
     assert _sub(app, code)["status"] == "sealed"

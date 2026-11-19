@@ -632,17 +632,85 @@ def submit_stage(dept_code, academic_year, stage_key, data, programme=None, acto
                               {"$set": update, "$unset": {f"{path}.returned_note": ""},
                                "$min": {f"{path}.started_at": now()}})
 
-    fresh = db.submissions.find_one({"dept_code": dept_code, "academic_year": academic_year})
-    top = (STAGE_BY_KEY.get(stage_key) or {}).get("parent") or stage_key
-    if (top == STAGE_KEYS[-1] and status == "submitted"
-            and compute_status(fresh, top) == "submitted"):
-        db.submissions.update_one({"_id": fresh["_id"]},
-                                  {"$set": {"status": "sealed", "sealed_at": now()}})
+    if status == "submitted":
+        seal_if_ready(dept_code, academic_year)
     return issues, summary, status
+
+
+# ---------------------------------------------------------------------------
+# HoD / Dean sign-off: before the record goes to the Office as final, the
+# Head of the Department approves it, then the Dean — each with name and
+# time. The record is final ("sealed") once every stage is submitted and
+# both have approved.
+# ---------------------------------------------------------------------------
+
+APPROVERS = (("hod", "Head of the Department"), ("dean", "Dean"))
+
+
+def approvals(submission) -> dict:
+    a = (submission or {}).get("approvals")
+    return {k: v for k, v in (a or {}).items() if k in dict(APPROVERS) and isinstance(v, dict) and v.get("name")}
+
+
+def approved(submission) -> bool:
+    a = approvals(submission)
+    return all(k in a for k, _ in APPROVERS)
+
+
+def all_submitted(submission) -> bool:
+    return compute_status(submission, STAGE_KEYS[-1]) == "submitted" and \
+        all(compute_status(submission, k) == "submitted" for k in STAGE_KEYS)
+
+
+def seal_if_ready(dept_code, academic_year):
+    """Final once every stage is submitted and the HoD and the Dean have approved."""
+    db = get_db()
+    fresh = db.submissions.find_one({"dept_code": dept_code, "academic_year": academic_year})
+    if fresh and fresh.get("status") != "sealed" and approved(fresh) and all_submitted(fresh):
+        db.submissions.update_one({"_id": fresh["_id"]}, {"$set": {"status": "sealed", "sealed_at": now()}})
+        return True
+    return False
+
+
+def approve(dept_code, academic_year, role, name, person=None):
+    """The HoD (first) or the Dean approves the record."""
+    if role not in dict(APPROVERS):
+        raise ValueError(role)
+    sub = get_or_create_submission(dept_code, academic_year)
+    if role == "dean" and "hod" not in approvals(sub):
+        raise ValueError("The Head of the Department approves first.")
+    get_db().submissions.update_one({"_id": sub["_id"]}, {"$set": {
+        f"approvals.{role}": {"name": name, "at": now(), "person": person or {}}, "updated_at": now()}})
+    seal_if_ready(dept_code, academic_year)
+
+
+def withdraw_approval(dept_code, academic_year, role):
+    """Take an approval back (the HoD's takes the Dean's with it)."""
+    unset = {"approvals.dean": ""} if role == "dean" else {"approvals": ""}
+    get_db().submissions.update_one({"dept_code": dept_code, "academic_year": academic_year},
+                                    {"$unset": unset, "$set": {"updated_at": now()}})
+
+
+def clear_approvals(dept_code, academic_year):
+    """Sent back by the Office: the corrected record is approved again."""
+    get_db().submissions.update_one({"dept_code": dept_code, "academic_year": academic_year},
+                                    {"$unset": {"approvals": ""}})
+
+
+def approval_lines(submission) -> list:
+    """[("Head of the Department", "Dr. X", "19 Nov 2026, 10:42 AM"), …] for the documents."""
+    a = approvals(submission)
+    out = []
+    for k, label in APPROVERS:
+        if k in a:
+            at = a[k].get("at")
+            out.append((label, a[k]["name"], to_ist(at).strftime("%d %b %Y, %I:%M %p") if at else ""))
+    return out
 
 
 def return_stage(dept_code, academic_year, stage_key, note, actor="", programme_code=None):
     """Office of Academic Affairs sends a submitted stage back for correction."""
+    clear_approvals(dept_code, academic_year)
     stage = STAGE_BY_KEY.get(stage_key) or {}
     if stage.get("parts"):
         # every submitted part goes back — or just one programme's

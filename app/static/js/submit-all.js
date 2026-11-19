@@ -35,6 +35,71 @@
     return { el: d, stats: st };
   }
 
+  /* Approval: the Head of the Department, then the Dean — each types their
+     name and approves; the time is recorded. "Withdraw" takes it back (the
+     HoD's takes the Dean's too) until the record is final. */
+  function signoffBlock(sign, changed) {
+    const box = el("div", "so-box");
+    box.appendChild(el("h4", "so-h", "Approval before the final submit"));
+    box.appendChild(el("p", "so-note", sign.acting
+      ? "The Head of the Department and the Dean approve from the department's own login."
+      : "The Head of the Department approves first, then the Dean. The record becomes final once every stage is submitted and both have approved."));
+    const list = el("div", "so-list");
+    box.appendChild(list);
+    const err = el("p", "so-err");
+    err.hidden = true;
+    box.appendChild(err);
+    function post(url, body) {
+      err.hidden = true;
+      return fetch(url, { method: "POST", credentials: "same-origin",
+                          headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(r => r.json()).then(res => {
+          if (!res.ok) { err.textContent = res.error || "Could not save. Try again."; err.hidden = false; return; }
+          Object.assign(sign, res.signoff);
+          paint();
+          changed();
+          if (sign.sealed) {
+            box.replaceChildren(el("p", "so-final", "✓ Approved by the Head of the Department and the Dean. The record is final and with the Office of Academic Affairs."));
+          }
+        }).catch(() => { err.textContent = "Could not save. Try again."; err.hidden = false; });
+    }
+    function paint() {
+      list.textContent = "";
+      sign.approvers.forEach((a, k) => {
+        const row = el("div", "so-row" + (a.approved ? " is-done" : ""));
+        row.appendChild(el("span", "so-role", a.label));
+        if (a.approved) {
+          row.appendChild(el("span", "so-who", `✓ Approved by ${a.name} · ${a.at}`));
+          if (!sign.acting) {
+            const w = el("button", "so-undo", "Withdraw");
+            w.type = "button";
+            w.addEventListener("click", () => post(sign.withdraw_url, { role: a.role }));
+            row.appendChild(w);
+          }
+        } else {
+          const earlier = sign.approvers[k - 1];
+          const waiting = earlier && !earlier.approved;
+          const name = el("input", "so-name");
+          name.type = "text";
+          name.value = a.name || "";
+          name.placeholder = `Name of the ${a.label}`;
+          name.setAttribute("aria-label", `Name of the ${a.label}`);
+          name.disabled = waiting || sign.acting;
+          const b = el("button", "btn btn-sm", "Approve");
+          b.type = "button";
+          b.disabled = waiting || sign.acting;
+          b.addEventListener("click", () => post(sign.approve_url, { role: a.role, name: name.value }));
+          row.appendChild(name);
+          row.appendChild(b);
+          if (waiting) row.appendChild(el("span", "so-wait", "After the Head of the Department"));
+        }
+        list.appendChild(row);
+      });
+    }
+    paint();
+    return box;
+  }
+
   function open(opts) {
     const start = opts.beforeOpen ? opts.beforeOpen() : Promise.resolve();
     Promise.resolve(start).then(() => fetch(opts.record, { credentials: "same-origin" }))
@@ -73,17 +138,22 @@
     const err = el("div", "sa-error");
     err.hidden = true;
     foot.appendChild(err);
-    let terms = null, go = null;
+    let terms = null, go = null, tick = null;
+    // the HoD, then the Dean, approves before the final submit
+    const sign = j.signoff;
+    const signed = () => !sign || sign.acting || sign.approvers.every(a => a.approved);
+    const ready = () => { if (go) go.disabled = !(tick && tick.checked && signed()); };
+    if (sign && !sign.sealed) foot.appendChild(signoffBlock(sign, ready));
     if (pending.length) {
       terms = el("label", "rv-terms");
-      const tick = el("input");
+      tick = el("input");
       tick.type = "checkbox";
       terms.appendChild(tick);
       terms.appendChild(el("span", null,
         "I have checked every stage above. I understand that once submitted, the Board of Studies record " +
         "goes to the Office of Academic Affairs and is locked — only the Office can send a part back for correction."));
       foot.appendChild(terms);
-      tick.addEventListener("change", () => { go.disabled = !tick.checked; });
+      tick.addEventListener("change", ready);
     }
     const row = el("div", "rv-actions");
     // view only: a copy comes from the Office of Academic Affairs

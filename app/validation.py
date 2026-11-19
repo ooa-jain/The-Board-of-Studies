@@ -21,7 +21,7 @@ import re
 from datetime import date, datetime
 
 from . import ugc_rules as U
-from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, mapping_value, programme_columns
+from .schema import NON_CREDIT_GROUPS, STAGE_BY_KEY, mapping_title, mapping_value, programme_columns
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
@@ -140,6 +140,10 @@ def validate_field(fdef, value, section_key=None, row=None):
                     out.append(err(f"{label}: describe {prefix}{n}, or remove it.", **where))
         if fdef.get("max_items") and len(texts) > fdef["max_items"]:
             out.append(err(f"{label}: at most {fdef['max_items']}.", **where))
+        given = sum(1 for t in texts if t)
+        if fdef.get("min_warn") and 0 < given < fdef["min_warn"]:
+            out.append(warn(f"{label}: {given} given — the University's guidelines ask for "
+                            f"{fdef['min_warn']} to {fdef.get('max_items') or fdef['min_warn']}.", **where))
         return out
 
     if _is_blank(value):
@@ -664,7 +668,7 @@ def r_co_po_mapping_valid(data, ctx, sk):
                 out.append(warn(f"Course {_course_name(r, i)}, CO{n} is not mapped to any PO or PSO.",
                                 section=sk, row=i, field="outcomes"))
         if not mapped:
-            out.append(err(f"Course {_course_name(r, i)}: fill in its CO-PO-PSO Mapping.",
+            out.append(err(f"Course {_course_name(r, i)}: fill in its {mapping_title(cols)}.",
                            section=sk, row=i, field="outcomes"))
             continue
         # the Articulation row: a number for each column something is mapped to
@@ -874,6 +878,9 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
         else:
             vals = _vals(data, sk)
             for f in section.get("fields", []):
+                # a field the department has said does not apply (PSOs not applicable)
+                if f.get("unless") and vals.get(f["unless"]) in (True, "true", "on", 1, "1", "Yes"):
+                    continue
                 issues += validate_field(f, vals.get(f["name"]), sk, None)
 
         for rule_name in section.get("rules", []) or []:

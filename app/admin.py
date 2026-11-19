@@ -2297,7 +2297,8 @@ def comment_add():
                 path = f"programmes.{prog}.{stage}"
                 db.submissions.update_one({"_id": sub["_id"]}, {"$set": {
                     f"{path}.status": "returned", f"{path}.returned_note": text,
-                    f"{path}.returned_by": _actor(), f"{path}.returned_at": now(), "status": "in_progress"}})
+                    f"{path}.returned_by": _actor(), f"{path}.returned_at": now(), "status": "in_progress"},
+                    "$unset": {"approvals": ""}})          # approved again once corrected
                 doc["reopened"] = True
         elif compute_status(sub, stage) == "submitted":
             return_stage(code, _year(), stage, text, _actor())

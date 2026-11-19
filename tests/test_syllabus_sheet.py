@@ -81,7 +81,9 @@ def test_the_curriculum_describes_each_po_and_pso():
               for f in s["fields"]}
     po, pso = fields["programme_outcomes"], fields["programme_specific_outcomes"]
     assert po["label"].startswith("1.A") and pso["label"].startswith("1.B") and not po.get("wide")
-    assert validate_field(po, ["Knowledge", "Skills"]) == []
+    # two described: no error, only the guideline's 7 to 12 as a warning
+    two = validate_field(po, ["Knowledge", "Skills"])
+    assert [i["level"] for i in two] == ["warning"] and "7 to 12" in two[0]["message"]
     assert "describe PO1" in validate_field(po, [])[0]["message"]
     assert "describe PO1" in validate_field(po, [""])[0]["message"]                  # PO1 open, left empty
     assert "describe PSO2, or remove it" in validate_field(pso, ["Accounts", " "])[0]["message"]

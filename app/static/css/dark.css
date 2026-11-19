@@ -5484,6 +5484,51 @@ html[data-theme="dark"] .topnav[data-open="true"] .nav-right {
   border-top: 1px solid #2e3542;
 }
 }
+html[data-theme="dark"] .rt tbody tr.rt-sem-start > td {
+  border-top: 3px solid #2c5488;
+}
+html[data-theme="dark"] .rt tbody tr.rt-sem-start > td:first-child {
+  box-shadow: inset 4px 0 0 #2c5488;
+}
+html[data-theme="dark"] .so-box {
+  border: 1px solid #2e3542;
+  background: #181b21;
+}
+html[data-theme="dark"] .so-h {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .so-note {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .so-row {
+  background: #121519;
+  border: 1px solid #2e3542;
+}
+html[data-theme="dark"] .so-row.is-done {
+  border-color: #335e40;
+  background: #18321f;
+}
+html[data-theme="dark"] .so-role {
+  color: #ced8e6;
+}
+html[data-theme="dark"] .so-who {
+  color: #87deac;
+}
+html[data-theme="dark"] .so-wait {
+  color: #aab2c1;
+}
+html[data-theme="dark"] .so-undo {
+  border: 0;
+  background: none;
+  color: #b2c9e6;
+  text-decoration: underline;
+}
+html[data-theme="dark"] .so-err {
+  color: #e48b81;
+}
+html[data-theme="dark"] .so-final {
+  color: #87deac;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

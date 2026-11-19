@@ -1238,7 +1238,67 @@ def api_record():
         name = next((p.get("programme_name") for p in programmes_of(sub, dept)
                      if p["programme_code"] == only), only)
         return jsonify({"ok": True, "dept_name": name, "items": items})
-    return jsonify({"ok": True, "dept_name": name, "items": items})
+    return jsonify({"ok": True, "dept_name": name, "items": items, "signoff": _signoff(sub, dept)})
+
+
+def _signoff(sub, dept):
+    """The HoD / Dean sign-off, for the Review & submit panel."""
+    from .workflow import APPROVERS, approvals
+    a = approvals(sub)
+    out = []
+    for k, label in APPROVERS:
+        v = a.get(k)
+        out.append({"role": k, "label": label,
+                    "name": (v or {}).get("name") or (dept.get("hod_name") if k == "hod" else "") or "",
+                    "approved": bool(v),
+                    "at": to_ist(v["at"]).strftime("%d %b %Y, %I:%M %p") if v and v.get("at") else ""})
+    return {"approvers": out, "sealed": sub.get("status") == "sealed", "acting": bool(acting()),
+            "approve_url": url_for("dept.api_approve"), "withdraw_url": url_for("dept.api_withdraw")}
+
+
+@bp.post("/api/approve")
+@department_required
+def api_approve():
+    """The HoD, then the Dean, approves the record before the final submit."""
+    from .workflow import approve
+    if acting():
+        return jsonify(ok=False, error="The Office cannot approve for the department."), 400
+    body = request.get_json(silent=True) or {}
+    role = body.get("role")
+    name = " ".join(str(body.get("name") or "").split())[:80]
+    if len(name) < 3:
+        return jsonify(ok=False, error="Type the name of the person approving."), 400
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    if sub.get("status") == "sealed":
+        return jsonify(ok=False, error="The record is already final."), 400
+    try:
+        approve(dept["dept_code"], _year(), role, name, (_me().get("person") or {}))
+    except ValueError as e:
+        return jsonify(ok=False, error=str(e) if "first" in str(e) else "Unknown approval."), 400
+    audit(_me()["username"], f"signoff.{role}", f"{dept['dept_code']} {name}")
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    return jsonify(ok=True, signoff=_signoff(sub, dept))
+
+
+@bp.post("/api/approve/withdraw")
+@department_required
+def api_withdraw():
+    from .workflow import withdraw_approval
+    if acting():
+        return jsonify(ok=False, error="The Office cannot change the department's approvals."), 400
+    body = request.get_json(silent=True) or {}
+    role = body.get("role")
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    if sub.get("status") == "sealed":
+        return jsonify(ok=False, error="The record is already final."), 400
+    if role not in ("hod", "dean"):
+        return jsonify(ok=False, error="Unknown approval."), 400
+    withdraw_approval(dept["dept_code"], _year(), role)
+    audit(_me()["username"], f"signoff.{role}.withdrawn", dept["dept_code"])
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    return jsonify(ok=True, signoff=_signoff(sub, dept))
 
 
 @bp.post("/api/programme-check")
@@ -1275,6 +1335,14 @@ def api_submit_all():
     done = []
     only = request.args.get("programme")
     sub = get_or_create_submission(dept["dept_code"], _year())
+    if not only and not acting():
+        from .workflow import approved
+        if not approved(sub):
+            return jsonify({"ok": False, "done": [],
+                            "failed": {"title": "Approval", "url": "",
+                                       "issues": [{"level": "error", "message":
+                                                   "The Head of the Department and the Dean approve the record "
+                                                   "before it is submitted."}]}})
     for item in _record_items(sub, dept):
         if only and item["programme"] != only:
             continue

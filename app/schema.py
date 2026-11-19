@@ -102,7 +102,8 @@ def bloom_level(text):
 
 # the columns of the sample syllabus's CO-PO-PSO Mapping (the sample sheets use them)
 OUTCOME_COLUMNS = [f"PO{n}" for n in range(1, 10)] + [f"PSO{n}" for n in range(1, 5)]
-PO_MAX, PSO_MAX = 15, 8
+# the University's guideline: a programme has 7 to 12 POs
+PO_MIN, PO_MAX, PSO_MAX = 7, 12, 8
 
 
 def mapping_value(v):
@@ -141,13 +142,27 @@ def outcome_items(v):
     return items or [""]
 
 
+def pso_na(profile) -> bool:
+    """Has the programme said its PSOs are not applicable?"""
+    return (profile or {}).get("pso_na") in (True, "true", "on", 1, "1", "Yes")
+
+
 def programme_columns(profile):
     """The CO-PO-PSO Mapping's columns: the POs, then the PSOs, the programme's
-    Curriculum has a box for — each with its description: [("PO1", "…"), …]."""
+    Curriculum has a box for — each with its description: [("PO1", "…"), …].
+    A programme whose PSOs are not applicable has the POs alone."""
     out = []
-    for key, prefix in (("programme_outcomes", "PO"), ("programme_specific_outcomes", "PSO")):
+    keys = (("programme_outcomes", "PO"),) if pso_na(profile) else \
+        (("programme_outcomes", "PO"), ("programme_specific_outcomes", "PSO"))
+    for key, prefix in keys:
         out += [(f"{prefix}{n}", t) for n, t in enumerate(outcome_items((profile or {}).get(key)), start=1)]
     return out
+
+
+def mapping_title(cols) -> str:
+    """CO-PO-PSO Mapping, or CO-PO Mapping when there are no PSO columns."""
+    names = [c[0] if isinstance(c, (list, tuple)) else c for c in cols or []]
+    return "CO-PO Mapping" if names and not any(str(n).startswith("PSO") for n in names) else "CO-PO-PSO Mapping"
 
 
 def objective_lines(text):
@@ -550,10 +565,15 @@ PROGRAMME_CURRICULUM = {
                 # the programme's outcomes, side by side, one box each: every course's
                 # CO-PO-PSO Mapping in the Syllabus has a column for each
                 {"name": "programme_outcomes", "label": "1.A Programme Outcomes (POs)", "type": "outcome_list",
-                 "prefix": "PO", "required": True, "max_items": PO_MAX,
-                 "help": "PO1 is open — add PO2, PO3 … as the programme has them; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
+                 "prefix": "PO", "required": True, "max_items": PO_MAX, "min_warn": PO_MIN,
+                 "help": "7 to 12 POs, as the University's guidelines say. PO1 is open — add PO2, PO3 …; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
+                # PSOs do not apply to every programme (BBA has none): then none is
+                # asked, and each course's mapping is a CO-PO Mapping
+                {"name": "pso_na", "label": "PSOs are not applicable to this programme", "type": "checkbox",
+                 "wide": True},
                 {"name": "programme_specific_outcomes", "label": "1.B Programme Specific Outcomes (PSOs)",
                  "type": "outcome_list", "prefix": "PSO", "required": True, "max_items": PSO_MAX,
+                 "unless": "pso_na",
                  "help": "PSO1 is open — add PSO2, PSO3 …; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
                 {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
                  "required": True, "min": 6, "max": 72},

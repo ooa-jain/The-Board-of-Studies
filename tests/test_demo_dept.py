@@ -104,6 +104,11 @@ def test_review_and_submit_all_stages_at_once(app, client):
         user, pw = demo_dept.create("2027-28", app.config["UPLOAD_ROOT"])
     login(client, user, pw)
 
+    # not approved: the HoD and the Dean approve first
+    j = client.post("/department/api/submit-all").get_json()
+    assert not j["ok"] and "approve" in j["failed"]["issues"][0]["message"]
+    from test_workflow import approve_both
+    approve_both(client)
     # nothing filled: it stops at the first stage and says so
     j = client.post("/department/api/submit-all").get_json()
     assert not j["ok"] and j["failed"]["title"] == "Department Information"

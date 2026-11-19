@@ -5298,3 +5298,28 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
   .topnav[data-open="true"] .nav-right .nav-cta { width: auto; justify-content: center; }
   .topnav[data-open="true"] .nav-theme { width: auto; margin: 0; padding: 4px 12px; justify-content: flex-start; }
 }
+
+/* a field that does not apply (PSOs not applicable) is hidden, whatever its display */
+.fields-grid > [hidden] { display: none !important; }
+
+/* programme structure: a line where each semester starts; a new row, marked for a moment */
+.rt tbody tr.rt-sem-start > td { border-top: 3px solid var(--ink-600); }
+.rt tbody tr.rt-sem-start > td:first-child { box-shadow: inset 4px 0 0 var(--ink-600); }
+@keyframes rt-new { from { background: #fff4c2; } to { background: transparent; } }
+.rt tbody tr.rt-new > td { animation: rt-new 1.6s ease; }
+
+/* Review & submit: the HoD / Dean approval */
+.so-box { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px; margin: 0 0 12px; background: var(--ink-050); }
+.so-h { margin: 0 0 4px; font-size: .95rem; color: var(--ink-800); }
+.so-note { margin: 0 0 10px; font-size: .82rem; color: var(--ink-soft); }
+.so-list { display: grid; gap: 8px; }
+.so-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); }
+.so-row.is-done { border-color: #b9dcc4; background: var(--ok-bg); }
+.so-role { font-weight: 700; font-size: .85rem; min-width: 170px; color: var(--ink); }
+.so-name { flex: 1 1 220px; padding: 7px 10px; }
+.so-who { flex: 1; font-size: .86rem; color: var(--ok); font-weight: 600; }
+.so-wait { font-size: .78rem; color: var(--ink-faint); }
+.so-undo { border: 0; background: none; color: var(--ink-600); font: inherit; font-size: .8rem; text-decoration: underline; cursor: pointer; }
+.so-err { margin: 8px 0 0; color: var(--err); font-size: .85rem; }
+.so-final { margin: 0; font-weight: 600; color: var(--ok); }

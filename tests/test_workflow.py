@@ -4,6 +4,12 @@ import re
 import json
 
 
+def approve_both(client, hod="Dr. Head Of Department", dean="Dr. Dean Of School"):
+    """The HoD, then the Dean, approves the record (before the final submit)."""
+    assert client.post("/department/api/approve", json={"role": "hod", "name": hod}).get_json()["ok"]
+    assert client.post("/department/api/approve", json={"role": "dean", "name": dean}).get_json()["ok"]
+
+
 def login(client, username, password):
     return client.post("/login", data={"username": username, "password": password},
                        follow_redirects=False)
@@ -442,8 +448,13 @@ def test_submitting_every_part_completes_and_seals(app, client, monkeypatch):
     from app.db import get_db
     with app.app_context():
         sub = get_db().submissions.find_one({"dept_code": "COM"})
-        assert sub["status"] == "sealed"
+        # every stage in, but final only once the HoD and the Dean approve
+        assert sub["status"] != "sealed"
         assert workflow.compute_status(sub, "curriculum") == "submitted"
+    approve_both(client)
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "COM"})
+        assert sub["status"] == "sealed"
 
 
 def test_returning_the_curriculum_sends_every_part_back(app, client, monkeypatch):

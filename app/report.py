@@ -119,6 +119,9 @@ def section_items(stage_key, data, links):
             for f in section.get("fields", []):
                 if f.get("type") == "fixed" or f.get("hidden"):
                     continue
+                if f.get("unless") and vals.get(f["unless"]) in (True, "true", "on", 1, "1", "Yes"):
+                    items.append((True, f.get("label") or f["name"], "Not applicable", []))
+                    continue
                 v = _field_text(f, vals.get(f["name"]))
                 docs = [(x.get("name") or "file", links.file(stage_key, x)) for x in files_in(v)]
                 text = "" if docs else _text(v)
@@ -167,6 +170,13 @@ def build(db, dept_code, year, links=None):
             ("Campus", dept.get("campus")), ("Academic year", year),
             ("Progress", f"{p['done']} of {p['total']} stages submitted"),
             ("Report generated", now_ist().strftime("%d %b %Y, %H:%M"))]
+    # the HoD / Dean sign-off
+    from .workflow import approval_lines
+    signed = approval_lines(sub)
+    for label, who, at in signed:
+        info.append((f"Approved — {label}", f"{who}, {at}"))
+    if not signed:
+        info.append(("Approval", "Not yet approved by the Head of the Department and the Dean"))
 
     stages = []
     for s in STAGES:

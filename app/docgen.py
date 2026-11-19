@@ -22,6 +22,8 @@ removed.
 from __future__ import annotations
 
 import copy
+import contextvars
+import functools
 import io
 import re
 from datetime import datetime
@@ -258,7 +260,49 @@ def _title(text):
     return text if len(text) <= 255 else text[:254] + "…"
 
 
+# the department's HoD / Dean sign-off, printed at the end of the documents
+# made while it is set (curriculum, syllabus, course revision)
+_SIGNOFF = contextvars.ContextVar("bos_signoff", default=None)
+
+
+def with_signoff(fn):
+    @functools.wraps(fn)
+    def run(db, dept_code, year, *a, **kw):
+        token = _SIGNOFF.set((db, dept_code, year))
+        try:
+            return fn(db, dept_code, year, *a, **kw)
+        finally:
+            _SIGNOFF.reset(token)
+    return run
+
+
+def _signoff_block(doc):
+    ctx = _SIGNOFF.get()
+    if not ctx:
+        return
+    db, dept_code, year = ctx
+    from .workflow import approval_lines
+    sub = db.submissions.find_one({"dept_code": dept_code, "academic_year": year}) or {}
+    lines = approval_lines(sub)
+    doc.add_paragraph()
+    p = doc.add_paragraph()
+    r = p.add_run("Approval")
+    r.bold, r.font.size = True, Pt(10.5)
+    for label, name, at in lines:
+        q = doc.add_paragraph()
+        q.paragraph_format.space_after = Pt(1)
+        a = q.add_run(f"{label}: ")
+        a.bold, a.font.size = True, Pt(10)
+        b = q.add_run(f"{name} — approved {at}")
+        b.font.size = Pt(10)
+    if not lines:
+        q = doc.add_paragraph()
+        b = q.add_run("Not yet approved by the Head of the Department and the Dean.")
+        b.italic, b.font.size = True, Pt(10)
+
+
 def _save(doc):
+    _signoff_block(doc)
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)
@@ -347,6 +391,8 @@ def _profile_table(doc, cur, width, degree_level=None):
     fields = next(s for s in for_level(STAGE_BY_KEY["prog_curriculum"], degree_level)["sections"]
                   if s["key"] == "profile")["fields"]
     defaults = {**DEFAULT_REGULATIONS, **(PG_REGULATIONS if is_pg(degree_level) else {})}
+    from .schema import pso_na
+    fields = [f for f in fields if f["name"] != "pso_na"]          # said under 1.B instead
     for n, f in enumerate(fields, start=1):
         # numbered as the form numbers it: 1, 1.A, 1.B, 2 …
         no = re.match(r"^(\d+(?:\.[A-Z])?)\.?\s", f["label"])
@@ -378,6 +424,8 @@ def _profile_table(doc, cur, width, degree_level=None):
             # PO1: … one per line
             from .schema import outcome_texts
             value = "\n".join(f"{f.get('prefix', '')}{i}: {x}" for i, x in enumerate(outcome_texts(value), start=1))
+            if f.get("unless") == "pso_na" and pso_na(prof):
+                value = "Not applicable to this programme."
         _write(row[2], _fmt(value) if isinstance(value, (int, float)) else (value or ""), size=9.5)
     _widths(t, [width * 0.06, width * 0.17, width * 0.77])
 
@@ -556,6 +604,7 @@ def _pg_semester_tables(doc, rows, width):
         doc.add_paragraph()
 
 
+@with_signoff
 def curriculum_docx(db, dept_code, year, programme_code):
     rec = programme_record(db, dept_code, year, programme_code)
     if not rec:
@@ -652,7 +701,7 @@ def _course_sheet(doc, programme_name, c, width, cols=None):
     the CO-PO-PSO Mapping with its Articulation row, the Course Content, and
     the Text Books, Book References and Web References (then Pedagogy and
     Skill Development Activities, when they are given)."""
-    from .schema import bloom_level, mapping_value, programme_columns
+    from .schema import bloom_level, mapping_title, mapping_value, programme_columns
     cols = cols or [n for n, _ in programme_columns({})]          # the programme's POs and PSOs
     center, left = WD_ALIGN_PARAGRAPH.CENTER, WD_ALIGN_PARAGRAPH.LEFT
 
@@ -707,7 +756,7 @@ def _course_sheet(doc, programme_name, c, width, cols=None):
     _widths(t, [width * 0.16, width * 0.64, width * 0.2])
 
     # CO-PO-PSO Mapping, and each column's average
-    heading("CO-PO-PSO Mapping:")
+    heading(mapping_title(cols) + ":")
     rows = c.get("co_po") if isinstance(c.get("co_po"), list) else []
     t = doc.add_table(rows=1, cols=len(cols) + 1)
     _borders(t, size=6)
@@ -777,6 +826,7 @@ def _earlier(db, dept_code, year, prog, part):
     return data, sems, f"Batch of {label}" + (f" · {words[0].upper()}{words[1:]}" if words else "")
 
 
+@with_signoff
 def syllabus_docx(db, dept_code, year, programme_code, part="prog_syllabus"):
     rec = programme_record(db, dept_code, year, programme_code)
     if not rec:
@@ -905,6 +955,7 @@ def _pct(v):
     return "—" if v is None else f"{_fmt(v)}%"
 
 
+@with_signoff
 def revision_docx(db, dept_code, year, programme_code, part="prog_revision"):
     """The programme's Course Revision in the Office's revision template —
     the current batch's, or (part: an earlier batch) that batch's own."""
