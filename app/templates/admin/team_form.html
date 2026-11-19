@@ -28,11 +28,12 @@
         <input id="tm-name" name="name" value="{{ v.name }}" required maxlength="80" placeholder="e.g. Dr. Priya Rao">
       </div>
       <div class="field">
-        <label for="tm-email">Email — their username</label>
+        <label for="tm-email">Username — an email, or a name such as ooa.kochi</label>
         {% if member %}
         <input id="tm-email" value="{{ member.username }}" disabled>
         {% else %}
-        <input id="tm-email" name="email" type="email" value="{{ v.email }}" required placeholder="name@jainuniversity.ac.in">
+        <input id="tm-email" name="email" type="text" value="{{ v.email }}" required autocapitalize="none"
+               spellcheck="false" placeholder="name@jainuniversity.ac.in or ooa.kochi">
         {% endif %}
       </div>
       {% if not member %}
@@ -70,6 +71,10 @@
       </div>
 
       <div class="tm-matrix-wrap" {% if v.preset != 'custom' %}hidden{% endif %}>
+        <div class="tm-setall" role="group" aria-label="Set every section">
+          <span class="small muted">Set every section to:</span>
+          {% for lv, label in levels %}<button type="button" class="btn btn-ghost btn-sm" data-set-all="{{ lv }}">All {{ label }}</button>{% endfor %}
+        </div>
         <div class="table-wrap">
           <table class="data tm-matrix">
             <thead><tr><th>Section of the menu</th>{% for lv, label in levels %}<th class="c">{{ label }}</th>{% endfor %}</tr></thead>
@@ -161,4 +166,15 @@
 </form>
 {% endblock %}
 
-{% block scripts %}<script src="{{ url_for('static', filename='js/team.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/team.js') }}"></script>
+<script>
+  // All None / All View / All Edit: every section at once, then change any one
+  document.querySelectorAll("[data-set-all]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll('.tm-matrix input[type=radio][value="' + b.dataset.setAll + '"]').forEach(function (r) {
+        r.checked = true;
+        r.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
+  });
+</script>{% endblock %}

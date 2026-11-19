@@ -5320,3 +5320,8 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .qd-field input[type=file] { font-weight: 400; }
 .q-shot img { display: block; width: 120px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
 .q-shot:hover img { border-color: var(--ink-600); }
+.kl-card { margin-bottom: 16px; }
+.kl-line { margin: 0 0 4px; }
+.kl-card .flex { gap: 8px; flex-wrap: wrap; align-items: center; }
+.kl-card form { margin: 0; }
+.tm-setall { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }

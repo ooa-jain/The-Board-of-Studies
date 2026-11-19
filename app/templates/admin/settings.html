@@ -14,6 +14,31 @@
 
 {% block content %}
 {% include "admin/_tabs.html" %}
+{% if is_full_admin() %}
+{# a login for the Office of Academic Affairs, Kochi: Kochi departments only #}
+<div class="card kl-card" style="max-width:720px">
+  <div class="card-head"><h3>Kochi login</h3></div>
+  <div class="card-body">
+    {% if kochi %}
+    <p class="kl-line"><strong>{{ kochi.name }}</strong> · username <span class="mono">{{ kochi.username }}</span>
+      {% if kochi.active is sameas false %}<span class="sh-pill is-locked">Off</span>{% endif %}</p>
+    <p class="small muted">{{ kochi.summary }}</p>
+    <div class="flex">
+      <a class="btn btn-sm" href="{{ url_for('admin.team_edit', username=kochi.username) }}">Change what it can view and edit</a>
+      <form method="post" action="{{ url_for('admin.team_password', username=kochi.username) }}"
+            onsubmit="return confirm('Make a new password for {{ kochi.username }}? The old one stops working.')">
+        <input type="hidden" name="pw_mode" value="generate">
+        <button class="btn btn-ghost btn-sm" type="submit">New password</button>
+      </form>
+    </div>
+    {% else %}
+    <p class="small muted">A login for the {{ kochi_default.name }}: it sees the Kochi departments only.
+      The username and password are made for you; you choose which parts of the menu it can view or edit.</p>
+    <a class="btn btn-sm" href="{{ url_for('admin.team_new', **{'for': 'kochi'}) }}">Create the Kochi login</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 <div class="card" style="max-width:720px">
   <div class="card-head"><h3>Academic cycle</h3></div>
   <div class="card-body">

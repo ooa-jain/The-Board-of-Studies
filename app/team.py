@@ -22,6 +22,18 @@ from .auth import admin_required
 from .db import audit, forget_cached, generate_password, get_db, hash_password, now
 
 EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# or a plain username, for a shared office login (ooa.kochi)
+HANDLE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,39}$")
+
+# Settings › Kochi login: the Office of Academic Affairs, Kochi — every Kochi
+# department, View everywhere to start with; the Office chooses what it may edit
+KOCHI = {"name": "Office of Academic Affairs, Kochi", "username": "ooa.kochi", "place": "Kochi"}
+
+
+def kochi_login():
+    """The Kochi office's login, if it has been made."""
+    return get_db().users.find_one({"role": "admin", "team": True, "scope.places": [KOCHI["place"]],
+                                    "scope.all": False})
 
 
 def _member(username):
@@ -68,6 +80,12 @@ def _values(member=None, form=None):
                           else "selected"), "codes": set(sc.get("codes") or []),
                 "schools": set(sc.get("schools") or []), "campuses": set(sc.get("campuses") or []),
                 "places": set(sc.get("places") or [])}
+    if request.args.get("for") == "kochi":
+        # the Kochi office: its name and username made up, Kochi only, View everywhere
+        return {"name": KOCHI["name"], "email": KOCHI["username"], "preset": "custom",
+                "sections": {k: "view" for k in SECTION_KEYS}, "delete": False, "pw_mode": "generate",
+                "scope": f"place:{KOCHI['place']}", "codes": set(), "schools": set(), "campuses": set(),
+                "places": {KOCHI["place"]}}
     viewer = PRESETS["viewer"]
     return {"name": "", "email": "", "preset": "viewer",
             "sections": {k: viewer["sections"].get(k) or "none" for k in SECTION_KEYS}, "delete": False,
@@ -87,8 +105,9 @@ def _read_form(f, editing=None):
     name = (f.get("name") or "").strip()[:80]
     email = (f.get("email") or "").strip().lower()
     if not editing:
-        if not EMAIL.match(email):
-            return None, "Give the person's email address — it is their username."
+        if not (EMAIL.match(email) or HANDLE.match(email)):
+            return None, ("Give the person's email address, or a username such as ooa.kochi "
+                          "(letters, numbers, dots and dashes).")
         if get_db().users.find_one({"username": email}):
             return None, f"{email} already has an account on the portal."
     if not name:
@@ -123,7 +142,7 @@ def _read_form(f, editing=None):
            "scope": scope, "updated_at": now(), "updated_by": _actor()}
     if not editing:
         rec["username"] = email
-        rec["email"] = email
+        rec["email"] = email if EMAIL.match(email) else ""
     return rec, None
 
 

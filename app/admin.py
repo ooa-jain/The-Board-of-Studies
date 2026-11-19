@@ -1514,8 +1514,13 @@ def app_settings():
         flash("Settings saved.", "success")
         return redirect(url_for("admin.app_settings"))
     from .db import settings as s
+    from .access import is_full, summary
+    from .team import KOCHI, kochi_login
+    kochi = kochi_login() if is_full(current_user()) else None
+    if kochi:
+        kochi["summary"] = summary(kochi)
     return render_template("admin/settings.html", settings=s(), batches=batches(),
-                           stage_count=len(STAGES))
+                           stage_count=len(STAGES), kochi=kochi, kochi_default=KOCHI)
 
 
 @bp.post("/settings/next-batch")
