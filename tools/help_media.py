@@ -80,11 +80,16 @@ SAY = {
     "start.progress": "Below it, how many stages are done, and your submissions, programme by programme.",
     "start.side": "The menu on the left takes you to every stage: Department Information, Pre-BoS, BoS Documents "
                   "and Curriculum. A blue dot means in progress; green means submitted.",
+    "start.tools": "Below the stages are Version History, Help, Query, Report a bug, and Review and submit.",
 
     "dept.open": "Stage one is Department Information. Your department's name, faculty, school and campus come "
                  "from the Office's records.",
-    "dept.progs": "Below, tick the programmes you run this year: UG on the left, PG on the right.",
-    "dept.add": "A programme missing from the list? Add it here. Remove takes off one you do not run.",
+    "dept.numbers": "Then give the number of faculty, the students in the first year, and the students in the "
+                    "final semester.",
+    "dept.progs": "Open the list and tick the programmes you run this year. Search by name or by short form, "
+                  "such as B B A or M C A.",
+    "dept.add": "A programme missing from the list? Type its name, such as M A English, and press Add. "
+                "The cross takes off one you do not run.",
     "dept.save": "There is no save button. Every change saves itself, and the bar at the end of the page says so.",
 
     "prebos.open": "Stage two, Pre-BoS, collects the signed DIAC and DPAC compositions and the minutes of the "
@@ -108,24 +113,30 @@ SAY = {
     "curriculum.details": "Programme details come first. For a UG programme, the degree is worked out from its "
                           "programme structure.",
     "curriculum.objective": "Write the programme's objectives, one per line.",
-    "curriculum.pos": "Then its Programme Outcomes and Programme Specific Outcomes. Add the next one with the "
-                      "button. Every course's CO-PO mapping takes these columns.",
+    "curriculum.pos": "Then its Programme Outcomes, seven to twelve of them, and its Programme Specific Outcomes. "
+                      "Every course's mapping takes these columns.",
+    "curriculum.pso": "If PSOs do not apply to the programme, tick Not applicable. Each course then has a CO-PO "
+                      "mapping.",
     "curriculum.regs": "The regulations follow. Where a box shows grey sample wording, leaving it empty accepts "
                        "that wording.",
-    "curriculum.structure": "The programme structure lists every course, semester by semester, with its category, "
-                            "L-T-P-E hours, credits and marks.",
-    "curriculum.credits": "The credit tables fill themselves from the structure, and the UGC Table 2 strip at the "
-                          "top tells you whether the credits meet the requirement.",
+    "curriculum.structure": "The programme structure lists every course, semester by semester, and a line marks "
+                            "where each semester starts. Choose its category: Major, the Core Course, AEC with a "
+                            "row for languages, and the rest.",
+    "curriculum.ltpe": "Type L, T, P and E: the cursor moves on by itself, and the credits fill in. Contact hours "
+                       "are the weekly L plus T plus P plus E, times fifteen.",
+    "curriculum.credits": "The credit tables fill themselves from the structure. A total in red is outside the "
+                          "UGC credits the Office has set. Point at it to see the rule.",
 
     "syllabus.open": "The Syllabus has one sheet per course. Pick a semester and a course. Its information comes "
                      "straight from the Curriculum.",
     "syllabus.objectives": "The course objectives start from the programme's objectives. Change them for the course.",
-    "syllabus.cos": "Write each course outcome and choose its level of Bloom's Taxonomy. A level is suggested from "
-                    "the first word.",
-    "syllabus.map": "In the CO-PO-PSO mapping, choose 1, 2 or 3 for each outcome against each PO and PSO, and type "
-                    "the articulation figure for each column.",
-    "syllabus.content": "Then the course content, module by module, with its hours, the outcomes it serves and its "
-                        "Bloom's level, and then the text books, book references and web references.",
+    "syllabus.cos": "Write each course outcome, CO one, CO two and so on, and choose its level of Bloom's "
+                    "Taxonomy. A level is suggested from the first word.",
+    "syllabus.map": "In the mapping, choose 1, 2 or 3 for each outcome against each PO and PSO, and type the "
+                    "articulation figure for each column.",
+    "syllabus.content": "Then the course content, module by module, with its hours, its COs and its B T L, the "
+                        "Bloom's Taxonomy Level. If a module has two COs, choose the higher B T L. Then the text "
+                        "books and references.",
 
     "revision.open": "Course Revision compares each course's previous syllabus with the revised one.",
     "revision.summary": "The summary counts the courses and gives the average percentage of revision.",
@@ -146,6 +157,9 @@ SAY = {
     "submit.review": "A programme's last step opens a review of the whole programme: every part, and what is in it.",
     "submit.confirm": "Tick to confirm, and submit. Submitted work goes to the Office of Academic Affairs and "
                       "becomes read-only. Only the Office can send it back for correction.",
+    "submit.signoff": "Before the final submit, open Review and submit. The Head of the Department approves with "
+                      "their name, then the Dean. Each approval is recorded with its time, and printed in the "
+                      "documents.",
 
     "reports.open": "Reports lists every programme, with what you have submitted.",
     "reports.view": "See your submission shows each Curriculum, Syllabus and Course Revision exactly as the "
@@ -155,46 +169,92 @@ SAY = {
     "more.versions": "Version History shows every saved version, who made it and when. A version can be restored "
                      "as a draft, as long as that part is not yet submitted.",
     "more.password": "Change Password sets a new password for your department's login.",
+    "more.query": "Query lists the sections of this video. Choose one, and the video opens there.",
+    "more.bug": "Report a bug sends the Office what went wrong and where, with a screenshot. You get a ticket "
+                "number.",
     "more.help": "And Help brings you back to this video and to the user manual. Thank you.",
 }
 
-# the pointer, the ring, the caption and the title card, drawn over every page
+# the pointer, the spotlight, the caption and the title card, drawn over every page.
+# The title card plays the campus clip behind a navy veil; its words come in one
+# after the other, and a strip of the eleven sections shows where the video is.
 OVERLAY_JS = r"""
 (() => {
   if (window.__help) return;
   const css = `
   .demo-strip, #btn-sample, .demo-fill { display: none !important; }
-  #hx-cursor { position: fixed; left: -40px; top: -40px; width: 26px; height: 26px; z-index: 2147483647;
-    pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+  #hx-cursor { position: fixed; left: -60px; top: -60px; width: 30px; height: 30px; z-index: 2147483647;
+    pointer-events: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
+  #hx-cursor::before { content: ""; position: absolute; left: -14px; top: -14px; width: 34px; height: 34px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(245,158,11,.45), rgba(245,158,11,0) 70%);
+    animation: hx-halo 1.6s ease-in-out infinite; }
+  @keyframes hx-halo { 50% { transform: scale(1.35); opacity: .55; } }
   #hx-ring { position: fixed; z-index: 2147483646; pointer-events: none; border: 3px solid #f59e0b;
-    border-radius: 12px; box-shadow: 0 0 0 6px rgba(245,158,11,.22); opacity: 0; transition: all .35s ease; }
-  #hx-cap { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); width: max-content;
-    max-width: 1040px; z-index: 2147483645; pointer-events: none; background: rgba(14,42,92,.94); color: #fff;
-    font: 600 20px/1.45 Inter, "Segoe UI", system-ui, sans-serif; padding: 12px 24px; border-radius: 14px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.28); opacity: 0; transition: opacity .3s; text-align: center; }
+    border-radius: 14px; opacity: 0; transition: all .45s cubic-bezier(.2,.8,.2,1);
+    box-shadow: 0 0 0 9999px rgba(8,18,40,.42), 0 0 0 7px rgba(245,158,11,.25), 0 0 26px rgba(245,158,11,.55); }
+  #hx-ring.on { animation: hx-ringpulse 1.4s ease-in-out infinite; }
+  @keyframes hx-ringpulse { 50% { box-shadow: 0 0 0 9999px rgba(8,18,40,.42), 0 0 0 12px rgba(245,158,11,.12), 0 0 34px rgba(245,158,11,.7); } }
+  #hx-cap { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 18px); width: max-content;
+    max-width: 1060px; z-index: 2147483645; pointer-events: none; color: #fff;
+    background: linear-gradient(135deg, rgba(14,42,92,.97), rgba(29,78,216,.95));
+    font: 600 20px/1.45 Inter, "Segoe UI", system-ui, sans-serif; padding: 13px 26px 13px 54px; border-radius: 16px;
+    box-shadow: 0 14px 34px rgba(0,0,0,.32); opacity: 0; text-align: left;
+    transition: opacity .35s ease, transform .45s cubic-bezier(.2,.8,.2,1); }
+  #hx-cap.on { opacity: 1; transform: translate(-50%, 0); }
+  #hx-cap .wave { position: absolute; left: 20px; top: 50%; display: flex; gap: 3px; align-items: center;
+    height: 18px; transform: translateY(-50%); }
+  #hx-cap .wave i { width: 3px; border-radius: 2px; background: #fbbf24; animation: hx-wave .9s ease-in-out infinite; }
+  #hx-cap .wave i:nth-child(2) { animation-delay: .15s } #hx-cap .wave i:nth-child(3) { animation-delay: .3s }
+  @keyframes hx-wave { 0%,100% { height: 5px } 50% { height: 18px } }
   #hx-card { position: fixed; inset: 0; z-index: 2147483647; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; text-align: center; color: #fff; opacity: 0;
-    pointer-events: none; transition: opacity .45s;
-    background: radial-gradient(circle at 30% 20%, #1d4ed8 0, #0e2a5c 55%, #081a3a 100%);
+    align-items: center; justify-content: center; text-align: center; color: #fff; opacity: 0; overflow: hidden;
+    pointer-events: none; transition: opacity .5s ease; background: #081a3a;
     font-family: Inter, "Segoe UI", system-ui, sans-serif; }
-  #hx-card .k { font-size: 17px; letter-spacing: .28em; text-transform: uppercase; opacity: .78; }
-  #hx-card .t { font-size: 50px; font-weight: 800; margin-top: 14px; max-width: 1100px; line-height: 1.15; }
-  #hx-card .s { font-size: 21px; opacity: .85; margin-top: 16px; max-width: 980px; }
-  #hx-card .bar { width: 90px; height: 5px; border-radius: 3px; background: #f59e0b; margin-top: 26px; }
-  .hx-click { position: fixed; width: 18px; height: 18px; border-radius: 50%; background: rgba(245,158,11,.55);
+  #hx-card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    transform: scale(1.08); transition: transform 7s ease-out; }
+  #hx-card.on video { transform: scale(1.0); }
+  #hx-card .veil { position: absolute; inset: 0;
+    background: linear-gradient(160deg, rgba(8,18,40,.93) 0%, rgba(14,42,92,.84) 55%, rgba(29,78,216,.62) 100%); }
+  #hx-card .in { position: relative; display: flex; flex-direction: column; align-items: center; }
+  #hx-card .no { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 30px; font-weight: 800; background: #f59e0b; color: #0e2a5c; margin-bottom: 18px;
+    box-shadow: 0 0 0 10px rgba(245,158,11,.18); }
+  #hx-card .no:empty { display: none; }
+  #hx-card .k { font-size: 17px; letter-spacing: .3em; text-transform: uppercase; opacity: .82; }
+  #hx-card .t { font-size: 54px; font-weight: 800; margin-top: 14px; max-width: 1100px; line-height: 1.12; }
+  #hx-card .s { font-size: 22px; opacity: .88; margin-top: 16px; max-width: 980px; }
+  #hx-card .bar { width: 0; height: 5px; border-radius: 3px; background: #f59e0b; margin-top: 26px;
+    transition: width .9s cubic-bezier(.2,.8,.2,1) .7s; }
+  #hx-card.on .bar { width: 120px; }
+  #hx-card .no, #hx-card .k, #hx-card .t, #hx-card .s { opacity: 0; transform: translateY(26px);
+    transition: opacity .6s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
+  #hx-card.on .no { opacity: 1; transform: none; transition-delay: .05s; }
+  #hx-card.on .k { opacity: .82; transform: none; transition-delay: .2s; }
+  #hx-card.on .t { opacity: 1; transform: none; transition-delay: .35s; }
+  #hx-card.on .s { opacity: .88; transform: none; transition-delay: .55s; }
+  #hx-card .dots { position: absolute; bottom: 38px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+  #hx-card .dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.28);
+    transition: all .5s ease .8s; }
+  #hx-card .dots i.done { background: rgba(255,255,255,.7); }
+  #hx-card.on .dots i.now { background: #f59e0b; width: 34px; border-radius: 6px; }
+  .hx-click { position: fixed; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #f59e0b;
     z-index: 2147483646; pointer-events: none; transform: translate(-50%,-50%);
-    animation: hx-pulse .55s ease-out forwards; }
-  @keyframes hx-pulse { to { transform: translate(-50%,-50%) scale(3.6); opacity: 0; } }
+    animation: hx-pulse .7s ease-out forwards; }
+  @keyframes hx-pulse { to { transform: translate(-50%,-50%) scale(4.2); opacity: 0; } }
   `;
-  const arrow = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 2l15 11-6.5 1.2L16 21l-3 1.4-3.3-6.9L4 20z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+  const arrow = '<svg viewBox="0 0 24 24" width="30" height="30"><path d="M4 2l15 11-6.5 1.2L16 21l-3 1.4-3.3-6.9L4 20z" fill="#fff" stroke="#0e2a5c" stroke-width="1.5" stroke-linejoin="round"/></svg>';
   const make = () => {
     if (document.getElementById("hx-cursor")) return;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
     const c = document.createElement("div"); c.id = "hx-cursor"; c.innerHTML = arrow; document.body.appendChild(c);
     const r = document.createElement("div"); r.id = "hx-ring"; document.body.appendChild(r);
-    const cap = document.createElement("div"); cap.id = "hx-cap"; document.body.appendChild(cap);
+    const cap = document.createElement("div"); cap.id = "hx-cap";
+    cap.innerHTML = '<span class="wave"><i></i><i></i><i></i></span><span class="tx"></span>';
+    document.body.appendChild(cap);
     const card = document.createElement("div"); card.id = "hx-card";
-    card.innerHTML = '<div class="k"></div><div class="t"></div><div class="s"></div><div class="bar"></div>';
+    card.innerHTML = '<video muted playsinline loop src="/static/video/campus.mp4"></video><div class="veil"></div>' +
+      '<div class="in"><div class="no"></div><div class="k"></div><div class="t"></div><div class="s"></div><div class="bar"></div></div>' +
+      '<div class="dots"></div>';
     document.body.appendChild(card);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", make); else make();
@@ -205,17 +265,29 @@ OVERLAY_JS = r"""
   document.addEventListener("mousedown", e => {
     const d = document.createElement("div"); d.className = "hx-click";
     d.style.left = e.clientX + "px"; d.style.top = e.clientY + "px"; document.body.appendChild(d);
-    setTimeout(() => d.remove(), 700);
+    setTimeout(() => d.remove(), 800);
   }, true);
   window.__help = {
     at(x, y) { make(); const c = $("hx-cursor"); c.style.left = x + "px"; c.style.top = y + "px"; },
-    cap(text) { make(); const c = $("hx-cap"); if (text) { c.textContent = text; c.style.opacity = 1; } else c.style.opacity = 0; },
-    card(k, t, s) { make(); const c = $("hx-card"); c.querySelector(".k").textContent = k;
-      c.querySelector(".t").textContent = t; c.querySelector(".s").textContent = s || ""; c.style.opacity = 1; },
-    uncard() { const c = $("hx-card"); if (c) c.style.opacity = 0; },
+    cap(text) { make(); const c = $("hx-cap");
+      if (text) { c.classList.remove("on"); void c.offsetWidth; c.querySelector(".tx").textContent = text; c.classList.add("on"); }
+      else c.classList.remove("on"); },
+    // k: kicker, t: title, s: sub; n: section number (or 0), of: how many sections
+    card(k, t, s, n, of) { make(); const c = $("hx-card");
+      c.querySelector(".k").textContent = k; c.querySelector(".t").textContent = t;
+      c.querySelector(".s").textContent = s || ""; c.querySelector(".no").textContent = n ? String(n) : "";
+      const dots = c.querySelector(".dots"); dots.innerHTML = "";
+      for (let i = 1; i <= (n ? of : 0); i++) { const d = document.createElement("i");
+        d.className = i < n ? "done" : i === n ? "now" : ""; dots.appendChild(d); }
+      const v = c.querySelector("video");
+      try { v.currentTime = ((n || 0) * 0.83) % 9; v.play(); } catch (e) {}
+      c.classList.remove("on"); void c.offsetWidth; c.style.opacity = 1;
+      requestAnimationFrame(() => c.classList.add("on")); },
+    uncard() { const c = $("hx-card"); if (c) { c.style.opacity = 0; c.classList.remove("on");
+      const v = c.querySelector("video"); if (v) setTimeout(() => v.pause(), 600); } },
     ring(x, y, w, h) { make(); const r = $("hx-ring"); Object.assign(r.style, { left: x + "px", top: y + "px",
-      width: w + "px", height: h + "px", opacity: 1 }); },
-    unring() { const r = $("hx-ring"); if (r) r.style.opacity = 0; },
+      width: w + "px", height: h + "px", opacity: 1 }); r.classList.add("on"); },
+    unring() { const r = $("hx-ring"); if (r) { r.style.opacity = 0; r.classList.remove("on"); } },
     hide(on) { ["hx-cursor", "hx-ring", "hx-cap", "hx-card"].forEach(id => { const n = $(id); if (n) n.style.visibility = on ? "hidden" : ""; });
       document.querySelectorAll(".toast, .toasts, [class*=toast]").forEach(t => t.style.visibility = on ? "hidden" : ""); },
   };
@@ -348,11 +420,12 @@ class Rec:
         words = len(text.split())
         return max(2.4, words / 2.5 + 0.6)
 
-    def card(self, kicker, title, sub="", speak=None):
-        self.js("([k, t, s]) => { __help.cap(''); __help.card(k, t, s); }", [kicker, title, sub])
+    def card(self, kicker, title, sub="", speak=None, n=0):
+        self.js("([k, t, s, n, of]) => { __help.cap(''); __help.card(k, t, s, n, of); }",
+                [kicker, title, sub, n, len(SECTIONS)])
         if self.begin is None:
             self.begin = self.t()
-        self.wait(0.5)
+        self.wait(1.1)                                 # the words come in one after another
         start = self.t()
         text = speak or title
         self.wait(max(2.6, self._hold(text)))
@@ -500,7 +573,7 @@ class Rec:
 
 def card(r, n):
     s = SECTIONS[n - 1]
-    r.card(f"Section {n}", s["title"], s["sub"], speak=f"Section {n}. {s['title']}.")
+    r.card(f"Section {n} of {len(SECTIONS)}", s["title"], s["sub"], speak=f"Section {n}. {s['title']}.", n=n)
 
 
 def sec_start(r, login):
@@ -508,17 +581,17 @@ def sec_start(r, login):
     r.card("BoS Academic Portal · JAIN (Deemed-to-be University)", "How the portal works",
            "A walkthrough for departments · Office of Academic Affairs", speak=SAY["start.intro"])
     card(r, 1)
-    r.point(".login-card, form[action$='/login'], input[name=username]", "start.signin", scroll=False)
+    r.point(".login-box, form[action$='/login'], input[name=username]", "start.signin", scroll=False)
     r.type("input[name=username]", login[0])
     r.type("input[name=password]", login[1])
     r.shot("start_login")
-    r.click("form button[type=submit]", nav=True)
+    r.click(".login-go, form button[type=submit]", nav=True)
     if "/who" in r.page.url:
         r.point("form", "start.who", scroll=False)
         r.type("input[name=name]", "Dr. Asha Rao")
         r.type("input[name=email]", "asha.rao@jainuniversity.ac.in")
         r.shot("start_who")
-        r.click("form button[type=submit]", nav=True)
+        r.click("main form button[type=submit]", nav=True)
     if "/department/" not in r.page.url:
         r.goto("/department/")
     r.shot("start_home")
@@ -527,6 +600,7 @@ def sec_start(r, login):
     r.point(".subs-card", "start.progress")
     r.scroll_by(-800)
     r.point(".side-nav", "start.side", scroll=False)
+    r.point("#query-btn", "start.tools", scroll=False)
 
 
 def sec_dept(r):
@@ -534,10 +608,17 @@ def sec_dept(r):
     card(r, 2)
     r.point("#sec-identity", "dept.open", scroll=False)
     r.shot("dept_identity", "#sec-identity")
+    r.point("#sec-strength", "dept.numbers")
+    r.shot("dept_numbers", "#sec-strength")
     r.scroll_to("#sec-programmes_offered", "start")
-    r.point("#sec-programmes_offered", "dept.progs", scroll=False)
+    r.click(".pd-toggle", scroll=False)
+    r.type(".pd-search", "BBA", clear=False)
+    r.point(".pd-menu", "dept.progs", scroll=False)
     r.shot("dept_programmes")
-    r.point("text=Add UG programme", "dept.add")
+    r.point(".pd-add", "dept.add", scroll=False)
+    r.page.keyboard.press("Escape")
+    r.wait(0.4)
+    r.point(".pd-list", None, scroll=False)
     r.point(".savebar", "dept.save")
 
 
@@ -576,10 +657,23 @@ def sec_curriculum(r):
     r.shot("curriculum_outcomes")
     r.point(".field[data-field=programme_outcomes] .ol-foot button", None, scroll=False)
     r.say("curriculum.pos")
+    r.point(".field[data-field=pso_na]", "curriculum.pso")
     r.point(".field[data-field=selection_procedure]", "curriculum.regs")
     r.scroll_to("#sec-semester_structure", "start")
     r.shot("curriculum_structure")
     r.point("#sec-semester_structure", "curriculum.structure", scroll=False)
+    # L, T, P, E typed again as they are: the cursor moves on by itself
+    row = "#sec-semester_structure tbody tr[data-row='0']"
+    vals = r.js(f"() => ['l','t','p','e'].map(n => (document.querySelector(\"{row} [data-field=\" + n + \"] input\") || {{}}).value || '')")
+    if vals and all(v != "" for v in vals):
+        r.click(f"{row} [data-field=l] input")
+        r.page.keyboard.press("Control+A")
+        r.ring(r._one(f"{row}").bounding_box())
+        for v in vals:
+            r.page.keyboard.type(v, delay=260)
+            r.wait(0.35)
+        r.say("curriculum.ltpe")
+        r.unring()
     r.scroll_to("#sec-credit_classification", "start")
     r.shot("curriculum_credits")
     r.point("#sec-credit_classification", "curriculum.credits", scroll=False)
@@ -670,6 +764,20 @@ def sec_submit(r):
             r.shot("submit_done")
     else:
         r.say("submit.confirm")
+    # the HoD and the Dean approve before the final submit
+    r.goto("/department/?review=1")
+    r.wait(2.0)
+    box = ".so-box"
+    if r.page.locator(box).count():
+        r.scroll_to(box, "center")
+        r.type(".so-row:nth-child(1) .so-name", "Dr. Anita Rao")
+        r.click(".so-row:nth-child(1) button")
+        r.wait(0.8)
+        r.type(".so-row:nth-child(2) .so-name", "Dr. Vikram Shah")
+        r.click(".so-row:nth-child(2) button")
+        r.wait(0.8)
+        r.point(box, "submit.signoff", scroll=False)
+        r.shot("submit_signoff", box)
 
 
 def sec_reports(r):
@@ -686,6 +794,12 @@ def sec_reports(r):
     r.wait(1.0)
 
 
+# A pop-up opened as a modal sits above everything, the caption and the spotlight
+# too: for the recording it is shown as an ordinary one, in the same place.
+UNMODAL = """() => { const d = document.getElementById('query-dialog'); if (!d || !d.open) return;
+  d.close(); d.show(); Object.assign(d.style, { position: 'fixed', inset: '0', margin: 'auto', zIndex: '2147483000' }); }"""
+
+
 def sec_more(r):
     r.goto("/department/")
     card(r, 11)
@@ -694,6 +808,18 @@ def sec_more(r):
     r.shot("more_versions")
     r.click(".side-nav a[href*='password']", nav=True, scroll=False)
     r.point("form", "more.password", scroll=False)
+    r.click("#query-btn", scroll=False)
+    r.wait(1.0)
+    r.js(UNMODAL)
+    r.point(".qd-sections", "more.query", scroll=False)
+    r.shot("more_query", ".query-dialog")
+    r.click(".qd-close", scroll=False)
+    r.click("#bug-btn", scroll=False)
+    r.wait(0.8)
+    r.js(UNMODAL)
+    r.point(".qd-form", "more.bug", scroll=False)
+    r.shot("more_bug", ".query-dialog")
+    r.click(".qd-close", scroll=False)
     r.click(".side-nav a[href$='/department/help']", nav=True, scroll=False)
     r.point("main, .help-watch, .help-manual", "more.help", scroll=False)
     r.card("BoS Academic Portal", "Thank you", "Questions? Write to the Office of Academic Affairs.", speak="Thank you.")
@@ -883,19 +1009,26 @@ MANUAL = [
                "The first time on a computer, give your name and e-mail. Every change you save is noted against them.",
                "Your home page shows the next step: press Continue to carry on where you left off.",
                "Below it are how many stages are done, and your submissions, programme by programme.",
-               "The menu on the left opens every stage. A blue dot means in progress; green means submitted."],
+               "The menu on the left opens every stage. A blue dot means in progress; green means submitted.",
+               "Below the stages: Version History, Help, Query (the video at the section you need), Report a bug, "
+               "and Review & submit."],
      "tips": ["Use “Not you? Switch account” at the foot of the menu when someone else takes over on the same computer.",
               "Forgot the password, or no login yet? Write to the Office of Academic Affairs."],
      "shots": [("start_login", "Signing in"), ("start_who", "Who is filling in"), ("start_home", "The home page")]},
     {"key": "dept", "intro": "Your department's name, faculty, school and campus come from the Office's records. "
-     "Here you say which programmes you run this year.",
+     "Here you give the faculty and student numbers and say which programmes you run this year.",
      "steps": ["Open Department Information from the menu.",
                "Check the department's details at the top. To correct them, write to the Office.",
-               "Under Programmes offered, keep each programme you run this year; Remove takes off one you do not.",
-               "A programme missing from the list? Use Add UG programme or Add PG programme.",
-               "When the list is right, scroll to the end of the page and press Submit."],
+               "Faculty and students: the number of faculty, the students in the 1st year and the students in the "
+               "final semester.",
+               "Programmes offered: open the list and tick each programme you run this year. Search by name or by "
+               "short form (BBA, MCA …). The × beside a chosen programme takes it off.",
+               "A programme missing from the list? Type its name (for example “MA English”) under “Not in the "
+               "list?”, choose UG or PG, and press Add.",
+               "When the page is right, scroll to the end of the page and press Submit."],
      "tips": ["There is no Save button: every change saves itself (the note at the end of the page says when)."],
-     "shots": [("dept_identity", "Department identity"), ("dept_programmes", "Programmes offered")]},
+     "shots": [("dept_identity", "Department identity"), ("dept_numbers", "Faculty and students"),
+               ("dept_programmes", "Programmes offered")]},
     {"key": "prebos", "intro": "Pre-BoS collects the signed composition of the Department Industry-Academia Cell "
      "(DIAC), of the Department Programme Assessment Committee (DPAC), and the minutes of the Pre-BoS meeting.",
      "steps": ["Download each template (“Download the template for reference”), fill it in and sign it.",
@@ -919,13 +1052,18 @@ MANUAL = [
                "Programme details: the specialisation; the batch is set for you. For a UG programme the degree is "
                "worked out from its structure.",
                "1. Objective: the programme's objectives, one per line.",
-               "1.A and 1.B: the Programme Outcomes (POs) and Programme Specific Outcomes (PSOs). Add the next one "
-               "with “+ Add PO…”; every course's CO-PO-PSO mapping takes these columns.",
+               "1.A and 1.B: the Programme Outcomes (POs — 7 to 12) and Programme Specific Outcomes (PSOs). Add the "
+               "next one with “+ Add PO…”; every course's mapping takes these columns. If PSOs do not apply, tick "
+               "“PSOs are not applicable”: each course then has a CO-PO Mapping.",
                "Items 2 to 12, the regulations. A box showing grey sample wording may be left empty to accept it.",
-               "The programme structure: every course, semester by semester, with its category, L-T-P-E hours, "
-               "credits and marks. Semesters 7 and 8 have their own Honours and Honours with Research groups.",
-               "The credit tables fill themselves; the UGC Table 2 strip at the top says whether the credits meet "
-               "the requirement."],
+               "The programme structure: every course, semester by semester (a line marks where each semester "
+               "starts), with its category, L-T-P-E hours, credits and marks. Categories include Major / Core "
+               "Course (CC) and AEC (Language), where one row holds a code and title for each language. Semesters "
+               "7 and 8 have their own Honours and Honours with Research groups.",
+               "L, T, P and E: the cursor moves on by itself, and the credits fill in (L + T + P/2 + E/3). Contact "
+               "hours are (L + T + P + E) a week × 15.",
+               "The credit tables fill themselves from the structure. A total in red is outside the UGC credits the "
+               "Office has set; point at it to see the rule."],
      "tips": ["Submit the Curriculum, then go on to the Syllabus: the buttons at the top take you between the parts."],
      "shots": [("curriculum_list", "Programmes"), ("curriculum_outcomes", "Objective, POs and PSOs"),
                ("curriculum_structure", "The programme structure"), ("curriculum_credits", "Credits by classification")]},
@@ -936,10 +1074,10 @@ MANUAL = [
                "Course Objectives start from the programme's objectives: change them for the course.",
                "Course Outcomes: write each CO and choose its level of Bloom's Taxonomy (1 to 6). A level is "
                "suggested from the first word.",
-               "CO-PO-PSO Mapping: choose 1, 2 or 3 (or –) for each CO against each PO and PSO, and type the "
-               "Articulation figure for each column.",
-               "Course Content: each module with its title, hours, the COs it serves and its Bloom's level, then "
-               "the Text Books, Book References and Web References."],
+               "CO-PO-PSO Mapping (CO-PO Mapping when PSOs do not apply): choose 1, 2 or 3 (or –) for each CO "
+               "against each PO and PSO, and type the Articulation figure for each column.",
+               "Course Content: each module with its title, hours, its COs and its BTL (Bloom's Taxonomy Level — "
+               "with two COs, the higher BTL), then the Text Books, Book References and Web References."],
      "tips": ["“Fill in all courses from the Curriculum” makes a sheet for every course in the structure."],
      "shots": [("syllabus_nav", "Choosing a course"), ("syllabus_info", "Course Information"),
                ("syllabus_cos", "Course Outcomes and Bloom's levels"), ("syllabus_map", "CO-PO-PSO Mapping"),
@@ -962,12 +1100,17 @@ MANUAL = [
                "Once the checks pass, the stage or part is submitted and the next one opens.",
                "A programme's last step opens a review of the whole programme: every part, and what is in it. "
                "Tick to confirm and press Submit all.",
+               "Before the final submit, open Review & submit: the Head of the Department approves (name), then "
+               "the Dean. Each approval is recorded with its time and printed in the documents; the record is "
+               "final once every stage is submitted and both have approved.",
                "Submitted work goes to the Office of Academic Affairs and becomes read-only. Only the Office can "
-               "send it back for correction; their comments show at the top of the page."],
+               "send it back for correction (the approvals are then given again); their comments show at the top "
+               "of the page."],
      "tips": ["Nothing is lost if you stop half-way: everything you typed is saved, and Continue on the home page "
               "brings you back."],
      "shots": [("submit_checks", "The Checks panel lists what is missing"),
-               ("submit_review", "Review & submit this programme"), ("submit_done", "Submitted")]},
+               ("submit_review", "Review & submit this programme"), ("submit_done", "Submitted"),
+               ("submit_signoff", "HoD and Dean approval")]},
     {"key": "reports", "intro": "Reports shows what you have submitted.",
      "steps": ["Open Reports from the menu: every programme, with what is submitted.",
                "See your submission shows each Curriculum, Syllabus and Course Revision — current batch and each "
@@ -978,9 +1121,12 @@ MANUAL = [
      "steps": ["Version History shows every saved version, who made it and when; a version can be restored as a "
                "draft while that part is not yet submitted.",
                "Change Password sets a new password for your department's login.",
-               "Help opens the walkthrough video, section by section, and this manual."],
+               "Help opens the walkthrough video, section by section, and this manual.",
+               "Query lists the video's sections; choose one and the video opens there.",
+               "Report a bug: give it a name, say where it is and what went wrong, and add a screenshot (required). "
+               "Your e-mail is filled in from your sign-in, and you get a ticket number (B-0001 …)."],
      "tips": [],
-     "shots": [("more_versions", "Version History")]},
+     "shots": [("more_versions", "Version History"), ("more_query", "Query"), ("more_bug", "Report a bug")]},
 ]
 
 

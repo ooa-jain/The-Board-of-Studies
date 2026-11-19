@@ -28,12 +28,18 @@ DEPT = {
     "active": True, "demo": True,
 }
 
+# the programmes on the Office's list for the demo department (its own list,
+# as Departments › Edit keeps it): two it runs, and one it does not this year
 PROGRAMMES = [
     {"programme_code": "DEMOBBA", "programme_name": "BBA in Demonstration Management",
-     "degree": "UG", "source": "new", "decision": "keep"},
+     "degree": "UG", "source": "catalogue", "decision": "keep"},
     {"programme_code": "DEMOBCOM", "programme_name": "B.Com in Demonstration Accounting",
-     "degree": "UG", "source": "new", "decision": "keep"},
+     "degree": "UG", "source": "catalogue", "decision": "keep"},
 ]
+NOT_RUN = {"programme_code": "DEMOMBA", "programme_name": "MBA in Demonstration Strategy",
+           "degree": "PG", "source": "catalogue", "decision": "remove"}
+MASTER = [{k: p.get(k, "") for k in ("programme_code", "programme_name", "degree")}
+          | {"year_introduced": "2024", "category": "", "minors": ""} for p in PROGRAMMES + [NOT_RUN]]
 
 # file name → (stage, field, lines of text inside it); every one the right
 # document for its box, so the keyword check passes throughout
@@ -255,7 +261,7 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
                 "contact": {"office_email": "demo.office@example.edu", "faculty_count": 18},
                 "strength": {"faculty_count": 18, "students_first_year": 120,
                              "students_final_semester": 104},
-                "programmes_offered": PROGRAMMES}
+                "programmes_offered": PROGRAMMES + [NOT_RUN]}
     if stage_key == "pre_bos":
         return {"pre_bos_files": {k: files[k] for k in ("diac_signed", "dpac_signed", "pre_bos_minutes")
                                   if k in files}}
@@ -384,7 +390,7 @@ def create(year, upload_root, actor="system"):
     remove(db)
     t = now()
     taken = db.users.find_one({"username": USERNAME})
-    db.departments.insert_one({**DEPT, "created_at": t, "updated_at": t,
+    db.departments.insert_one({**DEPT, "created_at": t, "updated_at": t, "programmes_master": MASTER,
                                **({} if taken else {"username": USERNAME})})
     dept = db.departments.find_one({"dept_code": CODE})
     username, password = issue_department_login(db, dept, actor=actor)
