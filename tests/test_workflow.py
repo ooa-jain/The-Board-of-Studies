@@ -737,7 +737,7 @@ def test_the_not_found_page_offers_a_way_onward(client):
     assert r.status_code == 404
     body = r.get_data(as_text=True)
     assert "There is no page here" in body
-    assert "About the portal" in body and "The home page" in body
+    assert "Help — video and user manual" in body and "The home page" in body and "About the portal" not in body
 
 
 def _tiny_pdf():

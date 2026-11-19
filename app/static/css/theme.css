@@ -27,9 +27,8 @@
 /* where it sits: the right end of the top bar, or floating on pages without one */
 .erp-bar-end { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
 .erp-bar-mid + .erp-bar-end { margin-left: 0; }
-.theme-float { position: fixed; top: 14px; right: 16px; z-index: 120; padding: 6px; border-radius: 999px;
-  background: rgba(255, 255, 255, .85); box-shadow: 0 6px 18px -10px rgba(16, 24, 40, .45); backdrop-filter: blur(8px); }
-html[data-theme="dark"] .theme-float { background: rgba(17, 22, 32, .85); }
+.theme-float { position: fixed; top: 16px; right: 18px; z-index: 120; padding: 0; background: none; }
+.nav-theme { display: inline-flex; align-items: center; margin-left: 6px; }
 @media print { .theme-toggle, .theme-float { display: none !important; } }
 
 /* ---- the circle the new look opens out of ---- */

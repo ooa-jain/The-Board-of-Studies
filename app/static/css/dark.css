@@ -5479,6 +5479,11 @@ html[data-theme="dark"] .cd-table tr.cd-type.is-chosen td.cd-off {
 html[data-theme="dark"] .cd-off-note {
   color: #e48b81;
 }
+@media (max-width: 860px) {
+html[data-theme="dark"] .topnav[data-open="true"] .nav-right {
+  border-top: 1px solid #2e3542;
+}
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

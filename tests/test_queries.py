@@ -102,3 +102,12 @@ def test_sign_in_page_plays_the_campus_clip(app, client):
     assert (static / "video" / "campus.mp4").stat().st_size > 100_000
     chapters = json.loads((static / "help" / "chapters.json").read_text(encoding="utf-8"))
     assert chapters[0]["start"] == 0 and chapters[1]["start"] > 100      # moved on by the clip
+
+
+def test_about_is_gone_and_help_is_in_the_bar(client):
+    r = client.get("/about")
+    assert r.status_code == 301 and r.headers["Location"].endswith("/help")
+    page = client.get("/help").get_data(as_text=True)
+    assert ">About<" not in page and 'class="nav-theme"' in page and 'class="theme-float"' not in page
+    # the sign-in page has no bar: the switch sits in the corner
+    assert 'class="theme-float"' in client.get("/").get_data(as_text=True)
