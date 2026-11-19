@@ -5354,3 +5354,49 @@ body.is-terms { margin: 0; background: var(--canvas); }
 .terms-go:not(:disabled):hover { background: #1b3b63; }
 .terms-foot { margin: 16px 0 0; font-size: .82rem; color: var(--ink-faint); }
 @media (max-width: 600px) { .terms-card { padding: 24px 18px; } .terms-head h1 { font-size: 1.5rem; } .terms-key { flex-direction: column; } }
+
+/* ---- the BoS intro film: first sign-in page, and the sign-in page's pop-up ---- */
+body.is-intro { margin: 0; background: #060c1a; color: #fff; }
+.intro-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 24px 16px 32px; box-sizing: border-box;
+  background: radial-gradient(120% 90% at 50% 20%, #16306b 0%, #0b1730 55%, #060c1a 100%); }
+.intro-top { width: 100%; max-width: 1100px; display: flex; align-items: center; gap: 16px; }
+.intro-logo { width: 120px; height: auto; }
+.intro-kicker { flex: 1; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #9fb3d1; }
+.intro-skip-form { margin: 0; }
+.intro-skip { border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; font: inherit;
+  font-weight: 600; font-size: .9rem; padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+.intro-skip:hover { background: rgba(255,255,255,.18); }
+.intro-stage { position: relative; width: 100%; max-width: 1100px; }
+.intro-player { position: relative; width: 100%; max-height: calc(100vh - 140px); aspect-ratio: 16 / 9; margin: 0 auto; border-radius: 16px; overflow: hidden;
+  background: #000; box-shadow: 0 30px 80px -30px rgba(0,0,0,.8); }
+.intro-video { width: 100%; height: 100%; display: block; object-fit: cover; cursor: pointer; }
+.intro-sound { position: absolute; left: 16px; bottom: 18px; display: inline-flex; align-items: center; gap: 8px;
+  border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(9,19,36,.75); color: #fff; font: inherit;
+  font-weight: 600; font-size: .85rem; cursor: pointer; }
+.intro-sound svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.intro-sound[hidden] { display: none; }
+.intro-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.15); }
+.intro-bar i { display: block; height: 100%; width: 0; background: #f59e0b; transition: width .25s linear; }
+.intro-next { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 18px; margin: 0; border-radius: 16px; background: rgba(6, 12, 26, .72);
+  animation: intro-in .5s ease; }
+@keyframes intro-in { from { opacity: 0; } to { opacity: 1; } }
+.intro-next[hidden] { display: none; }
+.intro-next p { margin: 0; color: #fff; font-size: 1.5rem; font-weight: 700; text-align: center; }
+.intro-go { height: 46px; padding: 0 26px; border: 0; border-radius: 10px; background: #f59e0b; color: #0e2a5c;
+  font: inherit; font-weight: 700; cursor: pointer; }
+/* the sign-in page */
+.login-intro { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 16px; padding: 12px 14px;
+  border: 1px solid #dfe3ea; border-radius: 12px; background: #f6f8fb; font: inherit; text-align: left; cursor: pointer; color: #17202e; }
+.login-intro:hover { border-color: #2c5488; background: #eef2f8; }
+.login-intro-play { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #0f2440; }
+.login-intro-play svg { width: 16px; height: 16px; fill: #fff; margin-left: 2px; }
+.login-intro strong { display: block; font-size: .95rem; }
+.login-intro small { display: block; font-size: .8rem; color: #6b7588; }
+.intro-dialog { width: min(1000px, calc(100vw - 24px)); padding: 0; border: 0; border-radius: 16px; background: #0b1730; color: #fff;
+  box-shadow: 0 30px 90px rgba(0,0,0,.6); }
+.intro-dialog::backdrop { background: rgba(6,12,26,.82); }
+.intro-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 18px;
+  font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #9fb3d1; }
+.intro-dialog .intro-player { border-radius: 0 0 16px 16px; box-shadow: none; }

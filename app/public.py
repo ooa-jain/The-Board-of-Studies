@@ -78,7 +78,11 @@ def landing():
     # the counting.
     stats = {"departments": db.departments.count_documents({"active": True})}
     # the sign-in page is a page of its own: no top bar, no footer
-    return render_template("landing.html", stats=stats, next_url=nxt,
+    from pathlib import Path
+    folder = Path(current_app.static_folder) / "video"
+    intro = {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
+             for n in ("intro.mp4", "intro.jpg")}
+    return render_template("landing.html", stats=stats, next_url=nxt, intro=intro,
                            resume=_resume_for(session.get("user")), hide_chrome=True)
 
 

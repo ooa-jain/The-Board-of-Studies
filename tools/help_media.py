@@ -594,6 +594,9 @@ def sec_start(r, login):
         r.type("input[name=email]", "asha.rao@jainuniversity.ac.in")
         r.shot("start_who")
         r.click("main form button[type=submit]", nav=True)
+    if "/intro" in r.page.url:
+        r.wait(3.0)                                  # a moment of the intro film, then Skip
+        r.click(".intro-skip", nav=True, scroll=False)
     if "/terms" in r.page.url:
         r.point(".terms-key", "start.terms", scroll=False)
         r.shot("start_terms")
@@ -900,6 +903,9 @@ def record(only=None, voice=False):
             dpage.fill("input[name=name]", "Dr. Asha Rao")
             dpage.fill("input[name=email]", "asha.rao@jainuniversity.ac.in")
             dpage.click("form button[type=submit]")
+            dpage.wait_for_load_state("networkidle")
+        if "/intro" in dpage.url:
+            dpage.click(".intro-skip")
             dpage.wait_for_load_state("networkidle")
         if "/terms" in dpage.url:
             dpage.check("#terms-agree")

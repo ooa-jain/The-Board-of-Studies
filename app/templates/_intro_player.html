@@ -1,0 +1,13 @@
+{# The BoS intro film: plays at once (with sound when the browser allows it,
+   else muted with a "Turn sound on" button), and a Skip in the corner.
+   Needs intro_src and intro_poster; js/intro-player.js drives it. #}
+<div class="intro-player">
+  <video class="intro-video" playsinline preload="auto" poster="{{ intro_poster }}">
+    <source src="{{ intro_src }}" type="video/mp4">
+    Your browser cannot play this video.
+  </video>
+  <button type="button" class="intro-sound" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+    Turn sound on</button>
+  <div class="intro-bar" aria-hidden="true"><i></i></div>
+</div>

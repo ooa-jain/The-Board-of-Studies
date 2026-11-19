@@ -144,20 +144,79 @@ def _ask_who():
 TERMS_VERSION = "2026-11"
 
 
+# the intro film, shown once per department login before the terms
+INTRO_VERSION = "2026-11"
+
+
 def _ask_terms(u):
-    """The first time a department's login is used, the terms of use come
-    before anything else; once agreed, never again (until they change)."""
-    if (not current_app.config.get("ASK_TERMS", True) or acting() or u.get("terms") == TERMS_VERSION
-            or request.endpoint in ("dept.terms", "dept.who") or request.method != "GET"
-            or "/api/" in request.path):
+    """The first time a department's login is used, the intro film plays
+    (with Skip), then the terms of use come before anything else; once
+    seen and agreed, never again (until either changes)."""
+    if (acting() or request.endpoint in ("dept.terms", "dept.who", "dept.intro", "dept.intro_seen")
+            or request.method != "GET" or "/api/" in request.path):
         return None
-    d = get_db().departments.find_one({"dept_code": u.get("dept_code")}, {"terms": 1}) or {}
+    want_intro = current_app.config.get("ASK_INTRO", True) and u.get("intro") != INTRO_VERSION
+    want_terms = current_app.config.get("ASK_TERMS", True) and u.get("terms") != TERMS_VERSION
+    if not (want_intro or want_terms):
+        return None
+    d = get_db().departments.find_one({"dept_code": u.get("dept_code")}, {"terms": 1, "intro": 1}) or {}
+    nxt = request.full_path.rstrip("?")
+    if want_intro:
+        if (d.get("intro") or {}).get("version") == INTRO_VERSION:
+            u["intro"] = INTRO_VERSION
+            session["user"] = u
+            session.modified = True
+        else:
+            return redirect(url_for("dept.intro", next=nxt))
+    if not want_terms:
+        return None
     if (d.get("terms") or {}).get("version") == TERMS_VERSION:
         u["terms"] = TERMS_VERSION
         session["user"] = u
         session.modified = True
         return None
     return redirect(url_for("dept.terms", next=request.full_path.rstrip("?")))
+
+
+def _intro_file():
+    """The intro film and its still, each with its date as a version."""
+    folder = Path(current_app.static_folder) / "video"
+    return {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
+            for n in ("intro.mp4", "intro.jpg")}
+
+
+@bp.route("/intro")
+@department_required
+def intro():
+    """The first sign-in: the BoS intro film, full screen, with Skip."""
+    nxt = request.args.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("dept.dashboard")
+    files = _intro_file()
+    if not files["intro.mp4"]:
+        return redirect(nxt)
+    return render_template("dept/intro.html", dept=_dept(), nxt=nxt, files=files, hide_chrome=True)
+
+
+@bp.post("/intro/seen")
+@department_required
+def intro_seen():
+    """Watched or skipped: not shown again on this login."""
+    nxt = request.form.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("dept.dashboard")
+    me = _me()
+    if not acting():
+        dept = _dept()
+        how = "skipped" if request.form.get("how") == "skipped" else "watched"
+        get_db().departments.update_one({"_id": dept["_id"]}, {"$set": {"intro": {
+            "version": INTRO_VERSION, "at": now(), "how": how,
+            "name": (me.get("person") or {}).get("name", "")}}})
+        audit(me["username"], f"intro.{how}", dept["dept_code"])
+    me["intro"] = INTRO_VERSION
+    session["user"] = me
+    session.modified = True
+    return redirect(nxt)
 
 
 @bp.route("/terms", methods=["GET", "POST"])

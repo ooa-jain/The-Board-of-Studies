@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block body_class %}is-intro{% endblock %}
+{% block body %}
+<main id="main-content" class="intro-page">
+  <header class="intro-top">
+    <img class="intro-logo" data-logo="light" alt="JAIN (Deemed-to-be University)"
+         src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
+    <span class="intro-kicker">BoS Academic Portal · {{ dept.dept_name }}</span>
+    <form method="post" action="{{ url_for('dept.intro_seen') }}" class="intro-skip-form">
+      <input type="hidden" name="next" value="{{ nxt }}">
+      <input type="hidden" name="how" value="skipped">
+      <button type="submit" class="intro-skip">Skip intro <span aria-hidden="true">→</span></button>
+    </form>
+  </header>
+
+  <div class="intro-stage">
+    {% set intro_src = url_for('static', filename='video/intro.mp4', v=files['intro.mp4']) %}
+    {% set intro_poster = url_for('static', filename='video/intro.jpg', v=files['intro.jpg']) %}
+    {% include "_intro_player.html" %}
+    {# at the end, over the last picture: Continue #}
+    <form method="post" action="{{ url_for('dept.intro_seen') }}" class="intro-next" id="intro-next" hidden>
+      <input type="hidden" name="next" value="{{ nxt }}">
+      <input type="hidden" name="how" value="watched">
+      <p>Welcome to the BoS Academic Portal.</p>
+      <button type="submit" class="intro-go">Continue <span aria-hidden="true">→</span></button>
+    </form>
+  </div>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/intro-player.js') }}"></script>
+<script>
+  // at the end: Continue appears over the last picture
+  (function () {
+    var v = document.querySelector(".intro-video"), next = document.getElementById("intro-next");
+    if (!v || !next) return;
+    v.addEventListener("ended", function () {
+      next.hidden = false;
+      next.querySelector("button").focus();
+    });
+  })();
+</script>
+{% endblock %}
