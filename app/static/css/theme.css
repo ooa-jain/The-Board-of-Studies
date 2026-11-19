@@ -116,8 +116,9 @@ html[data-theme="dark"]:root .lsc-step.is-on i { background: #fff; color: #0e2a5
 
 /* The sign-in page's navy panel stays navy in dark mode (the generated dark
    rules would lift it to a bright blue, as they do navy buttons). */
-html[data-theme="dark"] body.is-login .login-side {
-  background: linear-gradient(160deg, #060c1a 0%, #0b1a33 55%, #142c4d 100%); color: #ffffff; }
+html[data-theme="dark"] body.is-login .login-side { background-color: #060c1a; color: #ffffff; }
+html[data-theme="dark"] body.is-login .login-side::before {
+  background: linear-gradient(160deg, rgba(6, 12, 26, .94) 0%, rgba(11, 26, 51, .84) 50%, rgba(20, 44, 77, .68) 100%); }
 html[data-theme="dark"] body.is-login .login-side h1 { color: #ffffff; }
 html[data-theme="dark"] body.is-login .login-kicker { color: #9fb3d1; }
 html[data-theme="dark"] body.is-login .login-lede { color: #c9d4e6; }

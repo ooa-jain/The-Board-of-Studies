@@ -8,9 +8,14 @@ body.is-login { margin: 0; min-height: 100vh; background: #ffffff; color: #17202
   margin: 0; padding: 0; font-family: "Roboto", "Segoe UI", system-ui, sans-serif; }
 
 /* ---- the navy side ---- */
-.login-side { display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
+.login-side { position: relative; isolation: isolate; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
   padding: 56px 64px; color: #ffffff;
-  background: linear-gradient(160deg, #091324 0%, #0f2440 55%, #1b3b63 100%); }
+  background: #0f2440 url("../video/campus.jpg") center / cover no-repeat; }
+/* the campus clip behind it, muted and looping, under a navy veil so the words read */
+.login-film { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
+.login-side::before { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(160deg, rgba(9, 19, 36, .92) 0%, rgba(15, 36, 64, .80) 50%, rgba(27, 59, 99, .62) 100%); }
 .login-logo { width: 180px; height: auto; display: block; }
 .login-kicker { display: block; color: #9fb3d1; font-size: .78rem; font-weight: 700; letter-spacing: .14em;
   text-transform: uppercase; margin-bottom: 10px; }
@@ -63,5 +68,8 @@ html body.is-login .theme-float { position: absolute; top: 18px; right: 20px; pa
   .login-side { padding: 32px 24px; gap: 24px; }
   .login-logo { width: 140px; }
   .login-steps { display: none; }
+  .login-film { display: none; }               /* the picture alone on a phone: no video to download */
   .login-main { padding: 32px 20px 40px; justify-content: flex-start; }
 }
+
+@media (prefers-reduced-motion: reduce) { .login-film { display: none; } }

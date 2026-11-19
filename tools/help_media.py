@@ -808,9 +808,23 @@ def ts(sec, sep="."):
     return f"{int(h):02d}:{int(m):02d}:{s:06.3f}".replace(".", sep)
 
 
+# the campus clip the video opens with (the same one as the sign-in page)
+INTRO = ROOT / "app" / "static" / "video" / "campus.mp4"
+
+
 def assemble(recs, voice=False):
     OUT.mkdir(parents=True, exist_ok=True)
     parts, chapters, vtt, at = [], [], ["WEBVTT", ""], 0.0
+    if INTRO.exists():
+        # first, the campus, fading out into section 1 — part of section 1
+        seg = WORK / "seg00-intro.mp4"
+        fade = max(0.0, (_duration(INTRO) or 10.0) - 0.6)
+        ff("-i", INTRO, "-vf", f"fps=25,format=yuv420p,fade=t=out:st={fade:.2f}:d=0.6",
+           "-af", f"aresample=44100,aformat=channel_layouts=mono,afade=t=out:st={fade:.2f}:d=0.6",
+           "-c:v", "libx264", "-preset", "medium", "-crf", "26",
+           "-c:a", "aac", "-b:a", "96k" if voice else "48k", "-ar", "44100", seg)
+        parts.append(seg)
+        at = _duration(seg) or 10.0
     for rec in recs:
         begin = max(0.0, rec["begin"] - 0.05)
         length = rec["end"] - begin
@@ -832,7 +846,9 @@ def assemble(recs, voice=False):
                "-map", "0:v", "-map", "1:a", "-vf", "fps=25,format=yuv420p", "-c:v", "libx264",
                "-preset", "medium", "-crf", "26", "-c:a", "aac", "-b:a", "48k", "-shortest", seg)
         real = _duration(seg) or length
-        chapters.append({"title": rec["title"], "sub": rec["sub"], "start": round(at, 2), "end": round(at + real, 2)})
+        # section 1 takes in the campus clip before it
+        start = 0.0 if not chapters else at
+        chapters.append({"title": rec["title"], "sub": rec["sub"], "start": round(start, 2), "end": round(at + real, 2)})
         for a, b, text in cues:
             vtt += [f"{ts(at + a)} --> {ts(at + b)}", text, ""]
         parts.append(seg)
@@ -847,7 +863,9 @@ def assemble(recs, voice=False):
         f"title={c['title']}\n" for c in chapters))
     ff("-i", joined, "-i", meta, "-map_metadata", "1", "-map_chapters", "1", "-c", "copy",
        "-movflags", "+faststart", OUT / "walkthrough.mp4")
-    ff("-ss", "1.2", "-i", OUT / "walkthrough.mp4", "-frames:v", "1", "-q:v", "3", OUT / "poster.jpg")
+    # the poster: the campus when the video opens with it, else the title card
+    ff("-ss", "7.5" if INTRO.exists() else "1.2", "-i", OUT / "walkthrough.mp4", "-frames:v", "1", "-q:v", "3",
+       OUT / "poster.jpg")
     (OUT / "chapters.json").write_text(json.dumps(chapters, indent=1, ensure_ascii=False))
     (OUT / "captions.vtt").write_text("\n".join(vtt))
     return chapters

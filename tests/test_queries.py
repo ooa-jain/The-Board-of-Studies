@@ -89,3 +89,16 @@ def test_help_opens_without_signing_in(client):
     body = r.get_data(as_text=True)
     assert "How the portal works" in body and "User manual" in body
     assert "Back to sign in" in body
+
+
+def test_sign_in_page_plays_the_campus_clip(app, client):
+    """The campus clip (Gemini mark removed) plays muted behind the navy side;
+    the Help walkthrough opens with it."""
+    import json
+    from pathlib import Path
+    page = client.get("/").get_data(as_text=True)
+    assert 'class="login-film"' in page and "video/campus.mp4" in page and "muted" in page
+    static = Path(app.static_folder)
+    assert (static / "video" / "campus.mp4").stat().st_size > 100_000
+    chapters = json.loads((static / "help" / "chapters.json").read_text(encoding="utf-8"))
+    assert chapters[0]["start"] == 0 and chapters[1]["start"] > 100      # moved on by the clip

@@ -7195,7 +7195,10 @@ html[data-theme="dark"] body.is-login {
 }
 html[data-theme="dark"] .login-side {
   color: #ffffff;
-  background: linear-gradient(160deg, #2b5aab 0%, #2962ae 55%, #2e64a8 100%);
+  background: #2962ae url("../video/campus.jpg") center / cover no-repeat;
+}
+html[data-theme="dark"] .login-side::before {
+  background: linear-gradient(160deg, rgba(43, 90, 171, 0.92) 0%, rgba(41, 98, 174, 0.8) 50%, rgba(46, 100, 168, 0.62) 100%);
 }
 html[data-theme="dark"] .login-kicker {
   color: #9fb3d1;

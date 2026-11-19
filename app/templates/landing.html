@@ -11,6 +11,10 @@
 {% block body %}
 <main id="main-content" class="login">
   <section class="login-side">
+    <video class="login-film" autoplay muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1"
+           poster="{{ url_for('static', filename='video/campus.jpg') }}">
+      <source src="{{ url_for('static', filename='video/campus.mp4') }}" type="video/mp4">
+    </video>
     <img class="login-logo" data-logo="light" alt="JAIN (Deemed-to-be University)"
          src="{{ url_for('static', filename='img/jain-logo-light.png') }}" width="1103" height="319">
     <div>
