@@ -3,66 +3,66 @@
   "title": "Signing in and your home page",
   "sub": "Sign in, say who you are, find your way",
   "start": 0.0,
-  "end": 107.13
+  "end": 112.17
  },
  {
   "title": "Department Information",
   "sub": "Stage 1 · the programmes you run",
-  "start": 107.13,
-  "end": 154.8
+  "start": 112.17,
+  "end": 179.09
  },
  {
   "title": "Pre-BoS",
   "sub": "Stage 2 · signed DIAC, DPAC and minutes",
-  "start": 154.8,
-  "end": 217.08
+  "start": 179.09,
+  "end": 240.33
  },
  {
   "title": "BoS Documents",
   "sub": "Stage 3 · the meeting and its documents",
-  "start": 217.08,
-  "end": 257.68
+  "start": 240.33,
+  "end": 280.73
  },
  {
   "title": "Curriculum",
   "sub": "Stage 4 · a programme's Curriculum",
-  "start": 257.68,
-  "end": 357.24
+  "start": 280.73,
+  "end": 415.45
  },
  {
   "title": "Syllabus",
   "sub": "One sheet per course",
-  "start": 357.24,
-  "end": 428.85
+  "start": 415.45,
+  "end": 490.97
  },
  {
   "title": "Course Revision",
   "sub": "Previous and revised syllabus",
-  "start": 428.85,
-  "end": 456.08
+  "start": 490.97,
+  "end": 521.73
  },
  {
   "title": "Earlier batches",
   "sub": "The same three parts for each earlier batch",
-  "start": 456.08,
-  "end": 491.0
+  "start": 521.73,
+  "end": 554.93
  },
  {
   "title": "Checking and submitting",
   "sub": "Autosave, the checks, Submit",
-  "start": 491.0,
-  "end": 600.12
+  "start": 554.93,
+  "end": 696.29
  },
  {
   "title": "Reports",
   "sub": "See your submission",
-  "start": 600.12,
-  "end": 642.67
+  "start": 696.29,
+  "end": 736.68
  },
  {
   "title": "Version history, password and help",
   "sub": "",
-  "start": 642.67,
-  "end": 688.35
+  "start": 736.68,
+  "end": 808.28
  }
 ]
