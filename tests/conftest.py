@@ -35,7 +35,7 @@ def app(monkeypatch):
     people._seen_at.clear()
     people._cleared_at.clear()
     application = create_app()
-    application.config.update(TESTING=True, SESSION_COOKIE_SECURE=False, ASK_PERSON=False)
+    application.config.update(TESTING=True, SESSION_COOKIE_SECURE=False, ASK_PERSON=False, ASK_TERMS=False)
     yield application
 
 

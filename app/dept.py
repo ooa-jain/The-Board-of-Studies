@@ -130,11 +130,61 @@ def _ask_who():
             session.modified = True
     if p:
         people.seen(u["dept_code"], p)
-        return None
+        return _ask_terms(u)
     if (not current_app.config.get("ASK_PERSON", True) or request.endpoint in _NO_ASK
             or request.method != "GET" or "/api/" in request.path):
-        return None
+        return _ask_terms(u)
     return redirect(url_for("dept.who", next=request.full_path.rstrip("?")))
+
+
+# ---------------------------------------------------------------------------
+# the terms of use, agreed once per department login (and again when they change)
+# ---------------------------------------------------------------------------
+
+TERMS_VERSION = "2026-11"
+
+
+def _ask_terms(u):
+    """The first time a department's login is used, the terms of use come
+    before anything else; once agreed, never again (until they change)."""
+    if (not current_app.config.get("ASK_TERMS", True) or acting() or u.get("terms") == TERMS_VERSION
+            or request.endpoint in ("dept.terms", "dept.who") or request.method != "GET"
+            or "/api/" in request.path):
+        return None
+    d = get_db().departments.find_one({"dept_code": u.get("dept_code")}, {"terms": 1}) or {}
+    if (d.get("terms") or {}).get("version") == TERMS_VERSION:
+        u["terms"] = TERMS_VERSION
+        session["user"] = u
+        session.modified = True
+        return None
+    return redirect(url_for("dept.terms", next=request.full_path.rstrip("?")))
+
+
+@bp.route("/terms", methods=["GET", "POST"])
+@department_required
+def terms():
+    if acting():
+        return redirect(url_for("dept.dashboard"))
+    dept = _dept()
+    me = _me()
+    nxt = request.values.get("next") or ""
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = url_for("dept.dashboard")
+    error = None
+    if request.method == "POST":
+        if request.form.get("agree") != "on":
+            error = "Tick the box to say you have read the terms and will keep a backup."
+        else:
+            person = me.get("person") or {}
+            get_db().departments.update_one({"_id": dept["_id"]}, {"$set": {"terms": {
+                "version": TERMS_VERSION, "at": now(), "name": person.get("name", ""),
+                "email": person.get("email", ""), "username": me["username"]}}})
+            me["terms"] = TERMS_VERSION
+            session["user"] = me
+            session.modified = True
+            audit(me["username"], "terms.accepted", f"{dept['dept_code']} {TERMS_VERSION}")
+            return redirect(nxt)
+    return render_template("dept/terms.html", dept=dept, nxt=nxt, error=error, hide_chrome=True)
 
 
 @bp.route("/who", methods=["GET", "POST"])

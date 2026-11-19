@@ -76,6 +76,8 @@ SAY = {
                     "issued to your department.",
     "start.who": "The first time on a computer, the portal asks who you are. Your name and e-mail go with every "
                  "change you save, so the Office knows who did what.",
+    "start.terms": "The first time your department signs in, read the terms of use. Above all, keep your own "
+                   "backup of every file and all the data you submit. Tick the box, and enter the portal.",
     "start.home": "Your home page shows the next step, with one button to continue where you left off.",
     "start.progress": "Below it, how many stages are done, and your submissions, programme by programme.",
     "start.side": "The menu on the left takes you to every stage: Department Information, Pre-BoS, BoS Documents "
@@ -592,6 +594,11 @@ def sec_start(r, login):
         r.type("input[name=email]", "asha.rao@jainuniversity.ac.in")
         r.shot("start_who")
         r.click("main form button[type=submit]", nav=True)
+    if "/terms" in r.page.url:
+        r.point(".terms-key", "start.terms", scroll=False)
+        r.shot("start_terms")
+        r.click("#terms-agree", scroll=True)
+        r.click("#terms-go", nav=True)
     if "/department/" not in r.page.url:
         r.goto("/department/")
     r.shot("start_home")
@@ -894,6 +901,10 @@ def record(only=None, voice=False):
             dpage.fill("input[name=email]", "asha.rao@jainuniversity.ac.in")
             dpage.click("form button[type=submit]")
             dpage.wait_for_load_state("networkidle")
+        if "/terms" in dpage.url:
+            dpage.check("#terms-agree")
+            dpage.click("#terms-go")
+            dpage.wait_for_load_state("networkidle")
         dpage.request.post(B + "/department/demo/fill-all")
         state = dept.storage_state()
 
@@ -1007,6 +1018,8 @@ MANUAL = [
      "Pre-BoS, BoS Documents and Curriculum.",
      "steps": ["Open the portal and enter your department's username and password, then press Sign in.",
                "The first time on a computer, give your name and e-mail. Every change you save is noted against them.",
+               "The first time your department signs in, read the terms of use — above all, keep your own backup "
+               "of every file and all the data you submit — tick the box and press Enter the portal.",
                "Your home page shows the next step: press Continue to carry on where you left off.",
                "Below it are how many stages are done, and your submissions, programme by programme.",
                "The menu on the left opens every stage. A blue dot means in progress; green means submitted.",

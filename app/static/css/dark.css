@@ -5530,6 +5530,71 @@ html[data-theme="dark"] .q-shot img {
 html[data-theme="dark"] .q-shot:hover img {
   border-color: #2c5488;
 }
+html[data-theme="dark"] body.is-terms {
+  background: #181b21;
+}
+html[data-theme="dark"] .terms-card {
+  background: #121519;
+  border: 1px solid #2e3542;
+  box-shadow: 0 6px 22px rgba(9, 19, 36, 0.09);
+}
+html[data-theme="dark"] .terms-kicker {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .terms-head h1 {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .terms-lede {
+  color: #afb8ca;
+}
+html[data-theme="dark"] .terms-key {
+  background: #322911;
+  border: 2px solid #f59e0b;
+  box-shadow: 0 8px 24px -14px rgba(245, 158, 11, 0.7);
+}
+html[data-theme="dark"] .terms-key h2 {
+  color: #ffb966;
+}
+html[data-theme="dark"] .terms-key p {
+  color: #e1c684;
+}
+html[data-theme="dark"] .terms-key-icon {
+  background: #f59e0b;
+}
+html[data-theme="dark"] .terms-key-icon svg {
+  fill: none;
+  stroke: #ffffff;
+}
+html[data-theme="dark"] .terms-list {
+  color: #ced8e6;
+}
+html[data-theme="dark"] .terms-list strong {
+  color: #acc7ec;
+}
+html[data-theme="dark"] .terms-error {
+  background: #301310;
+  color: #e48b81;
+}
+html[data-theme="dark"] .terms-form {
+  border-top: 1px solid #2e3542;
+}
+html[data-theme="dark"] .terms-agree input {
+  accent-color: #acc7ec;
+}
+html[data-theme="dark"] .terms-go {
+  border: 0;
+  background: #2962ae;
+  color: #ffffff;
+}
+html[data-theme="dark"] .terms-go:disabled {
+  background: #b8bfcc;
+}
+html[data-theme="dark"] .terms-go:not(:disabled):hover {
+  background: #2e64a8;
+}
+html[data-theme="dark"] .terms-foot {
+  color: #aab2c1;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

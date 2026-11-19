@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Terms of use{% endblock %}
+{% block body_class %}is-terms{% endblock %}
+{% block body %}
+<main id="main-content" class="terms-page">
+  <div class="terms-card">
+    <div class="terms-head">
+      <img class="terms-logo" alt="JAIN (Deemed-to-be University)"
+           src="{{ url_for('static', filename='img/jain-logo.png') }}" width="1103" height="319">
+      <span class="terms-kicker">BoS Academic Portal · {{ dept.dept_name }}</span>
+      <h1>Before you begin</h1>
+      <p class="terms-lede">A few ground rules for your department's Board of Studies record. Read them once,
+        tick the box, and the portal opens.</p>
+    </div>
+
+    {# the one that matters most, set apart #}
+    <section class="terms-key" aria-labelledby="terms-backup">
+      <span class="terms-key-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></span>
+      <div>
+        <h2 id="terms-backup">Keep your own backup — always</h2>
+        <p>The portal is where your record is <strong>submitted</strong>; it is not where your department's files are
+          <strong>kept</strong>. Hold a complete copy of everything you enter and upload — the signed DIAC and
+          DPAC forms, the Pre-BoS and BoS minutes, attendance and photos, each curriculum, syllabus and course
+          revision — in your department's own folder or drive, <strong>before and after you submit</strong>.
+          If a file is ever questioned, it is your copy that answers.</p>
+      </div>
+    </section>
+
+    <ol class="terms-list">
+      <li><strong>One login, one department.</strong> This username belongs to your department. Share it only with
+        the staff preparing the record, never outside it. Each change is saved under the name and e-mail given
+        when signing in.</li>
+      <li><strong>What you enter is the official record.</strong> Every figure, course and document should match
+        what your Board of Studies approved and the University's own records — nothing estimated, nothing borrowed
+        from another department.</li>
+      <li><strong>Approved before it goes.</strong> The Head of the Department and the Dean approve the record, by
+        name, before the final submit. Their approval is printed in the documents.</li>
+      <li><strong>Submitted means locked.</strong> Once a stage is submitted it cannot be changed from your side;
+        only the Office of Academic Affairs can send it back for correction.</li>
+      <li><strong>Upload only what belongs.</strong> Add the documents each box asks for, and no personal details
+        beyond what the forms require. Uploads are read automatically to check they are the right documents.</li>
+      <li><strong>How it is used.</strong> The record is used by the Office of Academic Affairs for the University's
+        academic records, approvals and accreditation, and is not shared outside the University for any other
+        purpose.</li>
+      <li><strong>Stuck?</strong> Use <em>Query</em> in the menu to watch how a step is done, or <em>Report a bug</em>
+        with a screenshot — the Office will see it.</li>
+    </ol>
+
+    {% if error %}<div class="terms-error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="terms-form">
+      <input type="hidden" name="next" value="{{ nxt }}">
+      <label class="terms-agree">
+        <input type="checkbox" name="agree" id="terms-agree">
+        <span>I have read these terms, and <strong>I will keep a backup of every file and all the data my department
+          submits</strong>.</span>
+      </label>
+      <button class="terms-go" type="submit" id="terms-go" disabled>Enter the portal <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="terms-foot">Signed in as {{ dept.dept_name }}{% if current_user.person %} · {{ current_user.person.name }}{% endif %}
+      · <a href="{{ url_for('auth.logout') }}">Not now — sign out</a></p>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var tick = document.getElementById("terms-agree"), go = document.getElementById("terms-go");
+    if (!tick || !go) return;
+    var sync = function () { go.disabled = !tick.checked; };
+    tick.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endblock %}

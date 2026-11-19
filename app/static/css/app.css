@@ -5325,3 +5325,32 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .kl-card .flex { gap: 8px; flex-wrap: wrap; align-items: center; }
 .kl-card form { margin: 0; }
 .tm-setall { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+
+/* ---- first sign-in: the terms of use ---- */
+body.is-terms { margin: 0; background: var(--canvas); }
+.terms-page { min-height: 100vh; display: flex; justify-content: center; padding: 40px 16px; box-sizing: border-box; }
+.terms-card { width: 100%; max-width: 760px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 20px; box-shadow: var(--shadow); padding: 34px 38px 26px; }
+.terms-logo { width: 130px; height: auto; display: block; margin-bottom: 18px; }
+.terms-kicker { display: block; font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-soft); }
+.terms-head h1 { margin: 8px 0 6px; font-size: 1.9rem; color: var(--ink-800); }
+.terms-lede { margin: 0 0 22px; color: var(--ink-soft); }
+.terms-key { display: flex; gap: 16px; align-items: flex-start; padding: 18px 20px; margin: 0 0 22px;
+  border-radius: 14px; background: #fff7e0; border: 2px solid #f59e0b; box-shadow: 0 8px 24px -14px rgba(245, 158, 11, .7); }
+.terms-key h2 { margin: 0 0 6px; font-size: 1.12rem; color: #8a4b00; }
+.terms-key p { margin: 0; color: #4a3a12; line-height: 1.6; }
+.terms-key-icon { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: #f59e0b; }
+.terms-key-icon svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.terms-list { margin: 0 0 22px; padding-left: 20px; display: grid; gap: 10px; color: var(--ink); line-height: 1.55; }
+.terms-list strong { color: var(--ink-800); }
+.terms-error { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: var(--err-bg); color: var(--err); font-size: .9rem; }
+.terms-form { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
+.terms-agree { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; line-height: 1.5; }
+.terms-agree input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: #0f2440; }
+.terms-go { justify-self: start; height: 48px; padding: 0 26px; border: 0; border-radius: 10px; background: #0f2440;
+  color: #fff; font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer; }
+.terms-go:disabled { background: #b8c0cc; cursor: not-allowed; }
+.terms-go:not(:disabled):hover { background: #1b3b63; }
+.terms-foot { margin: 16px 0 0; font-size: .82rem; color: var(--ink-faint); }
+@media (max-width: 600px) { .terms-card { padding: 24px 18px; } .terms-head h1 { font-size: 1.5rem; } .terms-key { flex-direction: column; } }
