@@ -78,12 +78,32 @@ def landing():
     # the counting.
     stats = {"departments": db.departments.count_documents({"active": True})}
     # the sign-in page is a page of its own: no top bar, no footer
+    return render_template("landing.html", stats=stats, next_url=nxt, intro=intro_media(),
+                           resume=_resume_for(session.get("user")), hide_chrome=True)
+
+
+# the intro film in each language: English first (the default), then the rest
+INTRO_LANGS = (("en", "English", "intro.mp4"), ("hi", "हिन्दी", "intro-hi.mp4"),
+               ("kn", "ಕನ್ನಡ", "intro-kn.mp4"), ("ta", "தமிழ்", "intro-ta.mp4"),
+               ("ml", "മലയാളം", "intro-ml.mp4"))
+
+
+def intro_media():
+    """The intro film: its still, and one file per language that is there,
+    each with its date as a version. None when there is no English film."""
     from pathlib import Path
     folder = Path(current_app.static_folder) / "video"
-    intro = {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
-             for n in ("intro.mp4", "intro.jpg")}
-    return render_template("landing.html", stats=stats, next_url=nxt, intro=intro,
-                           resume=_resume_for(session.get("user")), hide_chrome=True)
+
+    def ver(n):
+        f = folder / n
+        return int(f.stat().st_mtime) if f.is_file() else 0
+
+    langs = [{"code": c, "label": lab, "src": url_for("static", filename=f"video/{n}", v=ver(n))}
+             for c, lab, n in INTRO_LANGS if ver(n)]
+    if not langs or langs[0]["code"] != "en":
+        return None
+    return {"src": langs[0]["src"], "langs": langs,
+            "poster": url_for("static", filename="video/intro.jpg", v=ver("intro.jpg"))}
 
 
 def _resume_for(user):

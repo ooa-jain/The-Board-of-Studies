@@ -145,7 +145,7 @@ TERMS_VERSION = "2026-11"
 
 
 # the intro film, shown once per department login before the terms
-INTRO_VERSION = "2026-11"
+INTRO_VERSION = "2026-11b"
 
 
 def _ask_terms(u):
@@ -178,13 +178,6 @@ def _ask_terms(u):
     return redirect(url_for("dept.terms", next=request.full_path.rstrip("?")))
 
 
-def _intro_file():
-    """The intro film and its still, each with its date as a version."""
-    folder = Path(current_app.static_folder) / "video"
-    return {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
-            for n in ("intro.mp4", "intro.jpg")}
-
-
 @bp.route("/intro")
 @department_required
 def intro():
@@ -192,10 +185,11 @@ def intro():
     nxt = request.args.get("next") or ""
     if not nxt.startswith("/") or nxt.startswith("//"):
         nxt = url_for("dept.dashboard")
-    files = _intro_file()
-    if not files["intro.mp4"]:
+    from .public import intro_media
+    intro = intro_media()
+    if not intro:
         return redirect(nxt)
-    return render_template("dept/intro.html", dept=_dept(), nxt=nxt, files=files, hide_chrome=True)
+    return render_template("dept/intro.html", dept=_dept(), nxt=nxt, intro=intro, hide_chrome=True)
 
 
 @bp.post("/intro/seen")

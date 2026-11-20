@@ -5377,7 +5377,14 @@ body.is-intro { margin: 0; background: #060c1a; color: #fff; }
 .intro-sound svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .intro-sound[hidden] { display: none; }
 .intro-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.15); }
-.intro-bar i { display: block; height: 100%; width: 0; background: #f59e0b; transition: width .25s linear; }
+.intro-bar i { display: block; height: 100%; width: 0; background: #3b82f6; transition: width .25s linear; }
+.intro-langs { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 0 auto 12px; }
+.intro-langs-label { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #9fb3d1; margin-right: 4px; }
+.intro-lang { border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.06); color: #e5edf8; font: inherit; font-size: .9rem;
+  padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: background .15s, border-color .15s; }
+.intro-lang:hover { background: rgba(255,255,255,.14); }
+.intro-lang.is-on { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
+.intro-lang:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
 .intro-next { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 18px; margin: 0; border-radius: 16px; background: rgba(6, 12, 26, .72);
   animation: intro-in .5s ease; }
@@ -5400,3 +5407,4 @@ body.is-intro { margin: 0; background: #060c1a; color: #fff; }
 .intro-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 18px;
   font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #9fb3d1; }
 .intro-dialog .intro-player { border-radius: 0 0 16px 16px; box-shadow: none; }
+.intro-dialog .intro-langs { margin: 0; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.08); justify-content: flex-start; }

@@ -1,9 +1,19 @@
 {# The BoS intro film: plays at once (with sound when the browser allows it,
    else muted with a "Turn sound on" button), and a Skip in the corner.
-   Needs intro_src and intro_poster; js/intro-player.js drives it. #}
+   Needs intro (from public.intro_media); js/intro-player.js drives it.
+   A row of languages above it switches the voice; English comes first. #}
+{% if intro.langs|length > 1 %}
+<div class="intro-langs" role="group" aria-label="Language of the intro">
+  <span class="intro-langs-label">Language</span>
+  {% for l in intro.langs %}
+  <button type="button" class="intro-lang{% if loop.first %} is-on{% endif %}" data-src="{{ l.src }}"
+          lang="{{ l.code }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ l.label }}</button>
+  {% endfor %}
+</div>
+{% endif %}
 <div class="intro-player">
-  <video class="intro-video" playsinline preload="auto" poster="{{ intro_poster }}">
-    <source src="{{ intro_src }}" type="video/mp4">
+  <video class="intro-video" playsinline preload="auto" poster="{{ intro.poster }}">
+    <source src="{{ intro.src }}" type="video/mp4">
     Your browser cannot play this video.
   </video>
   <button type="button" class="intro-sound" hidden>

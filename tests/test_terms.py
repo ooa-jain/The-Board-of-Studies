@@ -41,6 +41,7 @@ def test_intro_film_first_then_terms_and_skip(app, client):
         assert r.status_code == 302 and "/department/intro" in r.headers["Location"]
         page = client.get("/department/intro?next=/department/").get_data(as_text=True)
         assert "video/intro.mp4" in page and "Skip intro" in page and "Continue" in page
+        assert "video/intro-ml.mp4" in page and "Language" in page
         # Skip: never again on this login, and the terms come next
         r = client.post("/department/intro/seen", data={"next": "/department/", "how": "skipped"})
         assert r.headers["Location"].endswith("/department/")
@@ -59,3 +60,9 @@ def test_intro_film_first_then_terms_and_skip(app, client):
 def test_sign_in_page_offers_the_intro(client):
     page = client.get("/").get_data(as_text=True)
     assert 'id="intro-open"' in page and "Watch the intro" in page and "video/intro.mp4" in page
+    # five voices, English first and chosen
+    for f in ("intro-hi.mp4", "intro-kn.mp4", "intro-ta.mp4", "intro-ml.mp4"):
+        assert "video/" + f in page
+    row = page[page.index('class="intro-langs"'):]
+    assert row.index("English") < row.index("हिन्दी") < row.index("ಕನ್ನಡ") < row.index("தமிழ்") < row.index("മലയാളം")
+    assert 'class="intro-lang is-on"' in page and page.count('aria-pressed="true"') == 1

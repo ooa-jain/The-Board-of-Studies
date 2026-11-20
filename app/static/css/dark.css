@@ -5630,7 +5630,26 @@ html[data-theme="dark"] .intro-bar {
   background: rgba(18, 21, 25, 0.15);
 }
 html[data-theme="dark"] .intro-bar i {
-  background: #f59e0b;
+  background: #3b82f6;
+}
+html[data-theme="dark"] .intro-langs-label {
+  color: #9fb3d1;
+}
+html[data-theme="dark"] .intro-lang {
+  border: 1px solid rgba(36, 41, 50, 0.28);
+  background: rgba(18, 21, 25, 0.06);
+  color: #e5edf8;
+}
+html[data-theme="dark"] .intro-lang:hover {
+  background: rgba(18, 21, 25, 0.14);
+}
+html[data-theme="dark"] .intro-lang.is-on {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+html[data-theme="dark"] .intro-lang:focus-visible {
+  outline: 2px solid #344860;
 }
 html[data-theme="dark"] .intro-next {
   background: rgba(40, 80, 174, 0.72);
@@ -5675,6 +5694,9 @@ html[data-theme="dark"] .intro-dialog-head {
 }
 html[data-theme="dark"] .intro-dialog .intro-player {
   box-shadow: none;
+}
+html[data-theme="dark"] .intro-dialog .intro-langs {
+  border-bottom: 1px solid rgba(36, 41, 50, 0.08);
 }
 
 /* ---- erp.css ---- */
