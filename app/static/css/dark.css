@@ -5698,6 +5698,25 @@ html[data-theme="dark"] .intro-dialog .intro-player {
 html[data-theme="dark"] .intro-dialog .intro-langs {
   border-bottom: 1px solid rgba(36, 41, 50, 0.08);
 }
+html[data-theme="dark"] .who-lang {
+  border-top: 1px solid #263247;
+}
+html[data-theme="dark"] .who-lang-label {
+  color: #a1abbe;
+}
+html[data-theme="dark"] .who-lang-list button {
+  border: 1px solid #2c3b52;
+  background: #121519;
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .who-lang-list button:hover {
+  background: #101a2d;
+}
+html[data-theme="dark"] .who-lang-list button.is-on {
+  background: #1e55b8;
+  border-color: #3874e1;
+  color: #ffffff;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
@@ -6987,6 +7006,19 @@ html[data-theme="dark"] .app-dialog::backdrop {
 }
 html[data-theme="dark"] .app-dialog-head p {
   color: #afb8ca;
+}
+html[data-theme="dark"] .side-lang-list button {
+  border: 1px solid rgba(100, 113, 139, 0.45);
+  background: transparent;
+  color: inherit;
+}
+html[data-theme="dark"] .side-lang-list button:hover {
+  background: rgba(100, 113, 139, 0.14);
+}
+html[data-theme="dark"] .side-lang-list button.is-on {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
 }
 
 /* ---- admin.css ---- */

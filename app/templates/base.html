@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ ui_lang or 'en' }}"{% if ui_lang and ui_lang != 'en' %} class="i18n-wait"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,6 +10,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% if ui_lang and ui_lang != 'en' %}
+  {# the portal in the language picked in the profile menu (app/i18n.py) #}
+  {% if ui_font %}<link href="https://fonts.googleapis.com/css2?family={{ ui_font }}:wght@400;500;600;700&display=swap" rel="stylesheet">{% endif %}
+  <style>html.i18n-wait body { visibility: hidden; }</style>
+  <script src="{{ url_for('public.i18n_words', code=ui_lang, v=ui_words_v) }}"></script>
+  <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
+  {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/erp.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/shell.css') }}">
 
@@ -238,6 +245,18 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9V7a3 3 0 0 1 6 0v2M7 9h10v5a5 5 0 0 1-10 0zM12 11v8M4 13h3M17 13h3M5 8l2 2M19 8l-2 2M5 19l2-2M19 19l-2-2"/></svg><span class="side-text">Report a bug</span></button>
     {% endif %}
     {{ review_item() }}
+    {# Language: the portal's own words in the person's language (app/i18n.py) #}
+    <details class="side-lang">
+      <summary class="side-link" title="Language">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.5 9h17M3.5 15h17M12 3c2.5 2.7 3.5 5.7 3.5 9s-1 6.3-3.5 9c-2.5-2.7-3.5-5.7-3.5-9s1-6.3 3.5-9z"/></svg><span class="side-text">Language · <b translate="no">{{ dict(ui_langs)[ui_lang] }}</b></span></summary>
+      <form method="post" action="{{ url_for('public.set_language') }}" class="side-lang-list" translate="no">
+        <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+        {% for code, label in ui_langs %}
+        <button type="submit" name="lang" value="{{ code }}" lang="{{ code }}"
+                class="{{ 'is-on' if code == ui_lang }}" aria-pressed="{{ 'true' if code == ui_lang else 'false' }}">{{ label }}</button>
+        {% endfor %}
+      </form>
+    </details>
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       {% if current_user.acting %}
@@ -317,6 +336,16 @@
               <a href="{{ url_for('dept.who', next=request.full_path.rstrip('?')) }}">{{ 'Not you? Change name' if current_user.person else 'Add your name and e-mail' }}</a>
               <a href="{{ url_for('dept.versions') }}">Version History</a>
               <a href="{{ url_for('auth.change_password') }}">Password</a>
+              <form method="post" action="{{ url_for('public.set_language') }}" class="who-lang">
+                <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+                <span class="who-lang-label">Language</span>
+                <span class="who-lang-list" translate="no">
+                  {% for code, label in ui_langs %}
+                  <button type="submit" name="lang" value="{{ code }}" lang="{{ code }}"
+                          class="{{ 'is-on' if code == ui_lang }}" aria-pressed="{{ 'true' if code == ui_lang else 'false' }}">{{ label }}</button>
+                  {% endfor %}
+                </span>
+              </form>
             </div>
           </details>
           {% endif %}

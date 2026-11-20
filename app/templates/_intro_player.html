@@ -6,8 +6,8 @@
 <div class="intro-langs" role="group" aria-label="Language of the intro">
   <span class="intro-langs-label">Language</span>
   {% for l in intro.langs %}
-  <button type="button" class="intro-lang{% if loop.first %} is-on{% endif %}" data-src="{{ l.src }}"
-          lang="{{ l.code }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ l.label }}</button>
+  <button type="button" class="intro-lang{% if l.on %} is-on{% endif %}" data-src="{{ l.src }}"
+          lang="{{ l.code }}" aria-pressed="{{ 'true' if l.on else 'false' }}" translate="no">{{ l.label }}</button>
   {% endfor %}
 </div>
 {% endif %}

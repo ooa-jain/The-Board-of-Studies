@@ -5408,3 +5408,12 @@ body.is-intro { margin: 0; background: #060c1a; color: #fff; }
   font-size: .8rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #9fb3d1; }
 .intro-dialog .intro-player { border-radius: 0 0 16px 16px; box-shadow: none; }
 .intro-dialog .intro-langs { margin: 0; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.08); justify-content: flex-start; }
+
+/* ---- Language, in the profile menu (app/i18n.py) ---- */
+.who-lang { margin: 6px 0 0; padding-top: 8px; border-top: 1px solid #e3e8f1; display: grid; gap: 6px; }
+.who-lang-label { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #5b6b85; padding: 0 8px; }
+.who-lang-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 4px 2px; }
+.who-lang-list button { border: 1px solid #cfd8e6; background: #fff; color: #0e2a5c; font: inherit; font-size: .85rem;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.who-lang-list button:hover { background: #eef2f9; }
+.who-lang-list button.is-on { background: #0e2a5c; border-color: #0e2a5c; color: #fff; }

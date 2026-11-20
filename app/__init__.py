@@ -116,7 +116,13 @@ def create_app(config_object=Config):
             acting_dept = database.get_db().departments.find_one({"dept_code": user["dept_code"]},
                                                                 {"dept_name": 1, "dept_code": 1})
         from .access import template_helpers
+        from .i18n import FONTS, LANGS, current_lang, version
+        lang = current_lang(user)
         return {
+            "ui_lang": lang,
+            "ui_langs": LANGS,
+            "ui_font": FONTS.get(lang),
+            "ui_words_v": version(lang) if lang != "en" else 0,
             **template_helpers(),
             "acting_dept": acting_dept,
             "dept_nav": dept_nav,

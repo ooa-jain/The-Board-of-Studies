@@ -102,7 +102,13 @@ def intro_media():
              for c, lab, n in INTRO_LANGS if ver(n)]
     if not langs or langs[0]["code"] != "en":
         return None
-    return {"src": langs[0]["src"], "langs": langs,
+    from .auth import page_user
+    from .i18n import current_lang
+    want = current_lang(page_user())
+    first = next((l for l in langs if l["code"] == want), langs[0])
+    for l in langs:
+        l["on"] = l is first
+    return {"src": first["src"], "langs": langs,
             "poster": url_for("static", filename="video/intro.jpg", v=ver("intro.jpg"))}
 
 
@@ -147,6 +153,35 @@ def help_media():
     files = {n: int((folder / n).stat().st_mtime) if (folder / n).is_file() else 0
              for n in ("walkthrough.mp4", "manual.pdf", "poster.jpg")}
     return chapters, files
+
+
+@bp.post("/language")
+def set_language():
+    """The language picked in the profile menu: kept in this browser for a
+    year, then back to the page it was picked on."""
+    from .i18n import CODES, COOKIE
+    code = request.form.get("lang", "en")
+    nxt = request.form.get("next") or "/"
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = "/"
+    resp = redirect(nxt)
+    if code in CODES:
+        resp.set_cookie(COOKIE, code, max_age=365 * 24 * 3600, samesite="Lax",
+                        secure=request.is_secure, httponly=False)
+    return resp
+
+
+@bp.route("/i18n/<code>.js")
+def i18n_words(code):
+    """One language's words, as a script the page loads before it draws."""
+    from .i18n import CODES, words
+    if code not in CODES or code == "en":
+        abort(404)
+    body = "window.BOS_I18N=" + json.dumps(words(code), ensure_ascii=False, separators=(",", ":")) + ";"
+    resp = current_app.response_class(body, mimetype="application/javascript")
+    resp.cache_control.public = True
+    resp.cache_control.max_age = 7 * 24 * 3600
+    return resp
 
 
 @bp.route("/help")
