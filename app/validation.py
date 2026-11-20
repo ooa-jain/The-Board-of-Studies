@@ -127,6 +127,19 @@ def validate_field(fdef, value, section_key=None, row=None):
                 out.append(err(f"Module {k}: the % change must be between 0 and 100.", **where))
         return out
 
+    if ftype == "name_list":
+        # a programme's minors: names, each once
+        items = value if isinstance(value, list) else []
+        names = [str(x or "").strip() for x in items]
+        seen = set()
+        for n in names:
+            if n and n.lower() in seen:
+                out.append(err(f"{label}: “{n}” is listed twice.", **where))
+            seen.add(n.lower())
+        if fdef.get("required") and not any(names):
+            out.append(err(f"{label}: add at least one.", **where))
+        return out
+
     if ftype == "outcome_list":
         # a programme's POs (or PSOs): each one described, PO1 at least
         prefix = fdef.get("prefix") or ""

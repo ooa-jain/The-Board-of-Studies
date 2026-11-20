@@ -5717,6 +5717,37 @@ html[data-theme="dark"] .who-lang-list button.is-on {
   border-color: #3874e1;
   color: #ffffff;
 }
+html[data-theme="dark"] .nl-num {
+  background: #101c31;
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .bk-card {
+  border: 1px solid #2e3542;
+  background: #121519;
+}
+html[data-theme="dark"] .bk-head strong {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .bk-tag {
+  color: #ffffff;
+  background: #2563eb;
+}
+html[data-theme="dark"] .bk-count {
+  color: #a1abbe;
+}
+html[data-theme="dark"] .bk-loose {
+  border-color: #593030;
+  background: #250c0c;
+}
+html[data-theme="dark"] .bk-empty {
+  border: 1px dashed #2e3542;
+  color: #a1abbe;
+}
+html[data-theme="dark"] .fixed-by {
+  background: #122f1d;
+  color: #7ee7ae;
+  border-bottom: 1px solid #2e3542;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {

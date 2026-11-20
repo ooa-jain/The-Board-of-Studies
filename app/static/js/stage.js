@@ -309,6 +309,8 @@
   /** A block the university fixes, shown as the template shows it. */
   function fixedBlock(def) {
     const box = el("div", "fixed-block");
+    // filled in already by the Office (4. Reservation): said so on top
+    if (def.office_filled) box.appendChild(el("div", "fixed-by", "✓ Filled by the Office of Academic Affairs"));
     (def.fixed_table || []).forEach(part => {
       const row = el("div", "fixed-part");
       row.appendChild(el("div", "fixed-head", part.head));
@@ -332,6 +334,229 @@
       .map(m => num(m.pct)).filter(x => x !== null);
     if (!v.length) return null;
     return Math.round(v.reduce((a, b) => a + b, 0) / v.length * 100) / 100;
+  }
+
+  /** A list of names with "+ Add minor" and × on each: the programme's
+      minors. Each is a list of courses in Annexure I (def.renames): renaming
+      one renames its courses' minor, removing one removes its courses. */
+  function nameList(def, value, onChange) {
+    const word = def.item || "item";
+    const items = (Array.isArray(value) ? value : []).map(x => String(x ?? ""));
+    if (!items.length) items.push("");
+    const R = def.renames;
+    const box = el("div", "nl-box");
+    const list = el("div", "nl-list");
+    const foot = el("div", "nl-foot");
+    box.appendChild(list);
+    box.appendChild(foot);
+    const changed = () => {
+      onChange(items.slice());
+      window.dispatchEvent(new CustomEvent("stage:buckets"));
+    };
+    const linked = name => R && name.trim()
+      ? rows(R.section).filter(r => r && String(r[R.field] || "").trim() === name.trim()) : [];
+    function draw() {
+      list.textContent = "";
+      foot.textContent = "";
+      items.forEach((t, i) => {
+        const row = el("div", "nl-item");
+        row.appendChild(el("span", "nl-num", String(i + 1)));
+        const input = el("input");
+        input.type = "text";
+        input.value = t;
+        input.placeholder = def.placeholder || "";
+        input.setAttribute("aria-label", `${word[0].toUpperCase() + word.slice(1)} ${i + 1}`);
+        input.disabled = !!CTX.readonly;
+        let before = t;
+        input.addEventListener("input", () => {
+          // its courses follow the new name
+          linked(before).forEach(r => { r[R.field] = input.value.trim(); });
+          items[i] = input.value;
+          before = input.value;
+          changed();
+        });
+        row.appendChild(input);
+        if (!CTX.readonly && (items.length > 1 || t.trim())) {
+          const x = el("button", "ol-x", "×");
+          x.type = "button";
+          x.title = `Remove ${t.trim() || word}`;
+          x.setAttribute("aria-label", x.title);
+          x.addEventListener("click", () => {
+            const n = linked(items[i]).length;
+            if (n && !window.confirm(`Remove the ${word} “${items[i].trim()}”? Its ${n} course${n === 1 ? "" : "s"} in Annexure I go too.`)) return;
+            if (n) {
+              const all = rows(R.section);
+              for (let k = all.length - 1; k >= 0; k--) {
+                if (all[k] && String(all[k][R.field] || "").trim() === items[i].trim()) all.splice(k, 1);
+              }
+            }
+            items.splice(i, 1);
+            if (!items.length) items.push("");
+            draw();
+            changed();
+          });
+          row.appendChild(x);
+        }
+        list.appendChild(row);
+      });
+      if (!CTX.readonly && items.length < (def.max_items || 20)) {
+        const add = el("button", "btn btn-ghost btn-sm", `+ Add ${word}`);
+        add.type = "button";
+        add.addEventListener("click", () => {
+          items.push("");
+          draw();
+          const last = list.querySelector(".nl-item:last-child input");
+          if (last) last.focus();
+        });
+        foot.appendChild(add);
+      }
+    }
+    draw();
+    return box;
+  }
+
+  /** Annexure I: a list of courses for each minor named in Programme
+      details (section.buckets_from), each with its own "+ Add a course".
+      The rows stay one list, each carrying its minor (section.bucket_field). */
+  function renderBuckets(section, host) {
+    const [bsec, bname] = section.buckets_from.split(".");
+    const BF = section.bucket_field;
+    const cols = section.columns.filter(c => c.name !== BF);
+    const names = () => {
+      const v = (state[bsec] || {})[bname];
+      return (Array.isArray(v) ? v : []).map(x => String(x || "").trim()).filter(Boolean)
+        .filter((x, i, a) => a.indexOf(x) === i);
+    };
+    const box = el("div", "bk-box");
+    host.appendChild(box);
+    function cell(c, row) {
+      const td = el("td");
+      const holder = el("div");
+      holder.dataset.field = c.name;
+      holder.appendChild(makeInput(c, row[c.name], v => { row[c.name] = v; touch(); counts(); }));
+      td.appendChild(holder);
+      return td;
+    }
+    function table(list, opts) {
+      const all = rows(section.key);
+      const wrap = el("div", "rt-wrap");
+      const t = el("table", "rt");
+      const htr = el("tr");
+      htr.appendChild(el("th", null, "#"));
+      if (opts.pick) htr.appendChild(el("th", null, "Minor *"));
+      cols.forEach(c => {
+        const th = el("th", null, (c.short || c.label) + (c.required ? " *" : ""));
+        if (c.type === "integer") th.className = "num-col";
+        else if (c.width) th.style.width = c.width;
+        htr.appendChild(th);
+      });
+      if (!CTX.readonly) htr.appendChild(el("th"));
+      const thead = el("thead");
+      thead.appendChild(htr);
+      t.appendChild(thead);
+      const tb = el("tbody");
+      list.forEach((row, n) => {
+        const tr = el("tr");
+        tr.dataset.row = all.indexOf(row);
+        tr.appendChild(el("td", "rt-idx", String(n + 1)));
+        if (opts.pick) {
+          const c = { name: BF, label: "Minor", type: "select", required: true, options: names() };
+          const td = el("td");
+          const holder = el("div");
+          holder.dataset.field = BF;
+          holder.appendChild(makeInput(c, row[BF], v => { row[BF] = v; touch(); draw(); }));
+          td.appendChild(holder);
+          tr.appendChild(td);
+        }
+        cols.forEach(c => tr.appendChild(cell(c, row)));
+        if (!CTX.readonly) {
+          const td = el("td", "rt-del");
+          const x = el("button", null, "×");
+          x.type = "button";
+          x.title = "Remove this row";
+          x.setAttribute("aria-label", "Remove this row");
+          x.addEventListener("click", () => {
+            const k = all.indexOf(row);
+            if (k >= 0) all.splice(k, 1);
+            touch();
+            draw();
+          });
+          td.appendChild(x);
+          tr.appendChild(td);
+        }
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      wrap.appendChild(t);
+      return wrap;
+    }
+    // each minor's "6 courses · 24 credits", kept up to date as credits are typed
+    const heads = [];
+    function counts() {
+      const all = rows(section.key);
+      heads.forEach(([n, span]) => {
+        const list = all.filter(r => r && String(r[BF] || "").trim() === n);
+        const cr = list.reduce((a, r) => a + (num(r.credits) || 0), 0);
+        span.textContent = `${list.length} course${list.length === 1 ? "" : "s"} · ${cr} credits`;
+      });
+    }
+    function draw() {
+      box.textContent = "";
+      heads.length = 0;
+      const all = rows(section.key);
+      const ns = names();
+      if (!ns.length) {
+        box.appendChild(el("p", "bk-empty",
+          "Name the minors under Programme details › Minors (above) — each one gets its list of courses here."));
+      }
+      ns.forEach(n => {
+        const list = all.filter(r => r && String(r[BF] || "").trim() === n);
+        const card = el("div", "bk-card");
+        const head = el("div", "bk-head");
+        head.appendChild(el("span", "bk-tag", "Minor"));
+        head.appendChild(el("strong", null, n));
+        const cnt = el("span", "bk-count");
+        head.appendChild(cnt);
+        heads.push([n, cnt]);
+        card.appendChild(head);
+        if (list.length) card.appendChild(table(list, {}));
+        if (!CTX.readonly) {
+          const add = el("button", "btn btn-ghost btn-sm", `+ Add a course to ${n}`);
+          add.type = "button";
+          add.addEventListener("click", () => {
+            const row = freshRow(section);
+            row[BF] = n;
+            all.push(row);
+            touch();
+            draw();
+            const tr = box.querySelector(`tr[data-row="${all.length - 1}"]`);
+            if (tr) {
+              tr.scrollIntoView({ behavior: "smooth", block: "center" });
+              tr.classList.add("rt-new");
+              setTimeout(() => tr.classList.remove("rt-new"), 1600);
+              const f = tr.querySelector("select, input");
+              if (f) f.focus({ preventScroll: true });
+            }
+          });
+          card.appendChild(add);
+        }
+        box.appendChild(card);
+      });
+      counts();
+      // courses whose minor is no longer in the list: choose one for each
+      const loose = all.filter(r => r && !ns.includes(String(r[BF] || "").trim()));
+      if (loose.length) {
+        const card = el("div", "bk-card bk-loose");
+        const head = el("div", "bk-head");
+        head.appendChild(el("strong", null, "Not under any minor"));
+        head.appendChild(el("span", "bk-count", "Choose the minor for each, or remove it."));
+        card.appendChild(head);
+        card.appendChild(table(loose, { pick: true }));
+        box.appendChild(card);
+      }
+    }
+    draw();
+    window.addEventListener("stage:buckets", draw);
   }
 
   /** A programme's POs (or PSOs): PO1 open to describe, "+ Add PO2" for the
@@ -817,6 +1042,7 @@
     if (def.type === "fixed") return fixedBlock(def);
     if (def.type === "module_compare") return moduleCompare(def, value, onChange);
     if (def.type === "outcome_list") return outcomeList(def, value, onChange);
+    if (def.type === "name_list") return nameList(def, value, onChange);
     if (def.type === "textarea") {
       input = el("textarea");
       input.rows = def.rows || 3;
@@ -1875,6 +2101,7 @@
   }
 
   function renderTable(section, host) {
+    if (section.buckets_from && !FLOW) return renderBuckets(section, host);
     // Programme Information takes its rows from Department Information:
     // no adding or removing here, and code and name are not retyped.
     const synced = !!(section.synced_from && CTX.synced);
@@ -4893,7 +5120,12 @@
                            "UG - 4 Year (Honours with Research)": "Honours with Research" };
             const read = ref => {
               const [sec, name] = ref.split(".");
-              const v = String(((state[sec] || {})[name]) || "").trim();
+              const raw = (state[sec] || {})[name];
+              if (Array.isArray(raw)) {
+                const ns = raw.map(x => String(x || "").trim()).filter(Boolean);
+                return ns.length ? "Minors: " + ns.join(" / ") : "";
+              }
+              const v = String(raw || "").trim();
               const tag = TAGS[(state.details || {}).degree_level];
               // the programme carries the degree chosen after semester 6
               return name === "programme_name" && tag

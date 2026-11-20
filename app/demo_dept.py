@@ -280,7 +280,8 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
     if stage_key == "prog_curriculum":
         from .autofill import PROGRAMME_OUTCOMES
         return {
-            "details": {"degree_level": "UG - 3 Year", "specialisation": "General"},
+            "details": {"degree_level": "UG - 3 Year", "specialisation": "General",
+                        "minor_streams": ["Marketing"]},
             "profile": {
                 "objective": f"To give students of the {programme['programme_name']} a sound grounding "
                              "in business knowledge and skills.\nTo prepare them for careers in industry, "

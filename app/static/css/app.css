@@ -5417,3 +5417,22 @@ body.is-intro { margin: 0; background: #060c1a; color: #fff; }
   padding: 4px 10px; border-radius: 999px; cursor: pointer; }
 .who-lang-list button:hover { background: #eef2f9; }
 .who-lang-list button.is-on { background: #0e2a5c; border-color: #0e2a5c; color: #fff; }
+
+/* ---- the programme's minors (Programme details) and Annexure I, a list a minor ---- */
+.nl-box { display: grid; gap: 8px; }
+.nl-list { display: grid; gap: 8px; }
+.nl-item { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; gap: 8px; align-items: center; max-width: 620px; }
+.nl-num { width: 26px; height: 26px; border-radius: 50%; background: #e8eef9; color: #0e2a5c; font-weight: 700;
+  font-size: .8rem; display: grid; place-items: center; }
+.nl-foot { display: flex; gap: 8px; }
+.bk-box { display: grid; gap: 14px; }
+.bk-card { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); display: grid; gap: 10px; }
+.bk-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bk-head strong { color: #0e2a5c; font-size: 1rem; }
+.bk-tag { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #fff;
+  background: #2563eb; border-radius: 999px; padding: 2px 9px; }
+.bk-count { margin-left: auto; font-size: .82rem; color: var(--muted, #5b6b85); }
+.bk-card > .btn { justify-self: start; }
+.bk-loose { border-color: #f0b4b4; background: #fff7f7; }
+.bk-empty { margin: 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--muted, #5b6b85); }
+.fixed-by { padding: 8px 12px; background: #eaf7ef; color: #146c3c; font-weight: 600; font-size: .85rem; border-bottom: 1px solid var(--line); }

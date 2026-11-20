@@ -797,5 +797,20 @@
 "document",
 "Curriculum document",
 "Curriculum Matrix (PDF, Word or Excel)",
-"Contact"
+"Contact",
+"Specialisation (Major)",
+"Minors",
+"+ Add minor",
+"+ Add a course to {name}",
+"{n} courses · {n} credits",
+"{n} course · {n} credits",
+"Not under any minor",
+"Choose the minor for each, or remove it.",
+"Name the minors under Programme details › Minors (above) — each one gets its list of courses here.",
+"One list for each minor named under Programme details › Minors: its courses, semester by semester.",
+"Each minor the programme offers — Analytics, Digital Marketing, Logistics and Supply Chain Management … Each one gets its own list of courses in Annexure I below.",
+"✓ Filled by the Office of Academic Affairs",
+"Already filled by the Office of Academic Affairs; nothing to fill in.",
+"For example: Corporate Finance",
+"Minor *"
 ]

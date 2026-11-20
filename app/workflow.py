@@ -563,7 +563,12 @@ def apply_defaults(stage_key, data, programme=None, flow=False):
 
     def read(ref):
         sec, name = ref.split(".", 1)
-        v = str(((data.get(sec) or {}) if isinstance(data.get(sec), dict) else {}).get(name) or "").strip()
+        raw = ((data.get(sec) or {}) if isinstance(data.get(sec), dict) else {}).get(name)
+        if isinstance(raw, list):
+            # the minors: "Minors: Analytics / Digital Marketing"
+            names = [str(x).strip() for x in raw if str(x or "").strip()]
+            return ("Minors: " + " / ".join(names)) if names else ""
+        v = str(raw or "").strip()
         if name == "programme_name":
             return degree_name(v, (data.get("details") or {}).get("degree_level")) if isinstance(data.get("details"), dict) else v
         return "" if name == "degree_level" else v

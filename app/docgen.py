@@ -336,6 +336,13 @@ def _title_line(prog, cur):
         (details.get("batch") or prog.get("batch") or "")
 
 
+def _minor_line(cur):
+    """The programme's minors, as one line: "Analytics / Digital Marketing"."""
+    v = (cur.get("details") or {}).get("minor_streams")
+    names = [str(x).strip() for x in v if str(x or "").strip()] if isinstance(v, list) else []
+    return " / ".join(names)
+
+
 def _version_line(name, batch):
     return f"{name} {batch}_v1_{now_ist().strftime('%d/%m/%Y')}".replace("  ", " ")
 
@@ -413,8 +420,10 @@ def _profile_table(doc, cur, width, degree_level=None):
             m = _num(value)
             value = f"{_fmt(m / 12)} years / {_fmt(m)} months" if m else ""
         if f["name"] == "course_specialisation" and not value:
-            value = " — ".join(x for x in (details.get("programme_name"),
-                                          details.get("specialisation")) if x)
+            minors = [str(x).strip() for x in (details.get("minor_streams") or []) if str(x or "").strip()] \
+                if isinstance(details.get("minor_streams"), list) else []
+            value = " — ".join(x for x in (details.get("programme_name"), details.get("specialisation"),
+                                          ("Minors: " + " / ".join(minors)) if minors else "") if x)
         if value in (None, "") and f["name"] in defaults:
             value = defaults[f["name"]]
         if f["name"] == "objective":
@@ -546,26 +555,45 @@ def _summary_table(doc, rows, width, title="SUMMARY"):
     _widths(t, [width * 0.13, width * 0.17, width * 0.18, width * 0.11, width * 0.11])
 
 
-def _minors_table(doc, minors, width):
-    t = doc.add_table(rows=0, cols=5)
+def _minors_table(doc, minors, width, order=()):
+    """Annexure I as the Course Matrix lays it out: a semester a row, and for
+    each minor (Analytics, Digital Marketing …) its Course Code and Course
+    Title side by side; two courses of one minor in a semester take two rows."""
+    names = [str(x).strip() for x in order if str(x or "").strip()]
+    for m in minors:
+        n = str(m.get("minor_title") or "").strip() or "Minor"
+        if n not in names:
+            names.append(n)
+    k = len(names)
+    t = doc.add_table(rows=0, cols=1 + 2 * k)
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _band(t, "Annexure – I – Minor", GREEN, size=10)
+    top = t.add_row().cells
+    _shade(top[0], GREEN)
+    for i, n in enumerate(names):
+        cell = top[1 + 2 * i].merge(top[2 + 2 * i])
+        _write(cell, n.upper(), bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _shade(cell, GREEN)
     hr = t.add_row().cells
-    for i, h in enumerate(("Minor", "Semester", "Course Code", "Course Title", "Credits")):
-        _write(hr[i], h, bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
-        _shade(hr[i], GREEN)
-    for stream in dict.fromkeys(m.get("minor_title") or "" for m in minors):
-        rs = sorted([m for m in minors if (m.get("minor_title") or "") == stream],
-                    key=lambda m: _num(m.get("semester")) or 0)
-        _band(t, stream or "Minor", PALE)
-        for m in rs:
+    _write(hr[0], "Semester", bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+    _shade(hr[0], GREEN)
+    for i in range(k):
+        for j, h in enumerate(("Course Code", "COURSE TITLE")):
+            _write(hr[1 + 2 * i + j], h, bold=True, size=8.5, align=WD_ALIGN_PARAGRAPH.CENTER)
+            _shade(hr[1 + 2 * i + j], GREEN)
+    by = {n: [m for m in minors if (str(m.get("minor_title") or "").strip() or "Minor") == n] for n in names}
+    for s in _sems(minors):
+        cols = [[m for m in by[n] if _num(m.get("semester")) == s] for n in names]
+        for line in range(max(len(c) for c in cols) or 1):
             cells = t.add_row().cells
-            for i, v in enumerate(("", _fmt(m.get("semester")), m.get("course_code") or "",
-                                   m.get("course_title") or "", _fmt(m.get("credits")))):
-                _write(cells[i], v, size=9,
-                       align=None if i in (2, 3) else WD_ALIGN_PARAGRAPH.CENTER)
-    _widths(t, [width * 0.18, width * 0.09, width * 0.14, width * 0.45, width * 0.09])
+            _write(cells[0], _fmt(s), size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+            for i, c in enumerate(cols):
+                if line < len(c):
+                    _write(cells[1 + 2 * i], c[line].get("course_code") or "", size=8.5)
+                    _write(cells[2 + 2 * i], c[line].get("course_title") or "", size=8.5)
+    each = (width * 0.92) / max(k, 1)
+    _widths(t, [width * 0.08] + [each * 0.36, each * 0.64] * k)
 
 
 def _pg_semester_tables(doc, rows, width):
@@ -627,6 +655,9 @@ def curriculum_docx(db, dept_code, year, programme_code):
     _para(doc, name, bold=True, size=14)
     if spec:
         _para(doc, spec, size=14)
+    if _minor_line(cur):
+        # the minors on offer, under the title: Analytics / Digital Marketing / …
+        _para(doc, _minor_line(cur), size=12)
     _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=14, after=6)
     _profile_table(doc, cur, width)
 
@@ -651,7 +682,7 @@ def curriculum_docx(db, dept_code, year, programme_code):
     minors = [m for m in (cur.get("minors") or []) if isinstance(m, dict)] if not flow else []
     if minors:
         _page_break(doc)
-        _minors_table(doc, minors, width)
+        _minors_table(doc, minors, width, (cur.get("details") or {}).get("minor_streams") or ())
     doc.core_properties.title = _title(f"{name} — Curriculum {batch}".strip())
     return _save(doc)
 
@@ -668,6 +699,9 @@ def _pg_curriculum_docx(prog, cur, deg):
     _para(doc, name, bold=True, size=14)
     if spec:
         _para(doc, spec, size=14)
+    if _minor_line(cur):
+        # the minors on offer, under the title: Analytics / Digital Marketing / …
+        _para(doc, _minor_line(cur), size=12)
     _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=14, after=6)
     _profile_table(doc, cur, width, deg)
 

@@ -546,7 +546,17 @@ PROGRAMME_CURRICULUM = {
                 {"name": "degree_level", "label": "Degree / Duration", "type": "select",
                  "required": False, "options": DEGREE_LEVELS, "prefill": "degree_level",
                  "reload_on_change": True},
-                {"name": "specialisation", "label": "Specialisation", "type": "text"},
+                # the major (Corporate Finance), then the minors on offer —
+                # each minor is a bucket of courses in Annexure I below
+                {"name": "specialisation", "label": "Specialisation (Major)", "type": "text",
+                 "placeholder": "For example: Corporate Finance"},
+                {"name": "minor_streams", "label": "Minors", "type": "name_list", "wide": True,
+                 "item": "minor", "max_items": 12,
+                 # renaming or removing a minor carries over to its courses
+                 "renames": {"section": "minors", "field": "minor_title"},
+                 "placeholder": "For example: Analytics",
+                 "help": "Each minor the programme offers — Analytics, Digital Marketing, Logistics and Supply Chain "
+                         "Management … Each one gets its own list of courses in Annexure I below."},
                 # worked out, never typed: the current batch's first year to the
                 # year the programme ends (2026-29 for a 3-year UG)
                 {"name": "batch", "label": "Batch", "type": "readonly", "prefill": "batch_auto",
@@ -592,7 +602,8 @@ PROGRAMME_CURRICULUM = {
                                 "International Students (In Percentage)"],
                       "note": DEFAULT_REGULATIONS["reservation_policy"]},
                  ],
-                 "help": "Fixed by the university; nothing to fill in."},
+                 "office_filled": True,
+                 "help": "Already filled by the Office of Academic Affairs; nothing to fill in."},
                 {"name": "eligibility", "label": "5. Eligibility", "type": "textarea",
                  "required": True, "rows": 3, "wide": True,
                  "placeholder": "For example: A student who has passed Level 4 / Class 12 "
@@ -606,7 +617,7 @@ PROGRAMME_CURRICULUM = {
                  "required": True, "prefill_text": DEFAULT_REGULATIONS["pattern"]},
                 {"name": "course_specialisation", "label": "9. Course & specialisation",
                  "type": "text", "required": True, "wide": True,
-                 "derive_from": ["details.programme_name", "details.specialisation"],
+                 "derive_from": ["details.programme_name", "details.specialisation", "details.minor_streams"],
                  "placeholder": "For example: BCom (Corporate Finance) Honours / Honours with "
                                 "Research — minors as per Annexure I"},
                 {"name": "assessment", "label": "10. Assessment", "type": "textarea",
@@ -686,12 +697,15 @@ PROGRAMME_CURRICULUM = {
         {
             "key": "minors",
             "title": "Minor / Honours — Annexure I",
-            "help": "One minor course per row.",
+            "help": "One list for each minor named under Programme details › Minors: its courses, "
+                    "semester by semester.",
+            # the rows are grouped by minor, one list each (stage.js)
+            "buckets_from": "details.minor_streams", "bucket_field": "minor_title",
             "type": "table",
             "min_rows": 0,
             "columns": [
-                {"name": "minor_title", "label": "Minor stream", "type": "text", "required": True,
-                 "help": "For example: Analytics"},
+                {"name": "minor_title", "label": "Minor", "type": "text", "required": True,
+                 "help": "One of the minors under Programme details › Minors."},
                 {"name": "semester", "label": "Semester", "type": "integer", "required": True,
                  "min": 1, "max": 8, "choices": SEMESTERS, "width": "84px"},
                 {"name": "course_code", "label": "Course code", "type": "text", "width": "130px"},
