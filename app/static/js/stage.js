@@ -5785,7 +5785,8 @@
      Revision. Moving between them happens in place — the address follows
      (?view=…), the steps at the top follow, and nothing typed is lost. */
   if (IS_BATCH) {
-    const VIEW_OF = { batch_courses: "curriculum", courses: "syllabus", revision_courses: "revision" };
+    const VIEW_OF = { batch_courses: "curriculum", details: "curriculum", minors: "curriculum",
+                      courses: "syllabus", revision_courses: "revision" };
     const setView = (v, push) => {
       v = ["syllabus", "revision"].includes(v) ? v : "curriculum";
       document.querySelectorAll(".section-block").forEach(b => {

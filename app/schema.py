@@ -377,16 +377,33 @@ DEFAULT_REGULATIONS = {
                "For all courses, a student is required to secure a minimum of 35% marks "
                "separately in ESE and 40% in aggregate in a course to secure a pass grade. "
                "(The Percentage Weightage of CA to ESE is 50:50 for theory courses.) A “R” "
-               "(Reappear) Grade will be awarded for unsatisfactory performance, i.e. if the "
-               "score is less than 40% aggregate.",
-    "award": "Under Graduate Certificate will be awarded at the end of semester 2, subject to "
-             "a minimum 4.00 CGPA and the successful completion of the 04-credit Vocational "
-             "Course in the summer (NCrF Level 4.5).\n"
-             "Under Graduate Diploma will be awarded at the end of semester 4, subject to a "
-             "minimum 4.00 CGPA and the successful completion of the 04-credit Vocational "
-             "Course in the summer (NCrF Level 5).\n"
-             "The Bachelor's degree will be awarded at the end of semester 6, and the "
-             "Honours / Honours with Research degree at the end of semester 8.",
+               "(Reappear) Grade will be awarded for his/her unsatisfactory performance, i.e. if "
+               "the score is less than 40% aggregate.\n"
+               "Students should pass in each semester separately by securing a minimum Semester "
+               "Grade Point Average (SGPA) of 4.0 on a 10-point scale. For successful completion "
+               "of a programme, the student should secure a minimum Cumulative Grade Point Average "
+               "(CGPA) of 4.0 at the end of the year. The University awards a Certificate / "
+               "Diploma / Degree / Honours to the student.",
+    "award": "Under Graduate Certificate will be awarded at the end of semester 2 by taking into "
+             "consideration the performance of all semester examinations, subject to obtaining a "
+             "minimum 4.00 CGPA and the successful completion of the 04-credit Vocational Course "
+             "in the summer. The qualification shall correspond to NCrF Level 4.5.\n"
+             "Under Graduate Diploma will be awarded at the end of semester 4 by taking into "
+             "consideration the performance of all semester examinations, subject to obtaining a "
+             "minimum 4.00 CGPA and the successful completion of the 04-credit Vocational Course "
+             "in the summer. The qualification shall correspond to NCrF Level 5.0.\n"
+             "The Bachelor's degree in the programme, with the applicable Minor, will be awarded "
+             "at the end of semester VI by taking into consideration the performance of all "
+             "semester examinations, subject to obtaining a minimum 4.00 CGPA. The qualification "
+             "shall correspond to NCrF Level 5.5.\n"
+             "The Bachelor's degree (Honours) in the programme, with the applicable Minor, will be "
+             "awarded at the end of semester VIII by taking into consideration the performance of "
+             "all semester examinations, subject to obtaining a minimum 4.00 CGPA. The "
+             "qualification shall correspond to NCrF Level 6.0.\n"
+             "The Bachelor's degree (Honours with Research) in the programme, with the applicable "
+             "Minor, will be awarded at the end of semester VIII by taking into consideration the "
+             "performance of all semester examinations, subject to obtaining a minimum 4.00 CGPA. "
+             "The qualification shall correspond to NCrF Level 6.0.",
 }
 
 
@@ -966,8 +983,41 @@ def _batch_part(start: int) -> dict:
             "columns": _batch_courses_columns(),
             "rules": ["ltpe_credit_arithmetic", "marks_add_up", "unique_course_codes", "batch_has_courses",
                       "semester_within_batch"],
-        }, sheet, revision],
+        }, *_batch_minors(label), sheet, revision],
     }
+
+
+def _batch_minors(label: str) -> list:
+    """An earlier batch's major and minors, as the current batch has them:
+    the minors on offer, then a list of courses for each (Annexure I)."""
+    import copy
+    cur = {x["key"]: x for x in PROGRAMME_CURRICULUM["sections"]}
+    fields = [copy.deepcopy(f) for f in cur["details"]["fields"]
+              if f["name"] in ("specialisation", "minor_streams")]
+    for f in fields:
+        if f["name"] == "minor_streams":
+            f["help"] = (f"Each minor the Batch of {label} was offered. Each one gets its own list of "
+                         "courses in Annexure I below.")
+    minors = copy.deepcopy(cur["minors"])
+    minors["title"] = f"Minor / Honours — Annexure I · Batch of {label}"
+    return [{
+        "key": "details",
+        "title": f"Programme details — Batch of {label}",
+        "help": "The specialisation (major) and the minors this batch was offered.",
+        "type": "fields",
+        "fields": fields,
+    }, minors]
+
+
+def without_minors(stage: dict) -> dict:
+    """A form with no minors: no Minors list and no Annexure I."""
+    import copy
+    s = copy.deepcopy(stage)
+    s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
+    for sec in s["sections"]:
+        if sec["key"] == "details":
+            sec["fields"] = [f for f in sec["fields"] if f["name"] != "minor_streams"]
+    return s
 
 
 BATCH_PARTS = [_batch_part(y) for y in range(2010, 2041)]
@@ -1032,7 +1082,8 @@ def for_level(stage: dict, degree_level) -> dict:
         # an earlier batch's course list follows the programme's level too
         if not (is_pg(degree_level) or degree_level == "UG - 3 Year"):
             return stage
-        s = copy.deepcopy(stage)
+        # a PG programme has no minors
+        s = without_minors(stage) if is_pg(degree_level) else copy.deepcopy(stage)
         for sec in s["sections"]:
             if sec["key"] != "batch_courses":
                 continue

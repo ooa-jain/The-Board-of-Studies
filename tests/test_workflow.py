@@ -1166,7 +1166,9 @@ def test_an_earlier_batch_syllabus_opens_and_does_not_hold_up_the_stage(app, cli
     assert "Earlier batch · 2024–2025" in page
     from app.schema import STAGE_BY_KEY as SBK
     assert [x["title"] for x in SBK["prog_syllabus_b2024"]["sections"]] == [
-        "Curriculum — Batch of 2024–2025", "Syllabus — Batch of 2024–2025", "Course Revision — Batch of 2024–2025"]
+        "Curriculum — Batch of 2024–2025", "Programme details — Batch of 2024–2025",
+        "Minor / Honours — Annexure I · Batch of 2024–2025",
+        "Syllabus — Batch of 2024–2025", "Course Revision — Batch of 2024–2025"]
     cur = client.get("/department/stage/prog_syllabus/BCMREG").get_data(as_text=True)
     assert "Syllabus — Batch of 2026–2027" in cur and "current batch" in cur
     assert "Current Batch" not in cur and "Existing Batch" not in cur

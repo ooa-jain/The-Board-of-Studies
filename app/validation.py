@@ -856,6 +856,10 @@ def validate_stage(stage_key: str, data: dict, ctx: dict | None = None):
     if flow:
         from .schema import flow_stage
         stage = flow_stage(stage)
+    elif ctx.get("flow") and stage.get("existing_batch"):
+        # an earlier batch of a No UGC department: no minors either
+        from .schema import without_minors
+        stage = without_minors(stage)
     # an upload box the Office has made not mandatory
     from .keyword_match import relax
     stage = relax(stage)

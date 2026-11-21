@@ -1169,6 +1169,9 @@ def batch_curriculum_docx(db, dept_code, year, programme_code, part):
     data = category_groups(data, deg, "batch_courses")
     rows = [r for r in in_semesters(data.get("batch_courses"), sems) if _num(r.get("semester")) is not None]
     name, spec, _ = _title_line(prog, cur)
+    # this batch's own major and minors, where it names them
+    own = data.get("details") if isinstance(data.get("details"), dict) else {}
+    spec = str(own.get("specialisation") or "").strip() or spec
     doc = _letterhead(_version_line(name, STAGE_BY_KEY[part].get("batch", "")))
     sec = doc.sections[0]
     width = int(sec.page_width - sec.left_margin - sec.right_margin)
@@ -1176,6 +1179,10 @@ def batch_curriculum_docx(db, dept_code, year, programme_code, part):
     _para(doc, name, bold=True, size=14)
     if spec:
         _para(doc, spec, size=14)
+    from .schema import is_flow
+    flow = is_flow(_dept) and not is_pg(deg)
+    if _minor_line(data) and not is_pg(deg) and not flow:
+        _para(doc, _minor_line(data), size=12)
     _para(doc, f"Curriculum — {batch}", bold=True, size=14, after=6)
     if not rows:
         _para(doc, "No courses entered for this batch yet.", size=10, align=WD_ALIGN_PARAGRAPH.LEFT)
@@ -1190,6 +1197,10 @@ def batch_curriculum_docx(db, dept_code, year, programme_code, part):
         _structure_table(doc, rows, width)
         doc.add_paragraph()
         _summary_table(doc, rows, width)
+        minors = [m for m in (data.get("minors") or []) if isinstance(m, dict)] if not flow else []
+        if minors:
+            _page_break(doc)
+            _minors_table(doc, minors, width, own.get("minor_streams") or ())
     doc.core_properties.title = _title(f"{name} — Curriculum, {batch}")
     return _save(doc)
 

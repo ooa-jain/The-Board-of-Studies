@@ -689,6 +689,11 @@ def stage(stage_key, programme_code=None):
         page_stage = flow_stage(page_stage)
         calc = {**calc, "flow": True, "track": None, "required_total": None}
         credit_matrix = None
+    elif stage_def.get("existing_batch") and is_flow(dept) and page_stage.get("level") != "PG":
+        # an earlier batch of a No UGC department: no minors, as its current batch
+        from .schema import is_pg, without_minors
+        if not is_pg(deg):
+            page_stage = without_minors(page_stage)
     if stage_key == "prog_curriculum":
         data = category_groups(data, deg, flow=flow)
         if flow:

@@ -75,3 +75,45 @@ def test_annexure_one_a_column_pair_per_minor():
     assert body[0][:5] == ["2", "26BAL2M01", "Introduction to Business Analytics", "26BDM2M01",
                            "Fundamentals of Digital Marketing"]
     assert [r[0] for r in body] == ["2", "6", "6"]
+
+
+def test_an_earlier_batch_has_minors_as_the_current_batch():
+    from app.schema import BATCH_PARTS, for_level
+    part = BATCH_PARTS[14]                      # Batch of 2024–2025
+    keys = [s["key"] for s in part["sections"]]
+    assert keys.index("batch_courses") < keys.index("details") < keys.index("minors") < keys.index("courses")
+    details = next(s for s in part["sections"] if s["key"] == "details")
+    assert [f["name"] for f in details["fields"]] == ["specialisation", "minor_streams"]
+    minors = next(s for s in part["sections"] if s["key"] == "minors")
+    assert minors["buckets_from"] == "details.minor_streams"
+    # a PG programme has none
+    pg = for_level(part, "PG - 2 Year")
+    assert "minors" not in [s["key"] for s in pg["sections"]]
+    assert [f["name"] for f in next(s for s in pg["sections"] if s["key"] == "details")["fields"]] == ["specialisation"]
+
+
+def test_an_earlier_batch_word_file_lists_its_minors():
+    from unittest import mock
+
+    import mongomock
+
+    from app import docgen
+    from app.schema import BATCH_PARTS
+    part = BATCH_PARTS[14]["key"]
+    data = {"details": {"specialisation": "Corporate Finance", "minor_streams": ["Analytics"]},
+            "batch_courses": [{"semester": 1, "nep_category": "Major (Core)", "course_code": "24BCC1C01",
+                               "course_title": "Accounting", "credits": 4, "cia": 50, "ese": 50,
+                               "total_marks": 100}],
+            "minors": [{"minor_title": "Analytics", "semester": 2, "course_code": "24BAL2M01",
+                        "course_title": "Business Analytics", "credits": 4}]}
+    with mock.patch.object(docgen, "programme_record",
+                           return_value=({"dept_code": "COM"}, {"programme_code": "BC", "programme_name": "BCom",
+                                                                "degree_level": "UG - 3 Year"}, {}, None)), \
+            mock.patch.object(docgen, "_earlier", return_value=(data, [1, 2], "Batch of 2024–2025")), \
+            mock.patch("app.schema.is_flow", return_value=False):
+        out = docgen.batch_curriculum_docx(mongomock.MongoClient().db, "COM", "2027-28", "BC", part)
+    doc = Document(io.BytesIO(out.getvalue() if hasattr(out, "getvalue") else out))
+    text = "\n".join(p.text for p in doc.paragraphs)
+    assert "Analytics" in text and "Corporate Finance" in text
+    annex = next(t for t in doc.tables if "Annexure" in t.rows[0].cells[0].text)
+    assert "Business Analytics" in [c.text for r in annex.rows for c in r.cells]
