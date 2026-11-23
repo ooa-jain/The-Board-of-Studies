@@ -244,8 +244,8 @@ def course_category(value, credits=None, title="", flow=False):
     v = str(value or "").strip()
     if v in NEP_CATEGORIES:
         return v
-    if flow and v == "Discipline Specific Elective (DSE)":
-        return v                       # a No UGC department keeps DSE as its own category
+    if flow and v in FLOW_CATEGORIES:
+        return v                       # a No UGC department keeps its own categories (DSE, PCC, BSC …)
     if v in _OLDER_GROUPS:
         return _OLDER_GROUPS[v]
     # the group's own words decide; a course's title only when it has no group
@@ -1274,11 +1274,45 @@ def is_flow(department) -> bool:
 # a No UGC department's course categories: no Minor; Major as CC / Core,
 # DSE on its own, and Multidisciplinary as GEC / OE / MDC; the rest as they are
 DSE = "Discipline Specific Elective (DSE)"
-FLOW_CATEGORIES = ["Major (Core)", DSE, "Multidisciplinary", "Ability Enhancement Courses (AEC)",
-                   AEC_LANGUAGE, "Skill Enhancement Courses (SEC)", "Value Added Courses (VAC)",
-                   "Summer Internship", "Research Project / Dissertation"]
-FLOW_LABELS = {**CATEGORY_LABELS, "Major (Core)": "Major / CC / Core", DSE: "DSE — Discipline Specific Elective",
-               "Multidisciplinary": "GEC / OE / MDC"}
+# the categories the No UGC schools' course matrices use (Law, FET, Allied
+# Health, Design): CC, PCC, BSC, ESC, HSMC, DSE, PEC, OE, OEC, GEC, AEC, SEC,
+# VAC, Internship, Project and Dissertation; the language course as in UGC
+FLOW_CATEGORIES = ["Major (Core)", "Programme Core Course (PCC)", "Basic Science Course (BSC)",
+                   "Engineering Science Course (ESC)",
+                   "Humanities, Social Sciences and Management Course (HSMC)", DSE,
+                   "Programme Elective Course (PEC)", "Multidisciplinary", "Open Elective Course (OEC)",
+                   "Generic Elective Course (GEC)", "Ability Enhancement Courses (AEC)", AEC_LANGUAGE,
+                   "Skill Enhancement Courses (SEC)", "Value Added Courses (VAC)", "Summer Internship",
+                   "Project (PROJ)", "Research Project / Dissertation"]
+# the short name of each: the Classification of Credits column, and the
+# structure's Category column in the Word file
+FLOW_SHORT = {"Major (Core)": "CC", "Programme Core Course (PCC)": "PCC", "Basic Science Course (BSC)": "BSC",
+              "Engineering Science Course (ESC)": "ESC",
+              "Humanities, Social Sciences and Management Course (HSMC)": "HSMC", DSE: "DSE",
+              "Programme Elective Course (PEC)": "PEC", "Multidisciplinary": "OE",
+              "Open Elective Course (OEC)": "OEC", "Generic Elective Course (GEC)": "GEC",
+              "Ability Enhancement Courses (AEC)": "AEC", AEC_LANGUAGE: "AEC",
+              "Skill Enhancement Courses (SEC)": "SEC", "Value Added Courses (VAC)": "VAC",
+              "Summer Internship": "Internship / INT", "Project (PROJ)": "Project / PROJ",
+              "Research Project / Dissertation": "Dissertation / Project"}
+FLOW_LABELS = {**CATEGORY_LABELS,
+               "Major (Core)": "CC — Core Course",
+               "Programme Core Course (PCC)": "PCC — Programme Core Course",
+               "Basic Science Course (BSC)": "BSC — Basic Science Course",
+               "Engineering Science Course (ESC)": "ESC — Engineering Science Course",
+               "Humanities, Social Sciences and Management Course (HSMC)":
+                   "HSMC — Humanities, Social Sciences and Management Course",
+               DSE: "DSE — Discipline Specific Elective",
+               "Programme Elective Course (PEC)": "PEC — Programme Elective Course",
+               "Multidisciplinary": "OE — Open Elective",
+               "Open Elective Course (OEC)": "OEC — Open Elective Course",
+               "Generic Elective Course (GEC)": "GEC — Generic Elective Course",
+               "Ability Enhancement Courses (AEC)": "AEC — Ability Enhancement Course",
+               "Skill Enhancement Courses (SEC)": "SEC — Skill Enhancement Course",
+               "Value Added Courses (VAC)": "VAC — Value Added Course",
+               "Summer Internship": "Internship / INT",
+               "Project (PROJ)": "Project / PROJ",
+               "Research Project / Dissertation": "Dissertation / Project"}
 
 
 def flow_stage(stage: dict) -> dict:

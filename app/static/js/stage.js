@@ -3041,15 +3041,24 @@
     ? { cia: 60, ese: 40, total_marks: 100 } : {};
   // the columns of the template's "Classification of Credits" table
   const DIST_GROUPS = FLOW ? [
-    // a No UGC department: no Minor; DSE and GEC / OE / MDC on their own
-    ["Major (Core)", "Major / CC / Core"],
+    // a No UGC department: its own categories (CC, PCC, BSC … as the
+    // schools' course matrices use them); the language course counts in AEC
+    ["Major (Core)", "CC"],
+    ["Programme Core Course (PCC)", "PCC"],
+    ["Basic Science Course (BSC)", "BSC"],
+    ["Engineering Science Course (ESC)", "ESC"],
+    ["Humanities, Social Sciences and Management Course (HSMC)", "HSMC"],
     ["Discipline Specific Elective (DSE)", "DSE"],
-    ["Multidisciplinary", "GEC / OE / MDC"],
-    ["Ability Enhancement Courses (AEC)", "Ability Enhancement / AEC"],
-    ["Skill Enhancement Courses (SEC)", "Skill Enhancement / SEC"],
-    ["Value Added Courses (VAC)", "Common Value Added / VAC"],
-    ["Summer Internship", "Summer Internship / INTERNSHIP"],
-    ["Research Project / Dissertation", "Research Project / Dissertation / PROJECT"],
+    ["Programme Elective Course (PEC)", "PEC"],
+    ["Multidisciplinary", "OE"],
+    ["Open Elective Course (OEC)", "OEC"],
+    ["Generic Elective Course (GEC)", "GEC"],
+    ["Ability Enhancement Courses (AEC)", "AEC"],
+    ["Skill Enhancement Courses (SEC)", "SEC"],
+    ["Value Added Courses (VAC)", "VAC"],
+    ["Summer Internship", "Internship / INT"],
+    ["Project (PROJ)", "Project / PROJ"],
+    ["Research Project / Dissertation", "Dissertation / Project"],
   ] : [
     ["Major (Core)", "Major"],
     ["Minor Stream", "Minor"],
@@ -3107,6 +3116,9 @@
       const sems = rows => Array.from(new Set(rows.map(r => num(r.semester)))).sort((a, b) => a - b);
 
       const sumBy = (rows, fn) => rows.reduce((a, r) => a + (fn(r) || 0), 0);
+      // a No UGC programme: a column for each category it uses, not all sixteen
+      const COLS = FLOW ? (DIST_GROUPS.filter(([cat]) => all.some(r => inGroup(r, cat))).length
+        ? DIST_GROUPS.filter(([cat]) => all.some(r => inGroup(r, cat))) : DIST_GROUPS.slice(0, 1)) : DIST_GROUPS;
       const nc = rows => rows.filter(r => r.nep_category === NC_COURSE ||
         (num(r.credits) === 0 && r.nep_category !== NC_AUDIT)).length || "";
       const audit = rows => rows.filter(r => r.nep_category === NC_AUDIT).length || "";
@@ -3115,7 +3127,7 @@
       if (wants("classification")) {
       const t1 = el("table", "cd-table");
       const h = el("tr");
-      ["Semester", ...DIST_GROUPS.map(g => g[1]), "Total Credits",
+      ["Semester", ...COLS.map(g => g[1]), "Total Credits",
        "No. of Mandatory Non-Credit Course/s", "No. of Mandatory Non-Credit Audit Course"]
         .forEach(x => h.appendChild(el("th", x === "Semester" ? null : "num", x)));
       const thead = el("thead");
@@ -3126,7 +3138,7 @@
         const rows = from.filter(r => num(r.semester) === sem);
         const tr = el("tr");
         tr.appendChild(el("td", null, String(sem)));
-        DIST_GROUPS.forEach(([cat]) => tr.appendChild(el("td", "num",
+        COLS.forEach(([cat]) => tr.appendChild(el("td", "num",
           fmt(sumBy(rows.filter(r => inGroup(r, cat)), r => num(r.credits))))));
         tr.appendChild(el("td", "num cd-strong", fmt(sumBy(rows, r => num(r.credits)))));
         tr.appendChild(el("td", "num", String(nc(rows))));
@@ -3168,7 +3180,7 @@
       const totRow = (label, counted, deg) => {
         const tot = el("tr", "total cd-type" + (deg && deg === DEGREE() ? " is-chosen" : ""));
         tot.appendChild(el("td", null, label));
-        DIST_GROUPS.forEach(([cat]) => {
+        COLS.forEach(([cat]) => {
           const got = sumBy(counted.filter(r => inGroup(r, cat)), r => num(r.credits));
           const td = el("td", "num", fmt(got));
           ugcMark(td, got, deg, nepKey[cat]);
@@ -3190,7 +3202,7 @@
         return tr;
       };
       const T = typeTotals(all);
-      const COLS1 = DIST_GROUPS.length + 4;
+      const COLS1 = COLS.length + 4;
       sems(T.upto6).forEach(sem => semRow(sem, T.upto6));
       totRow(ONE_LIST ? "TOTAL" : "3-Year UG", T.upto6, ONE_LIST ? null : "UG - 3 Year");
       if (T.fourYear) {

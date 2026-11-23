@@ -1,6 +1,7 @@
 """No UGC: Design, Allied Healthcare, Engineering and Law automatically; a
-No UGC curriculum has no Minor, keeps DSE on its own, calls Multidisciplinary
-GEC / OE / MDC, and has no credit rule."""
+No UGC curriculum has no Minor, its own course categories (CC, PCC, BSC, ESC,
+HSMC, DSE, PEC, OE, OEC, GEC, AEC, SEC, VAC, Internship, Project, Dissertation),
+and no credit rule."""
 
 import json
 
@@ -62,8 +63,15 @@ def test_no_ugc_curriculum_categories_and_no_credit_rule(app, client):
     struct = next(s for s in stage["sections"] if s["key"] == "semester_structure")
     cat = next(c for c in struct["columns"] if c["name"] == "nep_category")
     assert "Minor Stream" not in cat["options"] and "Discipline Specific Elective (DSE)" in cat["options"]
-    assert cat["option_labels"]["Major (Core)"] == "Major / CC / Core"
-    assert cat["option_labels"]["Multidisciplinary"] == "GEC / OE / MDC"
+    assert cat["option_labels"]["Major (Core)"] == "CC — Core Course"
+    assert cat["option_labels"]["Multidisciplinary"] == "OE — Open Elective"
+    for c in ("Programme Core Course (PCC)", "Basic Science Course (BSC)", "Engineering Science Course (ESC)",
+              "Humanities, Social Sciences and Management Course (HSMC)", "Programme Elective Course (PEC)",
+              "Open Elective Course (OEC)", "Generic Elective Course (GEC)", "Project (PROJ)"):
+        assert c in cat["options"]
+    # the language course is the same as a UGC department's
+    assert cat["option_labels"]["Ability Enhancement Courses (AEC) - Language"] == \
+        "Ability Enhancement / AEC (Language)"
     assert "ltpe_credit_arithmetic" not in struct.get("rules", [])
     data = json.loads(page.split('id="stage-data" type="application/json">')[1].split("</script>")[0])
     # DSE stays DSE (a UGC department reads it as Major)
@@ -83,3 +91,45 @@ def test_ugc_department_still_folds_dse_and_checks_credits(app, client):
                        json={"semester_structure": rows}).get_json()
     msgs = " ".join(i["message"] for i in body.get("issues", []))
     assert "works out to" in msgs
+
+
+def test_no_ugc_keeps_its_own_categories_and_the_word_file_counts_them(app, client):
+    from app.docgen import _used_groups
+    u, p = make_department(app, "COM", "Department of Commerce", "School of Design, Media and Creative Arts")
+    login(client, u, p)
+    rows = [_row(1, "Basic Science Course (BSC)", "B1", 4, 4),
+            _row(1, "Engineering Science Course (ESC)", "E1", 3, 3),
+            _row(5, "Programme Elective Course (PEC)", "P1", 3, 3),
+            _row(8, "Project (PROJ)", "J1", 6, 6)]
+    client.post("/department/api/prog_curriculum/BCMREG/save", json={"semester_structure": rows})
+    page = client.get("/department/stage/prog_curriculum/BCMREG").get_data(as_text=True)
+    data = json.loads(page.split('id="stage-data" type="application/json">')[1].split("</script>")[0])
+    # saved as entered, not folded into Major or Research
+    assert [r["nep_category"] for r in data["semester_structure"]] == [
+        "Basic Science Course (BSC)", "Engineering Science Course (ESC)",
+        "Programme Elective Course (PEC)", "Project (PROJ)"]
+    # the Classification of Credits has a column for each category used, and no others
+    assert [g[1] for g in _used_groups(data["semester_structure"], flow=True)] == \
+        ["BSC", "ESC", "PEC", "Project / PROJ"]
+
+
+def test_no_ugc_word_file_shows_the_new_categories(app, client):
+    import io
+
+    from docx import Document
+
+    from app import demo_dept
+    from app.db import get_db
+    from app.docgen import curriculum_docx
+    with app.app_context():
+        user, pw = demo_dept.create(app.config["ACADEMIC_YEAR"], app.config["UPLOAD_ROOT"])
+        get_db().departments.update_one({"dept_code": "DEMO"}, {"$set": {"credit_rules": "flow"}})
+    login(client, user, pw)
+    rows = [_row(1, "Basic Science Course (BSC)", "BS1", 4, 4), _row(3, "Programme Core Course (PCC)", "PC1", 3, 3),
+            _row(8, "Project (PROJ)", "PR1", 6, 6)]
+    client.post("/department/api/prog_curriculum/DEMOBBA/save", json={"semester_structure": rows})
+    with app.app_context():
+        doc = Document(io.BytesIO(curriculum_docx(get_db(), "DEMO", app.config["ACADEMIC_YEAR"], "DEMOBBA").getvalue()))
+    cells = [c.text for t in doc.tables for r in t.rows for c in r.cells]
+    assert "BASIC SCIENCE COURSES (BSC)" in cells and "PROGRAMME CORE COURSES (PCC)" in cells
+    assert "PCC" in cells and "Project / PROJ" in cells and "Category" in cells

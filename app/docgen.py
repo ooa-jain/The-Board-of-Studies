@@ -39,7 +39,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Emu, Pt, RGBColor
 
-from .schema import DEFAULT_REGULATIONS, STAGE_BY_KEY, btl, contact_hours
+from .schema import DEFAULT_REGULATIONS, FLOW_SHORT, STAGE_BY_KEY, btl, contact_hours
 from .workflow import programmes_of
 
 BASE = Path(__file__).parent / "doc_templates" / "jain_base.docx"
@@ -61,6 +61,16 @@ GROUP_HEADS = [
     ("Value Added Courses (VAC)", "VALUE ADDED COURSES"),
     ("Summer Internship", "SUMMER INTERNSHIP"),
     ("Research Project / Dissertation", "RESEARCH PROJECT / DISSERTATION"),
+    # a No UGC department's own categories
+    ("Programme Core Course (PCC)", "PROGRAMME CORE COURSES (PCC)"),
+    ("Basic Science Course (BSC)", "BASIC SCIENCE COURSES (BSC)"),
+    ("Engineering Science Course (ESC)", "ENGINEERING SCIENCE COURSES (ESC)"),
+    ("Humanities, Social Sciences and Management Course (HSMC)",
+     "HUMANITIES, SOCIAL SCIENCES AND MANAGEMENT COURSES (HSMC)"),
+    ("Programme Elective Course (PEC)", "PROGRAMME ELECTIVE COURSES (PEC)"),
+    ("Open Elective Course (OEC)", "OPEN ELECTIVE COURSES (OEC)"),
+    ("Generic Elective Course (GEC)", "GENERIC ELECTIVE COURSES (GEC)"),
+    ("Project (PROJ)", "PROJECT (PROJ)"),
     ("Mandatory Non-Credit Course", "MANDATORY NON-CREDIT COURSES"),
     ("Mandatory Non-Credit Audit Course", "MANDATORY NON-CREDIT AUDIT COURSES"),
 ]
@@ -370,12 +380,19 @@ def _sems(rows):
     return sorted({_num(r.get("semester")) for r in rows if _num(r.get("semester")) is not None})
 
 
-# a No UGC department's Classification of Credits: no Minor; DSE and GEC / OE / MDC on their own
-FLOW_DIST_GROUPS = [
-    ("Major (Core)", "Major / CC / Core"),
-    ("Discipline Specific Elective (DSE)", "DSE"),
-    ("Multidisciplinary", "GEC / OE / MDC"),
-] + DIST_GROUPS[3:]
+# a No UGC department's Classification of Credits: its own categories, a
+# column for each one the programme uses (the language course in AEC)
+def _flow_dist_groups():
+    from .schema import FLOW_CATEGORIES, FLOW_SHORT, AEC_LANGUAGE
+    return [(c, FLOW_SHORT[c]) for c in FLOW_CATEGORIES if c != AEC_LANGUAGE]
+
+
+def _used_groups(rows, flow=False):
+    if not flow:
+        return DIST_GROUPS
+    groups = _flow_dist_groups()
+    used = [g for g in groups if any(_in_group(r, g[0], True) for r in rows)]
+    return used or groups[:1]
 
 
 def _in_group(r, cat, flow=False):
@@ -442,7 +459,7 @@ def _profile_table(doc, cur, width, degree_level=None):
 def _classification_table(doc, rows, width, title="Classification of Credits and Number of Non-Credit Courses",
                           flow=False):
     base, blocks = _blocks(rows)
-    groups = FLOW_DIST_GROUPS if flow else DIST_GROUPS
+    groups = _used_groups(rows, flow)
     heads = (["Semester"] + [g[1] for g in groups] +
              ["Total Credits", "No. of Mandatory Non-Credit Course/s",
               "No. of Mandatory Non-Credit Audit Course/s"])
@@ -482,7 +499,7 @@ def _structure_table(doc, rows, width, flow=False):
     _borders(t)
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     _band(t, "Programme Structure", GREEN)
-    heads = ["Course Code", "Course Title", "Major / DSE" if flow else "Major / Minor", "Credits",
+    heads = ["Course Code", "Course Title", "Category" if flow else "Major / Minor", "Credits",
              "Continuous Assessment Marks", "End Semester Examination Marks", "Total Marks"]
     hr = t.add_row().cells
     for i, h in enumerate(heads):
@@ -506,8 +523,8 @@ def _structure_table(doc, rows, width, flow=False):
             for g in groups:
                 _band(t, heads_by.get(g, (g or "OTHER COURSES").upper()), PALE)
                 for r in [x for x in rs if (x.get("nep_category") or "") == g]:
-                    mm = ("Major" if _in_group(r, "Major (Core)", flow) else
-                          "DSE" if flow and g == "Discipline Specific Elective (DSE)" else
+                    mm = (FLOW_SHORT.get(g, "") if flow else
+                          "Major" if _in_group(r, "Major (Core)") else
                           "Minor" if g == "Minor Stream" else "")
                     cells = t.add_row().cells
                     vals = [r.get("course_code") or "", r.get("course_title") or "", mm,
