@@ -74,9 +74,10 @@ def report_bug(dept: dict, *, title: str, text: str, where: str, email: str, per
 
 
 def raise_ticket(dept: dict, *, subject: str, text: str, person: dict | None,
-                 page: str = "", year: str = "", actor: str = "", where: str = "") -> dict:
+                 page: str = "", year: str = "", actor: str = "", where: str = "",
+                 shot_bytes: bytes | None = None, shot_type: str | None = None, upload_root=None) -> dict:
     """Store an Academics query as a ticket and return it; `where` is the
-    stage the query is about (Pre-BoS, Curriculum …)."""
+    stage the query is about (Pre-BoS, Curriculum …); a screenshot is optional."""
     n = _next_number()
     doc = {
         "number": n, "ticket": ticket_no(n), "kind": "academics",
@@ -86,6 +87,13 @@ def raise_ticket(dept: dict, *, subject: str, text: str, person: dict | None,
         "name": (person or {}).get("name", ""), "email": (person or {}).get("email", ""),
         "actor": actor, "page": page[:300], "status": "open", "at": now(),
     }
+    if shot_bytes and shot_type in SHOT_TYPES and upload_root:
+        import uuid
+        folder = Path(upload_root) / "bug_reports"
+        folder.mkdir(parents=True, exist_ok=True)
+        stored = f"{doc['ticket']}-{uuid.uuid4().hex[:8]}{SHOT_TYPES[shot_type]}"
+        (folder / stored).write_bytes(shot_bytes)
+        doc.update(screenshot=stored, screenshot_type=shot_type)
     doc["_id"] = get_db().queries.insert_one(doc).inserted_id
     send_mail(doc, "raised")
     return doc

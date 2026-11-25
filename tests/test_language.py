@@ -11,13 +11,12 @@ from test_workflow import login, make_department
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_english_by_default_and_a_choice_in_the_sidebar(app, client):
+def test_english_by_default_and_no_language_in_the_sidebar(app, client):
     u, p = make_department(app)
     login(client, u, p)
     page = client.get("/department/").get_data(as_text=True)
-    assert 'class="side-lang"' in page
-    for label in ("English", "हिन्दी", "ಕನ್ನಡ", "தமிழ்", "മലയാളം"):
-        assert label in page
+    # the sidebar has no Language item; the language is picked on the intro
+    assert 'class="side-lang"' not in page
     assert '<html lang="en"' in page and "js/i18n.js" not in page
 
 

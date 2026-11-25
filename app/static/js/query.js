@@ -23,16 +23,24 @@
   function close() { if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open"); }
   function step(heading) { title.textContent = heading; body.textContent = ""; }
 
-  // ---- Query: raise a ticket for the Office, or the Help video section by section
-  function sections() {
+  // ---- Query: two choices — report a query (a ticket) or go through the Help video
+  function choice(heading, text, go) {
+    var b = el("button", "qd-choice");
+    b.type = "button";
+    b.appendChild(el("strong", null, heading));
+    b.appendChild(el("span", null, text));
+    b.addEventListener("click", go);
+    return b;
+  }
+  function choices() {
     step("Query");
-    var raise = el("button", "qd-choice");
-    raise.type = "button";
-    raise.appendChild(el("strong", null, "Raise a ticket"));
-    raise.appendChild(el("span", null, "A question for the Office of Academic Affairs — choose the stage it is about."));
-    raise.addEventListener("click", ticketForm);
-    body.appendChild(raise);
-    body.appendChild(el("p", "qd-note qd-or", "Or see how it is done in the Help video:"));
+    var box = el("div", "qd-choices");
+    box.appendChild(choice("Report a query", "Ask the Office of Academic Affairs. Choose the stage, write your question, attach a screenshot if you like — a ticket is raised.", ticketForm));
+    box.appendChild(choice("Go through the video", "See how it is done in the Help video, section by section.", sections));
+    body.appendChild(box);
+  }
+  function sections() {
+    step("Query — which section?");
     var note = el("p", "qd-note", "Loading the sections…");
     body.appendChild(note);
     fetch(qBtn.dataset.sectionsUrl, { credentials: "same-origin" })
@@ -161,9 +169,9 @@
     });
   }
 
-  // ---- Raise a ticket: the stage, a subject and the question
+  // ---- Report a query: the stage, a subject, the question and a screenshot (not required)
   function ticketForm() {
-    step("Raise a ticket");
+    step("Report a query");
     var form = el("form", "qd-form");
     form.appendChild(el("p", "qd-note", "Your question goes to the Office of Academic Affairs as a ticket."));
     var stage = el("select");
@@ -178,6 +186,9 @@
     what.rows = 4; what.maxLength = 3000; what.required = true;
     what.placeholder = "Write your question";
     form.appendChild(field("Your question", what));
+    var shot = el("input");
+    shot.type = "file"; shot.accept = "image/png,image/jpeg,image/webp";
+    form.appendChild(field("Screenshot (not required)", shot, "A picture of the screen helps (PNG or JPG, up to 5 MB)."));
     var err = el("p", "qd-err");
     err.hidden = true;
     var send = el("button", "btn qd-send", "Raise ticket");
@@ -188,12 +199,17 @@
     what.focus();
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      if (what.value.trim().length < 5) { err.textContent = "Please write your question."; err.hidden = false; return; }
+      var problem = what.value.trim().length < 5 ? "Please write your question." :
+        shot.files.length && shot.files[0].size > 5 * 1024 * 1024 ? "The screenshot is over 5 MB." : "";
+      if (problem) { err.textContent = problem; err.hidden = false; return; }
+      var fd = new FormData();
+      fd.append("stage", stage.value);
+      fd.append("subject", subj.value);
+      fd.append("text", what.value);
+      fd.append("page", location.pathname + location.search);
+      if (shot.files.length) fd.append("screenshot", shot.files[0]);
       send.disabled = true; send.textContent = "Sending…"; err.hidden = true;
-      fetch(qBtn.dataset.queryUrl, { method: "POST", credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stage: stage.value, subject: subj.value, text: what.value,
-                               page: location.pathname + location.search }) })
+      fetch(qBtn.dataset.queryUrl, { method: "POST", credentials: "same-origin", body: fd })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (d) {
           if (!d.ok) throw new Error(d.error || "Could not raise the ticket. Please try again.");
@@ -211,7 +227,7 @@
     });
   }
 
-  if (qBtn) qBtn.addEventListener("click", function () { sections(); show(); });
+  if (qBtn) qBtn.addEventListener("click", function () { choices(); show(); });
   if (bBtn) bBtn.addEventListener("click", function () { bugForm(); show(); });
   dlg.querySelector(".qd-close").addEventListener("click", close);
   dlg.addEventListener("click", function (e) { if (e.target === dlg) close(); });

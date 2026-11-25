@@ -235,7 +235,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span class="side-text">Help</span></a>
     {% if not current_user.acting %}
     {# Query: the Help video's sections, each opening the video there; Report a bug: a short form #}
-    <button type="button" class="side-link side-btn" id="query-btn" title="Query — raise a ticket or see how it is done"
+    <button type="button" class="side-link side-btn" id="query-btn" title="Query — report a query or go through the video"
             data-sections-url="{{ url_for('dept.query_sections') }}"
             data-query-url="{{ url_for('dept.query_raise') }}">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4zM9.5 8.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.4M12 14.5v.01"/></svg><span class="side-text">Query</span></button>
@@ -246,18 +246,6 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9V7a3 3 0 0 1 6 0v2M7 9h10v5a5 5 0 0 1-10 0zM12 11v8M4 13h3M17 13h3M5 8l2 2M19 8l-2 2M5 19l2-2M19 19l-2-2"/></svg><span class="side-text">Report a bug</span></button>
     {% endif %}
     {{ review_item() }}
-    {# Language: the portal's own words in the person's language (app/i18n.py) #}
-    <details class="side-lang">
-      <summary class="side-link" title="Language">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.5 9h17M3.5 15h17M12 3c2.5 2.7 3.5 5.7 3.5 9s-1 6.3-3.5 9c-2.5-2.7-3.5-5.7-3.5-9s1-6.3 3.5-9z"/></svg><span class="side-text">Language · <b translate="no">{{ dict(ui_langs)[ui_lang] }}</b></span></summary>
-      <form method="post" action="{{ url_for('public.set_language') }}" class="side-lang-list" translate="no">
-        <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
-        {% for code, label in ui_langs %}
-        <button type="submit" name="lang" value="{{ code }}" lang="{{ code }}"
-                class="{{ 'is-on' if code == ui_lang }}" aria-pressed="{{ 'true' if code == ui_lang else 'false' }}">{{ label }}</button>
-        {% endfor %}
-      </form>
-    </details>
     <div class="side-foot">
       <span class="who-avatar" aria-hidden="true">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
       {% if current_user.acting %}

@@ -147,3 +147,29 @@ def test_bug_report_needs_a_screenshot_and_reaches_the_office(app, client):
     assert "B-0001" in page and "Upload box stuck" in page and "in Pre-BoS" in page
     shot = client.get(f"/admin/queries/{t['_id']}/screenshot")
     assert shot.status_code == 200 and shot.data == _PNG
+
+
+def test_query_with_a_screenshot_and_without(app, client):
+    import io
+
+    from app.db import get_db
+    u, p = make_department(app)
+    login(client, u, p)
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    r = client.post("/department/query", data={"stage": "Pre-BoS", "subject": "DIAC", "text": "Who signs the minutes?",
+                                               "screenshot": (io.BytesIO(png), "shot.png", "image/png")},
+                    content_type="multipart/form-data").get_json()
+    assert r["ok"]
+    r2 = client.post("/department/query", data={"stage": "Syllabus", "text": "No screenshot here"},
+                     content_type="multipart/form-data").get_json()
+    assert r2["ok"]
+    bad = client.post("/department/query", data={"text": "A bad file", "screenshot": (io.BytesIO(b"hello"), "x.png", "image/png")},
+                      content_type="multipart/form-data").get_json()
+    assert bad["ok"] is False and "PNG" in bad["error"]
+    with app.app_context():
+        t1 = get_db().queries.find_one({"ticket": r["ticket"]})
+        t2 = get_db().queries.find_one({"ticket": r2["ticket"]})
+    assert t1["where"] == "Pre-BoS" and t1.get("screenshot")
+    assert t2["where"] == "Syllabus" and not t2.get("screenshot")
+    _admin(app, client)
+    assert client.get(f"/admin/queries/{t1['_id']}/screenshot").status_code == 200

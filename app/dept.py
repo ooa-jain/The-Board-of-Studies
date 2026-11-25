@@ -299,7 +299,14 @@ def query_raise():
     from .queries import raise_ticket
     if acting():
         return jsonify(ok=False, error="The Office cannot raise a query for a department."), 400
-    body = request.get_json(silent=True) or {}
+    # a form (with a screenshot, if one is attached) or JSON
+    body = request.get_json(silent=True) or request.form.to_dict() or {}
+    shot = request.files.get("screenshot")
+    shot_bytes, shot_type = None, None
+    if shot and shot.filename:
+        shot_bytes, shot_type, problem = _screenshot(shot)
+        if problem:
+            return jsonify(ok=False, error=problem), 400
     subject = " ".join(str(body.get("subject") or "").split())
     text = str(body.get("text") or "").strip()
     if len(text) < 5:
@@ -312,11 +319,25 @@ def query_raise():
         page = ""
     where = " ".join(str(body.get("stage") or "").split())
     t = raise_ticket(dept, subject=subject, text=text, person=person, page=page,
-                     year=_year(), actor=me["username"], where=where)
+                     year=_year(), actor=me["username"], where=where, shot_bytes=shot_bytes,
+                     shot_type=shot_type, upload_root=current_app.config["UPLOAD_ROOT"])
     notify_record(dept, "query", text=f"{t['ticket']}: {subject or text[:80]}",
                   actor=me["username"], person=person.get("name", ""))
     audit(me["username"], "query.raised", f"{dept['dept_code']} {t['ticket']}")
     return jsonify(ok=True, ticket=t["ticket"])
+
+
+def _screenshot(shot):
+    """A screenshot's bytes and type, or why it cannot be taken."""
+    from .queries import SHOT_MAX, SHOT_TYPES
+    data = shot.read(SHOT_MAX + 1)
+    kind = (shot.mimetype or "").lower()
+    if kind not in SHOT_TYPES or not (data[:8] == b"\x89PNG\r\n\x1a\n" or data[:3] == b"\xff\xd8\xff"
+                                      or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")):
+        return None, None, "The screenshot must be a PNG, JPG or WebP picture."
+    if len(data) > SHOT_MAX:
+        return None, None, "The screenshot is over 5 MB."
+    return data, kind, ""
 
 
 @bp.post("/bug")
@@ -324,7 +345,7 @@ def query_raise():
 def bug_report():
     """Report a bug: its name, the e-mail (from the sign-in), where it is, what
     went wrong, and a screenshot (required). Sent to the Office as a ticket."""
-    from .queries import SHOT_MAX, SHOT_TYPES, report_bug
+    from .queries import report_bug
     if acting():
         return jsonify(ok=False, error="The Office cannot report a bug for a department."), 400
     f = request.form
@@ -343,13 +364,9 @@ def bug_report():
         return jsonify(ok=False, error="Say what the issue is."), 400
     if not shot or not shot.filename:
         return jsonify(ok=False, error="Add a screenshot — it is required."), 400
-    data = shot.read(SHOT_MAX + 1)
-    kind = (shot.mimetype or "").lower()
-    if kind not in SHOT_TYPES or not (data[:8] == b"\x89PNG\r\n\x1a\n" or data[:3] == b"\xff\xd8\xff"
-                                      or (data[:4] == b"RIFF" and data[8:12] == b"WEBP")):
-        return jsonify(ok=False, error="The screenshot must be a PNG, JPG or WebP picture."), 400
-    if len(data) > SHOT_MAX:
-        return jsonify(ok=False, error="The screenshot is over 5 MB."), 400
+    data, kind, problem = _screenshot(shot)
+    if problem:
+        return jsonify(ok=False, error=problem), 400
     dept = _dept()
     page = str(f.get("page") or "")
     t = report_bug(dept, title=title, text=text, where=where, email=email, person=person,
