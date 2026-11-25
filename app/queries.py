@@ -74,14 +74,15 @@ def report_bug(dept: dict, *, title: str, text: str, where: str, email: str, per
 
 
 def raise_ticket(dept: dict, *, subject: str, text: str, person: dict | None,
-                 page: str = "", year: str = "", actor: str = "") -> dict:
-    """Store an Academics query as a ticket and return it."""
+                 page: str = "", year: str = "", actor: str = "", where: str = "") -> dict:
+    """Store an Academics query as a ticket and return it; `where` is the
+    stage the query is about (Pre-BoS, Curriculum …)."""
     n = _next_number()
     doc = {
         "number": n, "ticket": ticket_no(n), "kind": "academics",
         "dept_code": dept["dept_code"], "dept_name": dept.get("dept_name", ""),
         "campus": dept.get("campus", ""), "academic_year": year,
-        "subject": subject[:MAX_SUBJECT], "text": text[:MAX_TEXT],
+        "subject": subject[:MAX_SUBJECT], "text": text[:MAX_TEXT], "where": where[:60],
         "name": (person or {}).get("name", ""), "email": (person or {}).get("email", ""),
         "actor": actor, "page": page[:300], "status": "open", "at": now(),
     }

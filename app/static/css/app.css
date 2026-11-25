@@ -5190,6 +5190,8 @@ a.subm-doc:hover { border-color: var(--ink-800, #0e2a5c); }
 .qd-choice span { font-size: .85rem; color: var(--ink-soft); }
 .qd-choice:hover, .qd-choice:focus-visible { border-color: var(--ink-600); background: var(--ink-050); }
 .qd-note { margin: 0 0 10px; font-size: .88rem; color: var(--ink-soft); }
+.qd-or { margin-top: 14px; }
+.qd-form select { font-weight: 400; }
 .qd-sections { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .qd-section { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: var(--ink); text-decoration: none; }
 .qd-section:hover, .qd-section:focus-visible { background: var(--ink-050); }

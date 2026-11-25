@@ -310,8 +310,9 @@ def query_raise():
     page = str(body.get("page") or "")
     if not page.startswith("/"):
         page = ""
+    where = " ".join(str(body.get("stage") or "").split())
     t = raise_ticket(dept, subject=subject, text=text, person=person, page=page,
-                     year=_year(), actor=me["username"])
+                     year=_year(), actor=me["username"], where=where)
     notify_record(dept, "query", text=f"{t['ticket']}: {subject or text[:80]}",
                   actor=me["username"], person=person.get("name", ""))
     audit(me["username"], "query.raised", f"{dept['dept_code']} {t['ticket']}")

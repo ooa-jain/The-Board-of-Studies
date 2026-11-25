@@ -32,6 +32,7 @@ def test_department_page_shows_query_button(app, client):
     login(client, u, p)
     page = client.get("/department/stage/dept_info").get_data(as_text=True)
     assert 'id="query-btn"' in page and "Faculty and students" in page
+    assert 'data-query-url="/department/query"' in page
 
 
 def test_technical_query_lists_help_sections(app, client):
@@ -51,7 +52,7 @@ def test_academic_query_becomes_a_ticket_the_office_resolves(app, client):
     r = client.post("/department/query", json={"subject": "Minor credits", "text": "x"})
     assert r.status_code == 400
 
-    r = client.post("/department/query", json={"subject": "Minor credits",
+    r = client.post("/department/query", json={"subject": "Minor credits", "stage": "Curriculum",
                                                 "text": "How many credits for the minor?",
                                                 "page": "/department/stage/curriculum"}).get_json()
     assert r["ok"] and r["ticket"] == "Q-0001"
@@ -60,7 +61,7 @@ def test_academic_query_becomes_a_ticket_the_office_resolves(app, client):
 
     with app.app_context():
         t = get_db().queries.find_one({"ticket": "Q-0001"})
-        assert t["dept_code"] == "COM" and t["status"] == "open"
+        assert t["dept_code"] == "COM" and t["status"] == "open" and t["where"] == "Curriculum"
         assert get_db().notifications.find_one({"event": "query"})
 
     # a department cannot see the Office's list
@@ -68,7 +69,7 @@ def test_academic_query_becomes_a_ticket_the_office_resolves(app, client):
 
     _admin(app, client)
     page = client.get("/admin/queries").get_data(as_text=True)
-    assert "Q-0001" in page and "How many credits for the minor?" in page
+    assert "Q-0001" in page and "How many credits for the minor?" in page and "about Curriculum" in page
     client.post(f"/admin/queries/{t['_id']}/status", data={"status": "resolved"})
     with app.app_context():
         assert get_db().queries.find_one({"ticket": "Q-0001"})["status"] == "resolved"

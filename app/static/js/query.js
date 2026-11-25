@@ -23,9 +23,16 @@
   function close() { if (typeof dlg.close === "function") dlg.close(); else dlg.removeAttribute("open"); }
   function step(heading) { title.textContent = heading; body.textContent = ""; }
 
-  // ---- Query: the Help video, section by section
+  // ---- Query: raise a ticket for the Office, or the Help video section by section
   function sections() {
-    step("Query — which section?");
+    step("Query");
+    var raise = el("button", "qd-choice");
+    raise.type = "button";
+    raise.appendChild(el("strong", null, "Raise a ticket"));
+    raise.appendChild(el("span", null, "A question for the Office of Academic Affairs — choose the stage it is about."));
+    raise.addEventListener("click", ticketForm);
+    body.appendChild(raise);
+    body.appendChild(el("p", "qd-note qd-or", "Or see how it is done in the Help video:"));
     var note = el("p", "qd-note", "Loading the sections…");
     body.appendChild(note);
     fetch(qBtn.dataset.sectionsUrl, { credentials: "same-origin" })
@@ -151,6 +158,56 @@
           body.appendChild(ok);
         })
         .catch(function (x) { err.textContent = x.message; err.hidden = false; send.disabled = false; send.textContent = "Submit"; });
+    });
+  }
+
+  // ---- Raise a ticket: the stage, a subject and the question
+  function ticketForm() {
+    step("Raise a ticket");
+    var form = el("form", "qd-form");
+    form.appendChild(el("p", "qd-note", "Your question goes to the Office of Academic Affairs as a ticket."));
+    var stage = el("select");
+    PLACES.forEach(function (p) { stage.appendChild(new Option(p, p)); });
+    stage.value = here();
+    form.appendChild(field("Which stage is it about?", stage));
+    var subj = el("input");
+    subj.type = "text"; subj.maxLength = 150;
+    subj.placeholder = "e.g. Credits for the language course";
+    form.appendChild(field("Subject", subj));
+    var what = el("textarea");
+    what.rows = 4; what.maxLength = 3000; what.required = true;
+    what.placeholder = "Write your question";
+    form.appendChild(field("Your question", what));
+    var err = el("p", "qd-err");
+    err.hidden = true;
+    var send = el("button", "btn qd-send", "Raise ticket");
+    send.type = "submit";
+    form.appendChild(err);
+    form.appendChild(send);
+    body.appendChild(form);
+    what.focus();
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (what.value.trim().length < 5) { err.textContent = "Please write your question."; err.hidden = false; return; }
+      send.disabled = true; send.textContent = "Sending…"; err.hidden = true;
+      fetch(qBtn.dataset.queryUrl, { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: stage.value, subject: subj.value, text: what.value,
+                               page: location.pathname + location.search }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (d) {
+          if (!d.ok) throw new Error(d.error || "Could not raise the ticket. Please try again.");
+          step("Ticket raised");
+          var ok = el("div", "qd-done");
+          ok.appendChild(el("strong", "qd-ticket", d.ticket));
+          ok.appendChild(el("p", null, "The Office of Academic Affairs has your question about " + stage.value + ". Keep this number for reference."));
+          var c = el("button", "btn btn-sm", "Close");
+          c.type = "button";
+          c.addEventListener("click", close);
+          ok.appendChild(c);
+          body.appendChild(ok);
+        })
+        .catch(function (x) { err.textContent = x.message; err.hidden = false; send.disabled = false; send.textContent = "Raise ticket"; });
     });
   }
 
