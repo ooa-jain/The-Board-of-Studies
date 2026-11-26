@@ -371,6 +371,12 @@
 {% if side_shell %}
 <div class="erp-bar">
   <span class="erp-bar-name">JAIN (Deemed-to-be University) · Office of Academic Affairs</span>
+  {# the pages opened, as tabs (js/tabs.js); the name above shows until they are drawn #}
+  {% if current_user %}
+  <nav class="erp-tabs" id="erp-tabs" aria-label="Open pages" hidden
+       data-user="{{ current_user.username }}{{ ':' ~ current_user.dept_code if current_user.acting else '' }}"
+       data-home="{{ url_for('dept.dashboard') if current_user.role == 'department' else url_for('admin.dashboard') }}"></nav>
+  {% endif %}
   {% if admin_shell and my_places()|length > 1 %}
   {# which place every page shows: all, or one city — remembered until changed #}
   {% set here = current_place() %}
@@ -566,6 +572,7 @@
 {% endif %}
 <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
 <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+{% if side_shell %}<script src="{{ url_for('static', filename='js/tabs.js') }}"></script>{% endif %}
 <script src="{{ url_for('static', filename='js/pw-show.js') }}"></script>
 {% if dept_shell and not current_user.acting %}
 <dialog id="query-dialog" class="query-dialog" aria-labelledby="qd-title">

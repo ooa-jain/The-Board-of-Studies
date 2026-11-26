@@ -31,3 +31,10 @@ def test_the_office_bar_rings_for_new_updates(app, client):
                                            "at": now()})
     page = client.get("/admin/").get_data(as_text=True)
     assert 'class="erp-bell" href="/admin/updates"' in page and 'class="erp-bell-count">1<' in page
+
+
+def test_the_bar_carries_the_page_tabs(app, client):
+    u, p = make_department(app)
+    login(client, u, p)
+    page = client.get("/department/").get_data(as_text=True)
+    assert 'id="erp-tabs"' in page and 'data-home="/department/"' in page and "js/tabs.js" in page

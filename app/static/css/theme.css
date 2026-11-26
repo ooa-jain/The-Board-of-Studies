@@ -122,3 +122,11 @@ html[data-theme="dark"] body.is-login .login-side h1 { color: #ffffff; }
 html[data-theme="dark"] body.is-login .login-kicker { color: #9fb3d1; }
 html[data-theme="dark"] body.is-login .login-lede { color: #c9d4e6; }
 html[data-theme="dark"] body.is-login .login-steps li { color: #dbe4f2; border-color: rgba(255, 255, 255, .25); }
+
+/* the page tabs in the dark */
+html[data-theme="dark"] .erp-tab { color: #a1a9b8; }
+html[data-theme="dark"] .erp-tab:hover { background: rgba(166, 193, 242, .07); }
+html[data-theme="dark"] .erp-tab.is-on { background: #1c2230; color: #a6c1f2; }
+html[data-theme="dark"] .erp-tab + .erp-tab:not(.is-on)::before { background: #2e3542; }
+html[data-theme="dark"] .erp-tab-x:hover, html[data-theme="dark"] .erp-tab-new:hover { background: rgba(166, 193, 242, .12); }
+html[data-theme="dark"] .erp-tab-new { color: #a1a9b8; }
