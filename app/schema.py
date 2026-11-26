@@ -1050,6 +1050,15 @@ STAGES = [
 STAGE_KEYS = [s["key"] for s in STAGES]
 # every form that can be opened, the per-programme parts included
 STAGE_BY_KEY = {s["key"]: s for s in STAGES + PARTS + BATCH_PARTS}
+
+
+# every upload box takes several files (a signed copy in parts, an annexure …);
+# a box that held one file before shows it as the first of its list
+for _st in STAGE_BY_KEY.values():
+    for _sec in _st.get("sections", []):
+        for _f in _sec.get("fields", []) or []:
+            if _f.get("type") == "file":
+                _f["multiple"] = True
 PART_KEYS = [p["key"] for p in PARTS]
 
 GROUP_ORDER = [s["group"] for s in STAGES]

@@ -41,3 +41,10 @@ def test_the_office_makes_an_upload_box_not_mandatory(app, client):
     # a box still mandatory is still asked for
     j = client.post("/department/api/pre_bos/validate", json={"pre_bos_files": {}}).get_json()
     assert any("Industry-Academia" in i["message"] and i["level"] == "error" for i in j["issues"])
+
+
+def test_every_upload_box_takes_several_files():
+    from app.schema import STAGE_BY_KEY
+    boxes = [f for s in STAGE_BY_KEY.values() for sec in s["sections"]
+             for f in sec.get("fields", []) or [] if f.get("type") == "file"]
+    assert boxes and all(f.get("multiple") for f in boxes)

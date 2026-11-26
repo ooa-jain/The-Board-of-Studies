@@ -1138,14 +1138,16 @@ def _template_issues(dept, stage_key, data):
             if f.get("name") not in TEMPLATES:
                 continue
             v = ((data or {}).get(sec["key"]) or {}).get(f["name"])
-            if not isinstance(v, dict) or not v.get("stored"):
-                continue
-            rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": v["stored"]})
-            tpl = ((rec or {}).get("keyword_match") or {}).get("template")
-            for msg in problems(tpl):
-                out.append({"level": "warning", "section": sec["key"], "field": f["name"],
-                            "message": f"{f.get('label', f['name'])}: {msg} — check it; a category "
-                                       "that does not apply can stay empty."})
+            # one file or several: each is checked against the template
+            for one in (v if isinstance(v, list) else [v]):
+                if not isinstance(one, dict) or not one.get("stored"):
+                    continue
+                rec = get_db().files.find_one({"dept_code": dept["dept_code"], "stored_name": one["stored"]})
+                tpl = ((rec or {}).get("keyword_match") or {}).get("template")
+                for msg in problems(tpl):
+                    out.append({"level": "warning", "section": sec["key"], "field": f["name"],
+                                "message": f"{f.get('label', f['name'])}: {msg} — check it; a category "
+                                           "that does not apply can stay empty."})
     return out
 
 

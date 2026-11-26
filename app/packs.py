@@ -148,7 +148,8 @@ def _attach(db, pack, dept, academic_year, actor, sub_fn):
         if state.get("status") == "submitted" or not state.get("data"):
             continue
         have = ((state["data"].get(att["section"]) or {}).get(att["field"]) or {})
-        if isinstance(have, dict) and have.get("stored"):
+        if (isinstance(have, dict) and have.get("stored")) or \
+                (isinstance(have, list) and any(isinstance(x, dict) and x.get("stored") for x in have)):
             continue
         value = _place(db, code, academic_year, att["stage"], att["field"], src, actor)
         db.submissions.update_one(
