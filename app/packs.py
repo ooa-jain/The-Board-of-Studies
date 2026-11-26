@@ -64,11 +64,17 @@ def real_rows(rows):
 
 
 def has_content(part_key, data):
-    """Does a programme part hold anything of its own? Its courses, not a blank row."""
+    """Does a programme part hold anything of its own — a course, a minor or
+    an uploaded file? A blank row the page saved, or the form's own prefill, is not."""
+    def files(v):
+        if isinstance(v, dict):
+            return bool(v.get("stored")) or any(files(x) for x in v.values())
+        if isinstance(v, list):
+            return any(files(x) for x in v)
+        return False
     if not isinstance(data, dict) or not data:
         return False
-    key = "semester_structure" if part_key == "prog_curriculum" else "courses"
-    return bool(real_rows(data.get(key)))
+    return any(real_rows(v) for v in data.values() if isinstance(v, list)) or files(data)
 
 
 def get_pack(key: str):
