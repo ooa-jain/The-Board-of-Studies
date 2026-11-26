@@ -36,7 +36,7 @@ from flask import current_app
 from . import demo_dept
 from .db import get_db, now
 from .keyword_match import check as keyword_check
-from .packs import PARTS, find_department, get_pack, load_pack
+from .packs import PARTS, find_department, get_pack, load_pack, real_rows
 from .ugc_rules import split_honours
 from .schema import PARTS as PROGRAMME_PARTS
 from .schema import STAGE_BY_KEY, STAGE_KEYS, degree_years, programme_level
@@ -235,7 +235,8 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
         if (details.get("degree_level") or programme.get("degree_level")) else programme.get("level") != "PG"
     if not details.get("degree_level"):
         details["degree_level"] = ("UG - 4 Year (Honours with Research)" if ug else "PG - 2 Year")
-    if not data.get("semester_structure"):
+    if not real_rows(data.get("semester_structure")):
+        # nothing of its own (a blank row the page saved is not a course)
         rows = _ug_courses(prefix) if ug else _pg_courses(prefix)
         if syllabus_courses:
             # the syllabus is the Drive's: its courses are the major, the rest fills the scheme
@@ -275,7 +276,7 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
     for k, v in list(profile.items()):
         if v in (None, ""):
             del profile[k]
-    if not [m for m in data.get("minors") or [] if isinstance(m, dict)]:
+    if not real_rows(data.get("minors")):
         data["minors"] = _minors(data["semester_structure"], ug)
     if ug:
         # the specialisation (major) and the minors offered, from the programme and Annexure I
@@ -346,7 +347,7 @@ def _minors(structure, ug):
 def _syllabus(sub, programme, stored, year):
     code = programme["programme_code"]
     data = dict(stored or {})
-    courses = [c for c in (data.get("courses") or []) if isinstance(c, dict)]
+    courses = real_rows(data.get("courses"))
     if not courses:
         courses = [dict(c) for c in course_fill_source(sub, code)]
     out, used = [], {str(c.get("course_code") or "").strip().upper() for c in courses}
@@ -397,7 +398,7 @@ def _syllabus(sub, programme, stored, year):
 def _revision(sub, programme, stored, year):
     code = programme["programme_code"]
     data = dict(stored or {})
-    rows = [dict(r) for r in (data.get("courses") or []) if isinstance(r, dict)]
+    rows = [dict(r) for r in real_rows(data.get("courses"))]
     if not rows:
         rows = revision_fill_source(sub, code)
     out = []
@@ -671,7 +672,7 @@ def fill_from_drive(dept, year, actor):
                 data = _batch_syllabus(current, label, stored)
                 # the batch's course list: the programme structure's rows for
                 # the courses its syllabus has, with that batch's year in the codes
-                if not data.get("batch_courses"):
+                if not real_rows(data.get("batch_courses")):
                     structure = programme_stage_state(sub, pcode, "prog_curriculum").get("data") or {}
                     data["batch_courses"] = _batch_course_list(structure, data.get("courses"), label)
                 # only the semesters Settings asks this batch for, and its Course Revision
@@ -679,7 +680,7 @@ def fill_from_drive(dept, year, actor):
                 sems = batch_semesters(part)
                 for k in ("batch_courses", "courses"):
                     data[k] = in_semesters(data.get(k), sems)
-                if not data.get("revision_courses"):
+                if not real_rows(data.get("revision_courses")):
                     data["revision_courses"] = batch_revision_rows(data, label, revision_year(fresh()), sems)
                 # a UG batch: its specialisation and minors, as the current batch's
                 structure = programme_stage_state(fresh(), pcode, "prog_curriculum").get("data") or {}
@@ -688,7 +689,7 @@ def fill_from_drive(dept, year, actor):
                     det, rows = batch_minors(structure, label)
                     have = data.get("details") or {}
                     data["details"] = {**det, **{k: v for k, v in have.items() if v not in (None, "", [])}}
-                    if not [m for m in data.get("minors") or [] if isinstance(m, dict)]:
+                    if not real_rows(data.get("minors")):
                         data["minors"] = rows
                 base = prefill_for(part, dept, year, programme, fresh())
                 for k, v in base.items():
@@ -699,7 +700,7 @@ def fill_from_drive(dept, year, actor):
             if part == "prog_curriculum":
                 syl = (programme_stage_state(sub, pcode, "prog_syllabus").get("data") or {}).get("courses")
                 from_syl = (_syllabus(sub, programme, {"courses": syl}, year)["courses"]
-                            if syl and not stored.get("semester_structure") else ())
+                            if real_rows(syl) and not real_rows(stored.get("semester_structure")) else ())
                 data = build(dept, programme, sub, year, stored, from_syl)
                 if from_syl:                    # the syllabus gets the same codes
                     syl_codes = {"courses": list(from_syl)}

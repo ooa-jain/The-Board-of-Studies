@@ -54,6 +54,23 @@ def _read(path: str, mtime: float):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def real_rows(rows):
+    """The rows that hold a course: a code or a title. A blank row the page
+    starts with (and may have saved) is not one."""
+    return [r for r in (rows if isinstance(rows, list) else [])
+            if isinstance(r, dict) and (str(r.get("course_code") or "").strip()
+                                        or str(r.get("course_title") or "").strip()
+                                        or str(r.get("minor_title") or "").strip())]
+
+
+def has_content(part_key, data):
+    """Does a programme part hold anything of its own? Its courses, not a blank row."""
+    if not isinstance(data, dict) or not data:
+        return False
+    key = "semester_structure" if part_key == "prog_curriculum" else "courses"
+    return bool(real_rows(data.get(key)))
+
+
 def get_pack(key: str):
     path = PACK_DIR / f"{key}.json"
     if not path.is_file():
@@ -214,7 +231,7 @@ def load_pack(key: str, academic_year: str, actor: str, replace: bool = False):
             sub = fresh()
             label = f"{prog_code} · {STAGE_BY_KEY[part_key]['title']}"
             state = programme_stage_state(sub, programme["programme_code"], part_key)
-            if state.get("status") == "submitted" or (state.get("data") and not replace):
+            if state.get("status") == "submitted" or (has_content(part_key, state.get("data")) and not replace):
                 skipped.append(f"{label} — already has data")
                 continue
             if part_key == "prog_curriculum":
