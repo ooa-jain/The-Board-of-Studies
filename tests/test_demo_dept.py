@@ -87,7 +87,7 @@ def test_only_the_step_that_completes_the_record_reviews_first(app, client):
         sub = get_db().submissions.find_one({"dept_code": "DEMO"})
     for key in ("dept_info", "pre_bos", "bos_documents"):
         assert client.post(f"/department/api/{key}/submit", json=sub["stages"][key]["data"]).get_json()["ok"]
-    parts = [(code, part) for code in ("DEMOBBA", "DEMOBCOM")
+    parts = [(code, part) for code in ("DEMOBBA", "DEMOBCOM", "DEMOBCA")
              for part in ("prog_curriculum", "prog_syllabus", "prog_revision")]
     for code, part in parts[:-1]:
         data = sub["programmes"][code][part]["data"]

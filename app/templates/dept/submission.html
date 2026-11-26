@@ -35,13 +35,17 @@
   {% endfor %}
 </nav>
 
-<p class="subm-note">View only. For a copy of these documents, contact the Office of Academic Affairs.</p>
+<p class="subm-note">View only.
+  {% if pick %}<a class="btn btn-sm" href="{{ url_for('dept.programme_report_pdf', programme_code=programme.programme_code, batch=pick.batch, doc=pick.doc) }}" target="_blank" rel="noopener">View this as PDF</a>{% endif %}
+  <a class="btn btn-ghost btn-sm" href="{{ url_for('dept.programme_report_pdf', programme_code=programme.programme_code) }}" target="_blank" rel="noopener">View all as PDF</a>
+  For the full detailed report, mail the Office of Academic Affairs:
+  <a href="mailto:{{ office_email }}">{{ office_email }}</a>.</p>
 
 {% if view %}
 <div class="subm-doc-wrap">
   {% include "share/_gen_doc.html" %}
 </div>
-<p class="subm-noprint">This submission is view only. For a copy, contact the Office of Academic Affairs.</p>
+<p class="subm-noprint">This submission is view only. For the full detailed report, mail <a href="mailto:{{ office_email }}">{{ office_email }}</a>.</p>
 {% elif pick %}
 <p class="small muted">This document could not be shown just now. Please try again, or contact the Office of Academic Affairs.</p>
 {% else %}

@@ -3958,7 +3958,7 @@
     }
 
     /* The pencil beside a programme in the list: a pop-up with its name, level
-       and the year it began; "Acknowledge" keeps what is shown. */
+      and the year it began; "Save changes" keeps what is shown. */
     function editProgramme(row) {
       const dlg = document.createElement("dialog");
       dlg.className = "query-dialog pd-dialog";
@@ -3971,7 +3971,7 @@
       head.appendChild(x);
       const body = el("div", "qd-body");
       const form = el("form", "qd-form");
-      form.appendChild(el("p", "qd-note", `Programme code ${row.programme_code || "—"}. Check the details; Acknowledge keeps them.`));
+      form.appendChild(el("p", "qd-note", "Please edit the programme details as per the BoS."));
       const name = el("input");
       name.type = "text"; name.maxLength = 300; name.required = true;
       name.value = row.programme_name || "";
@@ -3986,7 +3986,7 @@
       year.value = row.year_introduced || "";
       const wYear = el("label", "qd-field"); wYear.appendChild(el("span", null, "Since (year)")); wYear.appendChild(year);
       const err = el("p", "qd-err"); err.hidden = true;
-      const ok = el("button", "btn qd-send", "Acknowledge");
+      const ok = el("button", "btn qd-send", "Save changes");
       ok.type = "submit";
       [wName, wLevel, wYear, err, ok].forEach(n => form.appendChild(n));
       body.appendChild(form);

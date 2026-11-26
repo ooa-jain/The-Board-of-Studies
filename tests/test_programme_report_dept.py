@@ -69,3 +69,43 @@ def test_a_department_sees_its_submission_without_a_download(app, client):
     # and there is no download for the department, of any report
     for url in (f"/department/programme/{code}/report.zip", "/department/export.xlsx", "/department/export.docx"):
         assert client.get(url).status_code == 404, url
+
+
+def test_reports_offer_a_pdf_to_view_and_a_mail_for_the_full_report(app, client):
+    code = _demo(app, client)
+    # nothing submitted yet: no PDF, but the full report can still be asked for
+    reports = client.get("/department/reports").get_data(as_text=True)
+    assert "View PDF" not in reports and "Request full report" in reports
+    assert "mailto:officeofacademicaffairs@jainuniversity.ac.in" in reports
+    assert client.get(f"/department/programme/{code}/report.pdf").status_code == 404
+
+    items = client.get(f"/department/api/record?programme={code}").get_json()["items"]
+    for it in items:
+        assert client.post(f"/department/api/{it['key']}/{code}/submit", json=it["data"]).get_json()["ok"]
+    reports = client.get("/department/reports").get_data(as_text=True)
+    assert "View PDF" in reports and f"/department/programme/{code}/report.pdf" in reports
+
+    r = client.get(f"/department/programme/{code}/report.pdf")
+    assert r.status_code == 200 and r.mimetype == "application/pdf"
+    assert r.data[:5] == b"%PDF-" and "inline" in r.headers["Content-Disposition"]
+    # one document of it
+    one = client.get(f"/department/programme/{code}/report.pdf?batch=current&doc=s")
+    assert one.status_code == 200 and 1000 < len(one.data) < len(r.data)
+    # the page offers both, and the Office's address
+    page = client.get(f"/department/programme/{code}/report").get_data(as_text=True)
+    assert "View this as PDF" in page and "View all as PDF" in page
+    assert "officeofacademicaffairs@jainuniversity.ac.in" in page
+
+
+def test_the_bca_demo_programme_is_fully_filled(app, client):
+    from app.db import get_db
+    _demo(app, client)
+    with app.app_context():
+        sub = get_db().submissions.find_one({"dept_code": "DEMO"})
+    parts = sub["programmes"]["DEMOBCA"]
+    cur = parts["prog_curriculum"]["data"]
+    assert cur["details"]["specialisation"] == "Artificial Intelligence and Machine Learning"
+    assert len(cur["profile"]["programme_specific_outcomes"]) == 4 and cur["minors"]
+    assert len(parts["prog_syllabus"]["data"]["courses"]) == len(cur["semester_structure"])
+    assert parts["prog_revision"]["data"]["courses"]
+    assert all(parts[k]["data"] for k in parts)

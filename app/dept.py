@@ -6,7 +6,7 @@ import re
 import uuid
 from pathlib import Path
 
-from flask import (Blueprint, abort, current_app, flash, jsonify, redirect,
+from flask import (Blueprint, Response, abort, current_app, flash, jsonify, redirect,
                    render_template, request, send_file, session, url_for)
 from werkzeug.utils import secure_filename
 
@@ -1733,10 +1733,25 @@ def _submission_view(dept, code, pick):
         return None
 
 
+OFFICE_EMAIL = "officeofacademicaffairs@jainuniversity.ac.in"
+
+
+def _request_mail(dept, code, name):
+    """A mailto: link to the Office of Academic Affairs asking for the full detailed report."""
+    from urllib.parse import quote
+    me = (_me().get("person") or {}).get("name") or ""
+    subject = f"Request for the full detailed report — {code} · {dept['dept_name']} · {_year()}"
+    body = (f"Dear Office of Academic Affairs,\n\nPlease share the full detailed report of {name} ({code}) "
+            f"for the academic year {_year()}.\n\nDepartment: {dept['dept_name']}\n"
+            + (f"Requested by: {me}\n" if me else "") + "\nThank you.")
+    return f"mailto:{OFFICE_EMAIL}?subject={quote(subject)}&body={quote(body)}"
+
+
 @bp.route("/reports")
 @department_required
 def reports():
-    """Every programme's submission, to see — not to download."""
+    """Every programme's submission, to see: as a page, or as a PDF to view.
+    The full detailed report is asked of the Office of Academic Affairs by mail."""
     dept = _dept()
     sub = get_or_create_submission(dept["dept_code"], _year())
     rows = []
@@ -1744,8 +1759,41 @@ def reports():
         docs = [d for g in _submission_docs(sub, p["programme_code"]) for d in g["docs"]]
         rows.append({"code": p["programme_code"], "name": p["programme_name"],
                      "submitted": sum(d["submitted"] for d in docs), "total": len(docs),
-                     "url": url_for("dept.programme_report", programme_code=p["programme_code"])})
-    return render_template("dept/reports.html", dept=dept, rows=rows, year=_year())
+                     "url": url_for("dept.programme_report", programme_code=p["programme_code"]),
+                     "pdf": url_for("dept.programme_report_pdf", programme_code=p["programme_code"]),
+                     "mail": _request_mail(dept, p["programme_code"], p["programme_name"])})
+    return render_template("dept/reports.html", dept=dept, rows=rows, year=_year(), office_email=OFFICE_EMAIL)
+
+
+@bp.route("/programme/<programme_code>/report.pdf")
+@department_required
+def programme_report_pdf(programme_code):
+    """View PDF: the programme's submitted documents — all of them, or the one
+    picked with ?batch= and ?doc= — laid out as PDF pages, shown in the browser."""
+    from pathlib import Path
+    from .pdfdoc import views_pdf
+    dept = _dept()
+    sub = get_or_create_submission(dept["dept_code"], _year())
+    programme = next((p for p in programmes_of(sub, dept) if p["programme_code"] == programme_code), None) \
+        or abort(404)
+    docs = [d for g in _submission_docs(sub, programme_code) for d in g["docs"] if d["submitted"]]
+    batch, doc = request.args.get("batch"), request.args.get("doc")
+    if batch and doc:
+        docs = [d for d in docs if (d["batch"], d["doc"]) == (batch, doc)]
+    if not docs:
+        abort(404)
+    views = []
+    for d in docs:
+        v = _submission_view(dept, programme_code, d)
+        if v:
+            views.append((d["title"], v))
+    if not views:
+        abort(404)
+    logo = Path(current_app.static_folder) / "img" / "jain-logo.png"
+    pdf = views_pdf(f"{programme_code} — {programme['programme_name']}", views, logo=str(logo))
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", f"BoS-{programme_code}-{_year()}") + ".pdf"
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{name}"', "Cache-Control": "no-store"})
 
 
 @bp.route("/programme/<programme_code>/report")
@@ -1764,4 +1812,4 @@ def programme_report(programme_code):
     pick = next((d for d in docs if (d["batch"], d["doc"]) == want), None) or (docs[0] if docs else None)
     view = _submission_view(dept, programme_code, pick) if pick else None
     return render_template("dept/submission.html", dept=dept, programme=programme, groups=groups,
-                           pick=pick, view=view, year=_year())
+                           pick=pick, view=view, year=_year(), office_email=OFFICE_EMAIL)

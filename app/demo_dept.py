@@ -36,6 +36,11 @@ PROGRAMMES = [
     {"programme_code": "DEMOBCOM", "programme_name": "B.Com in Demonstration Accounting",
      "degree": "UG", "source": "catalogue", "decision": "keep"},
 ]
+PROGRAMMES.append(
+    {"programme_code": "DEMOBCA",
+     "programme_name": "Bachelor of Computer Applications (Honours / Honours with Research) with "
+                       "specialisation in Artificial Intelligence and Machine Learning",
+     "degree": "UG", "source": "catalogue", "decision": "keep"})
 NOT_RUN = {"programme_code": "DEMOMBA", "programme_name": "MBA in Demonstration Strategy",
            "degree": "PG", "source": "catalogue", "decision": "remove"}
 MASTER = [{k: p.get(k, "") for k in ("programme_code", "programme_name", "degree")}
@@ -203,7 +208,38 @@ _TOPICS = {
 }
 
 
-def _courses(prefix):
+# the BCA demo programme: the same plan, with computing courses
+_TOPICS_BCA = {
+    "Major (Core)": ["Programming in Python", "Discrete Mathematics", "Computer Organisation",
+                     "Data Structures", "Database Management Systems", "Operating Systems",
+                     "Object Oriented Programming", "Computer Networks", "Software Engineering",
+                     "Web Technologies", "Design and Analysis of Algorithms", "Artificial Intelligence",
+                     "Machine Learning", "Deep Learning", "Natural Language Processing",
+                     "Computer Vision", "Capstone Project"],
+    "Minor Stream": ["Introduction to Data Analytics", "Statistics for Data Science",
+                     "Data Visualisation", "Predictive Analytics", "Big Data Technologies",
+                     "Business Intelligence"],
+    "Multidisciplinary": ["Environmental Studies", "Indian Economy", "Psychology at Work"],
+    "Ability Enhancement Courses (AEC)": ["English Communication I", "English Communication II",
+                                          "Technical Writing", "Kannada / Hindi"],
+    "Skill Enhancement Courses (SEC)": ["Spreadsheet Skills", "Version Control and DevOps", "Cloud Basics"],
+    "Value Added Courses (VAC)": ["Indian Constitution", "Yoga and Wellbeing", "Professional Ethics",
+                                  "Design Thinking"],
+    "Summer Internship": ["Summer Internship"],
+}
+BCA_PSOS = [
+    "Design, build and test software for real problems using sound engineering practice.",
+    "Apply machine learning methods to analyse data and build intelligent applications.",
+    "Use databases, cloud services and web technologies to deliver working systems.",
+    "Work in teams, communicate clearly and act ethically as a computing professional."]
+
+
+def _is_bca(code):
+    return str(code or "").upper().endswith("BCA")
+
+
+def _courses(prefix, topics=None):
+    topics = topics or _TOPICS
     rows, per_sem, n = [], {}, 0
     for group, credits, l, e, count in _PLAN:
         for i in range(count):
@@ -212,43 +248,54 @@ def _courses(prefix):
             per_sem[sem] = per_sem.get(sem, 0) + 1
             rows.append({"semester": sem, "track": "All semesters", "nep_category": group,
                          "course_code": f"27{prefix}{sem}C{per_sem[sem]:02d}",
-                         "course_title": _TOPICS[group][i % len(_TOPICS[group])],
+                         "course_title": topics[group][i % len(topics[group])],
                          "l": l, "t": 0, "p": 0, "e": e, "credits": credits,
                          "cia": 50, "ese": 50, "total_marks": 100})
     rows.sort(key=lambda r: (r["semester"], r["course_code"]))
     return rows
 
 
-def _modules(title, previous=False, total=60):
+def _modules(title, previous=False, total=60, bca=False):
     out = []
     # five modules, their hours adding up to the course's contact hours
     total = int(total or 60)
     hours = [total // 5 + (1 if k < total % 5 else 0) for k in range(5)]
     for m, (name, hrs) in enumerate(zip(["Foundations", "Concepts and frameworks", "Tools and techniques",
                                          "Applications", "Contemporary issues"], hours), 1):
-        now_text = f"{name} ({hrs} Hrs) — {title}: {name.lower()}, with cases from Indian business."
+        cases = "with hands-on examples in Python" if bca else "with cases from Indian business"
+        now_text = f"{name} ({hrs} Hrs) — {title}: {name.lower()}, {cases}."
         if previous:
             out.append({"previous": f"{name} ({hrs} Hrs) — {title}: {name.lower()}.",
                         "revised": now_text, "pct": 30 if m % 2 else 10, "pct_manual": True})
         else:
             # a syllabus module, as the sample lays it out: its title and hours, then its content
             out.append({"title": name, "hours": hrs, "previous": "", "pct": None,
-                        "revised": f"{title}: {name.lower()}, with cases from Indian business.",
+                        "revised": f"{title}: {name.lower()}, {cases}.",
                         "cos": [f"CO{n}" for n in ((1,), (1, 2), (2,), (2, 3), (3,))[m - 1]]})
     return out
 
 
-def _syllabus_row(c, batch_year, previous=False, objectives=""):
+def _syllabus_row(c, batch_year, previous=False, objectives="", bca=False):
     from .schema import course_info
     from .workflow import complete_syllabus
+    if bca:
+        pedagogy = "Lectures, hands-on lab sessions, mini-projects and peer code reviews."
+        outcomes = (f"Explain the key concepts of {c['course_title']}\n"
+                    f"Apply them to computing problems\nDesign a small solution and present it")
+        activities = "A mini-project built in a team, demonstrated and reviewed in class."
+        books = ("Silberschatz, A. Database System Concepts (latest edition)\n"
+                 "Sommerville, I. Software Engineering (latest edition)")
+    else:
+        pedagogy = "Lectures, case studies, group discussion and a field visit."
+        outcomes = (f"Explain the key ideas of {c['course_title']}\n"
+                    f"Apply them to business problems\nAnalyse a real case and present findings")
+        activities = "A short project with a local business, presented in class."
+        books = "Kotler, P. Principles (latest edition)\nRobbins, S. Management (latest edition)"
     return complete_syllabus({"course_code": c["course_code"], "course_title": c["course_title"],
             **course_info(c), "year_latest": batch_year,
-            "pedagogy": "Lectures, case studies, group discussion and a field visit.",
-            "outcomes": f"Explain the key ideas of {c['course_title']}\n"
-                        f"Apply them to business problems\nAnalyse a real case and present findings",
-            "modules": _modules(c["course_title"], previous, course_info(c).get("teaching_hours")),
-            "skill_activities": "A short project with a local business, presented in class.",
-            "books": "Kotler, P. Principles (latest edition)\nRobbins, S. Management (latest edition)"},
+            "pedagogy": pedagogy, "outcomes": outcomes,
+            "modules": _modules(c["course_title"], previous, course_info(c).get("teaching_hours"), bca),
+            "skill_activities": activities, "books": books},
             objectives)
 
 
@@ -275,20 +322,26 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
     if not programme:
         return {}
     code = programme["programme_code"]
-    prefix = "BBA" if "BBA" in code else "BCM"
-    courses = _courses(prefix)
+    bca = _is_bca(code)
+    prefix = "BCA" if bca else "BBA" if "BBA" in code else "BCM"
+    courses = _courses(prefix, _TOPICS_BCA if bca else None)
     if stage_key == "prog_curriculum":
         from .autofill import PROGRAMME_OUTCOMES
         return {
-            "details": {"degree_level": "UG - 3 Year", "specialisation": "General",
-                        "minor_streams": ["Marketing"]},
+            "details": {"degree_level": "UG - 3 Year",
+                        "specialisation": "Artificial Intelligence and Machine Learning" if bca else "General",
+                        "minor_streams": ["Data Analytics"] if bca else ["Marketing"]},
             "profile": {
-                "objective": f"To give students of the {programme['programme_name']} a sound grounding "
-                             "in business knowledge and skills.\nTo prepare them for careers in industry, "
-                             "for entrepreneurship and for higher study.\nTo build ethical values and "
-                             "social responsibility.",
+                "objective": (
+                    "To give students of the BCA a sound grounding in programming, data and intelligent "
+                    "systems.\nTo prepare them for careers in the software industry and for higher study."
+                    "\nTo build ethical values, teamwork and social responsibility.") if bca else
+                f"To give students of the {programme['programme_name']} a sound grounding "
+                "in business knowledge and skills.\nTo prepare them for careers in industry, "
+                "for entrepreneurship and for higher study.\nTo build ethical values and "
+                "social responsibility.",
                 "programme_outcomes": list(PROGRAMME_OUTCOMES),
-                "programme_specific_outcomes": [
+                "programme_specific_outcomes": BCA_PSOS if bca else [
                     "Apply the principles of management to business decisions.",
                     "Analyse financial and market information to support decisions.",
                     "Plan and run a business project with the tools of the trade.",
@@ -300,7 +353,8 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
             },
             "semester_structure": courses,
             # Annexure I: the minor stream's courses, as the structure has them
-            "minors": [{"minor_title": "Marketing", "semester": c["semester"], "course_code": c["course_code"],
+            "minors": [{"minor_title": "Data Analytics" if bca else "Marketing", "semester": c["semester"],
+                        "course_code": c["course_code"],
                         "course_title": c["course_title"], "credits": c["credits"]}
                        for c in courses if c["nep_category"] == "Minor Stream"],
             **({"curriculum_file": {"document": files["prog_curriculum.document"]}}
@@ -317,19 +371,19 @@ def sample(stage_key, programme=None, files=None, year="2027-28"):
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
         sems = batch_semesters(stage_key)
         own = in_semesters([{**c, "course_code": y[2:] + c["course_code"][2:]} for c in courses], sems)
-        out = {"batch_courses": own, "courses": [_syllabus_row(c, y, objectives=goals) for c in own]}
+        out = {"batch_courses": own, "courses": [_syllabus_row(c, y, objectives=goals, bca=bca) for c in own]}
         out["revision_courses"] = batch_revision_rows(out, batch, year[:4], sems)
         return out
     if stage_key == "prog_syllabus":
         y = batch[:4] if batch and batch[:4].isdigit() else year[:4]
-        out = {"courses": [_syllabus_row(c, y, objectives=goals) for c in courses]}
+        out = {"courses": [_syllabus_row(c, y, objectives=goals, bca=bca) for c in courses]}
         if stage_key == "prog_syllabus" and "prog_syllabus.document" in files:
             out["syllabus_file"] = {"document": files["prog_syllabus.document"]}
         return out
     if stage_key == "prog_revision":
         rows = []
         for c in courses:
-            mods = _modules(c["course_title"], previous=True)
+            mods = _modules(c["course_title"], previous=True, bca=bca)
             rows.append({"course_code": c["course_code"], "course_title": c["course_title"],
                          "semester": c["semester"], "year_previous": "2024", "year_latest": "2027",
                          "prev_code": c["course_code"].replace("27", "24", 1),

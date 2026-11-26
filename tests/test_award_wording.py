@@ -51,4 +51,4 @@ def test_the_reservation_block_is_greyed_out_and_the_programme_dropdown_has_a_pe
     js = (Path(__file__).resolve().parent.parent / "app/static/js/stage.js").read_text()
     css = (Path(__file__).resolve().parent.parent / "app/static/css/app.css").read_text()
     assert 'office_filled ? " is-greyed"' in js and ".fixed-block.is-greyed" in css
-    assert 'el("button", "pd-edit")' in js and '"Acknowledge"' in js
+    assert 'el("button", "pd-edit")' in js and '"Save changes"' in js

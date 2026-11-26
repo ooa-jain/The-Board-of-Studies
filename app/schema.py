@@ -616,14 +616,15 @@ PROGRAMME_CURRICULUM = {
                 {"name": "programme_outcomes", "label": "1.A Programme Outcomes (POs)", "type": "outcome_list",
                  "prefix": "PO", "required": True, "max_items": PO_MAX, "min_warn": PO_MIN,
                  "help": "7 to 12 POs, as the University's guidelines say. PO1 is open — add PO2, PO3 …; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
-                # PSOs do not apply to every programme (BBA has none): then none is
-                # asked, and each course's mapping is a CO-PO Mapping
-                {"name": "pso_na", "label": "PSOs are not applicable to this programme", "type": "checkbox",
-                 "wide": True},
+                # the PSOs sit to the right of the POs, on the same line
                 {"name": "programme_specific_outcomes", "label": "1.B Programme Specific Outcomes (PSOs)",
                  "type": "outcome_list", "prefix": "PSO", "required": True, "max_items": PSO_MAX,
                  "unless": "pso_na",
                  "help": "PSO1 is open — add PSO2, PSO3 …; × removes one. Each is a column of every course's CO-PO-PSO Mapping."},
+                # PSOs do not apply to every programme (BBA has none): then none is
+                # asked, and each course's mapping is a CO-PO Mapping
+                {"name": "pso_na", "label": "PSOs are not applicable to this programme", "type": "checkbox",
+                 "wide": True},
                 {"name": "duration_months", "label": "2. Duration (in months)", "type": "integer",
                  "required": True, "min": 6, "max": 72},
                 {"name": "intake", "label": "3. Student Intake", "type": "integer", "required": True,
