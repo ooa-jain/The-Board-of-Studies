@@ -308,8 +308,8 @@
 
   /** A block the university fixes, shown as the template shows it. */
   function fixedBlock(def) {
-    const box = el("div", "fixed-block");
-    // filled in already by the Office (4. Reservation): said so on top
+    const box = el("div", "fixed-block" + (def.office_filled ? " is-greyed" : ""));
+    // filled in already by the Office (4. Reservation): said so on top, the whole block greyed out
     if (def.office_filled) box.appendChild(el("div", "fixed-by", "✓ Filled by the Office of Academic Affairs"));
     (def.fixed_table || []).forEach(part => {
       const row = el("div", "fixed-part");
@@ -1406,8 +1406,17 @@
     if (!m || !m.status) return null;
     const line = el("div", "kw-match is-" + m.status);
     line.appendChild(el("span", "kw-icon", m.status === "match" ? "✓" : m.status === "unread" ? "–" : "!"));
+    // the share of the box's keywords the file carries; a miss or a wrong document: all missing
+    const total = (m.expected || []).length, got = (m.found || []).length;
+    const pct = m.status === "unread" || !total ? null : (m.percent !== undefined ? m.percent : Math.round(100 * got / total));
+    const allMissing = m.status === "miss" && total;
     line.appendChild(el("strong", null, m.looks_like ? "Wrong document — this looks like " + m.looks_like
-                                                     : (MATCH_WORDS[m.status] || "")));
+                                                     : allMissing ? "All keywords missing" : (MATCH_WORDS[m.status] || "")));
+    if (pct !== null) {
+      const chip = el("span", "kw-pct", `${pct}%`);
+      chip.title = allMissing ? `None of the ${total} keywords are in the file` : `${got} of ${total} keywords found`;
+      line.appendChild(chip);
+    }
     if (m.status === "unread") {
       line.appendChild(el("span", "kw-sub", m.why === "no_reader"
         ? "PDF keywords are not checked yet — fine to submit; open it to check"
@@ -1422,7 +1431,7 @@
         tags.appendChild(t);
       });
       line.appendChild(tags);
-      if (m.looks_like) line.appendChild(el("span", "kw-sub", `This looks like ${m.looks_like}, not the “${m.label}” — check you chose the right box.`));
+      if (m.looks_like) line.appendChild(el("span", "kw-sub", `All keywords missing. This looks like ${m.looks_like}, not the “${m.label}” — check you chose the right box.`));
       else if (m.status === "miss") line.appendChild(el("span", "kw-sub", "make sure this is the right file for “" + m.label + "”"));
     }
     return line;
@@ -1546,7 +1555,9 @@
   // The sample wording stays out of the box until the "i" is clicked; then it
   // shows faintly as the placeholder, and a second click hides it again.
   function addHint(wrap, lab, input, def) {
-    const text = (def.placeholder || "").trim();
+    // the wording can depend on the page (item 12 names the programme): read it when shown
+    const wording = () => String(def.placeholder_fn ? def.placeholder_fn() : (def.placeholder || "")).trim();
+    const text = wording();
     if (!text || def.type === "file" || !input || !("placeholder" in input)) return;
     const btn = el("button", "hint-i", "i");
     btn.type = "button";
@@ -1561,8 +1572,22 @@
       const on = btn.getAttribute("aria-pressed") !== "true";
       btn.setAttribute("aria-pressed", on ? "true" : "false");
       btn.title = on ? "Hide sample wording" : "Show sample wording";
-      input.placeholder = on ? text : quiet;
+      input.placeholder = on ? wording() : quiet;
     });
+  }
+
+  /** Item 12 for this programme: "in the programme" becomes the programme with
+      its major specialisation in brackets — Computer Applications (Artificial Intelligence …). */
+  function programmeField(name) {
+    return String(name || "").replace(/\([^)]*\)/g, " ").split(/\bwith\s+specialisation\b/i)[0]
+      .replace(/^\s*(Bachelor|Master)s?\s+(of|in)\s+/i, "").replace(/\s+/g, " ").replace(/^[\s\-,.]+|[\s\-,.]+$/g, "");
+  }
+  function awardWording(text) {
+    const d = state.details || {};
+    const field = programmeField(d.programme_name);
+    if (!field) return text;
+    const spec = String(d.specialisation || "").replace(/\s+/g, " ").trim();
+    return String(text).split("in the programme").join("in " + field + (spec ? ` (${spec})` : ""));
   }
 
   function fieldBlock(def, value, onChange) {
@@ -3917,11 +3942,73 @@
             .filter(Boolean).join(" · ");
           if (meta) txt.appendChild(el("small", null, meta));
           opt.appendChild(txt);
+          // a pencil: the programme's name, level and year in a pop-up
+          const pen = el("button", "pd-edit");
+          pen.type = "button";
+          pen.innerHTML = PENCIL;
+          pen.title = `Edit ${sh || label(r)}`;
+          pen.setAttribute("aria-label", `Edit ${sh || label(r)}`);
+          pen.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); editProgramme(r); });
+          opt.appendChild(pen);
           options.appendChild(opt);
         });
       });
       if (!shown) options.appendChild(el("div", "pd-none",
         q ? "Nothing matches. Type it in below." : "No programmes on record. Type each one in below."));
+    }
+
+    /* The pencil beside a programme in the list: a pop-up with its name, level
+       and the year it began; "Acknowledge" keeps what is shown. */
+    function editProgramme(row) {
+      const dlg = document.createElement("dialog");
+      dlg.className = "query-dialog pd-dialog";
+      dlg.setAttribute("aria-label", "Edit programme");
+      const head = el("div", "qd-head");
+      head.appendChild(el("h2", "qd-title", "Edit programme"));
+      const x = el("button", "qd-close", "×");
+      x.type = "button";
+      x.setAttribute("aria-label", "Close");
+      head.appendChild(x);
+      const body = el("div", "qd-body");
+      const form = el("form", "qd-form");
+      form.appendChild(el("p", "qd-note", `Programme code ${row.programme_code || "—"}. Check the details; Acknowledge keeps them.`));
+      const name = el("input");
+      name.type = "text"; name.maxLength = 300; name.required = true;
+      name.value = row.programme_name || "";
+      const wName = el("label", "qd-field"); wName.appendChild(el("span", null, "Programme name")); wName.appendChild(name);
+      const level = el("select");
+      const degs = Array.from(new Set(tabs.flatMap(t => t.degrees || []).concat(row.degree ? [row.degree] : [])));
+      degs.forEach(d => level.appendChild(new Option(d, d)));
+      level.value = row.degree || degs[0] || "";
+      const wLevel = el("label", "qd-field"); wLevel.appendChild(el("span", null, "Level")); wLevel.appendChild(level);
+      const year = el("input");
+      year.type = "text"; year.inputMode = "numeric"; year.maxLength = 4; year.placeholder = "e.g. 2020";
+      year.value = row.year_introduced || "";
+      const wYear = el("label", "qd-field"); wYear.appendChild(el("span", null, "Since (year)")); wYear.appendChild(year);
+      const err = el("p", "qd-err"); err.hidden = true;
+      const ok = el("button", "btn qd-send", "Acknowledge");
+      ok.type = "submit";
+      [wName, wLevel, wYear, err, ok].forEach(n => form.appendChild(n));
+      body.appendChild(form);
+      dlg.appendChild(head); dlg.appendChild(body);
+      document.body.appendChild(dlg);
+      const shut = () => { if (dlg.open) dlg.close(); dlg.remove(); };
+      x.addEventListener("click", shut);
+      dlg.addEventListener("click", e => { if (e.target === dlg) shut(); });
+      dlg.addEventListener("cancel", () => setTimeout(() => dlg.remove(), 0));
+      form.addEventListener("submit", e => {
+        e.preventDefault();
+        const nm = name.value.trim(), yr = year.value.trim();
+        if (!nm) { err.textContent = "Give the programme a name."; err.hidden = false; return; }
+        if (yr && !/^(19|20)\d{2}$/.test(yr)) { err.textContent = "Give the year as four digits, e.g. 2020."; err.hidden = false; return; }
+        row.programme_name = nm;
+        row.degree = level.value;
+        row.year_introduced = yr;
+        shut();
+        draw(); touch();
+      });
+      dlg.showModal();
+      name.focus();
     }
 
     function field(row, name, def) {
@@ -5142,6 +5229,10 @@
           if (f.prefill_text && f.type !== "fixed") {
             // never "required" on the page: empty is a valid answer here
             f = Object.assign({}, f, { placeholder: f.prefill_text, required: false });
+            if (f.name === "award" && /in the programme/.test(f.prefill_text)) {
+              f.placeholder_fn = () => awardWording(f.prefill_text);
+              f.placeholder = f.placeholder_fn();
+            }
             if (!CTX.readonly && String(state[section.key][f.name] || "").trim() === f.prefill_text.trim()) {
               state[section.key][f.name] = "";
             }

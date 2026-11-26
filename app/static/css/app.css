@@ -5436,10 +5436,24 @@ body.is-intro { margin: 0; background: #060c1a; color: #fff; }
 .bk-card > .btn { justify-self: start; }
 .bk-loose { border-color: #f0b4b4; background: #fff7f7; }
 .bk-empty { margin: 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--muted, #5b6b85); }
-.fixed-by { padding: 8px 12px; background: #eaf7ef; color: #146c3c; font-weight: 600; font-size: .85rem; border-bottom: 1px solid var(--line); }
+.fixed-by { padding: 8px 12px; background: var(--ink-100); color: var(--ink-faint); font-weight: 600; font-size: .85rem; border-bottom: 1px solid var(--line); }
+/* a block the Office has filled: all of it greyed out, nothing to fill in */
+.fixed-block.is-greyed { background: var(--ink-050); color: var(--ink-faint); opacity: .85; user-select: none; }
+.fixed-block.is-greyed .fixed-head { background: var(--ink-100); color: var(--ink-faint); }
+.fixed-block.is-greyed .fixed-item, .fixed-block.is-greyed .fixed-note { color: var(--ink-faint); }
 
 /* ---- Classification of Credits: the UGC Table 2 check as a pop-up ---- */
 .ugc-open { margin: 0 0 12px; }
 .ugc-open.is-bad .ugc-open-mark { color: #ffb3b3; font-weight: 700; }
 .ugc-open.is-ok .ugc-open-mark { color: #a8e6b0; font-weight: 700; }
 .ugc-dialog { width: min(720px, 94vw); }
+
+/* keyword match: the share of keywords found */
+.kw-pct { padding: 0 8px; border-radius: 999px; background: rgba(255,255,255,.75); font-weight: 700; font-size: .78rem; line-height: 1.6; }
+
+/* Programmes offered: the pencil beside each programme in the dropdown, and its pop-up */
+.pd-opt { position: relative; }
+.pd-edit { flex: none; margin-left: auto; align-self: center; display: grid; place-items: center; width: 28px; height: 28px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--ink-faint); cursor: pointer; }
+.pd-edit:hover, .pd-edit:focus-visible { background: var(--ink-100); color: var(--ink-800); }
+.pd-dialog { width: min(520px, 94vw); }

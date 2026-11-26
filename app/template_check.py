@@ -59,7 +59,7 @@ TEMPLATES = {
             ("Industry Expert", r"industry"),
             ("Alumni", r"alumn"),
             ("Parent", r"\bparent"),
-            ("Academician", r"academician"),
+            ("Academic Professional", r"academic\s+professional|academician"),
         ],
     },
 }
@@ -215,7 +215,7 @@ def make_bos_composition(dst: Path, people: dict) -> Path:
     S.No, Category, Role, Members — one row per category. For the demo."""
     import docx
     roles = {"Dean of Faculty / Director of School": "Chairperson", "Head of Department": "Co-Chairperson"}
-    externals = {"Industry Expert", "Alumni", "Parent", "Academician"}
+    externals = {"Industry Expert", "Alumni", "Parent", "Academic Professional"}
     doc = docx.Document()
     doc.add_heading("Composition of BoS Members", level=1)
     cats = TEMPLATES["bos_composition"]["categories"]

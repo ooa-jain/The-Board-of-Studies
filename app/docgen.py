@@ -405,7 +405,7 @@ def _credits(rows):
     return sum(_num(r.get("credits")) or 0 for r in rows)
 
 
-def _profile_table(doc, cur, width, degree_level=None):
+def _profile_table(doc, cur, width, degree_level=None, programme_name=None):
     from .schema import PG_REGULATIONS, for_level, is_pg
     prof = cur.get("profile") or {}
     details = cur.get("details") or {}
@@ -443,6 +443,10 @@ def _profile_table(doc, cur, width, degree_level=None):
                                           ("Minors: " + " / ".join(minors)) if minors else "") if x)
         if value in (None, "") and f["name"] in defaults:
             value = defaults[f["name"]]
+            if f["name"] == "award":
+                from .schema import award_wording
+                value = award_wording(value, details.get("programme_name") or programme_name,
+                                      details.get("specialisation"))
         if f["name"] == "objective":
             items = _lines(value)
             value = "\n".join(f"{i}. {x}" for i, x in enumerate(items, start=1))
@@ -676,7 +680,7 @@ def curriculum_docx(db, dept_code, year, programme_code):
         # the minors on offer, under the title: Analytics / Digital Marketing / …
         _para(doc, _minor_line(cur), size=12)
     _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=14, after=6)
-    _profile_table(doc, cur, width)
+    _profile_table(doc, cur, width, programme_name=prog.get("programme_name"))
 
     rows = [r for r in (cur.get("semester_structure") or [])
             if isinstance(r, dict) and _num(r.get("semester")) is not None]
@@ -720,7 +724,7 @@ def _pg_curriculum_docx(prog, cur, deg):
         # the minors on offer, under the title: Analytics / Digital Marketing / …
         _para(doc, _minor_line(cur), size=12)
     _para(doc, f"Programme Structure {batch}".strip(), bold=True, size=14, after=6)
-    _profile_table(doc, cur, width, deg)
+    _profile_table(doc, cur, width, deg, programme_name=prog.get("programme_name"))
 
     rows = [r for r in (cur.get("semester_structure") or [])
             if isinstance(r, dict) and _num(r.get("semester")) is not None]

@@ -31,7 +31,7 @@ def test_the_empty_template_is_all_blank():
     assert r["filled"] == 0 and r["total"] == 7 and r["placeholders"] == 7
     assert "Blank — fill Dean of Faculty / Director of School" in problems(r)[0]
     r = check(PAC, "dpac_signed")
-    assert r["total"] == 14 and "Academician" in r["blank"]
+    assert r["total"] == 14 and "Academic Professional" in r["blank"]
 
 
 def test_a_filled_form_passes_and_a_half_filled_one_names_the_gaps():

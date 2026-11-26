@@ -44,8 +44,9 @@ def test_a_word_document_is_read_too(app, client):
     body = "Department Vision\nOur mission is to teach well.\nProgramme overview and objectives."
     j = _upload(client, "vm.docx", _docx(body), field="vision_mission")
     assert j["match"]["status"] == "match"
+    assert 0 < j["match"]["percent"] <= 100 and len(j["match"]["found"]) >= 2
     j = _upload(client, "vm.docx", _docx("A shopping list: milk, bread, eggs and tea."), field="vision_mission")
-    assert j["match"]["status"] == "miss"
+    assert j["match"]["status"] == "miss" and j["match"]["percent"] == 0 and j["match"]["found"] == []
 
 
 def test_a_file_with_no_text_is_not_judged(app, client):
@@ -64,6 +65,8 @@ def test_a_document_in_the_wrong_box_is_named_by_its_title(app, client):
                                         "presented.\nPEOs and POs were approved.\nMembers present: 9"),
                 field="vision_mission")
     assert j["match"]["status"] == "miss" and j["match"]["looks_like"] == "the Minutes of Meeting"
+    # a wrong document: none of its words count, every keyword is missing
+    assert j["match"]["percent"] == 0 and j["match"]["found"] == [] and j["match"]["expected"]
 
 
 def test_bos_composition_marks_na_as_not_applicable(tmp_path):

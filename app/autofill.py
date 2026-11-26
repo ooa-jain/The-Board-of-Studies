@@ -265,9 +265,13 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
     profile.setdefault("course_specialisation", prog_name)
     # the university's standard wording for the regulations the Drive left empty
     from .schema import DEFAULT_REGULATIONS, PG_REGULATIONS
+    from .schema import award_wording
     for k, v in (DEFAULT_REGULATIONS if ug else {**DEFAULT_REGULATIONS, **PG_REGULATIONS}).items():
         if k != "reservation_policy" and not str(profile.get(k) or "").strip():
             profile[k] = v
+    if ug and profile.get("award") == DEFAULT_REGULATIONS["award"]:
+        # item 12 names the programme, its major specialisation in brackets
+        profile["award"] = award_wording(profile["award"], prog_name, details.get("specialisation"))
     for k, v in list(profile.items()):
         if v in (None, ""):
             del profile[k]

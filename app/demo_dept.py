@@ -109,7 +109,7 @@ PEOPLE = {
     "Associate Professor": ("Dr. Neha Shetty", "Associate Professor"),
     "Assistant Professor": ("Mr. Rahul Joshi", "Assistant Professor"),
     "Parent": ("Mr. Suresh Gowda", "Parent of a BBA student"),
-    "Academician": ("Prof. R. Srinivasan", "Professor (retd.), 30 years in management education"),
+    "Academic Professional": ("Prof. R. Srinivasan", "Professor (retd.), 30 years in management education"),
 }
 
 def _pdf(lines):

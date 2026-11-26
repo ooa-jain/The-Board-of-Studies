@@ -408,6 +408,28 @@ DEFAULT_REGULATIONS = {
 
 
 
+def programme_field(name) -> str:
+    """The subject of a programme from its catalogue name: "Bachelor of Computer
+    Applications (Honours / Honours with Research) with specialisation in …"
+    gives "Computer Applications"."""
+    n = re.sub(r"\([^)]*\)", " ", str(name or ""))
+    n = re.split(r"\bwith\s+specialisation\b", n, maxsplit=1, flags=re.I)[0]
+    n = re.sub(r"^\s*(Bachelor|Master)s?\s+(of|in)\s+", "", n, flags=re.I)
+    return " ".join(n.split()).strip(" -,.")
+
+
+def award_wording(text, programme_name, specialisation="") -> str:
+    """Item 12's wording for this programme: "in the programme" becomes the
+    programme with its major specialisation in brackets, as in
+    "The Bachelor's degree in Computer Applications (Artificial Intelligence and Machine Learning)"."""
+    field = programme_field(programme_name)
+    if not field:
+        return text
+    spec = " ".join(str(specialisation or "").split())
+    named = f"in {field}" + (f" ({spec})" if spec else "")
+    return str(text).replace("in the programme", named)
+
+
 # the PG Course Matrix's own wording where it differs from the UG template
 PG_REGULATIONS = {
     "selection_procedure": "Jain Entrance Test (JET) / Personal Interview.",

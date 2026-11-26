@@ -25,11 +25,11 @@ KEYWORDS = {
                     "Placement", "Industry", "Alumni", "Designation"],
     "dpac_signed": ["Program Assessment Committee / Programme Assessment Committee / PAC / DPAC",
                     "Chairperson", "Co-Chairperson", "Non-Teaching", "Office of Academics / OOA",
-                    "Student", "Professor", "Industry", "Alumni", "Parent", "Academician"],
+                    "Student", "Professor", "Industry", "Alumni", "Parent", "Academic Professional / Academician"],
     # from the CS & IT department's Composition of BoS Members
     "bos_composition": ["board of studies / BoS / composition", "Category", "Role / Chairperson",
                         "Members / Name", "Dean / Director", "Head of Department / HOD",
-                        "Industry", "Alumni", "Academician", "Parent", "Student"],
+                        "Industry", "Alumni", "Academic Professional / Academician", "Parent", "Student"],
     # from the CS & IT Vision, Mission, PEOs and POs
     "vision_mission": ["vision", "mission", "PEO / Programme Educational Objectives / Program Educational Objectives",
                        "PO / Programme Outcomes / Program Outcomes", "PSO / Programme Specific Outcomes / Program Specific Outcomes",
@@ -370,10 +370,12 @@ def check(path: Path, field: str, label: str) -> dict:
     out = {**base, "status": status, "found": found, "seen": seen}
     other = looks_like(field, text)
     if other:
-        out["status"] = "miss"
-        out["looks_like"] = other
+        # the wrong document: none of its words count — every keyword is missing
+        out.update(status="miss", looks_like=other, found=[], seen=[])
     elif field in LEADS and status == "match" and not re.search(LEADS[field][1], " ".join(text[:600].split()), re.I):
         out["status"] = "weak"           # the right words, but not under the right title
+    # how much of the box's list the file carries; a file that is not accurate says all missing
+    out["percent"] = round(100 * len(out["found"]) / len(words)) if words else 0
     # a box with a university template: is the form itself filled in?
     from .template_check import check as template_check
     tpl = template_check(path, field, text)
