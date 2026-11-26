@@ -6200,6 +6200,8 @@ html[data-theme="dark"] .erp-tab-x:focus-visible {
   background: rgba(30, 85, 184, 0.1);
 }
 html[data-theme="dark"] .erp-tab-new {
+  border: 0;
+  background: transparent;
   color: #a1a9b8;
   text-decoration: none;
 }

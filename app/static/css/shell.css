@@ -150,7 +150,7 @@ body.erp .side-link.is-on, .side-link.is-on { background: var(--sh-surface); col
   font-size: 14px; line-height: 1; cursor: pointer; opacity: .55; }
 .erp-tab-x:hover, .erp-tab-x:focus-visible { background: rgba(14, 42, 92, .1); opacity: 1; }
 .erp-tab-new { flex: none; align-self: center; display: grid; place-items: center; width: 26px; height: 26px; margin-left: 4px;
-  border-radius: 50%; color: var(--sh-muted); text-decoration: none; font-size: 18px; }
+  border: 0; background: transparent; cursor: pointer; font: inherit; border-radius: 50%; color: var(--sh-muted); text-decoration: none; font-size: 18px; line-height: 1; }
 .erp-tab-new:hover { background: rgba(14, 42, 92, .07); color: var(--sh-navy); }
 @media (max-width: 900px) { .erp-tabs { display: none; } }
 @media (max-width: 900px) { .erp-bar { top: 60px !important; } body.erp.has-side { padding-top: 60px !important; } }

@@ -38,3 +38,11 @@ def test_the_bar_carries_the_page_tabs(app, client):
     login(client, u, p)
     page = client.get("/department/").get_data(as_text=True)
     assert 'id="erp-tabs"' in page and 'data-home="/department/"' in page and "js/tabs.js" in page
+
+
+def test_the_tabs_work_like_browser_tabs():
+    """A tab opens only with + (on Home); pages gone to stay in the open tab."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "app/static/js/tabs.js").read_text()
+    assert "sessionStorage" in js and 'url: HOME, title: "Home"' in js
+    assert "tabs.push({ url: here" not in js          # going to a page never makes a new tab
