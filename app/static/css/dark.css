@@ -5748,6 +5748,12 @@ html[data-theme="dark"] .fixed-by {
   color: #7ee7ae;
   border-bottom: 1px solid #2e3542;
 }
+html[data-theme="dark"] .ugc-open.is-bad .ugc-open-mark {
+  color: #ffb3b3;
+}
+html[data-theme="dark"] .ugc-open.is-ok .ugc-open-mark {
+  color: #a8e6b0;
+}
 
 /* ---- erp.css ---- */
 html[data-theme="dark"] body.erp {
