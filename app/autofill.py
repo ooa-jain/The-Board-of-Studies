@@ -263,12 +263,57 @@ def _curriculum(dept, programme, sub, year, stored, syllabus_courses=()):
     profile.setdefault("intake", 60)
     profile.setdefault("eligibility", EXPECTED_ELIGIBILITY["UG" if ug else "PG"])
     profile.setdefault("course_specialisation", prog_name)
+    # the university's standard wording for the regulations the Drive left empty
+    from .schema import DEFAULT_REGULATIONS, PG_REGULATIONS
+    for k, v in (DEFAULT_REGULATIONS if ug else {**DEFAULT_REGULATIONS, **PG_REGULATIONS}).items():
+        if k != "reservation_policy" and not str(profile.get(k) or "").strip():
+            profile[k] = v
     for k, v in list(profile.items()):
         if v in (None, ""):
             del profile[k]
     if not [m for m in data.get("minors") or [] if isinstance(m, dict)]:
         data["minors"] = _minors(data["semester_structure"], ug)
+    if ug:
+        # the specialisation (major) and the minors offered, from the programme and Annexure I
+        if not str(details.get("specialisation") or "").strip():
+            details["specialisation"] = specialisation_of(prog_name)
+        if not [x for x in details.get("minor_streams") or [] if str(x).strip()]:
+            details["minor_streams"] = minor_names(data.get("minors"))
     return data
+
+
+def specialisation_of(name):
+    """The major a programme's name gives: the words after "specialisation in",
+    or the general programme."""
+    m = re.search(r"specialisation in\s+(.+)$", str(name or ""), re.I)
+    return m.group(1).strip(" .)") if m else "General"
+
+
+def minor_names(minors):
+    out = []
+    for m in minors or []:
+        t = str((m or {}).get("minor_title") or "").strip() if isinstance(m, dict) else ""
+        if t and t not in out:
+            out.append(t)
+    return out
+
+
+def batch_minors(current, batch_label):
+    """An earlier batch's specialisation and minors: the current batch's, the
+    batch's year in the course codes."""
+    yy = str(batch_label or "")[2:4]
+    det = (current or {}).get("details") or {}
+    rows = []
+    for m in (current or {}).get("minors") or []:
+        if not isinstance(m, dict):
+            continue
+        m = dict(m)
+        code_ = str(m.get("course_code") or "")
+        if yy.isdigit() and re.match(r"^\d{2}", code_):
+            m["course_code"] = yy + code_[2:]
+        rows.append(m)
+    return ({"specialisation": det.get("specialisation") or "",
+             "minor_streams": list(det.get("minor_streams") or minor_names(rows))}, rows)
 
 
 MINOR_STREAMS = [("Data Analytics", ["Introduction to Data Analytics", "Statistics for Data Science",
@@ -579,6 +624,11 @@ def fill_from_drive(dept, year, actor):
                     r["decision"] = "keep"
         data.setdefault("contact", {}).setdefault("office_email", dept.get("office_email") or "csit@jainuniversity.ac.in")
         data["contact"].setdefault("faculty_count", 20)
+        # faculty and student numbers: sample figures for the department to correct
+        strength = data.setdefault("strength", {})
+        for k, v in (("faculty_count", 20), ("students_first_year", 120), ("students_final_semester", 110)):
+            if strength.get(k) in (None, ""):
+                strength[k] = v
         save_draft(code, year, "dept_info", data)
         done.append("Department Information")
 
@@ -627,6 +677,15 @@ def fill_from_drive(dept, year, actor):
                     data[k] = in_semesters(data.get(k), sems)
                 if not data.get("revision_courses"):
                     data["revision_courses"] = batch_revision_rows(data, label, revision_year(fresh()), sems)
+                # a UG batch: its specialisation and minors, as the current batch's
+                structure = programme_stage_state(fresh(), pcode, "prog_curriculum").get("data") or {}
+                cur_deg = (structure.get("details") or {}).get("degree_level") or ""
+                if programme_level(cur_deg) == "UG":
+                    det, rows = batch_minors(structure, label)
+                    have = data.get("details") or {}
+                    data["details"] = {**det, **{k: v for k, v in have.items() if v not in (None, "", [])}}
+                    if not [m for m in data.get("minors") or [] if isinstance(m, dict)]:
+                        data["minors"] = rows
                 base = prefill_for(part, dept, year, programme, fresh())
                 for k, v in base.items():
                     data.setdefault(k, v)

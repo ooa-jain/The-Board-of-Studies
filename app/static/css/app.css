@@ -5437,3 +5437,9 @@ body.is-intro { margin: 0; background: #060c1a; color: #fff; }
 .bk-loose { border-color: #f0b4b4; background: #fff7f7; }
 .bk-empty { margin: 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--muted, #5b6b85); }
 .fixed-by { padding: 8px 12px; background: #eaf7ef; color: #146c3c; font-weight: 600; font-size: .85rem; border-bottom: 1px solid var(--line); }
+
+/* ---- Classification of Credits: the UGC Table 2 check as a pop-up ---- */
+.ugc-open { margin: 0 0 12px; }
+.ugc-open.is-bad .ugc-open-mark { color: #ffb3b3; font-weight: 700; }
+.ugc-open.is-ok .ugc-open-mark { color: #a8e6b0; font-weight: 700; }
+.ugc-dialog { width: min(720px, 94vw); }

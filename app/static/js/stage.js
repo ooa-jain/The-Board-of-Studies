@@ -2334,7 +2334,6 @@
           th.colSpan = SPAN;
           th.appendChild(el("strong", null, g.label));
           th.appendChild(el("span", "rt-group-sub", g.sub));
-          if (g.optional) th.appendChild(el("span", "rt-group-opt", "Optional"));
           head.appendChild(th);
           tbody.appendChild(head);
           let n = 0;
@@ -3222,6 +3221,8 @@
           "Totals in red are outside the UGC Table 2 credits set by the Office — point at one to see the rule."));
       }
       }
+      // the UGC Table 2 check: a button at the top of the Classification of Credits
+      if (wants("classification")) ugcCheck(all);
       if (!wants("summary")) return;
 
       // --- summary
@@ -3263,7 +3264,6 @@
       w2.appendChild(t2);
       if (SHOW === "all") box.appendChild(el("h4", "cd-head", "Summary"));
       box.appendChild(w2);
-      ugcCheck(all);
     }
 
     // --- UGC Table 2, from the same courses (only this programme's track)
@@ -3313,8 +3313,35 @@
       t3.appendChild(b3);
       const w3 = el("div", "rt-wrap");
       w3.appendChild(t3);
-      box.appendChild(el("h4", "cd-head", "Check against UGC Table 2"));
-      box.appendChild(w3);
+      // a button at the top of the Classification of Credits; the check opens as a pop-up
+      const bad = !!t3.querySelector(".bad-tick");
+      const open = el("button", "btn btn-sm ugc-open" + (bad ? " is-bad" : " is-ok"),
+                      "Click here to check against UGC Table 2");
+      open.type = "button";
+      open.appendChild(el("span", "ugc-open-mark", bad ? " · not met" : " · met"));
+      open.addEventListener("click", () => {
+        const d = document.createElement("dialog");
+        d.className = "query-dialog ugc-dialog";
+        d.setAttribute("aria-label", "Check against UGC Table 2");
+        const head = el("div", "qd-head");
+        head.appendChild(el("h2", "qd-title", "Check against UGC Table 2"));
+        const x = el("button", "qd-close", "×");
+        x.type = "button";
+        x.setAttribute("aria-label", "Close");
+        head.appendChild(x);
+        const body = el("div", "qd-body");
+        body.appendChild(el("p", "qd-note", `The credits in the programme structure against the UGC minimum for ${CREDIT.track_label}.`));
+        body.appendChild(w3);
+        d.appendChild(head);
+        d.appendChild(body);
+        document.body.appendChild(d);
+        const shut = () => { d.close(); d.remove(); };
+        x.addEventListener("click", shut);
+        d.addEventListener("click", e => { if (e.target === d) shut(); });
+        d.addEventListener("cancel", () => setTimeout(() => d.remove(), 0));
+        d.showModal();
+      });
+      box.insertBefore(open, box.firstChild);
 
       if (side && need) {
         const short = need - total;

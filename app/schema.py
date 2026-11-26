@@ -1105,9 +1105,8 @@ def for_level(stage: dict, degree_level) -> dict:
         return s
     if not is_pg(degree_level):
         return stage
-    s = copy.deepcopy(stage)
+    s = without_minors(stage)               # a PG programme has no minors
     s["level"] = "PG"
-    s["sections"] = [sec for sec in s["sections"] if sec["key"] != "minors"]
     for sec in s["sections"]:
         if sec["key"] == "details":
             # a PG programme chooses its degree; a UG one's comes from its structure
