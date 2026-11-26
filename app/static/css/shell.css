@@ -122,6 +122,19 @@ body.erp .side-link.is-on, .side-link.is-on { background: var(--sh-surface); col
 .erp-bar-name { color: var(--sh-muted) !important; }
 .erp-bar-mid { color: var(--sh-navy); }
 .erp-bar-year { color: var(--sh-navy) !important; background: #eef1f6; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+/* the bar's right side: the portal, the year, light / dark, the bell and who is signed in */
+.erp-right { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
+.erp-portal { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; color: var(--sh-navy); white-space: nowrap; }
+.erp-year { color: var(--sh-navy); background: #eef1f6; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.erp-bell { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid #dfe4ec; background: #fff; color: var(--sh-navy); text-decoration: none; }
+.erp-bell:hover, .erp-bell:focus-visible { background: #eef1f6; }
+.erp-bell-count { position: absolute; top: -5px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--sh-navy); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center;
+  border: 2px solid #fff; }
+.erp-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--sh-navy);
+  color: #fff; font-weight: 700; font-size: 13px; }
+@media (max-width: 700px) { .erp-portal { display: none; } .erp-right { gap: 8px; } }
 @media (max-width: 900px) { .erp-bar { top: 60px !important; } body.erp.has-side { padding-top: 60px !important; } }
 body.erp, body.has-side { background: var(--sh-bg); }
 

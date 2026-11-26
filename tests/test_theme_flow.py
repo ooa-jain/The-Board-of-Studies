@@ -23,7 +23,8 @@ def test_every_page_carries_the_light_dark_switch(app, client):
     assert 'setAttribute("data-theme"' in head and head.index("data-theme") < head.index("css/dark.css")
     # the Office's pages and a department's: in the top bar
     _admin(app, client)
-    assert 'class="erp-bar-end"><button class="theme-toggle"' in client.get("/admin/").get_data(as_text=True)
+    page = client.get("/admin/").get_data(as_text=True)
+    assert 'class="erp-right"' in page and page.index('class="erp-right"') < page.index("data-theme-toggle")
     client.get("/logout")
     u, p = make_department(app)
     login(client, u, p)

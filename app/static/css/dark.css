@@ -6147,6 +6147,32 @@ html[data-theme="dark"] .erp-bar-year {
   color: #a6c1f2 !important;
   background: #161d29;
 }
+html[data-theme="dark"] .erp-portal {
+  color: #a6c1f2;
+}
+html[data-theme="dark"] .erp-year {
+  color: #a6c1f2;
+  background: #161d29;
+}
+html[data-theme="dark"] .erp-bell {
+  border: 1px solid #2b3448;
+  background: #121519;
+  color: #a6c1f2;
+  text-decoration: none;
+}
+html[data-theme="dark"] .erp-bell:hover,
+html[data-theme="dark"] .erp-bell:focus-visible {
+  background: #161d29;
+}
+html[data-theme="dark"] .erp-bell-count {
+  background: #1e55b8;
+  color: #ffffff;
+  border: 2px solid #242932;
+}
+html[data-theme="dark"] .erp-avatar {
+  background: #1e55b8;
+  color: #ffffff;
+}
 html[data-theme="dark"] body.erp,
 html[data-theme="dark"] body.has-side {
   background: #181b21;

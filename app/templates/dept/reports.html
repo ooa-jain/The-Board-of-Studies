@@ -7,7 +7,7 @@
     <div>
       <div class="crumbs"><a href="{{ url_for('dept.dashboard') }}">{{ dept.dept_name }}</a> <span>›</span> Reports</div>
       <h1>Reports</h1>
-      <p>Your submission, programme by programme — each Curriculum, Syllabus and Course Revision as the Office's templates lay them out. View it as a page or as a PDF. For the full detailed report, mail the Office of Academic Affairs.</p>
+      <p>Your submission, programme by programme — each Curriculum, Syllabus and Course Revision as the Office's templates lay them out. View only; for a copy, contact the Office of Academic Affairs.</p>
     </div>
   </div>
 </div>
@@ -26,9 +26,7 @@
           <td class="subs-go">
             {% if p.submitted %}
             <a class="btn btn-ghost btn-sm" href="{{ p.url }}">See your submission →</a>
-            <a class="btn btn-sm" href="{{ p.pdf }}" target="_blank" rel="noopener">View PDF</a>
             {% else %}<span class="small muted">Nothing submitted yet</span>{% endif %}
-            <a class="btn btn-ghost btn-sm" href="{{ p.mail }}" title="Mail the Office of Academic Affairs for the full detailed report">Request full report</a>
           </td>
         </tr>
       {% else %}
@@ -38,6 +36,4 @@
     </table>
   </div>
 </section>
-<p class="small muted rep-note">Need the full detailed report? Press <strong>Request full report</strong>, or write to
-  <a href="mailto:{{ office_email }}">{{ office_email }}</a>.</p>
 {% endblock %}
