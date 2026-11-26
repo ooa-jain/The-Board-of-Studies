@@ -5744,15 +5744,40 @@ html[data-theme="dark"] .bk-empty {
   color: #a1abbe;
 }
 html[data-theme="dark"] .fixed-by {
-  background: #122f1d;
-  color: #7ee7ae;
+  background: #20252e;
+  color: #aab2c1;
   border-bottom: 1px solid #2e3542;
+}
+html[data-theme="dark"] .fixed-block.is-greyed {
+  background: #181b21;
+  color: #aab2c1;
+}
+html[data-theme="dark"] .fixed-block.is-greyed .fixed-head {
+  background: #20252e;
+  color: #aab2c1;
+}
+html[data-theme="dark"] .fixed-block.is-greyed .fixed-item,
+html[data-theme="dark"] .fixed-block.is-greyed .fixed-note {
+  color: #aab2c1;
 }
 html[data-theme="dark"] .ugc-open.is-bad .ugc-open-mark {
   color: #ffb3b3;
 }
 html[data-theme="dark"] .ugc-open.is-ok .ugc-open-mark {
   color: #a8e6b0;
+}
+html[data-theme="dark"] .kw-pct {
+  background: rgba(18, 21, 25, 0.75);
+}
+html[data-theme="dark"] .pd-edit {
+  border: 0;
+  background: transparent;
+  color: #aab2c1;
+}
+html[data-theme="dark"] .pd-edit:hover,
+html[data-theme="dark"] .pd-edit:focus-visible {
+  background: #20252e;
+  color: #acc7ec;
 }
 
 /* ---- erp.css ---- */
