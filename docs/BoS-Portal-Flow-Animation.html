@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BoS Portal Flow</title>
+<style>
+  :root {
+    --bg: #f4f6fa; --card: #ffffff; --ink: #14213d; --muted: #5b6678; --line: #d6dce6;
+    --navy: #1f2a44; --blue: #2e75b6; --blue-soft: #e6eef8; --ok: #2f8a55; --ok-soft: #e6f4ec;
+    --red: #c2412f; --red-soft: #fbebe8; --shadow: 0 6px 20px rgba(20, 33, 61, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10141b; --card: #171c25; --ink: #e6ebf3; --muted: #9aa5b6; --line: #2a3242;
+      --navy: #a6c1f2; --blue: #6fa8e8; --blue-soft: #1a2638; --ok: #5cc28a; --ok-soft: #15281e;
+      --red: #f08a7a; --red-soft: #2c1a17; --shadow: 0 6px 20px rgba(0, 0, 0, .35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10141b; --card: #171c25; --ink: #e6ebf3; --muted: #9aa5b6; --line: #2a3242;
+    --navy: #a6c1f2; --blue: #6fa8e8; --blue-soft: #1a2638; --ok: #5cc28a; --ok-soft: #15281e;
+    --red: #f08a7a; --red-soft: #2c1a17; --shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  .page { max-width: 1240px; margin: 0 auto; padding: 22px 16px 28px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.75rem); color: var(--navy); }
+  .sub { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }
+  .theme { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
+    padding: 6px 12px; cursor: pointer; font: inherit; font-size: .85rem; }
+
+  .stage { position: relative; margin-top: 18px; padding: 30px 30px 22px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 18px; box-shadow: var(--shadow); }
+  .grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: 56px 54px; }
+  svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; overflow: visible; pointer-events: none; }
+  .wire { fill: none; stroke: var(--line); stroke-width: 3; }
+  .wire.is-done { stroke: var(--blue); }
+  .wire-back { fill: none; stroke: var(--red); stroke-width: 2.5; stroke-dasharray: 7 6; opacity: 0; transition: opacity .4s; }
+  .wire-back.is-on { opacity: 1; }
+  .arrowhead { fill: var(--line); }
+  .arrowhead.is-done { fill: var(--blue); }
+  .token { fill: var(--blue); filter: drop-shadow(0 2px 4px rgba(46, 117, 182, .45)); }
+  .token.is-back { fill: var(--red); }
+  .back-label { font-size: 12px; font-weight: 700; fill: var(--red); opacity: 0; transition: opacity .4s; }
+  .back-label.is-on { opacity: 1; }
+
+  .station { position: relative; display: grid; gap: 6px; padding: 14px 14px 12px; min-height: 148px; border-radius: 14px;
+    background: var(--card); border: 2px solid var(--line); cursor: pointer; text-align: left; color: inherit; font: inherit;
+    transition: border-color .35s, background .35s, transform .35s, box-shadow .35s; }
+  .station:hover { border-color: var(--blue); }
+  .station:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  .station.is-now { border-color: var(--blue); background: var(--blue-soft); transform: translateY(-3px); box-shadow: var(--shadow); }
+  .station.is-done { border-color: var(--ok); }
+  .st-top { display: flex; align-items: center; gap: 10px; }
+  .st-n { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 700;
+    font-size: .85rem; background: var(--blue-soft); color: var(--navy); transition: background .35s, color .35s; }
+  .station.is-now .st-n { background: var(--blue); color: #fff; }
+  .station.is-done .st-n { background: var(--ok); color: #fff; }
+  .st-title { font-weight: 700; color: var(--navy); line-height: 1.25; }
+  .st-facts { display: flex; flex-wrap: wrap; gap: 5px; opacity: .25; transition: opacity .5s; }
+  .station.is-now .st-facts, .station.is-done .st-facts { opacity: 1; }
+  .fact { padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); font-size: .78rem; white-space: nowrap; }
+  .fact b { color: var(--navy); font-variant-numeric: tabular-nums; }
+  .st-state { justify-self: start; font-size: .74rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+    color: var(--muted); background: var(--bg); }
+  .station.is-now .st-state { color: var(--blue); background: var(--card); }
+  .station.is-done .st-state { color: var(--ok); background: var(--ok-soft); }
+  .bell { position: absolute; top: -10px; right: -10px; display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 50%; background: var(--red); color: #fff; font-size: .78rem; font-weight: 700; transform: scale(0);
+    transition: transform .35s cubic-bezier(.3, 1.6, .6, 1); }
+  .bell.is-on { transform: scale(1); }
+  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: .74rem; }
+  .chain span { padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); transition: all .35s; }
+  .chain span.is-on { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .chain i { color: var(--muted); font-style: normal; }
+
+  .note { margin-top: 18px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; padding: 14px 18px;
+    border-radius: 14px; background: var(--blue-soft); border-left: 5px solid var(--blue); min-height: 76px; }
+  .note.is-back { background: var(--red-soft); border-left-color: var(--red); }
+  .note-step { font-weight: 800; font-size: 1.6rem; color: var(--blue); font-variant-numeric: tabular-nums; }
+  .note.is-back .note-step { color: var(--red); }
+  .note h2 { margin: 0 0 2px; font-size: 1.05rem; color: var(--navy); }
+  .note p { margin: 0; color: var(--ink); }
+
+  .controls { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .controls button, .controls select { font: inherit; font-size: .9rem; border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); border-radius: 10px; padding: 7px 14px; cursor: pointer; }
+  .controls button.primary { background: var(--navy); border-color: var(--navy); color: var(--card); min-width: 96px; font-weight: 700; }
+  .controls label { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--muted); margin-left: 6px; }
+  .progress { flex: 1 1 160px; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; min-width: 120px; }
+  .progress div { height: 100%; width: 0; background: var(--blue); transition: width .5s; }
+  .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .85rem; min-width: 64px; text-align: right; }
+  .keys { margin-top: 8px; color: var(--muted); font-size: .8rem; }
+  @media (max-width: 760px) { .grid { gap: 44px 30px; } .station { min-height: 0; padding: 12px 10px 10px; }
+    .fact { white-space: normal; } .stage { padding: 26px 16px 18px; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>How a submission moves through the BoS Portal</h1>
+      <p class="sub">Board of Studies · Academic Year 2027–28 · one department, start to finish</p>
+    </div>
+    <button class="theme" id="theme" type="button">Dark mode</button>
+  </header>
+
+  <section class="stage" aria-label="The flow">
+    <svg class="wires" id="wires" aria-hidden="true"></svg>
+    <div class="grid" id="grid"></div>
+    <div class="note" id="note" role="status" aria-live="polite">
+      <div class="note-step" id="note-step">1</div>
+      <div><h2 id="note-title"></h2><p id="note-text"></p></div>
+    </div>
+    <div class="controls">
+      <button type="button" id="restart" title="Start again">⟲ Restart</button>
+      <button type="button" id="back" title="Step back (←)">◀ Back</button>
+      <button type="button" id="play" class="primary" title="Play or pause (space)">▶ Play</button>
+      <button type="button" id="next" title="Next step (→)">Next ▶</button>
+      <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="2">2×</option></select>
+      <label><input type="checkbox" id="loop" checked> Show “returned for correction”</label>
+      <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+      <span class="count" id="count"></span>
+    </div>
+    <p class="keys">Click any step to jump to it. Keys: space plays or pauses, ← and → step.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // ---- the stations: what the department does, with the numbers of a real programme
+  const STATIONS = [
+    { title: "Department signs in", facts: [["1", " login per department"], ["", "SPOC named"]],
+      text: "The department's SPOC signs in with the department's login, says who is working, and accepts the terms of use." },
+    { title: "Department Information", facts: [["5", " programmes ticked"], ["20", " faculty"], ["120", " first-year students"]],
+      text: "The department ticks the programmes it runs this year and gives its faculty and student numbers." },
+    { title: "Pre-BoS", facts: [["3", " documents"], ["9", " of 9 keywords"], ["100", "% match"]],
+      text: "The signed DIAC and DPAC compositions and the Pre-BoS minutes are uploaded. Every file is checked: a wrong document says so at once." },
+    { title: "BoS Documents", facts: [["8", " documents"], ["6", " meeting photos"], ["", "25 Jun 2026"]],
+      text: "The BoS meeting date, composition, minutes, attendance, expert profiles, photographs and feedback." },
+    { title: "Curriculum", facts: [["9", " POs"], ["4", " PSOs"], ["44", " courses"], ["128", " credits"], ["", "UGC ✓"]],
+      text: "For each programme: objectives, POs and PSOs, the regulations and the course structure. The credit tables fill themselves and are checked against UGC Table 2." },
+    { title: "Syllabus", facts: [["44", " syllabus sheets"], ["3", " COs each"], ["", "CO-PO-PSO mapping"]],
+      text: "Every course in the structure gets its syllabus: course outcomes with Bloom's levels, the mapping to POs and PSOs, modules and books." },
+    { title: "Course Revision", facts: [["44", " courses compared"], ["18", "% average change"]],
+      text: "Each course is compared with the 2024 batch, module by module; the portal works out the percentage of change." },
+    { title: "Approval and submission", facts: [], chain: ["HoD", "Director / Dean", "Office", "Sealed"],
+      text: "The HoD and the Director or Dean approve, the department submits everything together, and the Office of Academic Affairs reviews and seals it." },
+  ];
+  const BACK = { at: 4, title: "Returned for correction",
+    text: "If the Office finds something to fix, it sends the stage back with a note. The department's bell shows it; the department corrects it and submits again." };
+
+  const grid = document.getElementById("grid"), wires = document.getElementById("wires");
+  const SVG = "http://www.w3.org/2000/svg";
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let cols = 4, step = 0, playing = false, timer = null, anim = null;
+
+  // ---- the cards
+  const cards = STATIONS.map((s, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "station";
+    b.setAttribute("aria-label", `Step ${i + 1}: ${s.title}`);
+    b.innerHTML = `<span class="st-top"><span class="st-n">${i + 1}</span><span class="st-title">${s.title}</span></span>`;
+    const facts = document.createElement("span"); facts.className = "st-facts";
+    s.facts.forEach(([n, label]) => {
+      const f = document.createElement("span"); f.className = "fact";
+      f.innerHTML = n ? `<b data-to="${n}">0</b>${label}` : label;
+      facts.appendChild(f);
+    });
+    b.appendChild(facts);
+    if (s.chain) {
+      const c = document.createElement("span"); c.className = "chain";
+      c.innerHTML = s.chain.map(x => `<span>${x}</span>`).join("<i>→</i>");
+      b.appendChild(c);
+    }
+    const st = document.createElement("span"); st.className = "st-state"; st.textContent = "Waiting";
+    b.appendChild(st);
+    if (i === 0) { const bell = document.createElement("span"); bell.className = "bell"; bell.textContent = "1";
+      bell.title = "Returned for correction"; b.appendChild(bell); }
+    b.addEventListener("click", () => { pause(); go(stepOf(i)); });
+    grid.appendChild(b);
+    return b;
+  });
+
+  // the steps, in order: each station, and the return loop after Curriculum when shown
+  const loop = document.getElementById("loop");
+  function steps() {
+    const out = [];
+    STATIONS.forEach((_, i) => { out.push({ kind: "station", i }); if (i === BACK.at && loop.checked) out.push({ kind: "back", i }); });
+    return out;
+  }
+  const stepOf = i => steps().findIndex(s => s.kind === "station" && s.i === i);
+
+  // ---- placing the cards: a snake, so each step is beside the last
+  function place() {
+    cols = window.innerWidth < 760 ? 2 : 4;
+    grid.style.setProperty("--cols", cols);
+    cards.forEach((c, i) => {
+      const row = Math.floor(i / cols); let col = i % cols;
+      if (row % 2) col = cols - 1 - col;
+      c.style.gridRow = String(row + 1); c.style.gridColumn = String(col + 1);
+    });
+    drawWires();
+  }
+  let segs = [], backPath = null, backLabel = null, token = null, heads = [];
+  function centre(el) {
+    const r = el.getBoundingClientRect(), s = wires.getBoundingClientRect();
+    return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height / 2, w: r.width, h: r.height };
+  }
+  function edge(a, b) {
+    // where the line from a to b leaves a's card
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (Math.abs(dx) > Math.abs(dy)) return { x: a.x + Math.sign(dx) * (a.w / 2 + 4), y: a.y };
+    return { x: a.x, y: a.y + Math.sign(dy) * (a.h / 2 + 4) };
+  }
+  function drawWires() {
+    wires.innerHTML = ""; segs = []; heads = [];
+    const c = cards.map(centre);
+    for (let i = 0; i < c.length - 1; i++) {
+      const p = edge(c[i], c[i + 1]), q = edge(c[i + 1], c[i]);
+      const path = document.createElementNS(SVG, "path");
+      path.setAttribute("d", `M${p.x},${p.y} L${q.x},${q.y}`); path.setAttribute("class", "wire");
+      wires.appendChild(path); segs.push(path);
+      // an arrowhead at the far end
+      const ang = Math.atan2(q.y - p.y, q.x - p.x), s = 9;
+      const head = document.createElementNS(SVG, "path");
+      head.setAttribute("d", `M${q.x},${q.y} L${q.x - s * Math.cos(ang - .45)},${q.y - s * Math.sin(ang - .45)} L${q.x - s * Math.cos(ang + .45)},${q.y - s * Math.sin(ang + .45)} Z`);
+      head.setAttribute("class", "arrowhead"); wires.appendChild(head); heads.push(head);
+    }
+    // the return loop: from Curriculum back to the department, around the outside of the cards
+    const a = c[BACK.at], d = c[0], box = wires.getBoundingClientRect();
+    const right = a.x > box.width / 2;                       // leave by the nearer side
+    const sx = right ? a.x + a.w / 2 + 4 : a.x - a.w / 2 - 4, sy = a.y;
+    const gx = right ? box.width - 9 : 9, top = 9, ex = d.x, ey = d.y - d.h / 2 - 4, r = 12;
+    const dir = right ? 1 : -1;
+    backPath = document.createElementNS(SVG, "path");
+    backPath.setAttribute("d",
+      `M${sx},${sy} H${gx - dir * r} Q${gx},${sy} ${gx},${sy - r} V${top + r} Q${gx},${top} ${gx - dir * r},${top} ` +
+      `H${ex + dir * r} Q${ex},${top} ${ex},${top + r} V${ey}`);
+    backPath.setAttribute("class", "wire-back"); wires.appendChild(backPath);
+    backLabel = document.createElementNS(SVG, "text");
+    backLabel.setAttribute("x", (ex + gx) / 2); backLabel.setAttribute("y", top + 16);
+    backLabel.setAttribute("text-anchor", "middle"); backLabel.setAttribute("class", "back-label");
+    backLabel.textContent = "Returned for correction"; wires.appendChild(backLabel);
+    token = document.createElementNS(SVG, "circle"); token.setAttribute("r", 8); token.setAttribute("class", "token");
+    wires.appendChild(token);
+    paint(false);
+  }
+
+  // ---- showing one step
+  const note = document.getElementById("note");
+  function countUp(card) {
+    card.querySelectorAll("b[data-to]").forEach(b => {
+      const to = +b.dataset.to;
+      if (still) { b.textContent = to; return; }
+      const t0 = performance.now(), dur = 700 / speed();
+      const tick = t => { const k = Math.min(1, (t - t0) / dur); b.textContent = Math.round(to * k); if (k < 1) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+  }
+  function paint(moving) {
+    const list = steps(), s = list[step];
+    const reached = list.slice(0, step + 1).filter(x => x.kind === "station").map(x => x.i);
+    const last = reached[reached.length - 1];
+    cards.forEach((c, i) => {
+      const now = s.kind === "station" ? i === s.i : i === s.i;
+      const done = reached.includes(i) && !now;
+      c.classList.toggle("is-now", now); c.classList.toggle("is-done", done);
+      c.querySelector(".st-state").textContent = done ? "Done ✓" : now ? (s.kind === "back" ? "Sent back" : "Now") : "Waiting";
+      if (!reached.includes(i)) c.querySelectorAll("b[data-to]").forEach(b => { b.textContent = "0"; });
+      else if (!now || !moving) c.querySelectorAll("b[data-to]").forEach(b => { b.textContent = b.dataset.to; });
+    });
+    segs.forEach((p, i) => { const on = i < last; p.classList.toggle("is-done", on); heads[i].classList.toggle("is-done", on); });
+    const isBack = s.kind === "back";
+    backPath && backPath.classList.toggle("is-on", isBack || (loop.checked && last > BACK.at));
+    backLabel && backLabel.classList.toggle("is-on", isBack);
+    cards[0].querySelector(".bell").classList.toggle("is-on", isBack);
+    // the approval chain lights one by one
+    const chain = cards[7].querySelectorAll(".chain span");
+    chain.forEach(x => x.classList.remove("is-on"));
+    if (s.kind === "station" && s.i === 7) {
+      chain.forEach((x, k) => setTimeout(() => { if (steps()[step] === undefined || steps()[step].i !== 7) return; x.classList.add("is-on"); },
+        still ? 0 : (k + 1) * 550 / speed()));
+    }
+    // the note
+    const st = isBack ? BACK : STATIONS[s.i];
+    note.classList.toggle("is-back", isBack);
+    document.getElementById("note-step").textContent = isBack ? "!" : String(s.i + 1);
+    document.getElementById("note-title").textContent = st.title;
+    document.getElementById("note-text").textContent = st.text;
+    document.getElementById("bar").style.width = `${(step / (list.length - 1)) * 100}%`;
+    document.getElementById("count").textContent = `Step ${step + 1} of ${list.length}`;
+    // the token sits on the station
+    const at = isBack ? cards[0] : cards[s.i], c = centre(at);
+    if (!moving && token) { token.setAttribute("cx", c.x); token.setAttribute("cy", c.y - c.h / 2 - 2); token.classList.toggle("is-back", isBack); }
+  }
+
+  // ---- moving from one step to the next: the token travels the wire
+  function travel(path, reverse, back, done) {
+    if (anim) cancelAnimationFrame(anim);
+    if (still || !path) { done(); return; }
+    const len = path.getTotalLength(), t0 = performance.now(), dur = (back ? 1300 : 900) / speed();
+    token.classList.toggle("is-back", back);
+    const tick = t => {
+      const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const pt = path.getPointAtLength((reverse ? 1 - e : e) * len);
+      token.setAttribute("cx", pt.x); token.setAttribute("cy", pt.y);
+      if (k < 1) anim = requestAnimationFrame(tick); else { anim = null; done(); }
+    };
+    anim = requestAnimationFrame(tick);
+  }
+  function go(to, animate) {
+    const list = steps();
+    to = Math.max(0, Math.min(list.length - 1, to));
+    const from = list[step], next = list[to];
+    const finish = () => { step = to; paint(true); const s = list[to]; if (s.kind === "station") countUp(cards[s.i]); };
+    if (!animate || to !== step + 1) { step = to; paint(false); const s = list[to]; if (s.kind === "station") countUp(cards[s.i]); return; }
+    if (next.kind === "back") travel(backPath, false, true, finish);
+    else if (from.kind === "back") { step = to; paint(false); countUp(cards[next.i]); }
+    else travel(segs[from.i], false, false, finish);
+  }
+
+  // ---- play, pause, step
+  const playBtn = document.getElementById("play");
+  const speed = () => +document.getElementById("speed").value;
+  function hold() { return (steps()[step].kind === "station" && steps()[step].i === 7 ? 3600 : 3000) / speed(); }
+  function tickPlay() {
+    if (!playing) return;
+    if (step >= steps().length - 1) { pause(); return; }
+    go(step + 1, true);
+    timer = setTimeout(tickPlay, hold() + 1000 / speed());
+  }
+  function play() { if (step >= steps().length - 1) go(0); playing = true; playBtn.textContent = "❚❚ Pause"; timer = setTimeout(tickPlay, 600 / speed()); }
+  function pause() { playing = false; clearTimeout(timer); playBtn.textContent = "▶ Play"; }
+  playBtn.addEventListener("click", () => (playing ? pause() : play()));
+  document.getElementById("next").addEventListener("click", () => { pause(); go(step + 1, true); });
+  document.getElementById("back").addEventListener("click", () => { pause(); go(step - 1); });
+  document.getElementById("restart").addEventListener("click", () => { pause(); go(0); });
+  loop.addEventListener("change", () => { pause(); const s = steps(); step = Math.min(step, s.length - 1); paint(false); });
+  document.addEventListener("keydown", e => {
+    if (e.target.closest("select, input")) return;
+    if (e.key === " ") { e.preventDefault(); playing ? pause() : play(); }
+    if (e.key === "ArrowRight") { pause(); go(step + 1, true); }
+    if (e.key === "ArrowLeft") { pause(); go(step - 1); }
+  });
+
+  // ---- light and dark
+  const themeBtn = document.getElementById("theme");
+  const isDark = () => document.documentElement.dataset.theme === "dark" ||
+    (!document.documentElement.dataset.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const label = () => { themeBtn.textContent = isDark() ? "Light mode" : "Dark mode"; };
+  themeBtn.addEventListener("click", () => { document.documentElement.dataset.theme = isDark() ? "light" : "dark"; label(); });
+  label();
+
+  window.addEventListener("resize", () => { place(); });
+  place();
+  go(0);
+})();
+</script>
+</body>
+</html>
