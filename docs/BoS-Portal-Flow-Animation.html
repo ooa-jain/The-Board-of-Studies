@@ -6,87 +6,160 @@
 <title>BoS Portal Flow</title>
 <style>
   :root {
-    --bg: #f4f6fa; --card: #ffffff; --ink: #14213d; --muted: #5b6678; --line: #d6dce6;
-    --navy: #1f2a44; --blue: #2e75b6; --blue-soft: #e6eef8; --ok: #2f8a55; --ok-soft: #e6f4ec;
-    --red: #c2412f; --red-soft: #fbebe8; --shadow: 0 6px 20px rgba(20, 33, 61, .08);
+    --bg: #eef2f8; --card: #ffffff; --ink: #14213d; --muted: #5b6678; --line: #d3dbe7;
+    --navy: #1f2a44; --blue: #2e75b6; --blue-2: #4a90d9; --blue-soft: #e4eefa; --ok: #2f8a55; --ok-soft: #e3f3ea;
+    --red: #c2412f; --red-soft: #fbe9e6; --paper: #ffffff; --limb: #1f2a44; --shadow: 0 10px 28px rgba(20, 33, 61, .10);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #10141b; --card: #171c25; --ink: #e6ebf3; --muted: #9aa5b6; --line: #2a3242;
-      --navy: #a6c1f2; --blue: #6fa8e8; --blue-soft: #1a2638; --ok: #5cc28a; --ok-soft: #15281e;
-      --red: #f08a7a; --red-soft: #2c1a17; --shadow: 0 6px 20px rgba(0, 0, 0, .35);
+      --bg: #0e1219; --card: #171c26; --ink: #e6ebf3; --muted: #9aa5b6; --line: #2a3242;
+      --navy: #a6c1f2; --blue: #5b9be0; --blue-2: #7fb3ec; --blue-soft: #19253a; --ok: #5cc28a; --ok-soft: #14281d;
+      --red: #f08a7a; --red-soft: #2c1a17; --paper: #e9eef6; --limb: #c9d6ec; --shadow: 0 10px 28px rgba(0, 0, 0, .4);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #10141b; --card: #171c25; --ink: #e6ebf3; --muted: #9aa5b6; --line: #2a3242;
-    --navy: #a6c1f2; --blue: #6fa8e8; --blue-soft: #1a2638; --ok: #5cc28a; --ok-soft: #15281e;
-    --red: #f08a7a; --red-soft: #2c1a17; --shadow: 0 6px 20px rgba(0, 0, 0, .35);
+    --bg: #0e1219; --card: #171c26; --ink: #e6ebf3; --muted: #9aa5b6; --line: #2a3242;
+    --navy: #a6c1f2; --blue: #5b9be0; --blue-2: #7fb3ec; --blue-soft: #19253a; --ok: #5cc28a; --ok-soft: #14281d;
+    --red: #f08a7a; --red-soft: #2c1a17; --paper: #e9eef6; --limb: #c9d6ec; --shadow: 0 10px 28px rgba(0, 0, 0, .4);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-  .page { max-width: 1240px; margin: 0 auto; padding: 22px 16px 28px; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    overflow-x: hidden; }
+  .page { max-width: 1260px; margin: 0 auto; padding: 22px 16px 28px; }
   header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  h1 { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.75rem); color: var(--navy); }
+  h1 { margin: 0; font-size: clamp(1.25rem, 2.4vw, 1.8rem); color: var(--navy); }
   .sub { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }
   .theme { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
     padding: 6px 12px; cursor: pointer; font: inherit; font-size: .85rem; }
 
-  .stage { position: relative; margin-top: 18px; padding: 30px 30px 22px; background: var(--card); border: 1px solid var(--line);
-    border-radius: 18px; box-shadow: var(--shadow); }
-  .grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-    gap: 56px 54px; }
-  svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; overflow: visible; pointer-events: none; }
-  .wire { fill: none; stroke: var(--line); stroke-width: 3; }
-  .wire.is-done { stroke: var(--blue); }
-  .wire-back { fill: none; stroke: var(--red); stroke-width: 2.5; stroke-dasharray: 7 6; opacity: 0; transition: opacity .4s; }
-  .wire-back.is-on { opacity: 1; }
-  .arrowhead { fill: var(--line); }
-  .arrowhead.is-done { fill: var(--blue); }
-  .token { fill: var(--blue); filter: drop-shadow(0 2px 4px rgba(46, 117, 182, .45)); }
-  .token.is-back { fill: var(--red); }
-  .back-label { font-size: 12px; font-weight: 700; fill: var(--red); opacity: 0; transition: opacity .4s; }
-  .back-label.is-on { opacity: 1; }
+  /* ---- the stage ---- */
+  .stage { position: relative; margin-top: 18px; padding: 150px 34px 26px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; }
+  .stage.shake { animation: shake .45s; }
+  @keyframes shake { 20% { transform: translate(-6px, 2px); } 40% { transform: translate(5px, -3px); }
+    60% { transform: translate(-4px, 2px); } 80% { transform: translate(3px, -1px); } }
+  .bubbles-bg span { position: absolute; border-radius: 50%; background: var(--blue-soft); opacity: .7;
+    animation: floaty 14s ease-in-out infinite; z-index: 0; }
+  @keyframes floaty { 50% { transform: translate(18px, -22px) scale(1.08); } }
+  .grid { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    gap: 120px 56px; }
+  svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: visible; pointer-events: none; }
+  .wire { fill: none; stroke: var(--line); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 2 10; }
+  .wire.is-done { stroke: var(--blue); stroke-dasharray: none; }
+  .wire-back { fill: none; stroke: var(--red); stroke-width: 3; stroke-dasharray: 8 7; opacity: 0; transition: opacity .4s; }
+  .wire-back.is-on { opacity: 1; animation: march 1s linear infinite; }
+  @keyframes march { to { stroke-dashoffset: -30; } }
 
-  .station { position: relative; display: grid; gap: 6px; padding: 14px 14px 12px; min-height: 148px; border-radius: 14px;
-    background: var(--card); border: 2px solid var(--line); cursor: pointer; text-align: left; color: inherit; font: inherit;
-    transition: border-color .35s, background .35s, transform .35s, box-shadow .35s; }
-  .station:hover { border-color: var(--blue); }
+  /* ---- a station ---- */
+  .station { position: relative; display: grid; align-content: start; gap: 7px; padding: 14px 14px 12px; min-height: 168px;
+    border-radius: 16px; background: var(--card); border: 2px solid var(--line); cursor: pointer; text-align: left;
+    color: inherit; font: inherit; transition: border-color .35s, background .35s, box-shadow .35s; }
+  .station:hover { border-color: var(--blue-2); }
   .station:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
-  .station.is-now { border-color: var(--blue); background: var(--blue-soft); transform: translateY(-3px); box-shadow: var(--shadow); }
+  .station.is-now { border-color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 0 6px rgba(46, 117, 182, .12); }
   .station.is-done { border-color: var(--ok); }
+  .station.pop { animation: pop .55s cubic-bezier(.3, 1.6, .5, 1); }
+  @keyframes pop { 0% { transform: scale(.94); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
   .st-top { display: flex; align-items: center; gap: 10px; }
-  .st-n { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 700;
-    font-size: .85rem; background: var(--blue-soft); color: var(--navy); transition: background .35s, color .35s; }
+  .st-n { flex: none; position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+    font-weight: 800; font-size: .85rem; background: var(--blue-soft); color: var(--navy); transition: background .35s, color .35s; }
   .station.is-now .st-n { background: var(--blue); color: #fff; }
-  .station.is-done .st-n { background: var(--ok); color: #fff; }
-  .st-title { font-weight: 700; color: var(--navy); line-height: 1.25; }
-  .st-facts { display: flex; flex-wrap: wrap; gap: 5px; opacity: .25; transition: opacity .5s; }
+  .station.is-done .st-n { background: var(--ok); color: transparent; }
+  .st-n svg { position: absolute; inset: 6px; display: none; }
+  .station.is-done .st-n svg { display: block; }
+  .st-n svg path { stroke-dasharray: 24; stroke-dashoffset: 24; }
+  .station.is-done .st-n svg path { animation: draw .5s .1s forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .st-title { font-weight: 800; color: var(--navy); line-height: 1.2; }
+  .st-facts { display: flex; flex-wrap: wrap; gap: 5px; opacity: .28; transition: opacity .5s; }
   .station.is-now .st-facts, .station.is-done .st-facts { opacity: 1; }
-  .fact { padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); font-size: .78rem; white-space: nowrap; }
+  .fact { padding: 2px 8px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: .78rem; }
   .fact b { color: var(--navy); font-variant-numeric: tabular-nums; }
+  .meter { height: 9px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .meter div { height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--ok)); transition: width 1.2s ease-out; }
+  .stamp { justify-self: start; padding: 1px 9px; border: 2px solid var(--ok); color: var(--ok); border-radius: 6px; font-weight: 800;
+    font-size: .76rem; letter-spacing: .06em; transform: scale(0) rotate(-12deg); }
+  .stamp.on { animation: stampin .5s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+  @keyframes stampin { 0% { transform: scale(2.4) rotate(-12deg); opacity: 0; } 100% { transform: scale(1) rotate(-6deg); opacity: 1; } }
+  .gauge { width: 110px; height: 60px; }
+  .gauge .needle { transform-origin: 55px 54px; transform: rotate(-90deg); transition: transform 1.3s cubic-bezier(.3, 1.4, .5, 1); }
+  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: .76rem; }
+  .chain span { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); transition: all .35s; }
+  .chain span.is-on { background: var(--ok); border-color: var(--ok); color: #fff; animation: pop .45s; }
+  .chain i { color: var(--muted); font-style: normal; }
   .st-state { justify-self: start; font-size: .74rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
     color: var(--muted); background: var(--bg); }
   .station.is-now .st-state { color: var(--blue); background: var(--card); }
   .station.is-done .st-state { color: var(--ok); background: var(--ok-soft); }
-  .bell { position: absolute; top: -10px; right: -10px; display: grid; place-items: center; width: 26px; height: 26px;
-    border-radius: 50%; background: var(--red); color: #fff; font-size: .78rem; font-weight: 700; transform: scale(0);
-    transition: transform .35s cubic-bezier(.3, 1.6, .6, 1); }
+  .redfix { display: none; padding: 3px 8px; border-radius: 8px; background: var(--red-soft); color: var(--red);
+    font-size: .76rem; font-weight: 700; }
+  .redfix.on { display: block; animation: pop .45s; }
+  .bell { position: absolute; top: -12px; right: -12px; display: grid; place-items: center; width: 32px; height: 32px;
+    border-radius: 50%; background: var(--red); color: #fff; transform: scale(0); transition: transform .35s cubic-bezier(.3, 1.6, .6, 1); }
   .bell.is-on { transform: scale(1); }
-  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: .74rem; }
-  .chain span { padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); transition: all .35s; }
-  .chain span.is-on { background: var(--ok); border-color: var(--ok); color: #fff; }
-  .chain i { color: var(--muted); font-style: normal; }
+  .bell.ring svg { animation: ring .9s ease-in-out 2; transform-origin: 50% 10%; }
+  @keyframes ring { 15% { transform: rotate(22deg); } 30% { transform: rotate(-20deg); } 45% { transform: rotate(14deg); }
+    60% { transform: rotate(-10deg); } 75% { transform: rotate(5deg); } 100% { transform: rotate(0); } }
 
-  .note { margin-top: 18px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; padding: 14px 18px;
-    border-radius: 14px; background: var(--blue-soft); border-left: 5px solid var(--blue); min-height: 76px; }
+  /* ---- the character ---- */
+  .hero { position: absolute; left: 0; top: 0; z-index: 5; width: 84px; height: 96px; pointer-events: none; will-change: transform; }
+  .hero-inner { width: 100%; height: 100%; transform-origin: 50% 100%; transition: transform .25s; }
+  .hero.left .hero-inner { transform: scaleX(-1); }
+  .hero svg { width: 100%; height: 100%; overflow: visible; }
+  .hero .lb { stroke: var(--limb); }
+  .hero .lf { fill: var(--limb); }
+  .hero .body { transform-origin: 42px 92px; }
+  .hero.idle .body { animation: bob 1.6s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-3px) scaleY(1.02); } }
+  .hero.walk .body { animation: step .38s ease-in-out infinite; }
+  @keyframes step { 50% { transform: translateY(-4px); } }
+  .hero .leg-l, .hero .leg-r { transform-box: fill-box; transform-origin: 50% 0; }
+  .hero.walk .leg-l { animation: legs .38s ease-in-out infinite alternate; }
+  .hero.walk .leg-r { animation: legs .38s ease-in-out infinite alternate-reverse; }
+  @keyframes legs { from { transform: rotate(-24deg); } to { transform: rotate(24deg); } }
+  .hero .arm-r { transform-box: fill-box; transform-origin: 0 100%; }
+  .hero.wave .arm-r { animation: wave .5s ease-in-out 3 alternate; }
+  @keyframes wave { from { transform: rotate(-5deg); } to { transform: rotate(-40deg); } }
+  .hero.walk .arm-r, .hero.walk .arm-l { animation: swing .38s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 0; }
+  @keyframes swing { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+  .hero .eyes { transform-box: fill-box; transform-origin: 50% 50%; animation: blink 4s infinite; }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+  .hero .sad { display: none; }
+  .hero.is-sad .smile { display: none; }
+  .hero.is-sad .sad { display: inline; }
+  .hero.jump .body { animation: squash .7s ease-in-out; }
+  @keyframes squash { 0% { transform: scale(1.1, .85); } 30% { transform: scale(.9, 1.12); } 85% { transform: scale(1.08, .9); } 100% { transform: scale(1); } }
+  .say { position: absolute; z-index: 6; max-width: 250px; padding: 9px 12px; border-radius: 14px; background: var(--navy); color: var(--card);
+    font-size: .86rem; font-weight: 600; line-height: 1.35; box-shadow: var(--shadow); opacity: 0; transform: scale(.6);
+    transform-origin: 0 100%; transition: opacity .25s, transform .3s cubic-bezier(.3, 1.6, .5, 1); pointer-events: none; }
+  .say.on { opacity: 1; transform: scale(1); }
+  .say.red { background: var(--red); }
+
+  /* flying papers, sparks and confetti */
+  .fly { position: absolute; left: 0; top: 0; z-index: 4; width: 22px; height: 28px; border-radius: 3px; background: var(--paper);
+    border: 1px solid var(--line); box-shadow: 0 3px 8px rgba(0, 0, 0, .15); pointer-events: none; }
+  .fly::before { content: ""; position: absolute; left: 4px; right: 4px; top: 6px; height: 12px;
+    background: repeating-linear-gradient(var(--blue-2) 0 2px, transparent 2px 5px); opacity: .6; }
+  .spark { position: absolute; left: 0; top: 0; z-index: 4; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; }
+  .bigstamp { position: absolute; z-index: 7; left: 50%; top: 42%; padding: 10px 26px; border: 5px solid var(--ok); border-radius: 12px;
+    color: var(--ok); background: var(--card); font-size: clamp(1.4rem, 4vw, 2.6rem); font-weight: 900; letter-spacing: .12em;
+    transform: translate(-50%, -50%) scale(0) rotate(-10deg); opacity: 0; pointer-events: none; white-space: nowrap; }
+  .bigstamp.on { animation: bigstamp .6s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+  @keyframes bigstamp { 0% { transform: translate(-50%, -50%) scale(3) rotate(-10deg); opacity: 0; }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(-8deg); opacity: 1; } }
+
+  /* ---- the note and the controls ---- */
+  .note { position: relative; z-index: 2; margin-top: 22px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center;
+    padding: 14px 18px; border-radius: 14px; background: var(--blue-soft); border-left: 5px solid var(--blue); min-height: 76px; }
   .note.is-back { background: var(--red-soft); border-left-color: var(--red); }
-  .note-step { font-weight: 800; font-size: 1.6rem; color: var(--blue); font-variant-numeric: tabular-nums; }
+  .note-step { font-weight: 900; font-size: 1.7rem; color: var(--blue); font-variant-numeric: tabular-nums; }
   .note.is-back .note-step { color: var(--red); }
   .note h2 { margin: 0 0 2px; font-size: 1.05rem; color: var(--navy); }
-  .note p { margin: 0; color: var(--ink); }
-
-  .controls { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .note p { margin: 0; }
+  .note.swap { animation: noteIn .45s ease-out; }
+  @keyframes noteIn { from { opacity: 0; transform: translateY(8px); } }
+  .controls { position: relative; z-index: 2; margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .controls button, .controls select { font: inherit; font-size: .9rem; border: 1px solid var(--line); background: var(--card);
     color: var(--ink); border-radius: 10px; padding: 7px 14px; cursor: pointer; }
   .controls button.primary { background: var(--navy); border-color: var(--navy); color: var(--card); min-width: 96px; font-weight: 700; }
@@ -94,10 +167,15 @@
   .progress { flex: 1 1 160px; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; min-width: 120px; }
   .progress div { height: 100%; width: 0; background: var(--blue); transition: width .5s; }
   .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .85rem; min-width: 64px; text-align: right; }
-  .keys { margin-top: 8px; color: var(--muted); font-size: .8rem; }
-  @media (max-width: 760px) { .grid { gap: 44px 30px; } .station { min-height: 0; padding: 12px 10px 10px; }
-    .fact { white-space: normal; } .stage { padding: 26px 16px 18px; } }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .keys { position: relative; z-index: 2; margin: 8px 0 0; color: var(--muted); font-size: .8rem; }
+  @media (max-width: 760px) {
+    .stage { padding: 120px 14px 18px; }
+    .grid { gap: 110px 22px; }
+    .station { min-height: 0; padding: 12px 10px 10px; }
+    .hero { width: 64px; height: 74px; }
+    .say { max-width: 180px; font-size: .8rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
@@ -110,9 +188,48 @@
     <button class="theme" id="theme" type="button">Dark mode</button>
   </header>
 
-  <section class="stage" aria-label="The flow">
+  <section class="stage" id="stage" aria-label="The flow">
+    <div class="bubbles-bg" aria-hidden="true">
+      <span style="width:180px;height:180px;left:-40px;top:40px"></span>
+      <span style="width:120px;height:120px;right:8%;top:20px;animation-delay:-4s"></span>
+      <span style="width:220px;height:220px;right:-60px;bottom:120px;animation-delay:-8s"></span>
+      <span style="width:90px;height:90px;left:38%;bottom:180px;animation-delay:-2s"></span>
+    </div>
     <svg class="wires" id="wires" aria-hidden="true"></svg>
     <div class="grid" id="grid"></div>
+
+    <div class="hero idle" id="hero" aria-hidden="true">
+      <div class="hero-inner">
+        <svg viewBox="0 0 84 96">
+          <g class="leg-l"><path class="lb" d="M33 74 L31 90" stroke-width="4" stroke-linecap="round"/><ellipse class="lf" cx="29" cy="91" rx="6" ry="3.4"/></g>
+          <g class="leg-r"><path class="lb" d="M51 74 L53 90" stroke-width="4" stroke-linecap="round"/><ellipse class="lf" cx="55" cy="91" rx="6" ry="3.4"/></g>
+          <g class="body">
+            <g class="arm-l"><path class="lb" d="M14 50 Q4 56 6 66" fill="none" stroke-width="4" stroke-linecap="round"/><circle class="lf" cx="6" cy="67" r="4"/></g>
+            <!-- the papers inside the folder -->
+            <rect x="22" y="10" width="26" height="32" rx="3" fill="#fff" stroke="#c9d3e2" transform="rotate(-8 35 26)"/>
+            <path d="M26 18h16M26 23h16M26 28h11" stroke="#7fb3ec" stroke-width="2" transform="rotate(-8 35 26)"/>
+            <rect x="38" y="12" width="26" height="30" rx="3" fill="#fff" stroke="#c9d3e2" transform="rotate(7 51 27)"/>
+            <path d="M42 20h16M42 25h14M42 30h16" stroke="#7fb3ec" stroke-width="2" transform="rotate(7 51 27)"/>
+            <!-- the folder -->
+            <path d="M12 30 h22 l5 -6 h28 a5 5 0 0 1 5 5 v42 a6 6 0 0 1 -6 6 h-48 a6 6 0 0 1 -6 -6 z" fill="#2e75b6"/>
+            <path d="M10 38 h64 a4 4 0 0 1 4 4 l-3 29 a6 6 0 0 1 -6 6 h-50 a6 6 0 0 1 -6 -6 l-7 -29 a4 4 0 0 1 4 -4 z" fill="#4a90d9"/>
+            <!-- the face -->
+            <g class="eyes">
+              <ellipse cx="33" cy="52" rx="5" ry="6" fill="#fff"/><circle cx="34" cy="53" r="3" fill="#14213d"/><circle cx="35" cy="51.5" r="1" fill="#fff"/>
+              <ellipse cx="51" cy="52" rx="5" ry="6" fill="#fff"/><circle cx="52" cy="53" r="3" fill="#14213d"/><circle cx="53" cy="51.5" r="1" fill="#fff"/>
+            </g>
+            <circle cx="25" cy="61" r="3.5" fill="#ff9fb2" opacity=".7"/><circle cx="59" cy="61" r="3.5" fill="#ff9fb2" opacity=".7"/>
+            <path class="smile" d="M35 62 Q42 70 49 62" fill="#14213d"/>
+            <path class="smile" d="M38 65 Q42 68 46 65" fill="#ff7b93"/>
+            <path class="sad" d="M35 67 Q42 60 49 67" fill="none" stroke="#14213d" stroke-width="3" stroke-linecap="round"/>
+            <g class="arm-r"><path class="lb" d="M72 50 Q82 46 80 36" fill="none" stroke-width="4" stroke-linecap="round"/><circle class="lf" cx="80" cy="35" r="4"/></g>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="say" id="say"></div>
+    <div class="bigstamp" id="bigstamp">APPROVED ✓</div>
+
     <div class="note" id="note" role="status" aria-live="polite">
       <div class="note-step" id="note-step">1</div>
       <div><h2 id="note-title"></h2><p id="note-text"></p></div>
@@ -122,7 +239,7 @@
       <button type="button" id="back" title="Step back (←)">◀ Back</button>
       <button type="button" id="play" class="primary" title="Play or pause (space)">▶ Play</button>
       <button type="button" id="next" title="Next step (→)">Next ▶</button>
-      <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="2">2×</option></select>
+      <select id="speed" aria-label="Speed"><option value="1">1×</option><option value="1.6">1.6×</option><option value="0.7">Slow</option></select>
       <label><input type="checkbox" id="loop" checked> Show “returned for correction”</label>
       <div class="progress" aria-hidden="true"><div id="bar"></div></div>
       <span class="count" id="count"></span>
@@ -134,39 +251,52 @@
 <script>
 (function () {
   "use strict";
-  // ---- the stations: what the department does, with the numbers of a real programme
   const STATIONS = [
     { title: "Department signs in", facts: [["1", " login per department"], ["", "SPOC named"]],
+      say: "Hello! I'm signing in for our department.",
       text: "The department's SPOC signs in with the department's login, says who is working, and accepts the terms of use." },
-    { title: "Department Information", facts: [["5", " programmes ticked"], ["20", " faculty"], ["120", " first-year students"]],
+    { title: "Department Information", facts: [["5", " programmes"], ["20", " faculty"], ["120", " first-year students"]],
+      say: "5 programmes ticked, and our numbers are in.",
       text: "The department ticks the programmes it runs this year and gives its faculty and student numbers." },
-    { title: "Pre-BoS", facts: [["3", " documents"], ["9", " of 9 keywords"], ["100", "% match"]],
-      text: "The signed DIAC and DPAC compositions and the Pre-BoS minutes are uploaded. Every file is checked: a wrong document says so at once." },
-    { title: "BoS Documents", facts: [["8", " documents"], ["6", " meeting photos"], ["", "25 Jun 2026"]],
+    { title: "Pre-BoS", facts: [["3", " documents"], ["9", " of 9 keywords"], ["100", "% match"]], papers: 3,
+      say: "DIAC, DPAC and minutes — every file checked ✓",
+      text: "The signed DIAC and DPAC compositions and the Pre-BoS minutes are uploaded. Every file is checked; a wrong document says so at once." },
+    { title: "BoS Documents", facts: [["8", " documents"], ["6", " meeting photos"], ["", "25 Jun 2026"]], papers: 8,
+      say: "All 8 BoS documents are in.",
       text: "The BoS meeting date, composition, minutes, attendance, expert profiles, photographs and feedback." },
-    { title: "Curriculum", facts: [["9", " POs"], ["4", " PSOs"], ["44", " courses"], ["128", " credits"], ["", "UGC ✓"]],
+    { title: "Curriculum", facts: [["9", " POs"], ["4", " PSOs"], ["44", " courses"], ["128", " credits"]], meter: true,
+      say: "44 courses, 128 credits — UGC check passed!",
       text: "For each programme: objectives, POs and PSOs, the regulations and the course structure. The credit tables fill themselves and are checked against UGC Table 2." },
-    { title: "Syllabus", facts: [["44", " syllabus sheets"], ["3", " COs each"], ["", "CO-PO-PSO mapping"]],
+    { title: "Syllabus", facts: [["44", " syllabus sheets"], ["3", " COs each"], ["", "CO-PO-PSO mapping"]], papers: 5,
+      say: "44 syllabus sheets, mapped to POs and PSOs.",
       text: "Every course in the structure gets its syllabus: course outcomes with Bloom's levels, the mapping to POs and PSOs, modules and books." },
-    { title: "Course Revision", facts: [["44", " courses compared"], ["18", "% average change"]],
+    { title: "Course Revision", facts: [["44", " courses compared"], ["18", "% average change"]], gauge: 18,
+      say: "Compared with the 2024 batch: 18% changed.",
       text: "Each course is compared with the 2024 batch, module by module; the portal works out the percentage of change." },
     { title: "Approval and submission", facts: [], chain: ["HoD", "Director / Dean", "Office", "Sealed"],
+      say: "HoD ✓  Dean ✓  Office ✓ — we're done!",
       text: "The HoD and the Director or Dean approve, the department submits everything together, and the Office of Academic Affairs reviews and seals it." },
   ];
   const BACK = { at: 4, title: "Returned for correction",
-    text: "If the Office finds something to fix, it sends the stage back with a note. The department's bell shows it; the department corrects it and submits again." };
+    sayBack: "Oh! The Office sent Curriculum back.", sayFix: "Fixed it and submitted again!",
+    text: "If the Office finds something to fix, it sends the stage back with a note. The department's bell rings; it corrects the stage and submits again." };
 
-  const grid = document.getElementById("grid"), wires = document.getElementById("wires");
+  const stage = document.getElementById("stage"), grid = document.getElementById("grid"), wires = document.getElementById("wires");
+  const hero = document.getElementById("hero"), say = document.getElementById("say");
   const SVG = "http://www.w3.org/2000/svg";
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let cols = 4, step = 0, playing = false, timer = null, anim = null;
+  let cols = 4, step = 0, playing = false, timer = null, anim = null, heroAt = { x: 0, y: 0 }, runId = 0, done7 = false;
+  const speed = () => +document.getElementById("speed").value;
+  const wait = ms => new Promise(r => setTimeout(r, still ? 0 : ms / speed()));
 
   // ---- the cards
+  const CHECK = '<svg viewBox="0 0 18 18"><path d="M3 9.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const BELL = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 20a1.94 1.94 0 0 0 3.4 0" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const cards = STATIONS.map((s, i) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "station";
     b.setAttribute("aria-label", `Step ${i + 1}: ${s.title}`);
-    b.innerHTML = `<span class="st-top"><span class="st-n">${i + 1}</span><span class="st-title">${s.title}</span></span>`;
+    b.innerHTML = `<span class="st-top"><span class="st-n">${i + 1}${CHECK}</span><span class="st-title">${s.title}</span></span>`;
     const facts = document.createElement("span"); facts.className = "st-facts";
     s.facts.forEach(([n, label]) => {
       const f = document.createElement("span"); f.className = "fact";
@@ -174,6 +304,19 @@
       facts.appendChild(f);
     });
     b.appendChild(facts);
+    if (s.meter) {
+      const m = document.createElement("span"); m.className = "meter"; m.innerHTML = "<div></div>"; b.appendChild(m);
+      const st = document.createElement("span"); st.className = "stamp"; st.textContent = "UGC ✓"; b.appendChild(st);
+      const fix = document.createElement("span"); fix.className = "redfix"; fix.textContent = "Office: please correct the credits in Semester 3";
+      b.appendChild(fix);
+    }
+    if (s.gauge) {
+      const g = document.createElementNS(SVG, "svg"); g.setAttribute("viewBox", "0 0 110 60"); g.setAttribute("class", "gauge");
+      g.innerHTML = '<path d="M10 54 A45 45 0 0 1 100 54" fill="none" stroke="var(--line)" stroke-width="9" stroke-linecap="round"/>' +
+        '<path d="M10 54 A45 45 0 0 1 32 15" fill="none" stroke="var(--blue)" stroke-width="9" stroke-linecap="round"/>' +
+        '<g class="needle"><path d="M55 54 L55 16" stroke="var(--navy)" stroke-width="3.5" stroke-linecap="round"/></g><circle cx="55" cy="54" r="5" fill="var(--navy)"/>';
+      b.appendChild(g);
+    }
     if (s.chain) {
       const c = document.createElement("span"); c.className = "chain";
       c.innerHTML = s.chain.map(x => `<span>${x}</span>`).join("<i>→</i>");
@@ -181,14 +324,12 @@
     }
     const st = document.createElement("span"); st.className = "st-state"; st.textContent = "Waiting";
     b.appendChild(st);
-    if (i === 0) { const bell = document.createElement("span"); bell.className = "bell"; bell.textContent = "1";
-      bell.title = "Returned for correction"; b.appendChild(bell); }
+    if (i === 0) { const bell = document.createElement("span"); bell.className = "bell"; bell.innerHTML = BELL; b.appendChild(bell); }
     b.addEventListener("click", () => { pause(); go(stepOf(i)); });
     grid.appendChild(b);
     return b;
   });
 
-  // the steps, in order: each station, and the return loop after Curriculum when shown
   const loop = document.getElementById("loop");
   function steps() {
     const out = [];
@@ -197,7 +338,7 @@
   }
   const stepOf = i => steps().findIndex(s => s.kind === "station" && s.i === i);
 
-  // ---- placing the cards: a snake, so each step is beside the last
+  // ---- placing: a snake, so each step is beside the last
   function place() {
     cols = window.innerWidth < 760 ? 2 : 4;
     grid.style.setProperty("--cols", cols);
@@ -208,146 +349,264 @@
     });
     drawWires();
   }
-  let segs = [], backPath = null, backLabel = null, token = null, heads = [];
-  function centre(el) {
-    const r = el.getBoundingClientRect(), s = wires.getBoundingClientRect();
-    return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height / 2, w: r.width, h: r.height };
-  }
-  function edge(a, b) {
-    // where the line from a to b leaves a's card
-    const dx = b.x - a.x, dy = b.y - a.y;
-    if (Math.abs(dx) > Math.abs(dy)) return { x: a.x + Math.sign(dx) * (a.w / 2 + 4), y: a.y };
-    return { x: a.x, y: a.y + Math.sign(dy) * (a.h / 2 + 4) };
-  }
+  const box = el => { const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height / 2, w: r.width, h: r.height,
+             top: r.top - s.top, left: r.left - s.left }; };
+  // where the character stands on a card: on its top edge
+  const spot = i => { const c = box(cards[i]); return { x: c.x, y: c.top + 2 }; };
+  let segs = [], backPath = null;
   function drawWires() {
-    wires.innerHTML = ""; segs = []; heads = [];
-    const c = cards.map(centre);
-    for (let i = 0; i < c.length - 1; i++) {
-      const p = edge(c[i], c[i + 1]), q = edge(c[i + 1], c[i]);
+    wires.innerHTML = ""; segs = [];
+    const s = stage.getBoundingClientRect();
+    wires.setAttribute("viewBox", `0 0 ${s.width} ${s.height}`);
+    for (let i = 0; i < cards.length - 1; i++) {
+      const a = spot(i), b = spot(i + 1);
       const path = document.createElementNS(SVG, "path");
-      path.setAttribute("d", `M${p.x},${p.y} L${q.x},${q.y}`); path.setAttribute("class", "wire");
-      wires.appendChild(path); segs.push(path);
-      // an arrowhead at the far end
-      const ang = Math.atan2(q.y - p.y, q.x - p.x), s = 9;
-      const head = document.createElementNS(SVG, "path");
-      head.setAttribute("d", `M${q.x},${q.y} L${q.x - s * Math.cos(ang - .45)},${q.y - s * Math.sin(ang - .45)} L${q.x - s * Math.cos(ang + .45)},${q.y - s * Math.sin(ang + .45)} Z`);
-      head.setAttribute("class", "arrowhead"); wires.appendChild(head); heads.push(head);
+      if (Math.abs(a.y - b.y) < 4) path.setAttribute("d", `M${a.x},${a.y} L${b.x},${b.y}`);
+      else {   // the next row: a jump down, as an arc beside the cards
+        const out = (a.x > s.width / 2 ? 1 : -1) * (box(cards[i]).w / 2 + 26);
+        path.setAttribute("d", `M${a.x},${a.y} C${a.x + out},${a.y - 60} ${b.x + out},${b.y - 70} ${b.x},${b.y}`);
+      }
+      path.setAttribute("class", "wire"); wires.appendChild(path); segs.push(path);
     }
-    // the return loop: from Curriculum back to the department, around the outside of the cards
-    const a = c[BACK.at], d = c[0], box = wires.getBoundingClientRect();
-    const right = a.x > box.width / 2;                       // leave by the nearer side
-    const sx = right ? a.x + a.w / 2 + 4 : a.x - a.w / 2 - 4, sy = a.y;
-    const gx = right ? box.width - 9 : 9, top = 9, ex = d.x, ey = d.y - d.h / 2 - 4, r = 12;
-    const dir = right ? 1 : -1;
+    // the way back: from the side of Curriculum round the outside to the department
+    const d = spot(0), c4 = box(cards[BACK.at]);
+    const right = c4.x > s.width / 2, gx = right ? s.width - 14 : 14, top = 16, r = 14, dir = right ? 1 : -1;
+    const sx = right ? c4.left + c4.w : c4.left, sy = c4.y;
     backPath = document.createElementNS(SVG, "path");
-    backPath.setAttribute("d",
-      `M${sx},${sy} H${gx - dir * r} Q${gx},${sy} ${gx},${sy - r} V${top + r} Q${gx},${top} ${gx - dir * r},${top} ` +
-      `H${ex + dir * r} Q${ex},${top} ${ex},${top + r} V${ey}`);
+    backPath.setAttribute("d", `M${sx},${sy} H${gx - dir * r} Q${gx},${sy} ${gx},${sy - r} V${top + r} ` +
+      `Q${gx},${top} ${gx - dir * r},${top} H${d.x + dir * r} Q${d.x},${top} ${d.x},${top + r} V${d.y}`);
     backPath.setAttribute("class", "wire-back"); wires.appendChild(backPath);
-    backLabel = document.createElementNS(SVG, "text");
-    backLabel.setAttribute("x", (ex + gx) / 2); backLabel.setAttribute("y", top + 16);
-    backLabel.setAttribute("text-anchor", "middle"); backLabel.setAttribute("class", "back-label");
-    backLabel.textContent = "Returned for correction"; wires.appendChild(backLabel);
-    token = document.createElementNS(SVG, "circle"); token.setAttribute("r", 8); token.setAttribute("class", "token");
-    wires.appendChild(token);
-    paint(false);
+    paint(); putHero(steps()[step]);
   }
 
-  // ---- showing one step
-  const note = document.getElementById("note");
+  // ---- the character
+  function setHero(x, y) {
+    heroAt = { x, y };
+    const w = hero.offsetWidth, h = hero.offsetHeight;
+    hero.style.transform = `translate(${x - w / 2}px, ${y - h + 4}px)`;
+    placeSay();
+  }
+  function setMode(mode) { ["idle", "walk", "jump"].forEach(m => hero.classList.toggle(m, m === mode)); }
+  function face(left) { hero.classList.toggle("left", left); }
+  function mood(sad) { hero.classList.toggle("is-sad", sad); }
+  function putHero(s) { if (!s) return; const p = spot(s.i); mood(false); setMode("idle"); setHero(p.x, p.y); }
+  function talk(text, red) {
+    say.textContent = text; say.classList.toggle("red", !!red);
+    say.classList.remove("on"); void say.offsetWidth; if (text) say.classList.add("on");
+    placeSay();
+  }
+  function placeSay() {
+    const s = stage.getBoundingClientRect(), h = hero.offsetHeight;
+    const w = say.offsetWidth || 200;
+    let x = heroAt.x + 24, y = heroAt.y - h - say.offsetHeight - 2;
+    if (x + w > s.width - 10) { x = heroAt.x - w - 10; say.style.transformOrigin = "100% 100%"; } else say.style.transformOrigin = "0 100%";
+    say.style.left = Math.max(8, x) + "px"; say.style.top = Math.max(6, y) + "px";
+  }
+  // walk (or jump) along a path, from one end to the other
+  function walk(path, reverse, mode, ms) {
+    return new Promise(resolve => {
+      if (anim) cancelAnimationFrame(anim);
+      const len = path.getTotalLength(), t0 = performance.now(), dur = (still ? 0 : ms / speed());
+      let lastX = null;
+      setMode(mode);
+      const tick = t => {
+        const k = dur ? Math.min(1, (t - t0) / dur) : 1;
+        const e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        const pt = path.getPointAtLength((reverse ? 1 - e : e) * len);
+        if (lastX !== null && Math.abs(pt.x - lastX) > .4) face(pt.x < lastX);
+        lastX = pt.x;
+        setHero(pt.x, pt.y);
+        if (k < 1) anim = requestAnimationFrame(tick); else { anim = null; setMode("idle"); resolve(); }
+      };
+      anim = requestAnimationFrame(tick);
+    });
+  }
+
+  // ---- effects
+  function papers(n, target, id) {
+    const t = box(target);
+    for (let k = 0; k < n; k++) {
+      setTimeout(() => {
+        if (id !== runId || still) return;
+        const p = document.createElement("div"); p.className = "fly"; stage.appendChild(p);
+        const x0 = heroAt.x - 11, y0 = heroAt.y - 70, x1 = t.x - 11 + (Math.random() * 60 - 30), y1 = t.y - 14;
+        p.animate([
+          { transform: `translate(${x0}px, ${y0}px) rotate(0deg) scale(.6)`, opacity: 0 },
+          { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 70}px) rotate(${180 + k * 40}deg) scale(1)`, opacity: 1, offset: .5 },
+          { transform: `translate(${x1}px, ${y1}px) rotate(${360 + k * 20}deg) scale(.5)`, opacity: 0 },
+        ], { duration: 900 / speed(), easing: "ease-in-out" }).onfinish = () => p.remove();
+      }, k * 160 / speed());
+    }
+  }
+  function sparks(target, colours) {
+    if (still) return;
+    const t = box(target);
+    for (let k = 0; k < 14; k++) {
+      const p = document.createElement("div"); p.className = "spark";
+      p.style.background = colours[k % colours.length]; stage.appendChild(p);
+      const a = Math.random() * Math.PI * 2, r = 60 + Math.random() * 70;
+      p.animate([{ transform: `translate(${t.x}px, ${t.top + 10}px) scale(1)`, opacity: 1 },
+                 { transform: `translate(${t.x + Math.cos(a) * r}px, ${t.top + 10 + Math.sin(a) * r}px) scale(.2)`, opacity: 0 }],
+                { duration: 750, easing: "cubic-bezier(.2,.7,.3,1)" }).onfinish = () => p.remove();
+    }
+  }
+  function confetti() {
+    if (still) return;
+    const s = stage.getBoundingClientRect(), cs = ["#2e75b6", "#4a90d9", "#2f8a55", "#5cc28a", "#c2412f", "#7fb3ec", "#1f2a44"];
+    for (let k = 0; k < 90; k++) {
+      const p = document.createElement("div"); p.className = "spark";
+      p.style.background = cs[k % cs.length]; p.style.width = (6 + Math.random() * 6) + "px"; p.style.height = (8 + Math.random() * 8) + "px";
+      p.style.borderRadius = "2px"; stage.appendChild(p);
+      const x = Math.random() * s.width, drift = Math.random() * 160 - 80;
+      p.animate([{ transform: `translate(${x}px, -20px) rotate(0)`, opacity: 1 },
+                 { transform: `translate(${x + drift}px, ${s.height * (.6 + Math.random() * .4)}px) rotate(${Math.random() * 720}deg)`, opacity: .9 }],
+                { duration: 1800 + Math.random() * 1400, delay: Math.random() * 500, easing: "cubic-bezier(.2,.6,.4,1)", fill: "backwards" }).onfinish = () => p.remove();
+    }
+  }
   function countUp(card) {
     card.querySelectorAll("b[data-to]").forEach(b => {
       const to = +b.dataset.to;
       if (still) { b.textContent = to; return; }
-      const t0 = performance.now(), dur = 700 / speed();
-      const tick = t => { const k = Math.min(1, (t - t0) / dur); b.textContent = Math.round(to * k); if (k < 1) requestAnimationFrame(tick); };
+      const t0 = performance.now(), dur = 900 / speed();
+      const tick = t => { const k = Math.min(1, (t - t0) / dur); b.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); };
       requestAnimationFrame(tick);
     });
   }
-  function paint(moving) {
+
+  // ---- the state of every card for a step (no motion)
+  const note = document.getElementById("note");
+  function paint() {
     const list = steps(), s = list[step];
     const reached = list.slice(0, step + 1).filter(x => x.kind === "station").map(x => x.i);
     const last = reached[reached.length - 1];
     cards.forEach((c, i) => {
-      const now = s.kind === "station" ? i === s.i : i === s.i;
-      const done = reached.includes(i) && !now;
+      const now = i === s.i, done = reached.includes(i) && !now;
       c.classList.toggle("is-now", now); c.classList.toggle("is-done", done);
       c.querySelector(".st-state").textContent = done ? "Done ✓" : now ? (s.kind === "back" ? "Sent back" : "Now") : "Waiting";
-      if (!reached.includes(i)) c.querySelectorAll("b[data-to]").forEach(b => { b.textContent = "0"; });
-      else if (!now || !moving) c.querySelectorAll("b[data-to]").forEach(b => { b.textContent = b.dataset.to; });
+      c.querySelectorAll("b[data-to]").forEach(b => { b.textContent = reached.includes(i) ? b.dataset.to : "0"; });
+      const m = c.querySelector(".meter div"); if (m) m.style.width = reached.includes(i) ? "100%" : "0";
+      const st = c.querySelector(".stamp"); if (st) st.classList.toggle("on", reached.includes(i));
+      const fx = c.querySelector(".redfix"); if (fx) fx.classList.toggle("on", s.kind === "back");
+      const g = c.querySelector(".needle"); if (g) g.style.transform = `rotate(${reached.includes(i) ? -90 + 180 * STATIONS[i].gauge / 100 * 1.6 : -90}deg)`;
+      c.querySelectorAll(".chain span").forEach(x => x.classList.toggle("is-on", done || (i === 7 && now && done7)));
     });
-    segs.forEach((p, i) => { const on = i < last; p.classList.toggle("is-done", on); heads[i].classList.toggle("is-done", on); });
-    const isBack = s.kind === "back";
-    backPath && backPath.classList.toggle("is-on", isBack || (loop.checked && last > BACK.at));
-    backLabel && backLabel.classList.toggle("is-on", isBack);
-    cards[0].querySelector(".bell").classList.toggle("is-on", isBack);
-    // the approval chain lights one by one
-    const chain = cards[7].querySelectorAll(".chain span");
-    chain.forEach(x => x.classList.remove("is-on"));
-    if (s.kind === "station" && s.i === 7) {
-      chain.forEach((x, k) => setTimeout(() => { if (steps()[step] === undefined || steps()[step].i !== 7) return; x.classList.add("is-on"); },
-        still ? 0 : (k + 1) * 550 / speed()));
-    }
-    // the note
-    const st = isBack ? BACK : STATIONS[s.i];
+    segs.forEach((p, i) => p.classList.toggle("is-done", i < last));
+    if (backPath) backPath.classList.toggle("is-on", s.kind === "back");
+    cards[0].querySelector(".bell").classList.toggle("is-on", s.kind === "back");
+    document.getElementById("bigstamp").classList.toggle("on", s.kind === "station" && s.i === 7 && done7);
+    const isBack = s.kind === "back", info = isBack ? BACK : STATIONS[s.i];
     note.classList.toggle("is-back", isBack);
+    note.classList.remove("swap"); void note.offsetWidth; note.classList.add("swap");
     document.getElementById("note-step").textContent = isBack ? "!" : String(s.i + 1);
-    document.getElementById("note-title").textContent = st.title;
-    document.getElementById("note-text").textContent = st.text;
+    document.getElementById("note-title").textContent = info.title;
+    document.getElementById("note-text").textContent = info.text;
     document.getElementById("bar").style.width = `${(step / (list.length - 1)) * 100}%`;
     document.getElementById("count").textContent = `Step ${step + 1} of ${list.length}`;
-    // the token sits on the station
-    const at = isBack ? cards[0] : cards[s.i], c = centre(at);
-    if (!moving && token) { token.setAttribute("cx", c.x); token.setAttribute("cy", c.y - c.h / 2 - 2); token.classList.toggle("is-back", isBack); }
   }
 
-  // ---- moving from one step to the next: the token travels the wire
-  function travel(path, reverse, back, done) {
-    if (anim) cancelAnimationFrame(anim);
-    if (still || !path) { done(); return; }
-    const len = path.getTotalLength(), t0 = performance.now(), dur = (back ? 1300 : 900) / speed();
-    token.classList.toggle("is-back", back);
-    const tick = t => {
-      const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      const pt = path.getPointAtLength((reverse ? 1 - e : e) * len);
-      token.setAttribute("cx", pt.x); token.setAttribute("cy", pt.y);
-      if (k < 1) anim = requestAnimationFrame(tick); else { anim = null; done(); }
-    };
-    anim = requestAnimationFrame(tick);
+  // ---- arriving at a step: the show
+  async function arrive(s, id) {
+    const card = cards[s.i], st = STATIONS[s.i];
+    card.classList.remove("pop"); void card.offsetWidth; card.classList.add("pop");
+    hero.classList.remove("wave"); void hero.offsetWidth; hero.classList.add("wave");
+    talk(st.say);
+    countUp(card);
+    if (st.papers) papers(st.papers, card, id);
+    sparks(card, ["#2e75b6", "#4a90d9", "#2f8a55"]);
+    if (s.i === 7) {
+      const chain = card.querySelectorAll(".chain span");
+      for (let k = 0; k < chain.length; k++) { await wait(550); if (id !== runId) return; chain[k].classList.add("is-on"); }
+      await wait(350); if (id !== runId) return;
+      done7 = true;
+      document.getElementById("bigstamp").classList.add("on");
+      setMode("jump");
+      stage.classList.remove("shake"); void stage.offsetWidth; stage.classList.add("shake");
+      confetti();
+    }
+    setTimeout(() => hero.classList.remove("wave"), 1500);
   }
-  function go(to, animate) {
+
+  async function backLoop(id) {
+    const c4 = cards[BACK.at], c0 = cards[0];
+    mood(true); talk(BACK.sayBack, true);
+    await wait(1400); if (id !== runId) return;
+    talk("");
+    const start = backPath.getPointAtLength(0);
+    const side = document.createElementNS(SVG, "path");
+    side.setAttribute("d", `M${heroAt.x},${heroAt.y} L${start.x},${start.y}`);
+    await walk(side, false, "walk", 600); if (id !== runId) return;
+    await walk(backPath, false, "walk", 2400); if (id !== runId) return;
+    const bell = c0.querySelector(".bell"); bell.classList.add("is-on", "ring");
+    talk("Fixing it…", true);
+    await wait(1500); if (id !== runId) return;
+    bell.classList.remove("ring");
+    mood(false); talk(BACK.sayFix);
+    hero.classList.add("wave");
+    await wait(1300); if (id !== runId) return;
+    talk("");
+    await walk(backPath, true, "walk", 2200); if (id !== runId) return;
+    const p4 = spot(BACK.at);
+    const up = document.createElementNS(SVG, "path"); up.setAttribute("d", `M${heroAt.x},${heroAt.y} L${p4.x},${p4.y}`);
+    await walk(up, false, "jump", 600); if (id !== runId) return;
+    face(false);
+    bell.classList.remove("is-on");
+    c4.querySelector(".redfix").classList.remove("on");
+    backPath.classList.remove("is-on");
+    talk("Resubmitted ✓");
+  }
+
+  // ---- moving between steps
+  async function go(to, animate) {
     const list = steps();
     to = Math.max(0, Math.min(list.length - 1, to));
+    const id = ++runId;
+    if (anim) { cancelAnimationFrame(anim); anim = null; }
     const from = list[step], next = list[to];
-    const finish = () => { step = to; paint(true); const s = list[to]; if (s.kind === "station") countUp(cards[s.i]); };
-    if (!animate || to !== step + 1) { step = to; paint(false); const s = list[to]; if (s.kind === "station") countUp(cards[s.i]); return; }
-    if (next.kind === "back") travel(backPath, false, true, finish);
-    else if (from.kind === "back") { step = to; paint(false); countUp(cards[next.i]); }
-    else travel(segs[from.i], false, false, finish);
+    talk("");
+    done7 = false;
+    document.getElementById("bigstamp").classList.remove("on");
+    if (!animate || to !== step + 1 || still) {
+      step = to; paint(); putHero(next); face(false);
+      if (next.kind === "station") arrive(next, id);
+      else if (animate === undefined) { mood(true); talk(BACK.sayBack, true); }
+      return;
+    }
+    if (next.kind === "back") { step = to; paint(); await backLoop(id); return; }
+    const path = segs[from.i];
+    const jump = Math.abs(spot(from.i).y - spot(next.i).y) > 4;
+    await walk(path, false, jump ? "jump" : "walk", jump ? 1000 : 1300);
+    if (id !== runId) return;
+    step = to; paint(); face(false);
+    arrive(next, id);
   }
 
   // ---- play, pause, step
   const playBtn = document.getElementById("play");
-  const speed = () => +document.getElementById("speed").value;
-  function hold() { return (steps()[step].kind === "station" && steps()[step].i === 7 ? 3600 : 3000) / speed(); }
-  function tickPlay() {
+  async function tickPlay() {
     if (!playing) return;
     if (step >= steps().length - 1) { pause(); return; }
-    go(step + 1, true);
-    timer = setTimeout(tickPlay, hold() + 1000 / speed());
+    const next = steps()[step + 1];
+    await go(step + 1, true);
+    if (!playing) return;
+    timer = setTimeout(tickPlay, (next.kind === "back" ? 1500 : next.i === 7 ? 5000 : 3000) / speed());
   }
-  function play() { if (step >= steps().length - 1) go(0); playing = true; playBtn.textContent = "❚❚ Pause"; timer = setTimeout(tickPlay, 600 / speed()); }
+  function play() {
+    if (step >= steps().length - 1) go(0);
+    playing = true; playBtn.textContent = "❚❚ Pause";
+    timer = setTimeout(tickPlay, 1800 / speed());
+  }
   function pause() { playing = false; clearTimeout(timer); playBtn.textContent = "▶ Play"; }
   playBtn.addEventListener("click", () => (playing ? pause() : play()));
   document.getElementById("next").addEventListener("click", () => { pause(); go(step + 1, true); });
-  document.getElementById("back").addEventListener("click", () => { pause(); go(step - 1); });
-  document.getElementById("restart").addEventListener("click", () => { pause(); go(0); });
-  loop.addEventListener("change", () => { pause(); const s = steps(); step = Math.min(step, s.length - 1); paint(false); });
+  document.getElementById("back").addEventListener("click", () => { pause(); go(step - 1, false); });
+  document.getElementById("restart").addEventListener("click", () => { pause(); go(0, false); });
+  loop.addEventListener("change", () => { pause(); step = 0; go(0, false); });
   document.addEventListener("keydown", e => {
     if (e.target.closest("select, input")) return;
     if (e.key === " ") { e.preventDefault(); playing ? pause() : play(); }
     if (e.key === "ArrowRight") { pause(); go(step + 1, true); }
-    if (e.key === "ArrowLeft") { pause(); go(step - 1); }
+    if (e.key === "ArrowLeft") { pause(); go(step - 1, false); }
   });
 
   // ---- light and dark
@@ -358,9 +617,10 @@
   themeBtn.addEventListener("click", () => { document.documentElement.dataset.theme = isDark() ? "light" : "dark"; label(); });
   label();
 
-  window.addEventListener("resize", () => { place(); });
+  let resizeT = null;
+  window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(place, 120); });
   place();
-  go(0);
+  go(0, false);
 })();
 </script>
 </body>
